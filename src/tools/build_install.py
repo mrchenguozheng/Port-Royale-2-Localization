@@ -58,6 +58,20 @@ GAME_EXE = "PR2.exe"
 LAUNCHER = "PR2Launcher.exe"
 #: 编译注入器。子进程里跑，结果读它的输出。
 INJECTOR_BAT = os.path.join(SRC, "build_injector.bat")
+#: 译文编辑器（本地 Web）。它跟上面三条链路都无关 —— 不编译、不复制、
+#: 不启动游戏，只改 src\translations\*.toml，所以自己一个按钮。
+EDITOR_DIR = os.path.join(SRC, "editor")
+#: 编辑器有自己的 venv（FastAPI 不是标准库，装在 src\editor\.venv 里）。
+#: 所以这里**不直接跑 python.exe** —— 直接跑会挑到系统 Python，而系统
+#: Python 不一定装了 FastAPI（这台机器上 3.14 就没有），表现是
+#: 「点了没反应」：pythonw 吞掉 traceback，谁也看不到 ModuleNotFoundError。
+EDITOR_BAT = os.path.join(EDITOR_DIR, "StartEditor.bat")
+#: venv 放在**仓库根**，不放 src\editor\ 下 —— 它是仓库的依赖环境，
+#: 将来别的东西要加包也用同一个。目前只有编辑器用得上 fastapi/uvicorn。
+VENV = os.path.join(ROOT, ".venv")
+VENV_SCRIPTS = os.path.join(VENV, "Scripts")
+REQUIREMENTS = os.path.join(ROOT, "requirements.txt")
+EDITOR_DIST = os.path.join(EDITOR_DIR, "dist")
 #: 启动语言下拉里的「不指定」项：读PR2Packs\locale.ini 的 language=。
 FOLLOW_LANG = "跟随 locale.ini"
 
@@ -407,6 +421,99 @@ def _oserr_hint(exc):
     return ""
 
 
+def venv_ensure():
+    """确保编辑器的 venv 存在且装好依赖。返回 (是否成功, 说明)。
+
+    为什么要有 venv：编辑器要 FastAPI + uvicorn，**这两个不是标准库**。
+    这台机器上有两个 Python —— 3.14（没有 FastAPI）和 3.11（有）——
+    哪个被挑中取决于 PATH 顺序。挑错的后果是启动三秒后
+    ModuleNotFoundError，而它跑在 pythonw 下（无控制台），
+    traceback 被丢弃，用户只看到「点了没反应」。
+
+    venv 把这件事一次解决：不管哪个 Python 建了它，venv 自带
+    site-packages，依赖钉死在里面，而且不往系统 Python 里装任何东西。
+
+    venv 在**仓库根**（.venv\），不是 src\editor\ 下：它是仓库的依赖
+    环境，不是编辑器专属的。以后别的东西要加包，装同一个。
+
+    全程用列表参数调子进程，不经过 cmd —— 仓库路径里有空格，
+    经 cmd 就会被引号吃掉。
+    """
+    exe = os.path.join(VENV_SCRIPTS, "python.exe")
+    if os.path.isfile(exe):
+        # 已有 venv：只在缺依赖时补装，避免每次启动都联网
+        probe = subprocess.run(
+            [exe, "-c", "import fastapi, uvicorn"],
+            capture_output=True, close_fds=True)
+        if probe.returncode == 0:
+            return True, "venv 就绪"
+        steps = [[exe, "-m", "pip", "install", "--quiet",
+                  "-r", REQUIREMENTS]]
+        what = "补装依赖"
+    else:
+        steps = [[sys.executable, "-m", "venv", VENV],
+                 [os.path.join(VENV_SCRIPTS, "python.exe"),
+                  "-m", "pip", "install", "--quiet",
+                  "-r", REQUIREMENTS]]
+        what = "创建 venv 并装依赖"
+
+    for cmd in steps:
+        try:
+            r = subprocess.run(cmd, capture_output=True, close_fds=True)
+        except OSError as exc:
+            return False, "%s 失败：%s" % (what, exc)
+        if r.returncode != 0:
+            # pip 的错误在 stderr；按 bytes 读再猜编码（同 read_lines 的道理）
+            raw = (r.stderr or b"")[:400]
+            for enc in ("utf-8", "mbcs"):
+                try:
+                    msg = raw.decode(enc).strip().splitlines()[-1]
+                    break
+                except Exception:
+                    msg = raw.decode("utf-8", "replace").strip()
+            return False, "%s 失败：%s" % (what, msg or "退出码 %d" % r.returncode)
+    return True, "venv %s完成" % what
+
+
+def open_editor():
+    """启动本地 Web 编辑器，返回 (是否成功, 说明)。
+
+    编辑器是一个长驻的 HTTP 服务（src\\editor\\server.py），不是一次性
+    任务 —— 所以**不等待它退出**，只把它拉起来就跑。窗口照常可以继续
+    构建、复制。
+
+    走 StartEditor.bat 而不是直接跑 python：那个脚本负责首次运行时
+    建 venv 并装 FastAPI，然后用 venv 里的 pythonw 启动。
+    """
+    if not os.path.isfile(EDITOR_BAT):
+        return False, "找不到 %s。" % EDITOR_BAT
+    if not os.path.isdir(EDITOR_DIST):
+        return False, ("前端还没构建（缺少 %s）。\n\n"
+                       "先在仓库里跑一次：\n"
+                       "  cd src\\editor\n"
+                       "  npm install\n"
+                       "  npm run build" % EDITOR_DIST)
+
+    # 直接跑 venv 里的 pythonw，**不碰 .bat、不套 cmd /c**。
+    #
+    # `cmd /c "C:\...\Port Royale 2 Localization\...\StartEditor.bat"` 在
+    # 路径含空格时必然失败：cmd 把整行当一条命令解析，第一个引号被吃掉，
+    # 路径被截断，报「此时不在…」。仓库目录名里就有空格，所以这是必踩的坑。
+    #
+    # venv 的建法也搬进 Python（venv_ensure）：同样是空格问题，
+    # `python -m venv <含空格路径>` 用列表参数传是对的，但外层一旦
+    # 经过 cmd 就会碎。在 Python 里全程用列表，不经 cmd。
+    try:
+        exe = os.path.join(VENV_SCRIPTS, "pythonw.exe")
+        if not os.path.isfile(exe):
+            exe = os.path.join(VENV_SCRIPTS, "python.exe")
+        subprocess.Popen([exe, os.path.join(EDITOR_DIR, "server.py")],
+                         cwd=EDITOR_DIR, env=child_env(), close_fds=True)
+    except OSError as exc:
+        return False, "启动编辑器失败：%s" % exc
+    return True, "编辑器已启动，稍候会在浏览器中打开。"
+
+
 # ------------------------------------------------------------ 构建
 
 def child_env():
@@ -594,6 +701,7 @@ class App(tk.Tk):
         self.building = False
         self.compiling = False
         self.installing = False
+        self.editing = False
         self.installed_done = True
         self.build_cool = 0
         self.missing_injector = missing_outputs(need_pack=False)
@@ -623,7 +731,7 @@ class App(tk.Tk):
         frm.grid(row=0, column=0, sticky="nsew")
         self.columnconfigure(0, weight=1)
         # 日志吸收多余高度：窗口拉高时它变高，而不是按钮之间被撑开。
-        self.rowconfigure(6, weight=1)
+        self.rowconfigure(7, weight=1)
 
         # 分三段，顺序就是使用顺序：构建 -> 部署 -> 启动。
         # 每段一个 LabelFrame，读起来是步骤而不是控件堆。
@@ -638,28 +746,34 @@ class App(tk.Tk):
         run_box = ttk.LabelFrame(frm, text="3  启动", padding=10)
         run_box.grid(row=2, column=0, sticky="new", pady=(12, 0))
 
+        # 编辑器不在三段流程里 —— 它改的是仓库里的译文，不碰游戏目录。
+        # 硬塞进「构建」段会让人以为构建语言包要先开编辑器，所以单列一段。
+        edit_box = ttk.LabelFrame(frm, text="4  译文编辑器（可选）", padding=10)
+        edit_box.grid(row=3, column=0, sticky="we", pady=(12, 0))
+
         self._build_section(build_box, langs)
         self._deploy_section(deploy_box)
         self._run_section(run_box)
+        self._editor_section(edit_box)
         # 开窗时游戏目录还是空的，先给一个只有「跟随」的下拉；
         # refresh_langs() 会在选定目录或装完之后填上真实语言。
         self.lang_box.configure(values=[FOLLOW_LANG])
 
         # -- 进度与日志。放在最后：它是结果，不是入口。
         self.bar = ttk.Progressbar(frm, mode="determinate", maximum=1.0)
-        self.bar.grid(row=3, column=0, sticky="we", pady=(16, 2))
+        self.bar.grid(row=4, column=0, sticky="we", pady=(16, 2))
         self.lbl_status = tk.Label(
             frm, textvariable=self.status, anchor="w", justify="left")
         # 间距挂在状态行自己身上：进度条空闲时是 grid_remove 掉的，
         # 把间距挂在它上面等于空闲时什么间距都没有。
-        self.lbl_status.grid(row=4, column=0, sticky="we", pady=(12, 0))
+        self.lbl_status.grid(row=5, column=0, sticky="we", pady=(12, 0))
 
-        ttk.Label(frm, text="日志").grid(row=5, column=0, sticky="w",
+        ttk.Label(frm, text="日志").grid(row=6, column=0, sticky="w",
                                          pady=(10, 2))
         self.log = tk.Text(frm, height=8, width=62, state="disabled",
                            wrap="word", bg="#f4f4f4", relief="solid",
                            borderwidth=1)
-        self.log.grid(row=6, column=0, sticky="nsew", pady=(0, 0))
+        self.log.grid(row=7, column=0, sticky="nsew", pady=(0, 0))
 
         if self.missing_injector:
             self.status.set("注入器未构建，请先点上方按钮。")
@@ -766,6 +880,39 @@ class App(tk.Tk):
                                               pady=(10, 0))
         box.columnconfigure(2, weight=1)
 
+    def _editor_section(self, box):
+        """译文编辑器入口。跟前三段无关，单列一段。
+
+        编辑器是常驻服务，所以这里只负责把它拉起来 —— 关掉这个窗口
+        不会停它，要停得关浏览器或者在任务管理器里结束 pythonw。
+        """
+        self.btn_editor = ttk.Button(
+            box, text="打开译文编辑器", command=self.on_editor)
+        self.btn_editor.grid(row=0, column=0, sticky="w")
+        ttk.Label(box, text="改 src\\translations\\ 下的译文。"
+                  "首次会创建 venv 并装依赖。").grid(
+            row=0, column=1, sticky="w", padx=(10, 0))
+
+    def on_editor(self):
+        if self.busy():
+            return
+        self.status.set("准备编辑器…（首次运行要装依赖，约一分钟）")
+        self.editing = True
+        self._set_state(self.btn_editor, "disabled")
+        self.worker = threading.Thread(target=self._editor_worker, daemon=True)
+        self.worker.start()
+
+    def _editor_worker(self):
+        """venv + 启动。放线程里是因为建 venv 要几十秒，
+        放主线程会把窗口冻住 —— 用户会以为程序卡死了。"""
+        ok, message = venv_ensure()
+        self.events.put(("editor_ready", (ok, message)))
+        if ok:
+            started, msg = open_editor()
+            self.events.put(("line", msg if started else "启动失败：" + msg))
+        else:
+            self.events.put(("line", message))
+
     def _center(self):
         self.update_idletasks()
         w, h = self.winfo_width(), self.winfo_height()
@@ -779,7 +926,8 @@ class App(tk.Tk):
         return [c for c in sorted(self.vars) if self.vars[c].get()]
 
     def busy(self):
-        return self.building or self.compiling or self.installing
+        return (self.building or self.compiling or self.installing
+                or self.editing)
 
     def end_build(self):
         """构建线程收尾：进冷却，之后才允许再点。
@@ -855,6 +1003,9 @@ class App(tk.Tk):
             else "normal")
         self._set_state(
             self.btn_injector,
+            "disabled" if locked else "normal")
+        self._set_state(
+            self.btn_editor,
             "disabled" if locked else "normal")
         # 没有已装语言包时无法指定语言，下拉只剩「跟随 locale.ini」。
         self._set_state(
@@ -1197,6 +1348,14 @@ class App(tk.Tk):
                         "复制完成",
                         "已复制到：\n%s\n\n现在可以点「启动游戏（已注入）」，"
                         "或点「运行游戏（原版）」对比。" % payload)
+
+                elif kind == "editor_ready":
+                    self.editing = False
+                    ok, message = payload
+                    self.status.set(message)
+                    self._sync()
+                    if not ok:
+                        messagebox.showerror("编辑器准备失败", message)
 
                 elif kind == "deploy_failed":
                     self.installing = False
