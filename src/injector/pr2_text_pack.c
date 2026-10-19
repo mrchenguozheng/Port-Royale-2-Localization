@@ -17,6 +17,12 @@
  * locale.ini format:
  *   language=zh
  *
+ * The language can be overridden for a single launch without touching
+ * this file: PR2Launcher.exe --lang=xx puts PR2_PACK_LANG=xx into the
+ * child's environment, and that wins over the language= line. Launching
+ * the game through PR2Launcher.exe with no argument leaves the variable
+ * unset, so the language= line below still decides.
+ *
  * NOTE: there is deliberately no width/line-length option here. The usable
  * line budget is a property of each on-screen control, not of the language:
  * the same string may fit in one tooltip and be dropped in a narrower box.
@@ -55,6 +61,7 @@ static int   g_editN = 0;
 
 char  g_locale[LOC_MAX] = "";        /* active language code, e.g. zh */
 char  g_locDir[MAX_PATH] = "";      /* full path of PR2Packs\ (no trailing backslash) */
+static int g_envLang = 0;           /* 1 = language came from PR2_PACK_LANG */
 
 /* ---------------- UTF-8 -> UTF-16 ---------------- */
 static int Utf8ToWide(const char* in, unsigned short* out, int outMax) {
@@ -206,11 +213,17 @@ static void LoadOverrideFile(const char* path) {
 
 /* 读locale.ini 定语言，然后载入对应的语言包。
  *
- * 读不到 locale.ini 时用下方 g_locale 的初始值兜底 —— 它必须与
- * PR2Packs\ 下真实的语言包文件名一致，否则找不到包且没有任何提示，
- * 现象是游戏全程英文。
+ * 语言代码的优先级：
+ *   1. 环境变量 PR2_PACK_LANG —— 由 PR2Launcher.exe 的 --lang=xx 传入，
+ *      只影响这一次启动。GUI 用它来「这次用别的语言跑」，直接双击
+ *      启动器时没有这个变量，行为与从前完全一致。
+ *   2. PR2Packs\locale.ini 的 language= —— 默认语言，手工改它可持久切换。
+ *   3. 下方 g_locale 的初始值 —— 连 locale.ini 都没有时的兜底。它必须与
+ *      PR2Packs\ 下真实的语言包文件名一致，否则找不到包且没有任何提示，
+ *      现象是游戏全程英文。
  *
- * 包里没有的 hash 一律不动，引擎自带的英文原样显示，那才是兜底。
+ * 三级都不命中语言包时，包里没有的 hash 一律不动，引擎自带的英文原样
+ * 显示，那才是兜底。
  * 诊断信息见 EditLoaded() / ActiveLocale() / ActivePackDir()。 */
 void LoadEditFile(void) {
     char   exe[MAX_PATH];
@@ -232,28 +245,46 @@ void LoadEditFile(void) {
     lstrcpynA(ini, g_locDir, MAX_PATH);
     lstrcatA(ini, "\\locale.ini");
 
-    /* Fallback when locale.ini is missing. This must name a file that
-     * really exists in PR2Packs\ -- an older build defaulted to "zh-CN"
-     * while the pack ships as "zh.txt", so the lookup failed silently and
-     * the whole localisation did nothing. */
+    /* Fallback when neither the env var nor locale.ini names a language.
+     * This must name a file that really exists in PR2Packs\ -- an older
+     * build defaulted to "zh-CN" while the pack ships as "zh.txt", so the
+     * lookup failed silently and the whole localisation did nothing. */
     lstrcpynA(g_locale, "zh", LOC_MAX);
 
-    hf = CreateFileA(ini, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                     FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hf != INVALID_HANDLE_VALUE) {
-        sz = GetFileSize(hf, NULL);
-        if (sz > 0 && sz < 65536) {
-            ibuf = (char*)HeapAlloc(GetProcessHeap(), 0, sz + 8);
-            if (ibuf) {
-                if (ReadFile(hf, ibuf, sz, &rd, NULL)) {
-                    ibuf[rd] = 0;
-                    v = IniGet(ibuf, "language");
-                    if (v && *v) TrimCopy(g_locale, LOC_MAX, v);
-                }
-                HeapFree(GetProcessHeap(), 0, ibuf);
-            }
+    /* 1. Per-launch override. The launcher passes it through the child's
+     * environment (CreateProcessA is called with a NULL env block, which
+     * means "inherit mine"), so this reaches us without any IPC.
+     * Decided here and not further down, so an explicit per-launch choice
+     * can never be undone by locale.ini. */
+    {
+        char  env[LOC_MAX] = "";
+        DWORD n = GetEnvironmentVariableA("PR2_PACK_LANG", env,
+                                          (DWORD)sizeof(env));
+        if (n > 0 && n < LOC_MAX) {
+            TrimCopy(g_locale, LOC_MAX, env);
+            g_envLang = 1;
         }
-        CloseHandle(hf);
+    }
+
+    /* 2. locale.ini -- only when step 1 did not decide. */
+    if (!g_envLang) {
+        hf = CreateFileA(ini, GENERIC_READ, FILE_SHARE_READ, NULL,
+                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hf != INVALID_HANDLE_VALUE) {
+            sz = GetFileSize(hf, NULL);
+            if (sz > 0 && sz < 65536) {
+                ibuf = (char*)HeapAlloc(GetProcessHeap(), 0, sz + 8);
+                if (ibuf) {
+                    if (ReadFile(hf, ibuf, sz, &rd, NULL)) {
+                        ibuf[rd] = 0;
+                        v = IniGet(ibuf, "language");
+                        if (v && *v) TrimCopy(g_locale, LOC_MAX, v);
+                    }
+                    HeapFree(GetProcessHeap(), 0, ibuf);
+                }
+            }
+            CloseHandle(hf);
+        }
     }
 
     /* the active language pack */
