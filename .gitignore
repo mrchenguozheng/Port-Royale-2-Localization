@@ -193,3 +193,4 @@ build/
 *.obj
 *.exe
 *.dll
+test_lang.toml
