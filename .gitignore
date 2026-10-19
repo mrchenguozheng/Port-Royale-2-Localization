@@ -190,6 +190,6 @@ node_modules/
 .workbuddy/
 
 build/
-.obj
-.exe
-.dll
+*.obj
+*.exe
+*.dll
