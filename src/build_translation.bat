@@ -15,7 +15,7 @@ REM  Note: %~dp0 already ends with a backslash.
 REM ============================================================
 setlocal
 
-REM --no-pause: set by build_n_patch.bat, which runs us non-interactively
+REM --no-pause: set by the window, which runs us non-interactively
 set "NOPAUSE="
 for %%a in (%*) do if /i "%%a"=="--no-pause" set "NOPAUSE=1"
 

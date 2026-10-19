@@ -19,7 +19,7 @@ REM  string literals in the launcher survive compilation intact.
 REM ============================================================
 setlocal
 
-REM --no-pause: set by build_n_patch.bat, which runs us non-interactively
+REM --no-pause: set by the window, which runs us non-interactively
 set "NOPAUSE="
 for %%a in (%*) do if /i "%%a"=="--no-pause" set "NOPAUSE=1"
 REM %~dp0 already ends with a backslash, so both dirs need the
