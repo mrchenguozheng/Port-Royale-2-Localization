@@ -537,6 +537,16 @@ static void InstallHook(void) {
         char b[160];
         sprintf(b, "[text] pack '%s' from %s: %d overrides", ActiveLocale(), ActivePackDir(), EditLoaded());
         log_line(b);
+    } else {
+        /* 没有加载到任何条目 = 游戏会全程显示英文。这是个静默失败：
+         * 屏幕上看不出是「没汉化」还是「汉化坏了」。把语言代码和目录
+         * 都写出来，才能判断是语言名写错、包没装，还是文件损坏。 */
+        char b[320];
+        sprintf(b, "[text] NO pack loaded: language '%s' from %s "
+                   "(pack file missing or empty -- the game will show "
+                   "the original English)",
+                ActiveLocale(), ActivePackDir());
+        log_line(b);
     }
     void* detour = pmf_to_ptr(&Hook::MyAdd);
     const char* ADD = "?Add@CStringManager@NA2dLib@@QAEXPBDPBXI@Z";
