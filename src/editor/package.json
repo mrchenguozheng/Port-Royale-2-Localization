@@ -1,0 +1,15 @@
+{
+  "name": "pr2-loc-editor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Port Royale 2 本地化编辑器（前端）",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "^7.4.1"
+  }
+}
