@@ -188,3 +188,8 @@ node_modules/
 
 # Workbuddy的会话记忆目录，不属于项目
 .workbuddy/
+
+build/
+.obj
+.exe
+.dll
