@@ -1,0 +1,73 @@
+---
+// 编辑器页面骨架。
+//
+// Astro 在这里只负责出静态 HTML：数据全部来自后端 /api，
+// 所以首屏是空壳，交互在 app.ts 里。这么切是因为 3548 条数据
+// 一次塞进 HTML 会让首屏很慢，而它几乎总是要立刻整表重排 ——
+// 不如先出骨架再取数据。
+import '../styles/editor.css';
+
+const title = 'PR2 本地化编辑器';
+---
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="bar">
+      <span class="brand">PR2 本地化编辑器</span>
+
+      <label class="field">
+        编辑
+        <select id="lang"></select>
+      </label>
+
+      <span class="sep"></span>
+
+      <label class="field">
+        参照
+        <select id="refA" class="ref-sel"></select>
+      </label>
+      <label class="field">
+        <select id="refB" class="ref-sel"></select>
+      </label>
+
+      <span class="sep"></span>
+
+      <label class="field">
+        字号
+        <select id="size">
+          <option value="12">12</option>
+          <option value="14" selected>14</option>
+          <option value="16">16</option>
+          <option value="18">18</option>
+          <option value="20">20</option>
+        </select>
+      </label>
+    </header>
+
+    <div class="head">
+      <div>id</div>
+      <div id="headLabels">翻译对照</div>
+    </div>
+
+    <main id="rows">
+      <!-- 滚动条长度的占位：未加载的条目按估算高度撑在这里，
+           它同时是 IntersectionObserver 的探测点，快到底时触发下一批。 -->
+      <div id="tail" class="tail"></div>
+    </main>
+
+    <footer class="foot">
+      <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…" spellcheck="false" />
+      <span id="stat">载入中…</span>
+      <span id="dirty" class="dirty"></span>
+      <span class="hint">Ctrl+Enter 下一条</span>
+      <button id="save" disabled>保存</button>
+    </footer>
+
+    <script src="../scripts/app.ts"></script>
+  </body>
+</html>

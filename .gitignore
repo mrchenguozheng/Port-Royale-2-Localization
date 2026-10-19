@@ -194,3 +194,15 @@ build/
 *.exe
 *.dll
 test_lang.toml
+
+# 译文编辑器（src\editor\）
+# node_modules 有 148 MB，装一次就够，不进仓库。
+node_modules/
+# astro build 的产物：由 `npm run build` 生成，不进仓库。
+src/editor/dist/
+# astro 生成的类型与缓存，每次 build 都会重写。
+src/editor/.astro/
+
+# 仓库根的虚拟环境：首次运行由 venv_ensure() 自动创建，
+# 里面装 requirements.txt 里的依赖，不进仓库。
+.venv/

@@ -1,0 +1,323 @@
+/* PR2 本地化编辑器
+ *
+ * 布局意图（改之前先想清楚这四条）：
+ *
+ * 1. **上中下三段，可改的在中间。** 之前是左中右并排，看着像表格，
+ *    但翻译时你真正反复看的是「参照 ↔ 译文」这一对，并排会把两者
+ *    挤到屏幕两端。上下堆叠让参照和译文垂直相邻，且译文的编辑区
+ *    正好落在视线自然落点（屏幕中部）。
+ *
+ * 2. 参照与译文**上下对齐到同一列宽**，这样同一句话的两个版本
+ *    在同一条竖线上，读起来不用横着扫。
+ *
+ * 3. 条目区是整页网格，不是 flex 行。flex 会被长内容压扁 ——
+ *    旧编辑器就是这样，左栏一长就把右栏挤没。每列显式 minmax(0, ·)，
+ *    长文本只能自己折行。
+ *
+ * 4. 表头 sticky，滚动时列名一直可见。
+ */
+
+:root {
+  --bg:         #14171c;
+  --bg-soft:    #1a1e25;
+  --bg-row:     #1e232b;
+  --bg-row-alt: #1b1f26;
+  --fg:         #d8dee9;
+  --fg-dim:     #8b95a5;
+  --fg-id:      #6b7686;
+  --line:       #2a3038;
+  --line-soft:  #232830;
+  --accent:     #4a9eff;
+  --warn:       #d9a441;
+  --err:        #e56a6a;
+
+  /* --cols 由 JS 设成参照语言个数。 */
+  --cols: 2;
+  --w-id: 6.5rem;
+
+  /* 等宽：中文与西文都用它，于是**空格宽度可预测** ——
+     这是空格高亮能对齐的前提（见 .hl-sp 的注释）。
+     等宽英文字体负责拉丁字母与数字，中文字体负责汉字，
+     两者共存于同一个 font-family 回退链。 */
+  --font-mono: Consolas, "Cascadia Mono", "DejaVu Sans Mono",
+               "Sarasa Mono SC", "Noto Sans Mono CJK SC", monospace;
+  --font-zh:   "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC",
+               var(--font-mono);
+
+  --sp-mark: #3d4655;      /* 空格高亮底色 */
+  --sp-mark-b: #4a5666;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-zh);
+  font-size: 14px;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── 顶栏 ─────────────────────────────────────────────── */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.9rem;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+  flex-wrap: wrap;
+}
+
+.brand { font-weight: 600; white-space: nowrap; }
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+
+.sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  margin: 0 0.15rem;
+}
+
+select, input, button {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-row);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+}
+
+button { cursor: pointer; min-width: 5rem; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { color: var(--fg-id); cursor: default; }
+
+select:focus-visible, input:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* ── 底栏 ─────────────────────────────────────────────── */
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0.9rem;
+  background: var(--bg-soft);
+  border-top: 1px solid var(--line);
+  flex: none;
+}
+
+#q { flex: 1; min-width: 10rem; }
+.hint { color: var(--fg-id); font-size: 0.85em; white-space: nowrap; }
+.dirty { color: var(--warn); white-space: nowrap; }
+
+/* ── 条目区 ───────────────────────────────────────────── */
+
+main {
+  flex: 1;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: var(--w-id) minmax(0, 1fr);
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--line);
+  color: var(--fg-dim);
+  font-size: 0.85em;
+  user-select: none;
+}
+
+.head > div {
+  padding: 0.35rem 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: var(--w-id) minmax(0, 1fr);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.row:nth-child(even) { background: var(--bg-row-alt); }
+.row:hover           { background: var(--bg-row); }
+.row:focus-within    { background: var(--bg-row); }
+
+/* 三块内容：id 竖在最左，其余上下排。
+ * 用了 gap 而不是靠 border —— 上下堆叠时竖线反而会切碎版面。 */
+.stack {
+  display: flex;
+  flex-direction: column;
+  padding: 0.3rem 0 0.5rem;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 3.6rem minmax(0, 1fr);
+  align-items: start;
+}
+
+.line + .line { margin-top: 0.3rem; }
+
+.tag {
+  padding: 0.15rem 0.5rem 0 0.7rem;
+  font-size: 0.8em;
+  color: var(--fg-id);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* 参照与译文的正文格：同一列宽，上下对齐。 */
+.body {
+  padding: 0 0.7rem 0 0;
+  min-width: 0;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;      /* 保留 | 之外的换行 */
+  overflow-wrap: anywhere;
+}
+
+.cell-ref { color: var(--fg-dim); }
+
+.cell-id {
+  padding: 0.3rem 0.5rem 0 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--fg-id);
+  border-right: 1px solid var(--line-soft);
+  white-space: nowrap;
+}
+
+/* 译文行：整格可点，textarea 透明铺满 */
+.cell-zh {
+  display: flex;
+  padding: 0;
+  position: relative;
+  background: #191d24;      /* 译文区略微提亮，一眼分得清哪块能改 */
+  border-radius: 3px;
+}
+
+.cell-zh:focus-within { box-shadow: inset 0 0 0 1px var(--accent); }
+
+.cell-zh textarea {
+  flex: 1;
+  width: 100%;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  border: none;
+  padding: 0.2rem 0.5rem;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  /* 等宽下空格宽度固定，所以 overlay 的空格高亮能对齐 */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cell-zh textarea:focus { outline: none; }
+
+/* ── 空格高亮 ─────────────────────────────────────────── */
+/*
+ * 为什么用 overlay（一个 div 垫在 textarea 下面）而不是直接
+ * 在 textarea 里标空格：textarea 内部的内容没法加样式。
+ *
+ * 关键前提：**两层必须用完全一样的字体、字号、行高、padding、
+ * 换行规则**。任何一项不同，空格块的横向位置就会与真实字符
+ * 错开，高亮会贴到别的字符上。所以这些属性在 .body / textarea
+ * 上都写死，且下面这条规则强制两者一致。
+ *
+ * 不用 textarea 的父级做定位基准，而是让 overlay 与 textarea
+ * 同为 .cell-zh 的直接子元素、各自独立 —— flex 里它们并排而非
+ * 叠放，absolute 相对 .cell-zh 定位。
+ */
+.sp-layer {
+  position: absolute;
+  inset: 0;
+  /* 高亮层要盖在 textarea 上面。textarea 是后加入的兄弟节点，
+     默认按文档顺序绘制，所以不加 z-index 会被它压住 ——
+     而 textarea 背景不透明，一压就什么都看不见。
+     pointer-events:none 保证点击与光标仍然落在 textarea 上。 */
+  z-index: 1;
+  padding: 0.2rem 0.5rem;
+  font: inherit;
+  line-height: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: transparent;       /* 字符本体不画，字符在 textarea 里 */
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 单个空格的高亮块。用 rgba 背景而不是画出可见的方块：
+ * 空格在中文语境里常常是「不该出现」（引擎按空格分词，
+ * 整串汉字会被丢弃），所以它的意义是「这里有一个分隔」，
+ * 底色刚好够指出来，不该抢成主角。 */
+.hl-sp {
+  background: var(--sp-mark);
+  border-radius: 1px;
+}
+
+/* 连续空格深一点：连续多个更容易被误当成排版。 */
+.hl-sp.run {
+  background: var(--sp-mark-b);
+}
+
+/* ── 未加载部分的占位 ─────────────────────────────────── */
+/*
+ * 分段加载：正文按需取，未加载的条目用这个块撑出滚动条长度。
+ * 少了它，滚动条只反映已加载的几十条 —— 滚到底就是"到底了"，
+ * 而实际还有三千多条没显示，滚动条会给出错误的空间感。
+ *
+ * 高度在 JS 里按「剩余条数 × 估算行高」算（估不准没关系，
+ * 滚到接近底部时会用真实数据把它替换掉）。
+ */
+.tail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  color: var(--fg-id);
+  font-size: 0.85em;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+/* ── 状态 ─────────────────────────────────────────────── */
+
+.row.untranslated .cell-zh { color: var(--warn); }
+.row.bad .cell-zh          { color: var(--err); }
+
+.flags {
+  grid-column: 2;
+  padding: 0.3rem 0.7rem 0 3.6rem;
+  font-size: 0.85em;
+  color: var(--err);
+  white-space: pre-line;
+}
+
+.flags:empty { display: none; }
