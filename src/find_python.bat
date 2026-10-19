@@ -13,6 +13,11 @@ REM  interpreter bundled with editors and toolchains -- so a PATH
 REM  hit is not good enough in that case and the search has to keep
 REM  testing the remaining candidates.
 REM
+REM  Do NOT try to select by "which Python has FastAPI". The editor
+REM  runs inside its own venv (src\editor\.venv) with the deps baked
+REM  in, so this script only ever needs to produce *some* working
+REM  interpreter for the GUI and the build scripts.
+REM
 REM  Sources, in order:
 REM    1. python.exe on PATH, every hit in turn
 REM    2. the py launcher
@@ -40,10 +45,14 @@ if defined PY exit /b 0
 REM -- Install dirs. %%~d strips the quotes; %%d keeps them, and a
 REM quoted path would reach python.exe as part of its own name.
 for %%d in ("%ProgramFiles%" "%ProgramFiles(x86)%" "%LocalAppData%\Programs") do (
-  for %%v in (313 312 311) do (
+  for %%v in (314 313 312 311) do (
     if not defined PY call :try "%%~d\Python\Python%%v\python.exe"
   )
 )
+REM -- 3.14 installs to LocalAppData\Python\bin, NOT to a versioned
+REM -- Programs\Python\Python314 subdir. Without this the newest
+REM -- interpreter is only found by luck of PATH order.
+if not defined PY call :try "%LocalAppData%\Python\bin\python.exe"
 
 if not defined PY exit /b 1
 exit /b 0
