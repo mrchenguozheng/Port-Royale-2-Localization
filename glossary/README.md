@@ -130,22 +130,3 @@ ignore = ["0xfc512ea5"]       # 版权声明里的 RAD Game Tools
 
 **编辑器里也接了**：打开编辑器时会自动跑一次，右上角状态显示
 「术语待统一 N 条」，对应行下面用橙色标出「Turk Islands：应为「特克群岛」」。
-
-## 拿不准的译法：※ 记号
-
-有些条目不是错，而是**可能不止一种译法**（人名 `Jan` 译「扬」还是「扬恩」、
-地名音译还是意译）。这种只有读游戏里的上下文才知道顺不顺。
-
-做法：把这些条目登记在 `review.toml`，然后在**译文末尾**加一个 `※` 记号 ——
-游玩时看到它，就知道这条值得再看一眼。
-
-```bat
-python src\tools\mark_review.py --list     :: 现在有哪些待复核
-python src\tools\mark_review.py --apply    :: 按 review.toml 给译文加 ※
-python src\tools\mark_review.py --clear    :: 复核完把 ※ 去掉
-```
-
-- 记号是 **※（U+203B）**，已加进字体的保留字符表（`subset_fonts.py` 的 `EXTRA`），
-  重新构建字体就会带上；不重新裁字体的话，游戏里会显示成空白。
-- 看到 ※ 后：在编辑器里搜 `※` 就能定位；改完把该条从 `review.toml` 删掉，
-  再跑一次 `--clear`。
