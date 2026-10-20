@@ -38,7 +38,7 @@ PUNCT = {
     "zh": {
         "open": "「『（［【〈〔",
         "close": "」』）］】〉〕",
-        "single": "，。、；：！？…・",
+        "single": "，。、；：！？…",
         "runs": "…—",
         "cjk": r"\u4e00-\u9fff\u3400-\u4dbf",
     },
@@ -207,7 +207,9 @@ def make_fmt(sets):
 
 
 def fix_vars(text, punct, cjk):
-    rx = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff\uff66-\uff9f]")
+    # 【坑】不能把整个片假名区当「文字」：・(U+30FB) 和 ー(U+30FC) 也在里面，
+    # 一律加空格会把 迭戈・莫扎雷拉 / 小麦・果物 拆开。已把它们排除。
+    rx = re.compile(r"[\u3041-\u30fa\u30fd-\u30ff\u4e00-\u9fff\uff66-\uff9f]")
 
     def need(ch):
         return bool(ch) and (rx.match(ch) or ch in punct)
