@@ -53,6 +53,10 @@ PUNCT = {
 
 VAR = re.compile(r"@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]")
 
+#: 日期格式串：占位符两侧**不加空格**，否则会渲染成「1600 年 4月 1 日」。
+#: 原文的「.」是德语的序数点（1. = 1 日）和分隔点，中日文里都不该保留。
+DATE_FORMAT_IDS = {"0x1ac38a65", "0x34d0f9eb", "0x22caa09f", "0x1813d72e"}
+
 #: 日语助词。长的写在前面（正则会先匹配到长的）。
 #: 只处理「汉字/片假名 + 助词 + 汉字/片假名或标点」的情况：
 #: 后面跟着平假名的一律跳过，避免把「について」「として」「ません」这类
@@ -266,7 +270,12 @@ def main():
         if a.particles and a.lang == "ja":
             new = space_particles_analyzer(new)
         # 助词空格先做，再统一标点与占位符（占位符两侧的空格由 fix_vars 补回）
-        new = clean_n(fix_vars(fmt(new), punct, sets["cjk"]))
+        if k in DATE_FORMAT_IDS:
+            # 日期格式串（%3年%2%1日）不能让 fix_vars 在占位符两侧补空格，
+            # 否则会渲染成「1600 年 4月 1 日」。
+            new = clean_n(fmt(new))
+        else:
+            new = clean_n(fix_vars(fmt(new), punct, sets["cjk"]))
         if new != doc[k]:
             changed += 1
             doc[k] = new
