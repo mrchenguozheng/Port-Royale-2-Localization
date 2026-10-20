@@ -48,6 +48,7 @@ if TOOLS not in sys.path:
 
 import translate as T          # noqa: E402
 import compile_pack as C       # noqa: E402
+import terms_check             # noqa: E402
 
 
 #: 真实端口，由 main() 在启动前填上。工具窗口靠 /api/health 判断
@@ -507,6 +508,25 @@ class Handler(BaseHTTPRequestHandler):
             rows = load_all()
             return self.send_json({"count": len(rows),
                                    "ids": [r["id"] for r in rows]})
+
+        if path == "/api/terms":
+            # 术语一致性：术语表（glossary\terms.toml）当规则用。
+            # 返回 {id: ["术语：Frigate 应为「巡防舰」", …]}，前端标在行上。
+            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
+            groups, ignore = terms_check.load_terms()
+            if not groups:
+                return self.send_json({"count": 0, "issues": {},
+                                       "note": "没有术语表"})
+            rows = load_all()
+            en = {r["id"]: r.get(T.BASE_LANG, "") for r in rows}
+            doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in ignore}
+            issues = terms_check.check_lang(lang, groups, en, doc)
+            out = {}
+            for x in issues:
+                out.setdefault(x["id"], []).append(
+                    "%s：应为「%s」" % (x["term"], x["expected"]))
+            return self.send_json({"count": len(issues), "issues": out,
+                                   "lang": lang})
 
         if path == "/api/entries":
             offset = int((query.get("offset") or ["0"])[0])
