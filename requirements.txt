@@ -1,8 +1,19 @@
-# 仓库目前**没有**第三方 Python 依赖：
+# 运行/开发依赖清单（详见 docs\开发依赖.md）
 #
-#   - 编辑器后端已改成纯标准库（http.server + json），不需要 fastapi / uvicorn，
-#     也不需要 venv —— 有 python.exe 就能开；
-#   - 其余脚本（translate / compile_pack / build_install）本来就只有标准库。
+# 核心流程只用 Python 标准库：
+#   - 编辑器后端是 http.server + json，不需要 fastapi / uvicorn，也不需要 venv；
+#   - translate / compile_pack / build_install / normalize_text / check_breaks /
+#     extract_strings / extract_fonts 全部只有标准库。
 #
-# 这份文件保留着，是为了以后真要加包时有地方写「装什么」，而不是散在
-# 各个脚本的注释里。
+# 下面都是「可选增强」，缺了会自动降级，不会让构建失败。
+# 建议用主 Python 安装：
+#   python.exe -m pip install -r requirements.txt
+
+# 日语助词判定（normalize_text.py --particles）。装一个即可，两个都装更好：
+janome>=0.5.0
+fugashi>=1.5.2
+unidic-lite>=1.0.8
+
+# 字体裁剪（subset_fonts.py）。本机目前装在 WorkBuddy 的 Python 环境里，
+# 脚本会自动找到；想统一就装进主环境。
+fonttools>=4.0
