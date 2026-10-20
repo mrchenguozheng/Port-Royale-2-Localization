@@ -1,0 +1,152 @@
+﻿分组,English,中文,id
+货物,Wheat,小麦,0x37328fb9
+货物,Fruit,水果,0x37328fba
+货物,Wood,木材,0x37328fbb
+货物,Bricks,砖块,0x37328fbc
+货物,Corn,玉米,0x37328fbd
+货物,Sugar,糖,0x37328fbe
+货物,Cotton,棉花,0x37328fbf
+货物,Hemp,麻,0x37328fc0
+货物,Meat,肉类,0x37328fc1
+货物,Garments,衣物,0x37328fc2
+货物,Rope,缆绳,0x3732902a
+货物,Rum,朗姆酒,0x3732902b
+货物,Coffee,咖啡,0x3732902c
+货物,Cocoa,可可,0x3732902d
+货物,Dyes,染料,0x3732902e
+货物,Tobacco,烟草,0x3732902f
+货物,Spices,香料,0x37329030
+货物,Wine,葡萄酒,0x37329031
+货物,Tools,工具,0x37329032
+货物,Settlers,移民,0x37329033
+船只,Pinnace,轻型帆船,0x24646e0b
+船只,Sloop,单桅帆船,0x24646e0c
+船只,Brig,双桅横帆船,0x24646e0d
+船只,Barque,三桅帆船,0x24646e0e
+船只,Pirate barque,海盗三桅帆船,0x24646e0f
+船只,Flute ship ,货船,0x24646e10
+船只,Trading flute-ship,商货船,0x24646e11
+船只,Corvette,护卫舰,0x24646e12
+船只,Frigate,巡防舰,0x24646e13
+船只,Military corvette,军事护卫舰,0x24646e14
+船只,Military frigate,军事巡防舰,0x24646e7c
+船只,Galleon,盖伦舰,0x24646e7d
+船只,Carrack,卡拉克帆船,0x24646e7e
+船只,Caravel,轻快帆船,0x24646e7f
+船只,War galleon,武装盖伦舰,0x24646e80
+船只,Ship of the line,战列舰,0x24646e81
+船只,Bonus ship,奖励舰,0x24646e82
+船只,Cannon ship,炮舰,0x24646e83
+军衔,Ship's Boy,船上的小伙计,0xe9278a47
+军衔,Ordinary Sailor,普通水手,0xe9278a48
+军衔,Sailor,水手,0xe9278a49
+军衔,Seaman,海员,0xe9278a4a
+军衔,Boatswain,事务长,0xe9278a4b
+军衔,Helmsman,舵手,0xe9278a4c
+军衔,Lieutenant,中尉,0xe9278a4d
+军衔,Navigator,领航员,0xe9278a4e
+军衔,Commander,指挥官,0xe9278a4f
+军衔,Captain,船长,0xe9278a50
+军衔,Commodore,准将,0xe9278ab8
+军衔,Rear Admiral,少将,0xe9278ab9
+军衔,Vice-Admiral,中将,0xe9278aba
+军衔,Admiral,上将,0xe9278abb
+军衔,Grand Admiral,大将,0xe9278abc
+军衔,Fleet Admiral,舰队上将,0xe9278abd
+军衔,Master of the Seas,海上霸主,0xe9278abe
+城镇,Corpus Christi,科珀斯克里斯蒂,0xc77f4c7a
+城镇,New Orleans,新奥尔良,0xc77f4c7b
+城镇,Biloxi,比洛克西,0xc77f4c7c
+城镇,Pensacola,彭萨科拉,0xc77f4c7d
+城镇,Port St. Joe,圣乔港,0xc77f4c7e
+城镇,Tampa,坦帕,0xc77f4c7f
+城镇,Florida Keys,佛罗里达礁岛,0xc77f4c80
+城镇,Tampico,坦皮科,0xc77f4c81
+城镇,Vera Cruz,韦拉克鲁斯,0xc77f4c82
+城镇,Villa Hermosa,维拉埃尔莫萨,0xc77f4c83
+城镇,Campeche,坎佩切,0xc77f4ceb
+城镇,Sisal,西萨尔,0xc77f4cec
+城镇,Cancun,坎昆,0xc77f4ced
+城镇,Belize,伯利兹,0xc77f4cee
+城镇,Roatán,罗阿坦,0xc77f4cef
+城镇,Charleston,查尔斯顿,0xc77f4cf0
+城镇,Fort Caroline,卡罗莱纳堡,0xc77f4cf1
+城镇,St. Augustine,圣奥古斯丁,0xc77f4cf2
+城镇,Grand Bahama,大巴哈马,0xc77f4cf3
+城镇,Eleuthera,伊留瑟拉,0xc77f4cf4
+城镇,Nassau,拿骚,0xc77f4d5c
+城镇,Cat Island,猫岛,0xc77f4d5d
+城镇,Charles Towne,查尔斯敦,0xc77f4d5e
+城镇,Nombre de Dios,迪奥斯港,0xc77f4d5f
+城镇,Evangelista,埃万赫利斯塔,0xc77f4d60
+城镇,Havana,哈瓦那,0xc77f4d61
+城镇,Trinidad ,特立尼达,0xc77f4d62
+城镇,Andross,安德罗斯,0xc77f4d63
+城镇,Gibara,吉巴拉,0xc77f4d64
+城镇,Santiago,圣地亚哥,0xc77f4d65
+城镇,Tortuga,托尔图加,0xc77f4dcd
+城镇,Port-au-Prince,太子港,0xc77f4dce
+城镇,Turk Islands,特克群岛,0xc77f4dcf
+城镇,Isabella,伊莎贝拉,0xc77f4dd0
+城镇,Santo Domingo,圣多明各,0xc77f4dd1
+城镇,San Juan,圣胡安,0xc77f4dd2
+城镇,St. Thome,圣托梅,0xc77f4dd3
+城镇,St. Martin,圣马丁,0xc77f4dd4
+城镇,St. Kitts,圣基茨,0xc77f4dd5
+城镇,Antigua,安提瓜,0xc77f4dd6
+城镇,Guadeloupe,瓜德罗普,0xc77f4e3e
+城镇,Grenada,格林纳达,0xc77f4e3f
+城镇,St. Lucia,圣卢西亚,0xc77f4e40
+城镇,Martinique,马提尼克,0xc77f4e41
+城镇,Barbados,巴巴多斯,0xc77f4e42
+城镇,Providence,普罗维登斯,0xc77f4e43
+城镇,Cayman,开曼,0xc77f4e44
+城镇,Port Royale,皇家港,0xc77f4e45
+城镇,Cartagena,卡塔赫纳,0xc77f4e46
+城镇,Santa Marta,圣玛尔塔,0xc77f4e47
+国家,England,英格兰,0xf90d7ea2
+国家,France,法国,0xf90d7ea3
+国家,Spain,西班牙,0xf90d7ea5
+月份,July,七月,0x0d0f1795
+月份,June,六月,0x0d0f1877
+月份,September,九月,0x1e2d749a
+月份,April,四月,0x302a8f02
+月份,February,二月,0x31e445b8
+月份,May,五月,0x327c63bf
+月份,October,十月,0x34242510
+月份,August,八月,0x36d6072c
+月份,November,十一月,0xdd9499c6
+月份,March,三月,0xdf1770e0
+月份,January,一月,0xeaeac619
+月份,December,十二月,0xf12dfc0b
+月份（英文缩写）,Jul,7月,0x01756c04
+月份（英文缩写）,Jun,6月,0x01756ce6
+月份（英文缩写）,May,5月,0x0247d1b7
+月份（英文缩写）,Feb,2月,0x06b2378b
+月份（英文缩写）,Apr,4月,0x1155d401
+月份（英文缩写）,Jan,1月,0x136970b1
+月份（英文缩写）,Sep,9月,0x2d6fbb37
+月份（英文缩写）,Nov,11月,0xd0b18a8e
+月份（英文缩写）,Aug,8月,0xd68a45b2
+月份（英文缩写）,Dec,12月,0xe015ba2e
+月份（英文缩写）,Oct,10月,0xee4e882d
+月份（英文缩写）,Mar,3月,0xfbdd7fd6
+建筑,Hospital,医院,0x12015c3c
+建筑,Marketplace,市场,0x2ebaaed0
+建筑,Shipyard,船坞,0xc96a80a4
+建筑,Market stall,市场摊位,0xcbe3c595
+建筑,School,学校,0xcf2f93ca
+建筑,Church,教堂,0xdc939a60
+建筑,Sawmill,锯木厂,0xdd6d3669
+建筑,Weaving mill,织造厂,0xdd6d3670
+建筑,Warehouse ,仓库,0xef65aaec
+界面,Load,读取,0x1426f58b
+界面,Fleet,舰队,0x2fec4614
+界面,Chronicle,编年史,0xc595352c
+界面,Messages,消息,0xc618cdea
+界面,Rename,重命名,0xc638ee24
+界面,Save,保存,0xca6a6869
+界面,Continue,继续,0xcbc60959
+界面,Cancel,取消,0xe1598619
+界面,Return to Game,返回游戏,0xec815821
+界面,Options,选项,0xff075dec
