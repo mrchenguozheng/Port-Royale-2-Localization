@@ -70,6 +70,86 @@ JA_PART_RX = re.compile(
     r"(?<=[%s])(%s)(?=[%s])" % (JA_HEAD, "|".join(JA_PARTICLES), JA_TAIL))
 
 
+_TOK = None
+
+
+def _tagger():
+    """优先用形态素分析（Janome → fugashi），都没有就退回正则。"""
+    global _TOK
+    if _TOK is not None:
+        return _TOK
+    try:
+        from janome.tokenizer import Tokenizer
+        _TOK = ("janome", Tokenizer())
+        return _TOK
+    except Exception:
+        pass
+    try:
+        import fugashi
+        _TOK = ("fugashi", fugashi.Tagger())
+        return _TOK
+    except Exception:
+        pass
+    _TOK = ("none", None)
+    return _TOK
+
+
+SPLIT_RX = re.compile(r"(<[^<>]*>|@[A-Za-z]\$[^$]*\$|%[0-9A-Za-z]+)")
+NO_SPACE_AFTER = "、。！？…：；～—」』）"
+#: 遇到这些词尾就不算独立助词（について / として / によって / という …）
+IDIOM_TAIL = ("つい", "つき", "よっ", "より", "とっ", "おい", "かか", "わた",
+              "対", "伴", "応", "関", "際", "先立", "向け", "通じ", "基づ",
+              "限", "代わ", "加え", "従", "即", "照", "いう", "いっ")
+
+
+def space_particles_analyzer(text):
+    """用形态素分析判定「助詞」，在助词后补空格；不可用时退回正则。"""
+    kind, tok = _tagger()
+    if kind == "none":
+        return space_particles(text)
+    out = []
+    for part in SPLIT_RX.split(text):
+        if not part:
+            continue
+        if SPLIT_RX.fullmatch(part):
+            out.append(part)
+            continue
+        if kind == "janome":
+            toks = [(t.surface, t.part_of_speech) for t in tok.tokenize(part)]
+        else:
+            toks = []
+            for w in tok(part):
+                f = w.feature
+                pos = getattr(f, "pos1", "") or (f[0] if isinstance(f, (list, tuple)) else "")
+                toks.append((w.surface, pos))
+        res = []
+        for i, (surf, pos) in enumerate(toks):
+            res.append(surf)
+            if not pos.startswith("助詞"):
+                continue
+            if surf == "の" or "連体化" in pos:
+                continue
+            if "接続助詞" in pos or "終助詞" in pos or "間投助詞" in pos:
+                continue
+            # 只给「名词/代词/数词 + 助词」这种结构补空格：
+            # 助词前面不是实词（像「沈んだと 聞く」「〜て いる」）就不切。
+            prev_pos = toks[i - 1][1] if i > 0 else ""
+            if not prev_pos.startswith(("名詞", "代名詞", "数詞", "固有名詞")):
+                continue
+            nxt_tok = toks[i + 1][0] if i + 1 < len(toks) else ""
+            nxt_pos = toks[i + 1][1] if i + 1 < len(toks) else ""
+            if nxt_tok.startswith(IDIOM_TAIL):
+                continue
+            if nxt_pos.startswith("助詞"):
+                continue
+            nxt = nxt_tok[:1]
+            if not nxt or nxt == " " or nxt in NO_SPACE_AFTER:
+                continue
+            res.append(" ")
+        out.append("".join(res))
+    return "".join(out)
+
+
 def space_particles(text):
     """在句子中间的助词后面补一个半角空格（日语）。"""
     return JA_PART_RX.sub(lambda m: m.group(1) + " ", text)
@@ -171,10 +251,11 @@ def main():
     for k in ids:
         if not cjk_rx.search(doc[k]):
             continue          # 还没译的条目保持与原文逐字一致，不动
-        new = fix_vars(fmt(doc[k]), punct, sets["cjk"])
+        new = doc[k]
         if a.particles and a.lang == "ja":
-            new = space_particles(new)
-        new = clean_n(new)
+            new = space_particles_analyzer(new)
+        # 助词空格先做，再统一标点与占位符（占位符两侧的空格由 fix_vars 补回）
+        new = clean_n(fix_vars(fmt(new), punct, sets["cjk"]))
         if new != doc[k]:
             changed += 1
             doc[k] = new
