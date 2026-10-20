@@ -18,13 +18,18 @@ PR2Launcher.exe 启动游戏，语言包在启动时读取，
 
 import ctypes
 import hashlib
+import json
 import os
 import queue
 import shutil
+import socket
 import subprocess
 import sys
 import threading
 import time
+import urllib.request
+import uuid
+import webbrowser
 
 try:
     import tkinter as tk
@@ -61,17 +66,16 @@ INJECTOR_BAT = os.path.join(SRC, "build_injector.bat")
 #: 译文编辑器（本地 Web）。它跟上面三条链路都无关 —— 不编译、不复制、
 #: 不启动游戏，只改 src\translations\*.toml，所以自己一个按钮。
 EDITOR_DIR = os.path.join(SRC, "editor")
-#: 编辑器有自己的 venv（FastAPI 不是标准库，装在 src\editor\.venv 里）。
-#: 所以这里**不直接跑 python.exe** —— 直接跑会挑到系统 Python，而系统
-#: Python 不一定装了 FastAPI（这台机器上 3.14 就没有），表现是
-#: 「点了没反应」：pythonw 吞掉 traceback，谁也看不到 ModuleNotFoundError。
+#: 独立入口（想不开工具窗口时双击用）。
 EDITOR_BAT = os.path.join(EDITOR_DIR, "StartEditor.bat")
-#: venv 放在**仓库根**，不放 src\editor\ 下 —— 它是仓库的依赖环境，
-#: 将来别的东西要加包也用同一个。目前只有编辑器用得上 fastapi/uvicorn。
-VENV = os.path.join(ROOT, ".venv")
-VENV_SCRIPTS = os.path.join(VENV, "Scripts")
-REQUIREMENTS = os.path.join(ROOT, "requirements.txt")
 EDITOR_DIST = os.path.join(EDITOR_DIR, "dist")
+#: 编辑器从 8777 起往上找空端口，所以探测也按这个范围来 ——
+#: 这样才能找到「上一次 start 留下、还在跑」的那个实例并复用它。
+EDITOR_PORT_BASE = 8777
+#: 扫得比 server.py 的候选范围（8777 + 20）再宽一点：端口被占时它会往上挪，
+#: 而上一轮留下的实例可能正好停在更上面。多扫几个端口很便宜（本地拒绝是
+#: 立刻返回的），漏扫的代价却是「没认出来 → 又起一个」。
+EDITOR_PORT_TRIES = 24
 #: 启动语言下拉里的「不指定」项：读PR2Packs\locale.ini 的 language=。
 FOLLOW_LANG = "跟随 locale.ini"
 
@@ -289,6 +293,63 @@ def launcher_installed(target):
     return os.path.isfile(os.path.join(target, LAUNCHER))
 
 
+#: 我们装进游戏目录的东西 —— 「移除补丁」只删这些，别的一概不碰。
+#: 目录项以反斜杠结尾：删它里面的文件，空了再把目录删掉。
+PATCH_ITEMS = (
+    "PR2Launcher.exe",
+    "PR2TextSource.dll",
+    "PR2TextSource.log",
+    "PR2TextSource_gap.log",
+    "PR2TextSource_lsr.log",
+    "PR2TextSource_resolve.log",
+    "PR2Packs\\",
+)
+
+
+def patch_items(target):
+    """游戏目录里实际存在的补丁文件。返回 [(相对名, 绝对路径, 是否目录)]。
+
+    **只按这张固定清单找**：不扫目录、不猜通配，所以不可能误删 PR2.exe、
+    存档或别的 mod 的 DLL。
+    """
+    out = []
+    for rel in PATCH_ITEMS:
+        p = os.path.join(target, rel.rstrip("\\"))
+        if os.path.exists(p):
+            out.append((rel, p, os.path.isdir(p)))
+    return out
+
+
+def remove_patch(target, only=None):
+    """删掉补丁文件。返回 (是否全部成功, 删掉列表, 失败列表)。
+
+    only 给定时只处理其中的相对名 —— 二次确认的勾选框就是靠它生效的。
+    """
+    removed, failed = [], []
+    for rel, path, isdir in patch_items(target):
+        if only is not None and rel not in only:
+            continue
+        try:
+            if isdir:
+                for name in sorted(os.listdir(path)):
+                    fp = os.path.join(path, name)
+                    if os.path.isfile(fp):
+                        os.remove(fp)
+                        removed.append(rel + name)
+                    else:
+                        failed.append("%s%s（不是文件，保留）" % (rel, name))
+                if not os.listdir(path):
+                    os.rmdir(path)
+                    removed.append(rel)
+            else:
+                os.remove(path)
+                removed.append(rel)
+        except OSError as exc:
+            # 游戏在跑时文件被占，这里会失败 —— 原样报出来，别静默。
+            failed.append("%s（%s）" % (rel, exc))
+    return (not failed), removed, failed
+
+
 def installed_langs(target):
     """游戏目录里真实存在的语言包代码，按字母序。
 
@@ -377,10 +438,25 @@ def launch_game(target, lang=None):
         cmd = [exe]
         if lang:
             cmd.append("--lang=%s" % lang)
-        subprocess.Popen(cmd, cwd=target, close_fds=True)
+        proc = subprocess.Popen(cmd, cwd=target, close_fds=True)
     except OSError as exc:
         return False, "启动 %s 失败：%s\n\n%s" % (LAUNCHER, exc,
                                                 _oserr_hint(exc))
+
+    # 启动器很快退出：注入完就返回，不等游戏。所以「两秒内退出码非 0」
+    # 就是它没把游戏拉起来（例如 --lang 的值它不接受）。这种失败只打在
+    # 它自己的控制台里，而那个窗口一闪就关 —— 不给提示的话，用户看到的
+    # 就是「黑框一闪，游戏没了」。这里补一句人话。
+    try:
+        code = proc.wait(timeout=2.0)
+    except subprocess.TimeoutExpired:
+        code = 0            # 还在跑，说明游戏已经拉起来了
+    if code != 0:
+        return False, ("%s 退出码 %d —— 游戏没有启动。\n\n"
+                       "常见原因：语言代码里有它不接受的字符（只允许字母、数字、"
+                       "连字符、下划线）。\n本次命令行：%s"
+                       % (LAUNCHER, code, " ".join(cmd)))
+
     if lang:
         return True, "已通过 %s 启动游戏，本次使用 %s.txt。" % (LAUNCHER, lang)
     return True, "已通过 %s 启动游戏。" % LAUNCHER
@@ -421,113 +497,163 @@ def _oserr_hint(exc):
     return ""
 
 
-def venv_ensure():
-    """确保编辑器的 venv 存在且装好依赖。返回 (是否成功, 说明)。
+def editor_health(port, timeout=0.25):
+    """问一句「这个端口上跑的是我们的编辑器吗」，是就返回它的自述。
 
-    为什么要有 venv：编辑器要 FastAPI + uvicorn，**这两个不是标准库**。
-    这台机器上有两个 Python —— 3.14（没有 FastAPI）和 3.11（有）——
-    哪个被挑中取决于 PATH 顺序。挑错的后果是启动三秒后
-    ModuleNotFoundError，而它跑在 pythonw 下（无控制台），
-    traceback 被丢弃，用户只看到「点了没反应」。
-
-    venv 把这件事一次解决：不管哪个 Python 建了它，venv 自带
-    site-packages，依赖钉死在里面，而且不往系统 Python 里装任何东西。
-
-    venv 在**仓库根**（.venv\），不是 src\editor\ 下：它是仓库的依赖
-    环境，不是编辑器专属的。以后别的东西要加包，装同一个。
-
-    全程用列表参数调子进程，不经过 cmd —— 仓库路径里有空格，
-    经 cmd 就会被引号吃掉。
+    查的是 /api/health，而不是「端口通不通」：8777 附近完全可能有别的东西
+    在监听，端口通不代表是我们的服务，认错比没认出来更难查。
     """
-    exe = os.path.join(VENV_SCRIPTS, "python.exe")
-    if os.path.isfile(exe):
-        # 已有 venv：只在缺依赖时补装，避免每次启动都联网
-        probe = subprocess.run(
-            [exe, "-c", "import fastapi, uvicorn"],
-            capture_output=True, close_fds=True)
-        if probe.returncode == 0:
-            return True, "venv 就绪"
-        steps = [[exe, "-m", "pip", "install", "--quiet",
-                  "-r", REQUIREMENTS]]
-        what = "补装依赖"
-    else:
-        steps = [[sys.executable, "-m", "venv", VENV],
-                 [os.path.join(VENV_SCRIPTS, "python.exe"),
-                  "-m", "pip", "install", "--quiet",
-                  "-r", REQUIREMENTS]]
-        what = "创建 venv 并装依赖"
+    url = "http://127.0.0.1:%d/api/health" % port
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            if resp.status != 200:
+                return None
+            info = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+    return info if isinstance(info, dict) and info.get("app") == "pr2-editor" else None
 
-    for cmd in steps:
-        try:
-            r = subprocess.run(cmd, capture_output=True, close_fds=True)
-        except OSError as exc:
-            return False, "%s 失败：%s" % (what, exc)
-        if r.returncode != 0:
-            # pip 的错误在 stderr；按 bytes 读再猜编码（同 read_lines 的道理）
-            raw = (r.stderr or b"")[:400]
-            for enc in ("utf-8", "mbcs"):
-                try:
-                    msg = raw.decode(enc).strip().splitlines()[-1]
-                    break
-                except Exception:
-                    msg = raw.decode("utf-8", "replace").strip()
-            return False, "%s 失败：%s" % (what, msg or "退出码 %d" % r.returncode)
-    return True, "venv %s完成" % what
+
+def _port_open(port, timeout=0.05):
+    """这个端口上有没有人 accept。只做 TCP 握手，不问 HTTP。
+
+    先用它筛一遍再发请求：没有监听者的端口在正常机器上立刻 refused，
+    但在网络栈被拦的环境里会一直等到超时 —— 24 个端口逐个等就是十几秒。
+    握手超时放得很短，代价只是偶尔漏掉一个响应极慢的实例。
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(timeout)
+            return s.connect_ex(("127.0.0.1", port)) == 0
+    except OSError:
+        return False
+
+
+def find_editor():
+    """找已经在跑的编辑器。返回 (port, info)；没有就是 (None, None)。
+
+    先做 TCP 探测、再问 /api/health：只有真正有监听者的端口才值得发请求。
+    """
+    for port in range(EDITOR_PORT_BASE, EDITOR_PORT_BASE + EDITOR_PORT_TRIES):
+        if not _port_open(port):
+            continue
+        info = editor_health(port)
+        if info:
+            return port, info
+    return None, None
+
+
+def wait_editor(proc, token, timeout=20.0):
+    """等刚拉起的这个进程把 /api/health 答上来。
+
+    认的是**令牌**而不是 pid：Windows 上的 python.exe 有时只是个转接器，
+    Popen 拿到的 pid 与真正在监听的进程不是同一个（实测差了一个 pid，
+    于是「明明起来了」被判成「20 秒没响应」）。
+    """
+    end = time.time() + timeout
+    exited_at = None
+    # 先给子进程半秒：它要在 exec 之后才 bind，立刻扫必然扫空，
+    # 白扫一遍 24 个端口。
+    time.sleep(0.5)
+    while time.time() < end:
+        port, info = find_editor()
+        if info and token and info.get("token") == token:
+            return port, info
+        if proc is not None and proc.poll() is not None:
+            # 转接器退出不代表服务没起来，再等两秒看看；
+            # 真起不来（比如端口全占）就没必要干等到超时。
+            exited_at = exited_at or time.time()
+            if time.time() - exited_at > 2:
+                return None, None
+        time.sleep(0.3)
+    return None, None
+
+
+def editor_shutdown(port, timeout=3.0):
+    """请编辑器自己退出，并等它真的消失。返回是否已经停了。
+
+    走 /api/shutdown 而不是直接杀进程：不依赖进程权限，也不用管
+    python.exe 是不是中转进程 —— 真正在监听的那个会自己退出，
+    它的控制台窗口随之关闭，端口也一起放掉。
+    """
+    try:
+        req = urllib.request.Request(
+            "http://127.0.0.1:%d/api/shutdown" % port, method="POST")
+        urllib.request.urlopen(req, timeout=1.5).read()
+    except Exception:
+        return False
+    end = time.time() + timeout
+    while time.time() < end:
+        if not editor_health(port, timeout=0.3):
+            return True
+        time.sleep(0.2)
+    return False
 
 
 def open_editor():
-    """启动本地 Web 编辑器，返回 (是否成功, 说明)。
+    """拉起本地 Web 编辑器服务，返回 (是否成功, 说明, Popen, 令牌)。
 
     编辑器是一个长驻的 HTTP 服务（src\\editor\\server.py），不是一次性
-    任务 —— 所以**不等待它退出**，只把它拉起来就跑。窗口照常可以继续
-    构建、复制。
+    任务 —— 所以**不等待它退出**，只把它拉起来、把句柄交给调用方。
+    句柄是用来收尾的：窗口关掉时由 start 负责把它停掉，不留孤儿进程。
 
-    走 StartEditor.bat 而不是直接跑 python：那个脚本负责首次运行时
-    建 venv 并装 FastAPI，然后用 venv 里的 pythonw 启动。
+    起服务时带 --no-open：浏览器由这边在确认 /api/health 通了之后再开，
+    免得服务还没起来就先弹一个打不开的页面。
+
+    令牌从环境变量传进去，服务在 /api/health 里原样回传 —— 这样即使
+    机器上还有别的实例，也能认出「哪个是我刚起的这个」。
     """
-    if not os.path.isfile(EDITOR_BAT):
-        return False, "找不到 %s。" % EDITOR_BAT
     if not os.path.isdir(EDITOR_DIST):
         return False, ("前端还没构建（缺少 %s）。\n\n"
                        "先在仓库里跑一次：\n"
                        "  cd src\\editor\n"
                        "  npm install\n"
-                       "  npm run build" % EDITOR_DIST)
+                       "  npm run build" % EDITOR_DIST), None, None
 
-    # 直接跑 venv 里的 pythonw，**不碰 .bat、不套 cmd /c**。
-    #
-    # `cmd /c "C:\...\Port Royale 2 Localization\...\StartEditor.bat"` 在
-    # 路径含空格时必然失败：cmd 把整行当一条命令解析，第一个引号被吃掉，
-    # 路径被截断，报「此时不在…」。仓库目录名里就有空格，所以这是必踩的坑。
-    #
-    # venv 的建法也搬进 Python（venv_ensure）：同样是空格问题，
-    # `python -m venv <含空格路径>` 用列表参数传是对的，但外层一旦
-    # 经过 cmd 就会碎。在 Python 里全程用列表，不经 cmd。
+    # 用 python.exe 而不是 pythonw.exe：**故意留一个控制台窗口**。
+    # 服务打印的地址、端口被占时的提示、请求报错都在那个窗口里，
+    # 关掉它就等于停掉编辑器 —— 这是这个常驻服务最直观的把手。
+    token = uuid.uuid4().hex
+    env = child_env()
+    env["PR2_EDITOR_TOKEN"] = token
     try:
-        exe = os.path.join(VENV_SCRIPTS, "pythonw.exe")
-        if not os.path.isfile(exe):
-            exe = os.path.join(VENV_SCRIPTS, "python.exe")
-        subprocess.Popen([exe, os.path.join(EDITOR_DIR, "server.py")],
-                         cwd=EDITOR_DIR, env=child_env(), close_fds=True)
+        proc = subprocess.Popen(
+            [_server_exe(), os.path.join(EDITOR_DIR, "server.py"), "--no-open"],
+            cwd=EDITOR_DIR, env=env, close_fds=True)
     except OSError as exc:
-        return False, "启动编辑器失败：%s" % exc
-    return True, "编辑器已启动，稍候会在浏览器中打开。"
+        return False, "启动编辑器失败：%s" % exc, None, None
+    return True, "编辑器进程已拉起。", proc, token
+
+
+def _server_exe():
+    """挑一个**带控制台**的 Python 来起编辑器服务。
+
+    工具窗口自己是 pythonw 起的（没有控制台），拿它启动服务就什么都看不见；
+    这里优先用同目录的 python.exe。服务只用标准库，不需要任何 venv。
+    """
+    exe = sys.executable
+    if exe.lower().endswith("pythonw.exe"):
+        cand = exe[:-len("pythonw.exe")] + "python.exe"
+        if os.path.isfile(cand):
+            return cand
+    return exe
 
 
 # ------------------------------------------------------------ 构建
 
 def child_env():
-    r"""子进程环境：强制 stdout / stderr 用 UTF-8。
+    r"""子进程环境：UTF-8 + 无缓冲。
 
     Windows 上 Python 给文本流套的是**控制台代码页**（简体中文机器是
     cp936），而这里把管道按 utf-8 解 —— 两边不一致，中文输出就成了
     一串「已生成」模样的乱码。PYTHONIOENCODING 管的就是文本流本身，
     比事后猜编码可靠（猜错了会把正常文本也毁掉）。
 
-    只改这一个变量，其余环境原样继承。
+    PYTHONUNBUFFERED：输出要实时进日志，不能攒够一块才吐。
     """
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUNBUFFERED"] = "1"
     return env
 
 
@@ -680,6 +806,113 @@ def run_build(langs, events):
 
 # ------------------------------------------------------------ 界面
 
+#: 危险动作统一用这个红。白字 + 深红底，和窗口里其它按钮一眼分开。
+_DANGER_BG = "#b3261e"
+_DANGER_BG_HOVER = "#8c1d18"
+
+
+class ConfirmDialog(tk.Toplevel):
+    """自定义确认框 —— 按钮文字自己定，不用「是/否」。
+
+    messagebox 只给「是的 / 否」，对「删除补丁」这种事说不清：用户看到的
+    「要继续吗？」配「是」并不告诉他按下之后会做什么。这里把动词写在按钮上
+    （「继续删除」「确认删除」），并且让危险按钮是红的。
+
+    body 里的清单直接换行显示，所以「第二次确认看不到要删什么」不会再发生。
+
+    choices 给出时，正文下面会列成一排复选框（默认全勾），只有勾选的才算数；
+    self.selected 返回勾中的那些。一个都不勾时按「确认」不会关窗，而是提示 ——
+    否则按下去等于什么都没做，用户却以为删过了。
+    """
+
+    def __init__(self, master, title, body, ok_text, cancel_text="取消",
+                 danger=True, choices=None):
+        super().__init__(master)
+        self.result = False
+        self._choices = list(choices or [])
+        self.selected = []                        # 默认一个都不勾
+        self.vars = []
+        self.title(title)
+        self.transient(master)
+        self.resizable(False, False)
+
+        box = ttk.Frame(self, padding=16)
+        box.pack(fill="both", expand=True)
+
+        head = ttk.Frame(box)
+        head.pack(fill="x")
+        ttk.Label(head, text="⚠", foreground=_DANGER_BG,
+                  font=("Segoe UI", 16, "bold")).pack(side="left", padx=(0, 8))
+        ttk.Label(head, text=title,
+                  font=("Segoe UI", 10, "bold")).pack(side="left")
+
+        ttk.Label(box, text=body, justify="left", wraplength=560).pack(
+            fill="x", pady=(10, 10))
+
+        if choices:
+            wrap = ttk.Frame(box, borderwidth=1, relief="solid", padding=8)
+            wrap.pack(fill="x", pady=(0, 10))
+            allvar = tk.BooleanVar(value=False)
+
+            def toggle_all():
+                for v in self.vars:
+                    v.set(allvar.get())
+
+            ttk.Checkbutton(wrap, text="全选 / 全不选", variable=allvar,
+                            command=toggle_all).pack(anchor="w", pady=(0, 4))
+            for c in choices:
+                v = tk.BooleanVar(value=False)
+                self.vars.append(v)
+                ttk.Checkbutton(wrap, text=c, variable=v).pack(
+                    anchor="w", padx=(18, 0))
+
+        self.warn = ttk.Label(box, text="", foreground=_DANGER_BG)
+        self.warn.pack(fill="x")
+
+        row = ttk.Frame(box)
+        row.pack(fill="x", pady=(6, 0))
+        if danger:
+            ok = tk.Button(row, text=ok_text, command=self._ok,
+                           fg="white", bg=_DANGER_BG,
+                           activebackground=_DANGER_BG_HOVER,
+                           activeforeground="white", relief="flat",
+                           padx=14, pady=3, cursor="hand2")
+        else:
+            ok = ttk.Button(row, text=ok_text, command=self._ok)
+        ok.pack(side="right")
+        cancel = ttk.Button(row, text=cancel_text, command=self._cancel)
+        cancel.pack(side="right", padx=(0, 8))
+
+        self.bind("<Escape>", lambda e: self._cancel())
+        self.bind("<Return>", lambda e: self._ok())
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
+
+        self.update_idletasks()
+        try:
+            px, py = master.winfo_rootx(), master.winfo_rooty()
+            pw, ph = master.winfo_width(), master.winfo_height()
+            w, h = self.winfo_width(), self.winfo_height()
+            self.geometry("+%d+%d" % (px + (pw - w) // 2, py + (ph - h) // 3))
+        except tk.TclError:
+            pass
+        self.grab_set()
+        cancel.focus_set()          # 默认落在「取消」上，回车不会误删
+
+    def _ok(self):
+        if self.vars:
+            self.selected = [c for c, v in zip(self._choices, self.vars) if v.get()]
+            if not self.selected:
+                self.warn.configure(
+                    text="一个都没勾选 —— 这样不会删除任何东西。取消或至少勾一项。")
+                return
+        self.result = True
+        self.destroy()
+
+    def _cancel(self):
+        self.result = False
+        self.destroy()
+
+
 class App(tk.Tk):
     POLL_MS = 80
     #: 构建结束后按钮还要多锁一会儿。构建常常不到一秒，禁用状态
@@ -702,6 +935,17 @@ class App(tk.Tk):
         self.compiling = False
         self.installing = False
         self.editing = False
+        #: 编辑器准备工作开始的时刻 + 当前在第几步 —— 用来在状态栏里
+        #: 显示「已等 N 秒」，让用户看得出它是在干活，而不是卡住了。
+        self._editor_t0 = 0.0
+        self._editor_step = ""
+        #: 编辑器服务的 pid / 端口 / 句柄。本窗口起的，或者探测到的旧实例。
+        #: 收了 pid 才能在关窗口时把它一起停掉，也才知道「停止」按钮该不该亮。
+        self.editor_pid = None
+        self.editor_proc = None
+        self.editor_port = None
+        #: 轮询计数：编辑器存活检查不用每 80ms 做一次。
+        self._tick = 0
         self.installed_done = True
         self.build_cool = 0
         self.missing_injector = missing_outputs(need_pack=False)
@@ -722,7 +966,7 @@ class App(tk.Tk):
         self._build_ui(langs, do_build)
         self._sync()
         self._center()
-        self.after(self.POLL_MS, self._poll)
+        self._poll_id = self.after(self.POLL_MS, self._poll)
 
     # ---- 布局
 
@@ -845,6 +1089,20 @@ class App(tk.Tk):
                   % GAME_EXE).grid(row=1, column=0, columnspan=3,
                                    sticky="w", pady=(6, 0))
 
+        # 危险操作：把补丁从游戏目录里删干净。放在部署段里，
+        # 但**不**跟着 busy() 一起锁 —— 复制失败时恰恰需要它来善后。
+        # 用 tk.Button 而不是 ttk：ttk 在 Windows 原生主题下不吃背景色，
+        # 这个按钮必须红得一眼能看见。
+        self.btn_remove = tk.Button(
+            box, text="移除补丁（危险）…", command=self.on_remove_patch,
+            fg="white", bg=_DANGER_BG, activebackground=_DANGER_BG_HOVER,
+            activeforeground="white", relief="flat", padx=10, pady=2,
+            cursor="hand2")
+        self.btn_remove.grid(row=2, column=2, sticky="e", padx=(10, 0), pady=(8, 0))
+        ttk.Label(box, text="只删本补丁的文件：启动器、DLL、语言包与它的日志；"
+                  "PR2.exe 不会动。").grid(row=2, column=0, columnspan=2,
+                                          sticky="w", pady=(8, 0))
+
     def _run_section(self, box):
         """启动语言 + 启动与保存。
 
@@ -883,34 +1141,147 @@ class App(tk.Tk):
     def _editor_section(self, box):
         """译文编辑器入口。跟前三段无关，单列一段。
 
-        编辑器是常驻服务，所以这里只负责把它拉起来 —— 关掉这个窗口
-        不会停它，要停得关浏览器或者在任务管理器里结束 pythonw。
+        编辑器由这个窗口**启动并收尾**：已经开着就复用（不再起第二个），
+        窗口关掉就一起停，不留孤儿进程。前端（dist\\ 的静态文件）和后端
+        （FastAPI）跑在同一个进程里 —— 服务顺便把前端托管了 ——
+        所以这里只有这一个进程要管。
         """
         self.btn_editor = ttk.Button(
             box, text="打开译文编辑器", command=self.on_editor)
         self.btn_editor.grid(row=0, column=0, sticky="w")
-        ttk.Label(box, text="改 src\\translations\\ 下的译文。"
-                  "首次会创建 venv 并装依赖。").grid(
-            row=0, column=1, sticky="w", padx=(10, 0))
+
+        self.btn_editor_stop = ttk.Button(
+            box, text="停止编辑器", command=self.on_stop_editor, state="disabled")
+        self.btn_editor_stop.grid(row=0, column=1, sticky="w", padx=(8, 0))
+
+        ttk.Label(box, text="改 src\\translations\\ 下的译文。不需要装任何依赖；"
+                  "关掉本窗口会一并停掉编辑器。").grid(
+            row=0, column=2, sticky="w", padx=(10, 0))
+        box.columnconfigure(2, weight=1)
+
+    def _forget_editor(self):
+        self.editor_pid = None
+        self.editor_proc = None
+        self.editor_port = None
+
+    def _kill_editor(self):
+        """停掉编辑器：先请它自己退，不行再强杀。
+
+        1) /api/shutdown：不给权限问题、也不怕 python.exe 是个中转进程 ——
+           真正监听的进程自己退出，控制台窗口跟着关。
+        2) taskkill /T：服务没响应（比如卡死）时兜底，杀整棵树。
+           只杀父进程会留下还在监听的孤儿，端口继续占着。
+        """
+        pid = self.editor_pid
+        port = self.editor_port
+        stopped = editor_shutdown(port) if port else False
+        if not stopped:
+            # pid 可能是 /api/health 报上来的真实服务进程；还没探测完就关窗口时
+            # 只有 Popen 的 pid（可能是中转进程），两种都用 /T 杀整棵树。
+            target = pid or (self.editor_proc.pid if self.editor_proc else None)
+            if target:
+                try:
+                    subprocess.run(["taskkill", "/PID", str(target), "/T", "/F"],
+                                   stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL)
+                except OSError:
+                    pass
+        proc = self.editor_proc
+        if proc is not None:
+            try:
+                if proc.poll() is None:
+                    proc.terminate()      # 对自家子进程一定有权限，再兜一道
+            except OSError:
+                pass
+        self._forget_editor()
+
+    def on_stop_editor(self):
+        """停掉编辑器。pid 可能是本窗口起的，也可能是探测到的旧实例。"""
+        if not self.editor_pid:
+            port, info = find_editor()
+            if info:
+                self.editor_pid = int(info.get("pid") or 0) or None
+                self.editor_port = port
+        if not self.editor_pid:
+            self.status.set("没有找到正在运行的编辑器。")
+            self._sync()
+            return
+        pid = self.editor_pid
+        port = self.editor_port
+        self._kill_editor()
+        # 只看**原来那个端口**：别的实例（或用户自己另开的）不该影响判断。
+        if port and editor_health(port):
+            self.status.set("停止命令已发出，但编辑器仍在运行。")
+            self._log("停止后端口 %d 仍有响应，可能卡住了。" % port)
+        else:
+            self.status.set("编辑器已停止。")
+            self._log("已停止编辑器（pid %d）。" % pid)
+        self._sync()
 
     def on_editor(self):
         if self.busy():
             return
-        self.status.set("准备编辑器…（首次运行要装依赖，约一分钟）")
+        # 已经有一个在跑（可能是上一次 start 留下的）：复用，不再起第二个。
+        # 以前每点一次就新起一个，结果 8777/8778/8779 各躺着一个服务。
+        port, info = find_editor()
+        if info:
+            self.editor_pid = int(info.get("pid") or 0) or None
+            self.editor_port = port
+            webbrowser.open("http://127.0.0.1:%d/" % port)
+            self.status.set("编辑器已在运行（端口 %d），已打开浏览器。" % port)
+            self._log("复用已在运行的编辑器：端口 %d，pid %s"
+                      % (port, self.editor_pid))
+            self._sync()
+            return
+
+        self._begin_log("译文编辑器")
+        # 起服务本身只要一两秒，但「等它真的答话」最多 20 秒。进度条用
+        # 不确定模式，同时状态文字一直在报已经等了多少秒 —— 这样"在启动"
+        # 和"卡死了"能一眼分开。
+        self.bar.configure(mode="indeterminate")
+        self.bar.start(80)
+        self._editor_t0 = time.time()
+        self._editor_step = "启动服务"
+        self.status.set("正在启动编辑器…")
         self.editing = True
         self._set_state(self.btn_editor, "disabled")
         self.worker = threading.Thread(target=self._editor_worker, daemon=True)
         self.worker.start()
+        self._sync()
 
     def _editor_worker(self):
-        """venv + 启动。放线程里是因为建 venv 要几十秒，
-        放主线程会把窗口冻住 —— 用户会以为程序卡死了。"""
-        ok, message = venv_ensure()
-        self.events.put(("editor_ready", (ok, message)))
-        if ok:
-            started, msg = open_editor()
-            self.events.put(("line", msg if started else "启动失败：" + msg))
-        else:
+        """启动 + 等服务答话。放线程里是因为等 /api/health 最多要 20 秒，
+        放主线程会把窗口冻住 —— 用户会以为程序卡死了。
+        """
+        ok, message = False, "编辑器准备时出现未知错误。"
+        pid, port, proc = None, None, None
+        try:
+            started, msg, child, token = open_editor()
+            if not started:
+                ok, message = False, "编辑器启动失败：\n\n" + msg
+            else:
+                # 先记下句柄：等待期间用户可能直接关窗口，那时要靠它收尾。
+                self.editor_proc = child
+                # 起进程 ≠ 起来了：要等它真的能回答 /api/health，
+                # 否则浏览器会在服务还没监听时打开一个打不开的页面。
+                port, info = wait_editor(child, token)
+                if not info:
+                    ok, message = False, (
+                        "编辑器进程起来了，但 20 秒内没有响应。\n\n"
+                        "看一下它那个控制台窗口里的报错。")
+                else:
+                    proc = child
+                    pid = int(info.get("pid") or 0) or child.pid
+                    webbrowser.open("http://127.0.0.1:%d/" % port)
+                    message = "编辑器已启动（端口 %d），浏览器已打开。" % port
+                    ok = True
+        except Exception as exc:      # 线程里抛出去没人接，界面会一直卡在「准备中」
+            ok, message = False, "编辑器准备时出错：%s" % exc
+        finally:
+            self.events.put(("editor_ready", {"ok": ok, "message": message,
+                                              "pid": pid, "port": port,
+                                              "proc": proc}))
+        if not ok:
             self.events.put(("line", message))
 
     def _center(self):
@@ -1007,6 +1378,10 @@ class App(tk.Tk):
         self._set_state(
             self.btn_editor,
             "disabled" if locked else "normal")
+        # 「停止编辑器」只在确实知道有个实例在跑时才是亮的。
+        self._set_state(
+            self.btn_editor_stop,
+            "normal" if (not locked and self.editor_pid) else "disabled")
         # 没有已装语言包时无法指定语言，下拉只剩「跟随 locale.ini」。
         self._set_state(
             self.lang_box,
@@ -1272,6 +1647,82 @@ class App(tk.Tk):
         self.worker.start()
         self._sync()
 
+    def on_remove_patch(self):
+        """把补丁从游戏目录删掉 —— 整个窗口里唯一会删东西的地方。
+
+        所以做得比别的操作都啰嗦：
+          · 先列出**实际存在**的文件，不是「可能有哪些」；
+          · 两次确认**都带清单**，第二次不是「确定吗」这种空话；
+          · 按钮写动词（继续删除 / 确认删除），不用含糊的是/否；
+          · 每个文件的结果都写进日志，失败（比如游戏正在运行）原样报出来。
+        """
+        if self.busy():
+            return
+        d = self.var_dir.get()
+        if not is_game_dir(d):
+            messagebox.showerror("没有游戏目录",
+                                 "先选择一个含 %s 的目录。" % GAME_EXE)
+            return
+
+        items = patch_items(d)
+        if not items:
+            messagebox.showinfo("没有可删的", "这个目录里没有本补丁的文件。")
+            return
+
+        names = "\n".join("   " + rel for rel, _p, _isdir in items)
+
+        # 第一次：说清删什么、不删什么、后果。
+        dlg = ConfirmDialog(
+            self, "从游戏目录移除补丁",
+            "目录：\n%s\n\n将删除以下 %d 项：\n%s\n\n"
+            "不会删除 PR2.exe、存档、其它 DLL 或其它语言包。\n"
+            "删除后游戏回到原版（英文），而且不可撤销。"
+            % (d, len(items), names),
+            ok_text="继续删除")
+        self.wait_window(dlg)
+        if not dlg.result:
+            return
+
+        # 第二次：逐项复选 —— 只删勾中的。清单再摊一遍，不靠记忆。
+        dlg2 = ConfirmDialog(
+            self, "再次确认：勾选要删除的文件",
+            "下面这些是本补丁在游戏目录里的文件。**只有勾选的会被删除**，"
+            "取消勾选的会原样留在目录里。\n\n"
+            "删除后无法恢复；PR2.exe、存档、其它 DLL 都不受影响。",
+            ok_text="删除勾选项",
+            choices=[rel for rel, _p, _isdir in items])
+        self.wait_window(dlg2)
+        if not dlg2.result:
+            return
+        chosen = dlg2.selected
+
+        ok, removed, failed = remove_patch(d, only=chosen)
+
+        self._begin_log("移除补丁（勾选 %d / %d 项）：%s"
+                        % (len(chosen), len(items), d))
+        for r in removed:
+            self._log("  已删除 %s" % r)
+        for f in failed:
+            self._log("  失败 %s" % f)
+        for rel, _p, _isdir in items:
+            if rel not in chosen:
+                self._log("  保留 %s（未勾选）" % rel)
+
+        # 语言包没了，启动语言下拉必须跟着变（否则还列着已经不存在的包）
+        self.refresh_langs()
+        self.installed_done = False
+        self.built_langs = []
+        if ok:
+            self.status.set("已按勾选删除 %d 项（勾了 %d 项），未勾选的保留。"
+                            % (len(removed), len(chosen)))
+        else:
+            self.status.set("有 %d 项没删掉 —— 游戏可能正在运行。" % len(failed))
+            messagebox.showwarning(
+                "部分文件没删掉",
+                "常见原因是游戏正在运行（文件被占用）。\n关闭游戏后可以再试一次。\n\n"
+                "详见下方日志。")
+        self._sync()
+
     def on_vanilla(self):
         ok, message = launch_vanilla(self.var_dir.get())
         if ok:
@@ -1280,15 +1731,45 @@ class App(tk.Tk):
             messagebox.showerror("无法启动", message)
 
     def on_close(self):
-        # 构建与复制线程都是 daemon，窗口关掉时它们随进程一起结束。
+        """关窗口 = 收工：编辑器是 start 拉起来的，也由 start 停掉。
+
+        构建/复制线程都是 daemon，随进程一起结束；编辑器是**独立进程**，
+        不主动停就会一直留在后台 —— 以前正是这样，点几次攒几个。
+        """
+        # 先取消下一轮轮询：窗口都销毁了还回调，Tk 会往 stderr 抛
+        # 「invalid command name ...」。
+        if getattr(self, "_poll_id", None):
+            try:
+                self.after_cancel(self._poll_id)
+            except Exception:
+                pass
+            self._poll_id = None
+        if self.editor_pid or self.editor_proc is not None:
+            self._kill_editor()
         self.destroy()
 
     # ---- 队列泵
 
     def _poll(self):
         self._drain()
+        self._tick += 1
+        # 编辑器没了（控制台被关掉 / 崩了）就把「停止」按钮和 pid 一起清掉，
+        # 免得界面还显示「在运行」。每 40 个轮询（约 3 秒）探一次。
+        if self.editor_pid and self._tick % 40 == 0:
+            port, info = find_editor()
+            if not info:
+                self._forget_editor()
+                self.status.set("编辑器已退出（控制台窗口被关掉了？）。")
+        # 编辑器准备期间每秒刷新一次「已等 N 秒」：进度条在动、数字在走，
+        # 才能把「正在下东西」和「已经卡死」区分开。
+        if self.editing and self._editor_t0:
+            secs = int(time.time() - self._editor_t0)
+            if secs >= 1 and secs != getattr(self, "_editor_secs", -1):
+                self._editor_secs = secs
+                self.status.set("编辑器：%s… 已等 %d 秒"
+                                % (self._editor_step or "检查依赖", secs))
         self._sync()
-        self.after(self.POLL_MS, self._poll)
+        self._poll_id = self.after(self.POLL_MS, self._poll)
 
     def _drain(self):
         try:
@@ -1349,12 +1830,29 @@ class App(tk.Tk):
                         "已复制到：\n%s\n\n现在可以点「启动游戏（已注入）」，"
                         "或点「运行游戏（原版）」对比。" % payload)
 
+                elif kind == "editor_step":
+                    i, n, label = payload
+                    self._editor_step = "%s（第 %d/%d 步）" % (label, i, n)
+                    self.status.set("编辑器：" + self._editor_step + "…")
+
+                elif kind == "editor_line":
+                    self._log("  " + str(payload))
+
                 elif kind == "editor_ready":
                     self.editing = False
-                    ok, message = payload
-                    self.status.set(message)
+                    info = payload
+                    ok, message = info["ok"], info["message"]
+                    self.editor_pid = info.get("pid")
+                    self.editor_port = info.get("port")
+                    self.editor_proc = info.get("proc")
+                    # 退出不确定模式，交还给构建/复制用的确定模式进度条。
+                    self.bar.stop()
+                    self.bar.configure(mode="determinate", maximum=1.0, value=0.0)
+                    # 失败说明可能有好几行，状态栏只放第一行，全文进日志
+                    self.status.set(message.splitlines()[0] if message else "")
                     self._sync()
                     if not ok:
+                        self._log(message)
                         messagebox.showerror("编辑器准备失败", message)
 
                 elif kind == "deploy_failed":
