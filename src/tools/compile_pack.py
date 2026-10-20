@@ -245,11 +245,26 @@ def main():
     ap.add_argument("--lang", default="", help="语言代码，默认 translations\\ 下第一个可编辑语言")
     ap.add_argument("--out", default=DEFAULT_OUT, help="输出目录")
     ap.add_argument("--strict", action="store_true", help="有错误时返回非零")
+    ap.add_argument("--no-fonts", action="store_true",
+                    help="只编语言包，不检查/重建字体（批量编译时由调用方统一做）")
     a = ap.parse_args()
     lang = a.lang
     if not lang:
         lang = _default_lang()
-    return build(lang, a.out, a.strict)
+    code = build(lang, a.out, a.strict)
+
+    # 编完语言包顺手检查字体：译文里出现新字（比如新补的「嫩」）时，
+    # 字体不重裁就会画成空白。字体出错不算构建失败 —— 语言包本身没问题。
+    if code == 0 and not a.no_fonts:
+        try:
+            import subset_fonts
+            ok, msg = subset_fonts.ensure_fonts(log=lambda m: print(m))
+            print("字体：" + msg)
+            if not ok:
+                print("（部署时字体不会更新；详见上一行提示）")
+        except Exception as exc:                  # 字体只是附带的，别拖垮构建
+            print("字体检查跳过：%s" % exc)
+    return code
 
 
 if __name__ == "__main__":
