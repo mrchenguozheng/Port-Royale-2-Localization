@@ -396,6 +396,131 @@ def read_ini_language(ini_path):
     return None
 
 
+# ---------------------------------------------------------------- 游戏版本
+
+#: 已知的 PR2.exe 构建（SHA-256 为实测值，来自 1.1.2.3 的三种发行版）。
+#: 用途只有一个：识别用户手上是哪个版本，从而记住对应目录、提示兼容性。
+KNOWN_BUILDS = (
+    {
+        "id": "gog-en-1.1.2.3",
+        "label": "GOG 英文版 1.1.2.3",
+        "sha256": "394CE2A48BC6B21708B81A232C7C88459BE7F3C8082CC593AD83B0B8E4C168EC",
+        "note": "原版英文，注入方案首选；安装目录自带 PR2Packs 目录。",
+    },
+    {
+        "id": "gog-fr-1.1.2.3",
+        "label": "GOG 法语版 1.1.2.3",
+        "sha256": "EF0E97D40F8DDF24186D18D39D07F12C562949D005654E99B7C1D21429110FA5",
+        "note": "法文界面文本编在 exe 里；同样可注入。",
+    },
+    {
+        "id": "steam-en-1.1.2.3",
+        "label": "Steam 英文版 1.1.2.3",
+        "sha256": "5295C06689147F7565F72510AEB686719CF0AE38AA581A6DF3E4D61D0CF76264",
+        "note": "带 CEG 校验，exe 不能改；必须走注入。",
+    },
+)
+BUILD_BY_SHA = {b["sha256"].upper(): b for b in KNOWN_BUILDS}
+
+
+def settings_path():
+    """设置文件：优先 %LOCALAPPDATA%，没有就放仓库 build\\ 下。"""
+    override = os.environ.get("PR2_SETTINGS")
+    if override:
+        return override
+    base = os.environ.get("LOCALAPPDATA")
+    if base:
+        return os.path.join(base, "PR2Localization", "settings.json")
+    return os.path.join(ROOT, "build", "settings.json")
+
+
+def load_settings():
+    path = settings_path()
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        if isinstance(data, dict):
+            data.setdefault("dirs", {})
+            data.setdefault("current", "")
+            data.setdefault("last_dir", "")
+            return data
+    except (OSError, ValueError):
+        pass
+    return {"dirs": {}, "current": "", "last_dir": ""}
+
+
+def save_settings(data):
+    path = settings_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=1)
+        return True
+    except OSError:
+        return False
+
+
+def exe_sha256(path):
+    """PR2.exe 的 SHA-256（大写）；读不到返回空串。"""
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest().upper()
+    except OSError:
+        return ""
+
+
+def identify_dir(path):
+    """返回 (sha256, 已知构建 dict 或 None)。"""
+    sha = exe_sha256(os.path.join(path, GAME_EXE))
+    return sha, BUILD_BY_SHA.get(sha)
+
+
+def version_label(sha):
+    b = BUILD_BY_SHA.get(sha)
+    if b:
+        return b["label"]
+    return "未知版本（%s…）" % sha[:8] if sha else "未识别"
+
+
+def patch_report(path):
+    """检查游戏目录里补丁的安装状态，返回 [(项目, 状态, 说明)]。"""
+    out = []
+    out.append(("PR2.exe", "有" if is_game_dir(path) else "缺失",
+                "必需" if is_game_dir(path) else "该目录里没有 PR2.exe"))
+    out.append(("PR2Launcher.exe", "有" if launcher_installed(path) else "无",
+                "注入启动器"))
+    out.append(("PR2TextSource.dll", "有" if os.path.isfile(
+        os.path.join(path, "PR2TextSource.dll")) else "无", "注入 DLL"))
+    packs = installed_langs(path)
+    out.append(("PR2Packs\\", "%d 个语言包" % len(packs) if packs else "无",
+                "、".join(packs) if packs else "还没有复制语言包"))
+    ini = os.path.join(path, PACK_DIR, "locale.ini")
+    if os.path.isfile(ini):
+        out.append(("PR2Packs\\locale.ini", read_ini_language(ini) or "无 language=",
+                    "决定游戏加载哪个包"))
+    else:
+        out.append(("PR2Packs\\locale.ini", "无", "复制后才会生成"))
+    fonts_dir = os.path.join(path, "fonts")
+    orig_dir = os.path.join(ROOT, "assets", "fonts", "original")
+    for name in ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf"):
+        live = os.path.join(fonts_dir, name)
+        orig = os.path.join(orig_dir, name)
+        if not os.path.isfile(live):
+            out.append(("fonts\\" + name, "缺失", "游戏目录里没有这个字体"))
+            continue
+        if not os.path.isfile(orig):
+            out.append(("fonts\\" + name, "无法比对", "仓库缺原版字体"))
+            continue
+        replaced = file_digest(live) != file_digest(orig)
+        out.append(("fonts\\" + name,
+                    "已替换" if replaced else "原版",
+                    "含中日文字形的子集" if replaced else "未动"))
+    return out
+
+
 def write_ini_language(ini_path, code):
     """把 language= 写成 code，保留文件里其他行。
 
@@ -995,6 +1120,10 @@ class App(tk.Tk):
         self.missing_injector = missing_outputs(need_pack=False)
 
         self.var_dir = tk.StringVar()
+        #: 已记住的游戏版本（按 PR2.exe 的 SHA-256 索引）与当前选中项
+        self.settings = load_settings()
+        self.var_version = tk.StringVar()
+        self._version_items = []
         self.status = tk.StringVar()
         #: 启动语言下拉。FOLLOW_LANG 是「不指定」，让 locale.ini 说话。
         self.var_lang = tk.StringVar(value=FOLLOW_LANG)
@@ -1008,6 +1137,8 @@ class App(tk.Tk):
             self.vars[code] = v
 
         self._build_ui(langs, do_build)
+        self._refresh_version_choices()
+        self._restore_last_dir()
         self._sync()
         self._center()
         self._poll_id = self.after(self.POLL_MS, self._poll)
@@ -1116,10 +1247,34 @@ class App(tk.Tk):
             self.btn_build.grid(row=1, column=1, sticky="w", pady=(8, 0))
 
     def _deploy_section(self, box):
-        """游戏目录 + 部署。两者挨着，因为部署只对目录生效。"""
-        ttk.Label(box, text="游戏目录").grid(row=0, column=0, sticky="w")
+        """版本识别 + 游戏目录 + 部署。
+
+        版本一段放在最上面：先认出是哪个构建，再决定用哪个目录，
+        顺序与用户的心智一致（「我装的是哪个版本」→「它在哪」）。
+        """
+        ttk.Label(box, text="已知版本").grid(row=0, column=0, sticky="w")
+        self.version_box = ttk.Combobox(
+            box, textvariable=self.var_version, state="readonly", width=44)
+        self.version_box.grid(row=0, column=1, sticky="we", padx=(10, 0))
+        self.version_box.bind("<<ComboboxSelected>>", self.on_pick_version)
+
+        ver_btns = ttk.Frame(box)
+        ver_btns.grid(row=0, column=2, sticky="e", padx=(10, 0))
+        self.btn_remember = ttk.Button(
+            ver_btns, text="记住当前目录", width=12, command=self.on_remember_version)
+        self.btn_remember.grid(row=0, column=0)
+        self.btn_check = ttk.Button(
+            ver_btns, text="检查补丁…", width=10, command=self.on_check_patch)
+        self.btn_check.grid(row=0, column=1, padx=(6, 0))
+
+        self.lbl_version = tk.Label(box, text="", anchor="w", justify="left")
+        self.lbl_version.grid(row=1, column=0, columnspan=3, sticky="w",
+                              pady=(4, 0))
+
+        ttk.Label(box, text="游戏目录").grid(row=2, column=0, sticky="w",
+                                            pady=(10, 0))
         dir_row = ttk.Frame(box)
-        dir_row.grid(row=0, column=1, sticky="we", padx=(10, 0))
+        dir_row.grid(row=2, column=1, sticky="we", padx=(10, 0), pady=(10, 0))
         dir_row.columnconfigure(0, weight=1)
         tk.Entry(dir_row, textvariable=self.var_dir, width=44,
                  state="readonly").grid(row=0, column=0, sticky="we")
@@ -1127,24 +1282,22 @@ class App(tk.Tk):
                    command=self.on_browse).grid(row=0, column=1, padx=(6, 0))
         self.btn_install = ttk.Button(
             box, text="复制到游戏目录", width=16, command=self.on_install)
-        self.btn_install.grid(row=0, column=2, padx=(10, 0))
+        self.btn_install.grid(row=2, column=2, padx=(10, 0), pady=(10, 0))
 
         ttk.Label(box, text="须含 %s。只复制构建产物，内容相同就跳过。"
-                  % GAME_EXE).grid(row=1, column=0, columnspan=3,
+                  % GAME_EXE).grid(row=3, column=0, columnspan=3,
                                    sticky="w", pady=(6, 0))
 
         # 危险操作：把补丁从游戏目录里删干净。放在部署段里，
         # 但**不**跟着 busy() 一起锁 —— 复制失败时恰恰需要它来善后。
-        # 用 tk.Button 而不是 ttk：ttk 在 Windows 原生主题下不吃背景色，
-        # 这个按钮必须红得一眼能看见。
         self.btn_remove = tk.Button(
             box, text="移除补丁（危险）…", command=self.on_remove_patch,
             fg="white", bg=_DANGER_BG, activebackground=_DANGER_BG_HOVER,
             activeforeground="white", relief="flat", padx=10, pady=2,
             cursor="hand2")
-        self.btn_remove.grid(row=2, column=2, sticky="e", padx=(10, 0), pady=(8, 0))
+        self.btn_remove.grid(row=4, column=2, sticky="e", padx=(10, 0), pady=(8, 0))
         ttk.Label(box, text="只删本补丁的文件：启动器、DLL、语言包与它的日志；"
-                  "PR2.exe 不会动。").grid(row=2, column=0, columnspan=2,
+                  "PR2.exe 不会动。").grid(row=4, column=0, columnspan=2,
                                           sticky="w", pady=(8, 0))
 
     def _run_section(self, box):
@@ -1509,7 +1662,119 @@ class App(tk.Tk):
             self.status.set("该目录里没有 %s，请选游戏所在目录。" % GAME_EXE)
         else:
             self._sync_lang_display()
+            self._auto_remember(path)
+        self._update_version_status()
         self._sync()
+
+    # ---- 版本记忆
+
+    def _refresh_version_choices(self):
+        """把已记住的版本填进下拉框（按上次使用时间倒序）。"""
+        dirs = self.settings.get("dirs") or {}
+        items = []
+        for sha, rec in dirs.items():
+            d = rec.get("dir") or ""
+            if not d:
+                continue
+            items.append((rec.get("last_used") or "", sha, d))
+        items.sort(reverse=True)
+        self._version_items = [(sha, d) for _t, sha, d in items]
+        labels = ["%s — %s" % (version_label(sha), d) for sha, d in self._version_items]
+        self.version_box.configure(values=labels)
+        cur = self.settings.get("current") or ""
+        for i, (sha, _d) in enumerate(self._version_items):
+            if sha == cur:
+                self.var_version.set(labels[i])
+                break
+        else:
+            self.var_version.set("")
+
+    def _restore_last_dir(self):
+        """启动时恢复上次的目录；没有就用最近记住的那个。"""
+        last = (self.settings.get("last_dir")
+                or (self._version_items[0][1] if self._version_items else ""))
+        if last and is_game_dir(last):
+            self.set_dir(last)
+
+    def _auto_remember(self, path):
+        """识别并静默记住当前目录（不弹窗，失败只写日志）。"""
+        sha, build = identify_dir(path)
+        if not sha:
+            return
+        dirs = self.settings.setdefault("dirs", {})
+        rec = dirs.get(sha, {})
+        rec.update({"dir": path, "label": version_label(sha),
+                    "last_used": time.strftime("%Y-%m-%d %H:%M:%S")})
+        dirs[sha] = rec
+        self.settings["current"] = sha
+        self.settings["last_dir"] = path
+        save_settings(self.settings)
+        self._refresh_version_choices()
+        if build:
+            self._log("识别到 %s（%s）" % (build["label"], sha[:12]))
+        else:
+            self._log("未识别的 PR2.exe（%s），仍可记住该目录。" % sha[:12])
+
+    def _update_version_status(self):
+        path = self.var_dir.get()
+        if not is_game_dir(path):
+            self.lbl_version.configure(
+                text="未选择游戏目录，或目录里没有 %s。" % GAME_EXE, fg="#a00000")
+            return
+        sha, build = identify_dir(path)
+        if not sha:
+            self.lbl_version.configure(text="无法读取 %s。" % GAME_EXE, fg="#a00000")
+            return
+        known = "已记住" if sha in (self.settings.get("dirs") or {}) else "未记住"
+        if build:
+            self.lbl_version.configure(
+                text="%s ｜ %s ｜ SHA %s… ｜ %s" % (build["label"], known, sha[:12], build["note"]),
+                fg="#006000")
+        else:
+            self.lbl_version.configure(
+                text="未知版本 ｜ %s ｜ SHA %s…（可用「记住当前目录」保存）" % (known, sha[:12]),
+                fg="#a06000")
+
+    def on_pick_version(self, _event=None):
+        idx = self.version_box.current()
+        if 0 <= idx < len(self._version_items):
+            sha, path = self._version_items[idx]
+            self.settings["current"] = sha
+            self.settings["last_dir"] = path
+            save_settings(self.settings)
+            if is_game_dir(path):
+                self.set_dir(path)
+            else:
+                self.status.set("该版本的目录已不存在：%s" % path)
+
+    def on_remember_version(self):
+        path = self.var_dir.get()
+        if not is_game_dir(path):
+            messagebox.showinfo("记住当前目录", "请先选择一个包含 %s 的游戏目录。" % GAME_EXE)
+            return
+        sha, build = identify_dir(path)
+        if not sha:
+            messagebox.showerror("记住当前目录", "读取 %s 失败。" % GAME_EXE)
+            return
+        self._auto_remember(path)
+        self._update_version_status()
+        label = build["label"] if build else "未知版本"
+        messagebox.showinfo("记住当前目录",
+                            "已记住：\n%s\n%s\n\nSHA-256：%s" % (label, path, sha))
+
+    def on_check_patch(self):
+        path = self.var_dir.get()
+        if not is_game_dir(path):
+            messagebox.showinfo("检查补丁", "请先选择一个包含 %s 的游戏目录。" % GAME_EXE)
+            return
+        rows = patch_report(path)
+        lines = ["%s：%s%s" % (name, state, ("  — " + note) if note else "")
+                 for name, state, note in rows]
+        sha, build = identify_dir(path)
+        head = build["label"] if build else "未知版本"
+        messagebox.showinfo(
+            "补丁状态 — %s" % head,
+            "\n".join(lines) + "\n\nSHA-256：%s" % sha)
 
     def _sync_lang_display(self):
         """把 locale.ini 的设置显示到下拉框上，并说明读到了什么。
