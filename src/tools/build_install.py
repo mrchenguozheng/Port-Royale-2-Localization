@@ -825,6 +825,23 @@ def run_build(langs, events):
         except Exception as exc:                  # 字体失败不该让构建失败
             events.put(("line", "字体检查跳过：%s" % exc))
 
+        # 术语对照表：同样是「跟着译文走」的产物，顺手重生成一份，
+        # 省得改完译文忘了同步。产物在 build\glossary\，不进仓库。
+        try:
+            script = os.path.join(HERE, "glossary.py")
+            events.put(("line", "生成术语对照…"))
+            cmd = [sys.executable, script]
+            for l in langs:
+                cmd += ["--lang", l]
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                cwd=ROOT, env=child_env())
+            read_lines(proc, events)
+            proc.wait()
+        except Exception as exc:
+            events.put(("line", "术语对照跳过：%s" % exc))
+
         events.put(("build_ok", list(langs)))
     except Exception as exc:                      # 兜底，别让线程静默死掉
         events.put(("line", "构建出错：%s" % exc))
