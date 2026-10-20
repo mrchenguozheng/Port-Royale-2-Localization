@@ -119,11 +119,24 @@ def is_placeholder(txt):
 RE_PIPE_BREAK = re.compile(r"(?<!<)\s*\|\s*(?!>)")
 
 
-#: 必须原样保留英文的条目（法律声明、第三方版权）。
-#: 编译时强制用英文原文，译文里写成什么都覆盖掉。
-KEEP_ORIGINAL = {
-    "0xfc512ea5": "Miles Sound System / RAD Game Tools 版权声明",
-}
+#: 必须原样保留英文的条目：法律声明、内部编号、纯符号/数字。
+#: 清单在 src\translations\keep_original.toml，编译时强制写英文原文。
+KEEP_ORIGINAL = {}
+
+
+def load_keep_original():
+    """读 keep_original.toml，返回 {id: 分组名}。"""
+    import tomllib
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "translations", "keep_original.toml")
+    if not os.path.isfile(path):
+        return {"0xfc512ea5": "版权声明"}
+    data = tomllib.load(open(path, "rb"))
+    out = {}
+    for group, val in data.items():
+        for k in (val.get("ids") or []):
+            out[k.lower()] = group
+    return out
 
 
 def to_engine(txt):
@@ -190,6 +203,7 @@ def build(lang, out_dir, strict):
     errors, warnings = [], []
 
     os.makedirs(out_dir, exist_ok=True)
+    KEEP_ORIGINAL.update(load_keep_original())
     path = os.path.join(out_dir, "%s.txt" % lang)
     lines = []
     n = n_ph = 0
