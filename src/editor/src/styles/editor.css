@@ -109,6 +109,84 @@ button { cursor: pointer; min-width: 5rem; }
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { color: var(--fg-id); cursor: default; }
 
+/* 顶栏里那种小方按钮（＋）。全局 button 有 5rem 最小宽度，
+ * 放在「编辑」下拉旁边会把它挤得离得很远。 */
+button.mini {
+  min-width: 0;
+  padding: 0.15rem 0.5rem;
+  line-height: 1.2;
+}
+
+/* ── 「添加语言」对话框 ───────────────────────────────── */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal[hidden] { display: none; }
+
+.modal-box {
+  width: min(30rem, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.1rem 1.2rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.modal-box h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.modal-box label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+
+.modal-box input,
+.modal-box select {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg-row);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+}
+
+.modal-note {
+  margin: 0;
+  color: var(--fg-id);
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.modal-err {
+  margin: 0;
+  min-height: 1.2em;
+  color: var(--err);
+  font-size: 0.9em;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
 select:focus-visible, input:focus-visible, button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
@@ -178,7 +256,9 @@ main {
 
 .line {
   display: grid;
-  grid-template-columns: 3.6rem minmax(0, 1fr);
+  /* 标签列按内容宽度：参照语言名带版本（en.gog_1.1.2.3），
+     写死 3.6rem 会被截成 "en.gog_1."。 */
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: start;
 }
 
@@ -200,6 +280,13 @@ main {
   font-family: var(--font-mono);
   white-space: pre-wrap;      /* 保留 | 之外的换行 */
   overflow-wrap: anywhere;
+}
+
+/* 参考语言那一版里没有这个 id（版本差异）。
+ * 用灰斜体，和「空译文」区分开 —— 后者是作者还没填，前者是压根不存在。 */
+.cell-ref.miss {
+  color: var(--fg-id);
+  font-style: italic;
 }
 
 .cell-ref { color: var(--fg-dim); }
@@ -288,23 +375,34 @@ main {
   background: var(--sp-mark-b);
 }
 
-/* ── 未加载部分的占位 ─────────────────────────────────── */
+/* ── 分页 ─────────────────────────────────────────────── */
 /*
- * 分段加载：正文按需取，未加载的条目用这个块撑出滚动条长度。
- * 少了它，滚动条只反映已加载的几十条 —— 滚到底就是"到底了"，
- * 而实际还有三千多条没显示，滚动条会给出错误的空间感。
- *
- * 高度在 JS 里按「剩余条数 × 估算行高」算（估不准没关系，
- * 滚到接近底部时会用真实数据把它替换掉）。
+ * 一页一取，底栏常驻页码。不用「滚动加载」：那种做法要靠估算行高
+ * 撑出占位高度，拖动滑块一跳就落进空白里，而且跳多远就要补多少条。
  */
-.tail {
-  display: flex;
+.pager {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  color: var(--fg-id);
-  font-size: 0.85em;
-  border-bottom: 1px solid var(--line-soft);
+  gap: 0.25rem;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+
+.pager button,
+.pager input,
+.pager select {
+  padding: 0.15rem 0.35rem;
+  min-width: 0;
+}
+
+.pager button {
+  min-width: 1.8rem;
+  line-height: 1;
+}
+
+.page-num {
+  width: 4rem;
+  text-align: center;
 }
 
 /* ── 状态 ─────────────────────────────────────────────── */

@@ -206,3 +206,5 @@ src/editor/.astro/
 # 仓库根的虚拟环境：首次运行由 venv_ensure() 自动创建，
 # 里面装 requirements.txt 里的依赖，不进仓库。
 .venv/
+
+HANDOFF.md

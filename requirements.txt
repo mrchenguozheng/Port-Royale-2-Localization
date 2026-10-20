@@ -1,8 +1,8 @@
-# 仓库的 Python 依赖。装进仓库根的 .venv，不污染系统 Python。
+# 仓库目前**没有**第三方 Python 依赖：
 #
-# 只有这两个是第三方依赖 —— 其余全是标准库。
-# 目前只有译文编辑器（src\editor\）用得上；以后别的东西要加包，也加这里。
-# 版本用下限而不是钉死：patch 版本差异不影响功能，钉死反而会在
-# 别的机器上卡住（尤其是刚出的新版本）。
-fastapi>=0.110
-uvicorn>=0.27
+#   - 编辑器后端已改成纯标准库（http.server + json），不需要 fastapi / uvicorn，
+#     也不需要 venv —— 有 python.exe 就能开；
+#   - 其余脚本（translate / compile_pack / build_install）本来就只有标准库。
+#
+# 这份文件保留着，是为了以后真要加包时有地方写「装什么」，而不是散在
+# 各个脚本的注释里。
