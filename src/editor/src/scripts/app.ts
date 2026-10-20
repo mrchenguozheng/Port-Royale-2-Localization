@@ -62,6 +62,8 @@ const S = {
   dirtyIds: [] as string[],
   size: 14,
   problems: {} as Record<string, Problem[]>,
+  /** 术语一致性： id -> ["Frigate：应为「巡防舰」", …] */
+  terms: {} as Record<string, string[]>,
   loading: false,
 };
 
@@ -106,6 +108,14 @@ async function boot() {
   // 参照默认取基准语言（en.gog_1.1.2.3 这类带来源与版本的名字）。
   S.refA = d.all.includes(d.base) ? d.base : (d.all[0] || '');
   S.refB = S.refLangs.includes('fr.gog_1.1.2.42') ? 'fr.gog_1.1.2.42' : FOLLOW;
+
+  // 术语一致性检查：术语表当规则，标在对应行上（慢一点也没关系，只取一次）
+  try {
+    const t = await api<{ issues: Record<string, string[]> }>('/api/terms?lang=' + encodeURIComponent(S.lang));
+    S.terms = t.issues || {};
+  } catch {
+    S.terms = {};
+  }
 
   fill($('lang'), S.langs, S.lang);
   fill($('refA'), S.refLangs, S.refA);
@@ -180,7 +190,9 @@ function updatePager() {
 
 function updateStat() {
   const pages = pageCount();
-  $('stat').textContent = `第 ${S.page} / ${pages} 页 · 共 ${S.total} 条`;
+  const n = Object.keys(S.terms).length;
+  $('stat').textContent = `第 ${S.page} / ${pages} 页 · 共 ${S.total} 条`
+    + (n ? ` · 术语待统一 ${n} 条` : '');
 }
 
 function fill(sel: HTMLSelectElement, items: string[], cur: string) {
@@ -271,7 +283,10 @@ function rowOf(e: Entry): HTMLElement {
 
   const flags = el('div', 'flags');
   const ps = S.problems[e.id];
-  if (ps && ps.length) flags.textContent = ps.map((p) => p.text).join('\n');
+  const ts = S.terms[e.id];
+  const parts = (ps || []).map((p) => p.text).concat(ts || []);
+  if (parts.length) flags.textContent = parts.join('\n');
+  if (ts && ts.length) flags.classList.add('term');
   row.appendChild(flags);
 
   const zh = textOf(e);

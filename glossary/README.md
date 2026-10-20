@@ -91,3 +91,42 @@ python src\tools\glossary.py --lang fr.gog_1.1.2.42
 - 「五月」有两条：`0x327c63bf` = 五月（月份名）、`0x0247d1b7` = 5月（日期缩写）；
 - 其余月份也是「一月 / 1月」两套，日期串用的是后者；
 - `Jan` 的人名条目译作「扬」，与月份「1月」不同源，别混用。
+
+## 自动检查：术语一致性
+
+光有一张表还得靠人记；所以另有一个脚本把术语表当**规则**用：
+
+```bat
+python src\tools\terms_check.py            :: 查所有可编辑语言
+python src\tools\terms_check.py --lang zh
+python src\tools\terms_check.py --json     :: 给编辑器/脚本用
+python src\tools\terms_check.py --strict   :: 有问题时退出码 1（可进 CI）
+```
+
+规则是「原文里出现 `Frigate`，译文里就该出现「巡防舰」」：
+
+- 整词匹配（`Frigate` 不会命中 `Frigatebird`），首字母大写时区分大小写
+  （否则 `may` 这个情态动词会被当成五月）；
+- 复数只认 `s`（不认 `es`，否则 `Wood` 会命中人名 `Woodes Rogers`）；
+- 长词优先：`Rear Admiral` 命中后，里面的 `Admiral` 不再重复报；
+- 译文比较**忽略空格**（「6 月」和「6月」同义）；
+- 译文里包含约定译法即通过（「军事巡防舰」含「巡防舰」）。
+
+可以在 `terms.toml` 里微调：
+
+```toml
+# 整组不查：界面词一词多义，不适合自动判
+[[group]]
+name = "界面"
+check = false
+
+# 同一个词允许的另一种译法（按术语条目的 id）
+[group.alt]
+"0xdc939a60" = ["教会"]      # Catholic Church → 教会
+
+# 与术语无关的误命中，整条跳过
+ignore = ["0xfc512ea5"]       # 版权声明里的 RAD Game Tools
+```
+
+**编辑器里也接了**：打开编辑器时会自动跑一次，右上角状态显示
+「术语待统一 N 条」，对应行下面用橙色标出「Turk Islands：应为「特克群岛」」。
