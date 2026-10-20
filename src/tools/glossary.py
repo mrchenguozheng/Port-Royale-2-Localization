@@ -48,7 +48,7 @@ sys.path.insert(0, HERE)
 import translate as T          # 复用语言列表与基准文件，别再抄一份规则
 
 #: 表头里用的语言显示名（代码 -> 中文名），以后加语言在这里补一行。
-LANG_NAMES = {"zh": "中文", "fr": "法语", "test_en": "English",
+LANG_NAMES = {"zh": "中文", "ja": "日本語", "fr": "法语", "test_en": "English",
               "en.gog_1.1.2.3": "English", "fr.gog_1.1.2.42": "法语（原版）"}
 
 
