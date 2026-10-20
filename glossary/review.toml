@@ -1,0 +1,25 @@
+# 待复核条目（拿不准的译法）
+#
+# 这些条目不是「错」，是「可能不止一种译法」：人名与月份/常用词撞车、
+# 音译没有唯一标准之类。游戏里会在译文末尾带一个 ※ 记号，游玩时看到
+# 就说明这条要再看一眼 —— 记下来，回来改，然后从本文件删掉。
+#
+# 用法：
+#   python src\tools\mark_review.py --apply    按本文件给译文加 ※
+#   python src\tools\mark_review.py --clear    把本文件里各条的 ※ 去掉
+#   python src\tools\mark_review.py --list     看看现在有哪些
+#
+# 注意：※ 必须在字体里，否则游戏里是空白。subset_fonts.py 的 EXTRA
+# 已经包含它，重新构建字体即可。
+
+[[item]]
+id = "0xfc517065"
+text = "Jan"
+zh = "扬"
+note = "人名 Jan 的音译：扬 / 扬恩 / 简？荷兰语常见「扬」"
+
+[[item]]
+id = "0xf7acf0d3"
+text = "Jan Erasmus Reining"
+zh = "扬·伊拉斯谟·赖宁"
+note = "同上；Reining 也常译「赖宁/赖宁格」"
