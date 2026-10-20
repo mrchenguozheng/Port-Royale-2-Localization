@@ -53,6 +53,28 @@ PUNCT = {
 
 VAR = re.compile(r"@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]")
 
+#: 日语助词。长的写在前面（正则会先匹配到长的）。
+#: 只处理「汉字/片假名 + 助词 + 汉字/片假名或标点」的情况：
+#: 后面跟着平假名的一律跳过，避免把「について」「として」「ません」这类
+#: 词尾切开；开头也要是汉字/片假名，避免把「か月」之类切坏。
+JA_PARTICLES = [
+    "から", "まで", "より", "など", "ほど", "ばかり", "だけ", "しか", "こそ",
+    "さえ", "でも", "って", "ので", "のに", "けど",
+    "は", "が", "を", "に", "で", "と", "も", "の", "へ", "や", "か", "ね", "よ",
+]
+JA_HEAD = r"\u4e00-\u9fff\u3400-\u4dbf\u30a1-\u30fa\u30fc"
+# 只在后面紧跟汉字/片假名/开括号时补空格；紧跟标点或句尾不动，
+# 免得出现「船か 。」这种「标点前空格」。
+JA_TAIL = r"\u4e00-\u9fff\u3400-\u4dbf\u30a1-\u30fa\u30fc「『（【〈〔"
+JA_PART_RX = re.compile(
+    r"(?<=[%s])(%s)(?=[%s])" % (JA_HEAD, "|".join(JA_PARTICLES), JA_TAIL))
+
+
+def space_particles(text):
+    """在句子中间的助词后面补一个半角空格（日语）。"""
+    return JA_PART_RX.sub(lambda m: m.group(1) + " ", text)
+
+
 
 def make_fmt(sets):
     open_, close, single, runs = (sets["open"], sets["close"],
@@ -125,6 +147,8 @@ def main():
     ap.add_argument("--lang", default="zh")
     ap.add_argument("--dry-run", action="store_true", help="只统计，不写文件")
     ap.add_argument("--force", action="store_true", help="对没有规则的语言也套用中文规则")
+    ap.add_argument("--particles", action="store_true",
+                    help="日语：在句子中间的助词后补空格（汉字/片假名 + 助词 + 汉字/片假名）")
     a = ap.parse_args()
 
     sets = PUNCT.get(a.lang)
@@ -147,7 +171,10 @@ def main():
     for k in ids:
         if not cjk_rx.search(doc[k]):
             continue          # 还没译的条目保持与原文逐字一致，不动
-        new = clean_n(fix_vars(fmt(doc[k]), punct, sets["cjk"]))
+        new = fix_vars(fmt(doc[k]), punct, sets["cjk"])
+        if a.particles and a.lang == "ja":
+            new = space_particles(new)
+        new = clean_n(new)
         if new != doc[k]:
             changed += 1
             doc[k] = new
