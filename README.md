@@ -147,3 +147,9 @@ Port Royale 2 Localization/
 （`IDM_CONTEST_…`）、按键名（`ESC`/`CTRL`/`F10`）、版权声明与制作方名称。
 清单在 `src/translations/keep_original.toml`，编译时会强制写回英文原文。
 
+## 路径约定
+
+仓库里的文档与脚本**不写本机绝对路径**：游戏目录一律写作 `<游戏目录>`，
+用户目录用 `%USERPROFILE%` 之类的环境变量表示。
+`subset_fonts.py` 需要的原版字体默认读仓库内 `assets/fonts/original/`（已在 `.gitignore` 中忽略），
+不再指向某台机器的安装位置。
