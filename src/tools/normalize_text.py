@@ -114,6 +114,15 @@ def space_particles_analyzer(text):
         if SPLIT_RX.fullmatch(part):
             out.append(part)
             continue
+        # 【坑】分段时首尾的空格必须原样保留：丢了的话 "%2 1 樽" 会被粘成 "%21"，
+        # 占位符就从 %2 变成 %21（游戏里直接少一个数字）。2026-10-20 实测踩到过。
+        lead = part[:len(part) - len(part.lstrip())]
+        tail = part[len(part.rstrip()):]
+        core = part.strip()
+        if not core:
+            out.append(part)
+            continue
+        part = core
         if kind == "janome":
             toks = [(t.surface, t.part_of_speech) for t in tok.tokenize(part)]
         else:
@@ -146,7 +155,7 @@ def space_particles_analyzer(text):
             if not nxt or nxt == " " or nxt in NO_SPACE_AFTER:
                 continue
             res.append(" ")
-        out.append("".join(res))
+        out.append(lead + "".join(res) + tail)
     return "".join(out)
 
 
