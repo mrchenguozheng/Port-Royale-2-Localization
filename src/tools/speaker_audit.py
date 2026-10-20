@@ -70,8 +70,11 @@ IMPERATIVE = re.compile(
     r"|Buy|Sell|Hire|Return|Report|Pay|Set|Keep|Look|Use|Select|Click|Wait|Speak|Sail)\b")
 FIRST_PERSON = re.compile(r"\b(I|my|me|we|our|us|I'm|I'd|I'll)\b")
 
+STRIP = re.compile(r"<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]")
+
 ORDER = ["落款", "自称", "头衔标签", "财政官/借贷", "亲属/恋人关系", "酒馆/醉汉",
-         "海盗/私掠", "官员/公务", "商人/交易", "教程/引导", "事件旁白", "系统界面", "通用对白"]
+         "海盗/私掠", "官员/公务", "商人/交易", "教程/引导", "事件旁白", "系统界面",
+         "通用-第1人称", "通用-祈使", "通用-无"]
 
 
 def person(en):
@@ -104,7 +107,18 @@ def classify(en):
         m = rx.search(e)
         if m:
             return "B", name, "B", "线索词：" + m.group(0)
-    return "C", "通用对白", "C", "只有人称/祈使，无角色线索"
+    p = person(e)
+    label = {"第1人称": "通用-第1人称", "祈使": "通用-祈使",
+             "第3人称": "通用-第3人称"}.get(p, "通用-无")
+    return "C", label, "C", "只有%s，无角色线索" % p
+
+
+def family_key(text, n=3):
+    """模板族的键：去掉标签和占位符后取开头 n 个词。"""
+    t = STRIP.sub(" ", text).lower()
+    t = re.sub(r"[^a-z' ]+", " ", t)
+    words = t.split()
+    return " ".join(words[:n]) if words else "(仅占位符/标签)"
 
 
 def load():
@@ -131,14 +145,31 @@ def build_rows():
             "fr": fr.get(k, "").strip(),
             "keep": "是" if k in keep else "",
             "evidence": why,
+            "family": family_key(e),
+            "family_size": 0,
+            "family_role": "",
         })
+    # 模板族统计：>=3 条才算一族，取最短一条作「代表」
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for r in rows:
+        groups[r["family"]].append(r)
+    for key, members in groups.items():
+        if len(members) < 3:
+            members[0]["family_size"] = len(members)
+            continue
+        members.sort(key=lambda r: (len(r["en"]), r["hash"]))
+        for i, r in enumerate(members):
+            r["family_size"] = len(members)
+            r["family_role"] = "代表" if i == 0 else "成员"
     return rows
 
 
 def write_csv(rows):
     path = os.path.join(DOCS, "speaker-audit.csv")
     key = lambda r: (r["tier"], ORDER.index(r["category"]) if r["category"] in ORDER else 99, r["hash"])
-    cols = ["hash", "tier", "category", "rule", "person", "en", "fr", "keep", "evidence"]
+    cols = ["hash", "tier", "category", "rule", "person", "family", "family_size",
+            "family_role", "en", "fr", "keep", "evidence"]
     with io.open(path, "w", encoding="utf-8-sig", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols)
         w.writeheader()
@@ -177,6 +208,21 @@ def write_md(rows):
     for c in ORDER:
         if cats[c]:
             L.append("| %s | %d |" % (c, cats[c]))
+    # 模板族
+    from collections import defaultdict
+    fam = defaultdict(list)
+    for r in rows:
+        if r["family_size"] >= 3:
+            fam[r["family"]].append(r)
+    top = sorted(fam.items(), key=lambda kv: -len(kv[1]))[:15]
+    L += ["", "## 模板族（C 级归并，>=3 条才算一族）", "",
+          "同一族是**同一套模板**换词，说话人相同、语气应一致；"
+          "每组标出一个「代表」（族里最短的一条），其余标「成员」。", "",
+          "| 族（开头词） | 条数 | 代表 hash | 代表英文 |", "|---|---|---|---|"]
+    for key, members in top:
+        rep = next((m for m in members if m["family_role"] == "代表"), members[0])
+        L.append("| `%s` | %d | `%s` | %s |" % (
+            key, len(members), rep["hash"], rep["en"][:70].replace("|", "\\|")))
     L += ["", "## A 级：文本自己写明身份（%d 条）" % len(A), "",
           "| hash | 类别 | 规则 | 英文原文 |", "|---|---|---|---|"]
     for r in A:
