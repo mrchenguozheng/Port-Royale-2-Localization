@@ -113,6 +113,22 @@ def classify(en):
     return "C", label, "C", "只有%s，无角色线索" % p
 
 
+SYM_ONLY = re.compile(r"[\s\-_.,:;!?/\\|+=*#%&()\[\]{}<>\"'`~^@$0-9]+")
+
+
+def text_kind(en, key, keep):
+    """区分「对白」与「非文本」：标签/符号、调试串、保留项。"""
+    t = en.strip()
+    stripped = SYM_ONLY.sub("", STRIP.sub("", t))
+    if t.startswith("IDM_") or t.lower() == "dummy":
+        return "调试"
+    if re.fullmatch(r"F\d+", t) or not stripped:
+        return "标签/符号"
+    if key in keep:
+        return "保留项"
+    return "对白"
+
+
 def family_key(text, n=3):
     """模板族的键：去掉标签和占位符后取开头 n 个词。"""
     t = STRIP.sub(" ", text).lower()
@@ -134,6 +150,14 @@ def build_rows():
     rows = []
     for k, e in en.items():
         e = e.strip()
+        kind = text_kind(e, k, keep)
+        if kind != "对白":
+            rows.append({"hash": k, "tier": "-", "category": "非文本", "rule": "X",
+                         "person": "无", "keep": "是" if k in keep else "",
+                         "evidence": "非对白文本：" + kind, "en": e,
+                         "fr": fr.get(k, "").strip(), "family": "", "family_size": 0,
+                         "family_role": "", "kind": kind})
+            continue
         tier, cat, rule, why = classify(e)
         rows.append({
             "hash": k,
@@ -148,12 +172,14 @@ def build_rows():
             "family": family_key(e),
             "family_size": 0,
             "family_role": "",
+            "kind": kind,
         })
     # 模板族统计：>=3 条才算一族，取最短一条作「代表」
     from collections import defaultdict
     groups = defaultdict(list)
     for r in rows:
-        groups[r["family"]].append(r)
+        if r["tier"] != "-":
+            groups[r["family"]].append(r)
     for key, members in groups.items():
         if len(members) < 3:
             members[0]["family_size"] = len(members)
@@ -168,7 +194,7 @@ def build_rows():
 def write_csv(rows):
     path = os.path.join(DOCS, "speaker-audit.csv")
     key = lambda r: (r["tier"], ORDER.index(r["category"]) if r["category"] in ORDER else 99, r["hash"])
-    cols = ["hash", "tier", "category", "rule", "person", "family", "family_size",
+    cols = ["hash", "tier", "category", "rule", "person", "kind", "family", "family_size",
             "family_role", "en", "fr", "keep", "evidence"]
     with io.open(path, "w", encoding="utf-8-sig", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols)
@@ -191,7 +217,10 @@ def write_md(rows):
          "| **B 可推断** | 由内容可推断说话人的角色或与玩家的关系 | %d |" % tiers["B"],
          "| **C 通用** | 只有第一人称/祈使，没有角色线索 | %d |" % tiers["C"],
          "| **N 无说话人** | 系统界面、第三人称事件旁白 | %d |" % tiers["N"],
+         "| **非文本** | 标签/符号、调试串、保留项，不参与说话人判定 | %d |" % tiers["-"],
          "| 合计 | | %d |" % len(rows), "",
+         "> 说话人判定只在 **%d 条对白**上做；剩下 %d 条是非文本，单独列在下面。" % (
+             len(rows) - tiers["-"], tiers["-"]), "",
          "## 上一版为什么显得乱", "",
          "| 问题 | 旧规则 | 现规则 |", "|---|---|---|",
          "| 把「提到亲属」当成「说话人是亲属」 | 出现 `my wife` / `my daughter` 就判 A 级，"
@@ -223,6 +252,13 @@ def write_md(rows):
         rep = next((m for m in members if m["family_role"] == "代表"), members[0])
         L.append("| `%s` | %d | `%s` | %s |" % (
             key, len(members), rep["hash"], rep["en"][:70].replace("|", "\\|")))
+    # 非文本明细
+    kinds = Counter(r["kind"] for r in rows if r["tier"] == "-")
+    L += ["", "## 非文本（不参与判定，%d 条）" % sum(kinds.values()), "",
+          "| 类型 | 条数 | 例子 |", "|---|---|---|"]
+    for kd, n in kinds.most_common():
+        samples = [r["en"][:24] for r in rows if r["tier"] == "-" and r["kind"] == kd][:3]
+        L.append("| %s | %d | %s |" % (kd, n, "、".join("`%s`" % x for x in samples)))
     L += ["", "## A 级：文本自己写明身份（%d 条）" % len(A), "",
           "| hash | 类别 | 规则 | 英文原文 |", "|---|---|---|---|"]
     for r in A:
