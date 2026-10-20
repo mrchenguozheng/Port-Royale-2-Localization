@@ -1018,7 +1018,7 @@
 "0xe32293cd" = "交易路を 削除できません。<n>ファイルが 書き込み禁止かも しれません。"
 "0xe329d4c5" = "%1 %2  +  %3 %4  +  %5 %6  =  %7"
 "0xe3512f4f" = "容量がいっぱいです"
-"0xe351d075" = "<n>%21 樽につき %1 を払います。 手元に %3 ありますね。<n><n>品を 渡してくれますか？"
+"0xe351d075" = "<n>%2 は 1 樽につき %1 を払います。 手元に %3 ありますね。<n><n>品を 渡してくれますか？"
 "0xe374facc" = "先住民が %1 を略奪"
 "0xe37c2194" = "3D グラフィックと 特殊効果"
 "0xe37f3b10" = " As the towns belonging to my nation do not produce enough, I was forced to rely on deliveries from English towns."
