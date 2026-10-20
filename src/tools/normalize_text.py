@@ -210,6 +210,30 @@ def make_fmt(sets):
     return fmt, punct
 
 
+def fix_ascii_punct(text, lang):
+    """把 CJK 文本里的半角标点换成全角（英文逗号混进来很扎眼）。
+
+    不动纯 ASCII 的格式串（%1:%2:%3 时间、1,000 千分位、ASCII 词内部）。
+    """
+    if not re.search(r"[\u3040-\u30ff\u4e00-\u9fff]", text):
+        return text
+    table = {"ja": {",": "、", ";": "；", ":": "：", "!": "！", "?": "？"},
+             "zh": {",": "，", ";": "；", ":": "：", "!": "！", "?": "？"}}[lang]
+    out = []
+    for i, ch in enumerate(text):
+        rep = table.get(ch)
+        if rep:
+            prev = text[i-1] if i else ""
+            nxt = text[i+1] if i+1 < len(text) else ""
+            if ch == ":" and prev.isdigit() and nxt.isdigit():
+                out.append(ch); continue
+            if prev.isascii() and prev.isalnum() and nxt.isascii() and nxt.isalnum():
+                out.append(ch); continue
+            out.append(rep); continue
+        out.append(ch)
+    return "".join(out)
+
+
 def fix_vars(text, punct, cjk):
     # 【坑】不能把整个片假名区当「文字」：・(U+30FB) 和 ー(U+30FC) 也在里面，
     # 一律加空格会把 迭戈・莫扎雷拉 / 小麦・果物 拆开。已把它们排除。
@@ -273,9 +297,9 @@ def main():
         if k in DATE_FORMAT_IDS:
             # 日期格式串（%3年%2%1日）不能让 fix_vars 在占位符两侧补空格，
             # 否则会渲染成「1600 年 4月 1 日」。
-            new = clean_n(fmt(new))
+            new = clean_n(fmt(fix_ascii_punct(new, a.lang)))
         else:
-            new = clean_n(fix_vars(fmt(new), punct, sets["cjk"]))
+            new = clean_n(fix_vars(fmt(fix_ascii_punct(new, a.lang)), punct, sets["cjk"]))
         if new != doc[k]:
             changed += 1
             doc[k] = new
