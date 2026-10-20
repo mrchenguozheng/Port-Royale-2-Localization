@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 # coding: utf-8
-r"""src/editor/server.py — 本地 Web 编辑器的后端（FastAPI）
+r"""src/editor/server.py — 本地 Web 编辑器的后端（纯标准库）
 
 浏览器负责显示与编辑，**校验规则全在这里** —— 因为规则本来就在
 translate.py / compile_pack.py 里，那是唯一的一份。抄到 JS 里就多一份
 实现，两边不一致时没人知道该信哪个。
 
 同时托管前端产物 dist\（astro build 的输出）。所以只起一个服务就够，
-不需要再单独跑 astro dev。
+不需要再单独跑 astro dev，也不需要任何第三方包：
+
+    只用 http.server / json / urllib，和仓库里其它脚本一样是标准库。
+    以前这里是 FastAPI + uvicorn 的，但那样每次「打开译文编辑器」都要
+    先建 venv、再联网装依赖 —— 网络不通就永远打不开，而它只是 8 个
+    本地 JSON 接口，用不上框架。
 
 启动：
     python src/editor/server.py              # 起服务并开浏览器
@@ -18,10 +23,17 @@ translate.py / compile_pack.py 里，那是唯一的一份。抄到 JS 里就多
 """
 
 import argparse
+import json
+import mimetypes
 import os
+import re
 import sys
 import threading
+import time
+import urllib.parse
+import urllib.request
 import webbrowser
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.dirname(HERE)                                  # 仓库的 src\
@@ -37,41 +49,17 @@ if TOOLS not in sys.path:
 import translate as T          # noqa: E402
 import compile_pack as C       # noqa: E402
 
-from fastapi import FastAPI, HTTPException    # noqa: E402
-from fastapi.responses import JSONResponse      # noqa: E402
-from fastapi.staticfiles import StaticFiles  # noqa: E402
-from pydantic import BaseModel               # noqa: E402
 
+#: 真实端口，由 main() 在启动前填上。工具窗口靠 /api/health 判断
+#: 「这个端口上跑的是不是编辑器、是哪一个」。
+CURRENT_PORT = 0
 
-# ---------------------------------------------------------------- 模型
+#: 工具窗口起的实例会带一个随机令牌；/api/health 原样回传，
+#: 用来把「我刚拉起的这个」和「旁边已经在跑的另一个」区分开。
+CURRENT_TOKEN = os.environ.get("PR2_EDITOR_TOKEN", "")
 
-class RowIn(BaseModel):
-    id: str
-    text: str = ""
-
-
-class CheckIn(BaseModel):
-    id: str
-    text: str = ""
-    lang: str = "zh"
-
-
-class SaveIn(BaseModel):
-    lang: str
-    rows: list[RowIn]
-
-
-class PatchIn(BaseModel):
-    """只提交改动过的条目 —— 配合分段加载用。
-
-    分段之后前端只握着几十条，没加载过的那些它根本没见过。
-    整表提交就得先把 320 KB 重新拉一遍再原样送回，纯浪费。
-    """
-    lang: str
-    rows: list[RowIn]
-
-
-app = FastAPI(title="PR2 本地化编辑器", docs_url=None, redoc_url=None)
+#: serve_forever() 的那个实例。关服务时用它。
+SERVER = None
 
 
 # ---------------------------------------------------------------- 校验
@@ -95,7 +83,7 @@ def check_one(entry, lang, text):
         out.append({"level": "warn", "text": "还没翻（仍是占位文本）"})
         return out
 
-    en = entry.get("en", "") or ""
+    en = entry.get(T.BASE_LANG, "") or ""
 
     # 占位符：复用 compile_pack 的实现 —— 那里处理了 %2%1 紧邻的情况
     errors, warnings = [], []
@@ -106,13 +94,15 @@ def check_one(entry, lang, text):
         out.append({"level": "warn", "text": _strip_id(w, entry.get("id", ""))})
 
     # 标签轮廓：只比数量与名字（译文可以换颜色）。
-    # 但译文**不得新增**任何排版标签 —— 换行只能用原文已有的 <n> 或 |。
-    en_p, zh_p = T.tag_profile(en), T.tag_profile(text)
+    # 译文**不得新增**排版标签 —— 除了换行：项目里写 " | "，引擎认 <n>，
+    # 两者等价，所以先把 <n> 折成 | 再比。顺带绕开 tag_profile 在
+    # 连续标签（<n><n>）上的一个分词毛病：它会拼出 "n><n" 这种假标签。
+    en_p, zh_p = T.tag_profile(_canon_breaks(en)), T.tag_profile(_canon_breaks(text))
     if en_p != zh_p:
         added = sorted({t for t in zh_p if zh_p.count(t) > en_p.count(t)})
         if added:
             out.append({"level": "error",
-                        "text": "译文擅自新增标签 %s —— 换行只能用原文已有的 <n> 或 |"
+                        "text": "译文擅自新增标签 %s —— 换行只能用 <n> 或 |"
                                 % " ".join(added)})
         else:
             out.append({"level": "warn",
@@ -126,21 +116,36 @@ def _strip_id(msg, hid):
     return msg[len(hid):].strip() if msg.startswith(hid) else msg
 
 
+def _canon_breaks(s):
+    """把引擎的 <n> 折回项目里的 |，用于标签比对。
+
+    两种写法在游戏里是同一个东西（换行）；不折平的话，「原文写 |、译文写
+    <n>」会被判成"擅自加标签"，而这种写法正是编译期会生成的。
+    """
+    return re.sub(r"<n>", "|", s or "")
+
+
 # ---------------------------------------------------------------- 数据
 
 def load_all():
     """读全部语言，按 id 合并成前端要的形态。
 
     走 translate.load_toml —— 它已经在做合并，且强制条目数与顺序与
-    en.toml 一致。这条是硬要求：多一条会让后面全部错位。
+    基准表（en.gog_1.1.2.3）一致。这条是硬要求：多一条会让后面全部错位。
     """
     doc = T.load_toml()
     langs = T.all_langs()
+    # 参考语言缺的 id（版本差异）：给前端一个显式标记，
+    # 否则「空字符串」和「这一版根本没这条」看起来一模一样。
+    lack = {k: set(v) for k, v in (doc.get("missing") or {}).items()}
     rows = []
     for e in T.entries(doc):
         r = {"id": e.get("id", ""), "ctx": e.get("ctx", "") or ""}
         for k in langs:
             r[k] = e.get(k, "") or ""
+        gone = [k for k, ids in lack.items() if e.get("id", "") in ids]
+        if gone:
+            r["missing"] = gone
         rows.append(r)
     return rows
 
@@ -173,6 +178,24 @@ def toml_escape(s):
         else:
             out.append(ch)
     return "".join(out)
+
+
+def rows_of(body):
+    """从请求体里取 rows，并保持 (id, text) 的形状。
+
+    以前这层是 pydantic 做的；现在只有这一处要校验，手写更直接 ——
+    也顺手把「id 不是字符串」「text 是 null」这类脏数据挡在外面。
+    """
+    rows = body.get("rows")
+    if not isinstance(rows, list):
+        raise ValueError("rows 必须是数组")
+    out = []
+    for r in rows:
+        if not isinstance(r, dict) or not isinstance(r.get("id"), str):
+            raise ValueError("rows 里的每一项都要有字符串 id")
+        text = r.get("text", "")
+        out.append({"id": r["id"], "text": "" if text is None else str(text)})
+    return out
 
 
 def save_all(lang, rows):
@@ -219,90 +242,7 @@ def save_all(lang, rows):
     return len(lines)
 
 
-# ---------------------------------------------------------------- 接口
-
-@app.get("/api/langs")
-def api_langs():
-    return {"editable": T.target_langs(), "all": T.all_langs()}
-
-
-@app.get("/api/count")
-def api_count():
-    """只报条数与 id 顺序，不带正文。
-
-    前端首屏只要这个：拿到条数就能把滚动条画对，正文等滚到哪再取哪。
-    """
-    rows = load_all()
-    return {"count": len(rows), "ids": [r["id"] for r in rows]}
-
-
-@app.get("/api/entries")
-def api_entries(offset: int = 0, limit: int = 0):
-    """按需取一段。limit=0 表示全量（给命令行 / 调试用）。
-
-    为什么分段：3548 条全量是约 320 KB 的 JSON，加上前端要建
-    3548×3 个 DOM 节点，首屏会明显卡一下。分段之后首屏只取
-    屏幕上那几十条，其余等滚到再取。
-    """
-    try:
-        rows = load_all()
-    except SystemExit as exc:          # load_toml 用它报业务错误
-        raise HTTPException(500, str(exc))
-    if limit <= 0:
-        return rows
-    if offset < 0:
-        offset = 0
-    return rows[offset:offset + limit]
-
-
-@app.get("/api/search")
-def api_search(q: str = ""):
-    """按关键字搜索，只返回命中的条目。
-
-    搜索必须走服务端而不是前端过滤：正文本来就**没有**全量在前端
-    （现在只按需取可视区域那段），前端过滤等于又要先把 320 KB 全拉下来，
-    分段的意义就没了。
-    """
-    q = (q or "").strip().lower()
-    if not q:
-        return []
-    rows = load_all()
-    langs = T.all_langs()
-    out = []
-    for e in rows:
-        if q in e["id"].lower():
-            out.append(e)
-            continue
-        for k in langs:
-            if q in (e.get(k) or "").lower():
-                out.append(e)
-                break
-    return out
-
-
-@app.post("/api/check")
-def api_check(body: CheckIn):
-    try:
-        rows = load_all()
-    except SystemExit as exc:
-        raise HTTPException(500, str(exc))
-    entry = next((r for r in rows if r["id"] == body.id), None)
-    if entry is None:
-        return []
-    return check_one(entry, body.lang, body.text)
-
-
-@app.post("/api/save")
-def api_save(body: SaveIn):
-    try:
-        n = save_all(body.lang, [r.model_dump() for r in body.rows])
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
-    return {"ok": True, "written": n}
-
-
-@app.post("/api/patch")
-def api_patch(body: PatchIn):
+def patch_all(lang, rows):
     """只写改动过的条目，其余原样保留。
 
     分段加载之后前端只见过几十条，顺序也不保证，所以**不能**按
@@ -312,26 +252,24 @@ def api_patch(body: PatchIn):
     顺序以**现有文件**为准（基准 id 顺序不能变，多一条会让后面
     全部错位），所以传上来的 id 只用来查值。
     """
-    if body.lang in T.REFERENCE_LANGS:
-        raise HTTPException(400, "%s 是只读参考原文，不能写入" % body.lang)
+    if lang in T.REFERENCE_LANGS:
+        raise ValueError("%s 是只读参考原文，不能写入" % lang)
 
-    path = T.lang_path(body.lang)
+    path = T.lang_path(lang)
     try:
         import tomllib
         with open(path, "rb") as f:
             cur = tomllib.load(f)
     except FileNotFoundError:
         cur = {}
-    except Exception as exc:
-        raise HTTPException(500, "读现有 %s.toml 失败：%s" % (body.lang, exc))
 
     base = load_all()                    # 含 id 顺序与 ctx
     order = [r["id"] for r in base]
 
-    upd = {r.id: r.text for r in body.rows}
+    upd = {r["id"]: r["text"] for r in rows}
     unknown = [i for i in upd if i not in cur and i not in order]
     if unknown:
-        raise HTTPException(400, "有 id 不在文件里：%s" % "、".join(unknown[:3]))
+        raise ValueError("有 id 不在文件里：%s" % "、".join(unknown[:3]))
 
     lines = []
     for rid in order:
@@ -350,38 +288,346 @@ def api_patch(body: PatchIn):
             back = tomllib.load(f)
     except Exception as exc:
         os.remove(tmp)
-        raise HTTPException(500, "写入后的文件无法解析，已放弃写入：%s" % exc)
+        raise ValueError("写入后的文件无法解析，已放弃写入：%s" % exc)
     if len(back) != len(order):
         os.remove(tmp)
-        raise HTTPException(500, "写入后条目数不符，已放弃写入")
+        raise ValueError("写入后条目数不符，已放弃写入")
 
     os.replace(tmp, path)
-    return {"ok": True, "written": len(order), "changed": len(upd)}
+    return len(order), len(upd)
 
 
-# ---------------------------------------------------------------- 静态
+#: 语言代码就是文件名，也只允许这些字符 —— 它要拼进路径。
+RE_LANG_CODE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,15}$")
 
-# 挂在最后：前面的 /api 路由要先注册，否则全被静态兜底吃掉。
-if os.path.isdir(DIST):
-    # Astro 把带哈希的资源放在 /_astro/ 下，目录名是它自己定的，
-    # 别猜 —— 直接把 dist 整体挂到根，前端要的路径原样就能命中。
-    app.mount("/", StaticFiles(directory=DIST, html=True), name="static")
-else:
-    @app.get("/")
-    def index():
-        return JSONResponse(
-            {"error": "前端还没构建。请先在 src\\editor 下跑 npm install && npm run build"},
-            status_code=503)
+
+def lang_status(code):
+    """这个语言代码现在能不能用。返回一份给界面直接显示的自述。
+
+    为什么要单独有这一步：新建语言是**写文件**，而".toml 已经在那儿"
+    在界面上完全看不出来（下拉里只列已记录的语言）。让输入框一边打字
+    一边问服务端，用户当场就能看到「这个名字已被占用」，而不是点下去
+    才发现。真正写盘那一步还有一道独占创建的保险（见 new_lang）。
+    """
+    code = (code or "").strip()
+    if not code:
+        return {"code": code, "ok": False, "reason": "先填一个语言代码"}
+    if not RE_LANG_CODE.match(code):
+        return {"code": code, "ok": False, "exists": False,
+                "reason": "只能字母开头，含字母 / 数字 / - / _，最长 16 个字符"}
+    if code.lower() in T.REFERENCE_LANGS:
+        return {"code": code, "ok": False, "exists": True, "reference": True,
+                "reason": "%s 是只读参考语言，不能当新语言的代码" % code}
+
+    path = T.lang_path(code)
+    if os.path.exists(path):
+        return {"code": code, "ok": False, "exists": True, "reference": False,
+                "path": path,
+                "reason": "%s 已经存在（%s.toml），不会覆盖" % (code, code)}
+    return {"code": code, "ok": True, "exists": False, "reference": False}
+
+
+def new_lang(code, src):
+    """以 src 为模板，复制出一份新语言。返回 {"code", "from"}。
+
+    为什么是「复制一份」而不是「建一张空表」：条目数必须与基准表（en.gog_1.1.2.3）
+    完全一致（合并与校验都按位置对齐，少一条都会让后面的 hash 错位）。
+    空表在第一次保存时就会被判成「少 3548 条」；拿一个现成语言当模板，
+    天然就是完整的一张表 —— 而且它自带参照，用户只要把右边逐条改掉。
+
+    只做复制：不替用户决定新语言的译文。模板选 zh 就是「以中文为底」，
+    选 en 就是「从英文原文起译」，两种都合理。
+    """
+    code = (code or "").strip()
+    src = (src or "").strip()
+
+    st = lang_status(code)
+    if not st["ok"]:
+        raise ValueError(st["reason"])
+    if not src:
+        raise ValueError("没有选择模板语言")
+
+    src_path = T.lang_path(src)
+    if not os.path.isfile(src_path):
+        raise ValueError("模板语言不存在：%s" % src)
+    dst = T.lang_path(code)
+
+    with open(src_path, "rb") as f:
+        data = f.read()
+
+    # 模板本身得是一张完整的表：id 顺序与基准表一致才敢复制。
+    # 复制一份对不齐的表，等于把错误原样传给新语言，而且更晚才发现。
+    import tomllib
+    doc = tomllib.loads(data.decode("utf-8"))
+    rows = [k for k in doc if k != "ctx"]
+    with open(T.lang_path(T.BASE_LANG), "rb") as f:
+        base = tomllib.load(f)
+    order = [k for k in base if k != "ctx"]
+    if rows != order:
+        raise ValueError("模板 %s 的条目与 %s 对不齐（%d vs %d），不能当模板"
+                         % (src, T.BASE_LANG, len(rows), len(order)))
+
+    # 【关键】独占创建，不用「先 exists() 再 replace」：那两步之间有窗口，
+    # 期间别人（另一个编辑器窗口、或用户自己刚放进去的文件）建了同名文件，
+    # replace 会把它**静默覆盖**掉。O_EXCL 让内核来保证「只能新建」。
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+    try:
+        fd = os.open(dst, flags)
+    except FileExistsError:
+        raise ValueError("语言 %s 已经存在（%s.toml），没有覆盖" % (code, code))
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+    except Exception:
+        # 写了一半就失败：别留一个残缺的语言文件
+        try:
+            os.remove(dst)
+        except OSError:
+            pass
+        raise
+
+    return {"code": code, "from": src}
+
+
+# ---------------------------------------------------------------- HTTP
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "PR2Editor/2"
+    #: keep-alive：前端一屏要连发好几个请求，省掉反复握手。
+    protocol_version = "HTTP/1.1"
+
+    # 访问日志一屏几十行，全打进控制台反而看不见真正的报错。
+    def log_message(self, fmt, *args):
+        pass
+
+    # ---- 输出
+
+    def send_json(self, obj, status=200):
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def send_error_json(self, status, message):
+        self.send_json({"detail": str(message)}, status)
+
+    def read_json(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(n) if n else b""
+        if not raw:
+            return {}
+        try:
+            body = json.loads(raw.decode("utf-8"))
+        except Exception:
+            raise ValueError("请求体不是合法 JSON")
+        if not isinstance(body, dict):
+            raise ValueError("请求体必须是对象")
+        return body
+
+    def send_file(self, path):
+        if not os.path.isfile(path):
+            body = "404 not found: %s" % path
+            data = body.encode("utf-8")
+            self.send_response(404)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        ctype = mimetypes.guess_type(path)[0] or "application/octet-stream"
+        if ctype.startswith("text/") or ctype in ("application/javascript",
+                                                  "application/json"):
+            ctype += "; charset=utf-8"
+        with open(path, "rb") as f:
+            data = f.read()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        # 前端产物带内容哈希，静态文件可以放心缓存；index.html 不行。
+        if os.path.basename(path) != "index.html":
+            self.send_header("Cache-Control", "max-age=3600")
+        self.end_headers()
+        self.wfile.write(data)
+
+    # ---- 路由
+
+    def do_GET(self):
+        parsed = urllib.parse.urlsplit(self.path)
+        path = urllib.parse.unquote(parsed.path)
+        try:
+            if path.startswith("/api/"):
+                return self.get_api(path, urllib.parse.parse_qs(parsed.query))
+            return self.get_static(path)
+        except Exception as exc:            # 兜底：别让一个异常把连接挂死
+            return self.send_error_json(500, exc)
+
+    def do_POST(self):
+        parsed = urllib.parse.urlsplit(self.path)
+        path = urllib.parse.unquote(parsed.path)
+        try:
+            if not path.startswith("/api/"):
+                return self.send_error_json(404, "not found")
+            return self.post_api(path)
+        except ValueError as exc:
+            return self.send_error_json(400, exc)
+        except Exception as exc:
+            return self.send_error_json(500, exc)
+
+    # ---- GET
+
+    def get_static(self, path):
+        rel = path.lstrip("/") or "index.html"
+        full = os.path.normpath(os.path.join(DIST, rel))
+        # 目录穿越：拼出来的路径必须还在 dist\ 里
+        if os.path.commonpath([full, DIST]) != DIST:
+            return self.send_error_json(404, "not found")
+        if os.path.isdir(full):
+            full = os.path.join(full, "index.html")
+        return self.send_file(full)
+
+    def get_api(self, path, query):
+        if path == "/api/health":
+            return self.send_json({"app": "pr2-editor", "pid": os.getpid(),
+                                   "port": CURRENT_PORT, "token": CURRENT_TOKEN})
+
+        if path == "/api/langs":
+            return self.send_json({"editable": T.target_langs(),
+                                   "all": T.all_langs(),
+                                   "base": T.BASE_LANG})
+
+        if path == "/api/lang-exists":
+            # 输入框一边打字一边问：这个名字能不能用、是不是已经有一份了。
+            return self.send_json(lang_status((query.get("code") or [""])[0]))
+
+        if path == "/api/count":
+            # 只报条数与 id 顺序，不带正文：首屏拿到它就能把滚动条画对。
+            rows = load_all()
+            return self.send_json({"count": len(rows),
+                                   "ids": [r["id"] for r in rows]})
+
+        if path == "/api/entries":
+            offset = int((query.get("offset") or ["0"])[0])
+            limit = int((query.get("limit") or ["0"])[0])
+            rows = load_all()
+            if limit <= 0:
+                return self.send_json(rows)
+            if offset < 0:
+                offset = 0
+            return self.send_json(rows[offset:offset + limit])
+
+        if path == "/api/search":
+            # 搜索必须走服务端：正文本来就没全量在前端，前端过滤等于
+            # 又要先把 320 KB 全拉下来，分段加载就白做了。
+            q = (query.get("q") or [""])[0].strip().lower()
+            if not q:
+                return self.send_json([])
+            rows = load_all()
+            langs = T.all_langs()
+            out = []
+            for e in rows:
+                if q in e["id"].lower():
+                    out.append(e)
+                    continue
+                for k in langs:
+                    if q in (e.get(k) or "").lower():
+                        out.append(e)
+                        break
+            return self.send_json(out)
+
+        return self.send_error_json(404, "unknown api: %s" % path)
+
+    # ---- POST
+
+    def post_api(self, path):
+        body = self.read_json()
+
+        if path == "/api/check":
+            text = body.get("text", "")
+            lang = body.get("lang", "zh")
+            hid = body.get("id", "")
+            row = next((r for r in load_all() if r["id"] == hid), None)
+            return self.send_json([] if row is None else check_one(row, lang, text))
+
+        if path == "/api/save":
+            lang = body.get("lang", "")
+            return self.send_json({"ok": True,
+                                   "written": save_all(lang, rows_of(body))})
+
+        if path == "/api/patch":
+            lang = body.get("lang", "")
+            written, changed = patch_all(lang, rows_of(body))
+            return self.send_json({"ok": True, "written": written,
+                                   "changed": changed})
+
+        if path == "/api/newlang":
+            made = new_lang(body.get("code", ""), body.get("from", ""))
+            return self.send_json({"ok": True, **made})
+
+        if path == "/api/shutdown":
+            self.send_json({"ok": True})
+            # 稍等一点，先让这条响应写回客户端，再收摊。
+            threading.Timer(0.2, stop_server).start()
+            return None
+
+        return self.send_error_json(404, "unknown api: %s" % path)
+
+
+def stop_server():
+    global SERVER
+    if SERVER is not None:
+        SERVER.shutdown()
+
+
+# ---------------------------------------------------------------- 启动
+
+def editor_on(host, port):
+    """这个端口上是不是我们自己的编辑器？问一句 /api/health。
+
+    只测「端口通不通」不够：旁边完全可能有别的服务在监听，
+    把它当成「编辑器已在运行」会让浏览器打开一个不相干的页面。
+    """
+    try:
+        with urllib.request.urlopen(
+                "http://%s:%d/api/health" % (host, port), timeout=1.0) as resp:
+            info = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return False
+    return isinstance(info, dict) and info.get("app") == "pr2-editor"
+
+
+def port_in_use(host, port):
+    """端口有没有人在占着。
+
+    Windows 上 SO_REUSEADDR 的语义和 Unix **相反**：它允许两个 socket 绑
+    同一个端口，于是「bind 成功」根本不能证明端口空着 —— 旧实现据此判
+    「空闲」，uvicorn 随后绑定失败，进程静默退出（pythonw 下连报错都看不到）。
+    SO_EXCLUSIVEADDRUSE 才是 Windows 上「我独占这个端口」的开关：
+    绑不上，就是有人占着。
+    """
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        else:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind((host, port))
+        except OSError:
+            return True
+    return False
 
 
 def _say(text):
     """打印一行提示，但在没有 stdout 的环境下（pythonw）安静跳过。
 
-    这个服务是用 pythonw 启动的 —— 不弹黑框。pythonw 里 sys.stdout 是
+    这个服务可能被 pythonw 拉起 —— 不弹黑框。pythonw 里 sys.stdout 是
     None，任何 print 都会 AttributeError。所以每句提示都要先问一句。
     """
     if sys.stdout is not None:
-        print(text)
+        print(text, flush=True)
 
 
 def main():
@@ -393,31 +639,36 @@ def main():
     ap.add_argument("--no-open", action="store_true", help="不自动开浏览器")
     a = ap.parse_args()
 
-    import uvicorn
-
     if not os.path.isdir(DIST):
         _say("注意：找不到前端产物 %s" % DIST)
         _say("      先构建：cd src\\editor && npm install && npm run build")
 
     port = a.port
     if port_in_use(a.host, port):
-        # 这不是错误 —— 编辑器是**常驻服务**，关掉浏览器不会停它。
-        # 所以「端口已占用」最常见的意思就是「它已经在跑了」，
-        # 该做的是把浏览器打开，而不是报错退出。
-        _say("端口 %d 已有服务在跑，直接打开它。" % port)
-        if not a.no_open:
-            webbrowser.open("http://%s:%d/" % (a.host, port))
-        return 0
+        # 编辑器是**常驻服务**，关掉浏览器不会停它，所以「端口被占」
+        # 最常见的意思是「它已经在跑了」。但必须问一句是不是**我们**的 ——
+        # 别的程序占着这个端口时，打开浏览器只会看到一个不相干的页面。
+        if editor_on(a.host, port):
+            _say("编辑器已在运行：http://%s:%d/" % (a.host, port))
+            if not a.no_open:
+                webbrowser.open("http://%s:%d/" % (a.host, port))
+            return 0
 
-    # 端口被别的程序占了（比如上次崩了留下的）—— 往上找一个空的。
-    for p in range(a.port + 1, a.port + 20):
-        if not port_in_use(a.host, p):
-            _say("端口 %d 被占，改用 %d。" % (a.port, p))
-            port = p
-            break
-    else:
-        _say("从 %d 往上 20 个端口都被占了。" % a.port)
-        return 1
+        # 被别的程序占着 —— 往上找一个空位。
+        for p in range(a.port + 1, a.port + 20):
+            if not port_in_use(a.host, p):
+                _say("端口 %d 被占，改用 %d。" % (a.port, p))
+                port = p
+                break
+        else:
+            _say("从 %d 往上 20 个端口都被占了。" % a.port)
+            return 1
+
+    global SERVER, CURRENT_PORT
+    CURRENT_PORT = port
+    httpd = ThreadingHTTPServer((a.host, port), Handler)
+    httpd.daemon_threads = True
+    SERVER = httpd
 
     _say("PR2 本地化编辑器：http://%s:%d/" % (a.host, port))
     _say("（只监听本机。按 Ctrl+C 停止。）")
@@ -425,30 +676,13 @@ def main():
         threading.Timer(0.8, lambda: webbrowser.open(
             "http://%s:%d/" % (a.host, port))).start()
 
-    # uvicorn 的日志初始化会调 sys.stdout.isatty() 来决定要不要上色，
-    # 而 pythonw.exe **根本没有 stdout**（是 None）—— 于是直接
-    # AttributeError 崩掉，表现为「点了按钮什么都没发生」。
-    # log_config=None 跳过那套配置，access_log=False 关掉每请求一行的
-    # 访问日志（本地服务，吵）。
-    uvicorn.run(app, host=a.host, port=port, log_config=None,
-                access_log=False)
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        httpd.server_close()
     return 0
-
-
-def port_in_use(host, port):
-    """端口有没有人在听。
-
-    用 bind 试探而不是「连接一下」：后者分不清「服务在跑」与
-    「连接被拒」，而在端口冲突时恰恰要分清。
-    """
-    import socket
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            s.bind((host, port))
-        except OSError:
-            return True
-    return False
 
 
 if __name__ == "__main__":
