@@ -53,37 +53,89 @@ KEYWORDS = [
 ]
 
 
-def classify(k, en):
-    """按「用途」给条目归类：段落区间 → 结构特征 → 关键词。"""
+def classify_hint(k, en):
     n = int(k, 16)
     for lo, hi, name in RANGES:
         if lo <= n <= hi:
             return name
-
-    text = en.strip()
-    low = text.lower()
-    words = re.findall(r"[A-Za-z']+", text)
-
-    if re.fullmatch(r"[\s%<@\d.:/%-]+", text):
-        return "格式串/符号"
-    if text in ("+++EMPTY+++", "...", "—"):
-        return "占位/空文本"
-    if re.search(r"\b(dear|sincerely|yours faithfully)\b", low):
-        return "信件"
+    low = en.lower()
     for pat, name in KEYWORDS:
         if re.search(pat, low):
             return name
+    if "click" in low:
+        return "教程/操作"
+    if len(en) > 180:
+        return "长文"
+    return "文本"
+
+
+def kind(en):
+    """一句话说清这条文本是干什么用的（不抄原文）。"""
+    t = en.strip()
+    low = t.lower()
+    if re.fullmatch(r"[\s%<@\d.:/%-]+", t):
+        return "格式串（只含占位符/符号）"
+    if t in ("+++EMPTY+++", "...", "—"):
+        return "空占位"
+    if "letter of marque" in low:
+        return "私掠许可证相关"
+    if re.search(r"\b(dear|sincerely|yours faithfully)\b", low):
+        return "信件（署名/正文）"
+    if "scenario" in low:
+        return "剧本目标/说明"
+    if "mission" in low:
+        return "任务相关提示"
+    if re.search(r"\b(congratulations|congratulation)\b", low):
+        return "祝贺提示"
+    if re.search(r"\b(failed|not accomplished|not completed)\b", low):
+        return "失败提示"
     if "click" in low or "right-click" in low:
-        return "提示/操作说明"
-    if '"' in text or "“" in text:
-        return "对话"
-    if len(words) <= 3 and len(text) < 32 and not re.search(r"[.!?]$", text):
-        return "短标签/词条"
-    if len(text) > 180:
-        return "长文/轶事"
-    if re.search(r"\b(you|your|we|our|i)\b", low):
-        return "叙述/提示句"
-    return "其它"
+        return "操作指引"
+    if re.search(r"\b(i |my |me |we |our )\b", low):
+        return "角色对白/叙述"
+    if re.search(r"\b(you |your )\b", low):
+        return "玩家提示"
+    if re.search(r"^(save|load|options|quit|cancel|continue|ok|yes|no|back)\b", low):
+        return "界面按钮"
+    if len(t.split()) <= 3 and not re.search(r"[.!?]$", t):
+        return "短标签/名词"
+    return "普通句子"
+
+
+TOPICS = [
+    (r"\b(ship|convoy|fleet|vessel|sail)\b", "船队"),
+    (r"\b(trade|goods|cargo|price|market|warehouse|stock)\b", "交易/货物"),
+    (r"\b(war|peace|nation|england|spain|france|dutch|treaty)\b", "战争/国家"),
+    (r"\b(mission|reward|deadline|order)\b", "任务"),
+    (r"\b(town|building|permit|wall|council)\b", "城镇/建筑"),
+    (r"\b(captain|governor|viceroy|pirate|buccaneer|crew)\b", "人物"),
+    (r"\b(plague|fire|storm|hurricane|attack|siege)\b", "灾害/战斗"),
+    (r"\b(loan|money|gold|debt|profit|income|wage)\b", "金钱"),
+]
+
+
+def topic(en):
+    low = en.lower()
+    for pat, name in TOPICS:
+        if re.search(pat, low):
+            return name
+    return ""
+
+
+def purpose(k, en, zh, cat):
+    """一句话说清用途：术语带译名，句子只说类型。"""
+    kind_s = kind(en)
+    name = re.sub(r"\s+", " ", (zh or en)).strip()
+    if len(name) > 16:
+        name = name[:16]
+    if cat.startswith("术语·") or cat.startswith("人名"):
+        return "%s：%s" % (cat, name)
+    if cat == "教程":
+        return "教程：" + kind_s
+    if kind_s == "短标签/名词":
+        return "标签：" + name
+    tp = topic(en)
+    return (tp + "·" + kind_s) if tp else kind_s
 
 
 def main():
@@ -106,29 +158,29 @@ def main():
     for r in rows:
         k = r["id"]
         en = r.get(T.BASE_LANG, "") or ""
-        text = (r.get(a.lang) or "") or en
-        cat = term_cat.get(k) or classify(k, en)
-        brief = re.sub(r"\s+", " ", text).strip()[:60]
-        out.append({"id": k, "cat": cat, "brief": brief,
-                    "en": re.sub(r"\s+", " ", en).strip()[:60],
-                    "n": len(re.findall(r"<n", en)),
-                    "vars": len(re.findall(r"%\d|@[A-Za-z]\$", en))})
+        zh = (r.get(a.lang) or "") or ""
+        cat = term_cat.get(k) or classify_hint(k, en)
+        out.append({
+            "id": k,
+            "use": purpose(k, en, zh, cat),
+            "n": len(re.findall(r"<n", en)),
+            "vars": len(re.findall(r"%\d|@[A-Za-z]\$", en)),
+        })
 
     with io.open(csv_path, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["id", "用途", "摘要", "English", "<n>", "占位符"])
+        w.writerow(["id", "作用", "段落数", "占位符数"])
         for x in out:
-            w.writerow([x["id"], x["cat"], x["brief"], x["en"], x["n"], x["vars"]])
+            w.writerow([x["id"], x["use"], x["n"], x["vars"]])
 
     # 按 hash 顺序输出（游戏表里的原始顺序），一条一行
     lines = ["# 字符串用途索引（按 hash 顺序）", "",
-             "> 由 `src\\tools\\hash_index.py` 生成；用途按段落/关键词判定，"
-             "内容取自 `%s`（没有译文时退回英文）。" % a.lang, "",
-             "| # | hash | 作用 | 内容 | English |", "|---|---|---|---|---|"]
+             "> 由 `src\\tools\\hash_index.py` 生成：每条按英文/法文原文的结构与关键词"
+             "概括用途（不抄原文），术语类带上 `%s` 的译名。" % a.lang, "",
+             "| # | hash | 作用 | 段落 | 占位符 |", "|---|---|---|---|---|"]
     for i, x in enumerate(out, 1):
-        lines.append("| %d | `%s` | %s | %s | %s |" % (
-            i, x["id"], x["cat"],
-            x["brief"].replace("|", "\\|"), x["en"].replace("|", "\\|")))
+        lines.append("| %d | `%s` | %s | %d | %d |" % (
+            i, x["id"], x["use"].replace("|", "\\|"), x["n"], x["vars"]))
     io.open(md_path, "w", encoding="utf-8", newline="\n").write("\n".join(lines) + "\n")
     print("已生成 %s / %s（%d 条，按 hash 顺序）" % (csv_path, md_path, len(out)))
     return 0
