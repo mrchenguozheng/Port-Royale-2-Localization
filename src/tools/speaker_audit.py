@@ -257,7 +257,9 @@ def write_md(rows):
     L += ["", "## 非文本（不参与判定，%d 条）" % sum(kinds.values()), "",
           "| 类型 | 条数 | 例子 |", "|---|---|---|"]
     for kd, n in kinds.most_common():
-        samples = [r["en"][:24] for r in rows if r["tier"] == "-" and r["kind"] == kd][:3]
+        def short(x, n=26):
+            return x if len(x) <= n else x[:14] + "…" + x[-8:]
+        samples = [short(r["en"]) for r in rows if r["tier"] == "-" and r["kind"] == kd][:3]
         L.append("| %s | %d | %s |" % (kd, n, "、".join("`%s`" % x for x in samples)))
     L += ["", "## A 级：文本自己写明身份（%d 条）" % len(A), "",
           "| hash | 类别 | 规则 | 英文原文 |", "|---|---|---|---|"]
