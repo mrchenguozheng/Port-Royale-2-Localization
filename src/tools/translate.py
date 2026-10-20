@@ -69,8 +69,10 @@ def target_langs():
     """可编辑的译文语言代码，按文件名排序（不含只读参考）。"""
     if not os.path.isdir(STRINGS_DIR):
         return []
+    # keep_original.toml 是「原样保留」清单，不是语言文件，跳过
     return sorted(f[:-5] for f in os.listdir(STRINGS_DIR)
                   if f.endswith(".toml") and not f.startswith("_")
+                  and f != "keep_original.toml"
                   and f[:-5] not in REFERENCE_LANGS)
 
 
