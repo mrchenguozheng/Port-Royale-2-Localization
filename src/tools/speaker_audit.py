@@ -158,6 +158,9 @@ def write_md(rows):
     L.append("> 判定只依据**英语**与**法语**原文——这两个版本是权威文本。"
              "荷兰语/西班牙语语音只用于核对同一句的发音，德语旁白没有权威文本，都不作为判定依据。")
     L.append("")
+    L.append("**日语不参与对照**：日语是我们自己译的，用它反推说话人等于循环论证；"
+             "本清单的示例一律用英语原文。")
+    L.append("")
     L.append("## 总览")
     L.append("")
     L.append("| 级别 | 含义 | 条数 |")
@@ -186,8 +189,7 @@ def write_md(rows):
     L.append("")
     for r in A:
         L.append("- `%s`（%s，%s）" % (r["hash"], r["category"], r["evidence"]))
-        L.append("  - EN: %s" % r["en"][:120])
-        L.append("  - JA: %s" % r["ja"][:120])
+        L.append("  - EN: %s" % r["en"][:150])
     L.append("")
     L.append("## B 级：能推断类别（%d 条）" % len(B))
     L.append("")
@@ -203,8 +205,7 @@ def write_md(rows):
         L.append("")
         for r in sub[:4]:
             L.append("- `%s`（%s）" % (r["hash"], r["evidence"]))
-            L.append("  - EN: %s" % r["en"][:110])
-            L.append("  - JA: %s" % r["ja"][:110])
+            L.append("  - EN: %s" % r["en"][:130])
         L.append("")
     L.append("## N 级：没有说话人（%d 条）" % len(N))
     L.append("")
@@ -213,8 +214,7 @@ def write_md(rows):
     L.append("")
     for r in N[:6]:
         L.append("- `%s`（%s，%s）" % (r["hash"], r["category"], r["evidence"]))
-        L.append("  - EN: %s" % r["en"][:110])
-        L.append("  - JA: %s" % r["ja"][:110])
+        L.append("  - EN: %s" % r["en"][:130])
     L.append("")
     L.append("## C 级：无法判定（%d 条）" % len(C))
     L.append("")
@@ -223,24 +223,7 @@ def write_md(rows):
     L.append("")
     for r in C[:6]:
         L.append("- `%s`" % r["hash"])
-        L.append("  - EN: %s" % r["en"][:110])
-        L.append("  - JA: %s" % r["ja"][:110])
-    L.append("")
-    L.append("## 语体待查（%d 条）" % len(flags))
-    L.append("")
-    L.append("日语里出现了谦让语或美化语（差し上げ / お受け取り / お持ち / 申し上げ / いたします），"
-             "而英文原文多为平陈述（I will give you / You will receive）。"
-             "这类比原文抬了一档，优先复核；系统祝贺里的「おめでとうございます」不算在内。")
-    L.append("")
-    L.append("> 轻重不同：`差し上げます`／`お受け取りになります` 最该改（谦让语把玩家抬高了）；"
-             "`お持ちです`／`お越しください` 只是普通敬语，与原文的 vous 相称，可以保留。")
-    L.append("")
-    L.append("| hash | 类别 | 日语现译 | EN |")
-    L.append("|---|---|---|---|")
-    for r in flags:
-        L.append("| `%s` | %s | %s | %s |" % (
-            r["hash"], r["category"],
-            r["ja"][:70].replace("|", "\\|"), r["en"][:70].replace("|", "\\|")))
+        L.append("  - EN: %s" % r["en"][:130])
     L.append("")
     L.append("## 怎么用")
     L.append("")
