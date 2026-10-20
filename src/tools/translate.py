@@ -42,14 +42,20 @@ STRINGS_DIR = os.path.join(SRC, "translations")
 #: 文件名以语言代码开头，没有块头也没有字段名，所以语言代码与文件里
 #: 的内容是同一个名字，不需要任何映射表。
 #: 只读参考原文放在 references\ 子目录：
-#:     references\en.toml   英文原文，合并基准，ctx 只在它里面
-#:     references\fr.toml   法文原文
+#:     references\en.gog_1.1.2.3.toml    英文原文（GOG 1.1.2.3 原版表），合并基准
+#:     references\fr.gog_1.1.2.42.toml   法文原文（GOG 1.1.2.42 原版表）
+#: 文件名里带来源与版本：这两份是**从原版 exe 里原样提取**的，不经过我们的
+#: 导出/整理，所以 `<n>`、行尾空格都保持原样。版本号不同，两边条目数可能
+#: 对不齐（法语 3571 vs 英文 3548），合并时按 id 对齐、多退少空。
 #: 其余 translations\*.toml 是可编辑的译文，文件名即语言代码。
 #: 语言列表不写死 —— 加一种语言只需把 <代码>.toml 放进 translations\。
-BASE_LANG = "en"
+BASE_LANG = "en.gog_1.1.2.3"
 
 #: 只读参考语言：参与 id 顺序与占位符校验，但不提供译文。
-REFERENCE_LANGS = ("en", "fr")
+REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42")
+#: 导出 / 校验里「法文那列」的字段名（导出产物仍沿用 en / fr 两个短键，
+#: 免得改掉外部脚本的约定）。
+FR_LANG = "fr.gog_1.1.2.42"
 
 
 def lang_path(code):
@@ -193,27 +199,53 @@ def load_toml():
     for rid, t in base_rows:
         merged[rid][BASE_LANG] = t
 
+    #: 参考语言里缺了哪些 id（版本差异）。参照时把它们标出来，
+    #: 免得「空」和「这一版根本没这条」混在一起。
+    missing = {}
+
     for lang in langs:
         path = lang_path(lang)
         if lang == BASE_LANG or not os.path.exists(path):
             continue
         rows, _ = read(path)
-        # 对齐检查：条目数与顺序必须与基准一致。
+
+        if lang in REFERENCE_LANGS:
+            # 参考原文是**原版提取**，版本可能与基准不同（法语 1.1.2.42 比
+            # 英文 1.1.2.3 多 42 条、少 19 条）。做参照时按 id 对齐即可：
+            # 多出来的丢掉，缺的记进 missing —— 它们不参与译文，也不进语言包。
+            extra = 0
+            have = set()
+            for rid, t in rows:
+                have.add(rid)
+                if rid in merged:
+                    merged[rid][lang] = t
+                else:
+                    extra += 1
+            lack = [rid for rid in order if rid not in have]
+            if lack:
+                missing[lang] = lack
+            if extra:
+                sys.stderr.write(
+                    "提示：%s 有 %d 条不在基准表里（版本差异），参照时已忽略。\n"
+                    % (lang, extra))
+            continue
+
+        # 对齐检查（只对可编辑译文）：条目数与顺序必须与基准一致。
         # 少一条只是显示问题，多一条会让后面的 hash 全部错位 —— 必须挡住。
         ids = [r for r, _ in rows]
         if ids != order:
             if len(ids) != len(order):
                 raise SystemExit(
-                    "%s.toml 有 %d 条，en.toml 有 %d 条——条目数不一致，无法合并。"
-                    % (lang, len(ids), len(order)))
+                    "%s.toml 有 %d 条，%s.toml 有 %d 条——条目数不一致，无法合并。"
+                    % (lang, len(ids), BASE_LANG, len(order)))
             n = next(i for i, (a, b) in enumerate(zip(ids, order)) if a != b)
             raise SystemExit(
-                "%s.toml 第 %d 条是 %s，en.toml 同位置是 %s——条目顺序不一致。"
-                % (lang, n, ids[n], order[n]))
+                "%s.toml 第 %d 条是 %s，%s.toml 同位置是 %s——条目顺序不一致。"
+                % (lang, n, ids[n], BASE_LANG, order[n]))
         for rid, t in rows:
             merged[rid][lang] = t
 
-    return {"s": [merged[i] for i in order]}
+    return {"s": [merged[i] for i in order], "missing": missing}
 
 
 def entries(doc):
@@ -233,7 +265,7 @@ def cmd_export(args):
         out.append({
             "id": e.get("id", ""),
             "en": e.get(BASE_LANG, ""),
-            "fr": e.get("fr", ""),
+            "fr": e.get(FR_LANG, ""),
             "ctx": e.get("ctx", ""),
             field: txt,
         })
