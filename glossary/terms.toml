@@ -11,11 +11,20 @@
 #   ids   = ["0x…", …]         精确列出，适合零散分布的那几组
 # max_len 是长度上限，用来挡掉区间里夹着的长句子。
 
+# 一致性检查时整条跳过的条目（与术语无关的误命中）：
+#   0xfc512ea5 版权声明里的 “RAD Game Tools, Inc.”
+#   0x35f48f70/72/73 “Holy August” 其实是人名圣奥古斯丁，不是八月
+ignore = ["0xfc512ea5", "0x35f48f70", "0x35f48f72", "0x35f48f73"]
+
 [[group]]
 name = "货物"
 note = "市场里买卖的商品，含「移民」这种特殊货物"
 range = ["0x37328fb9", "0x37329033"]
 max_len = 24
+
+# 货物名「Settlers（移民）」在沉船文本里译成「殖民者」是通的
+[group.alt]
+"0x37329033" = ["殖民者"]
 
 [[group]]
 name = "船只"
@@ -35,10 +44,18 @@ note = "加勒比各城镇的中文译名，翻译信件/任务时要保持一�
 range = ["0xc77f4c7a", "0xc77f4e47"]
 max_len = 26
 
+# Port Royale 也是游戏名，标题里保留英文不算错
+[group.alt]
+"0xc77f4e45" = ["Port Royale"]
+
 [[group]]
 name = "国家"
 note = "游戏里实际出现的国家名"
 ids = ["0xf90d7ea2", "0xf90d7ea3", "0xf90d7ea5"]
+
+# England 在叙事里常写成“英国”，和城镇/舰队语境一致，两种都算对
+[group.alt]
+"0xf90d7ea2" = ["英国"]
 
 [[group]]
 name = "月份"
@@ -49,7 +66,8 @@ ids = ["0xeaeac619", "0x31e445b8", "0xdf1770e0", "0x302a8f02",
 
 [[group]]
 name = "月份（英文缩写）"
-note = "英文 Jan/Feb/Mar… 的条目；日期串 %3年%2%1日 里的 %2 用的就是这一组（显示成「4月」），不是上面的「四月」"
+check = false
+note = "英文 Jan/Feb/Mar… 的条目；日期串 %3年%2%1日 里的 %2 用的就是这一组（显示成「4月」），不是上面的「四月」。缩写同时是人名/船名（Jan = 扬），不做一致性检查"
 ids = ["0x136970b1", "0x06b2378b", "0xfbdd7fd6", "0x1155d401",
        "0x0247d1b7", "0x01756ce6", "0x01756c04", "0xd68a45b2",
        "0x2d6fbb37", "0xee4e882d", "0xd0b18a8e", "0xe015ba2e"]
@@ -60,8 +78,13 @@ ids = ["0xdc939a60", "0x12015c3c", "0xef65aaec", "0xc96a80a4",
        "0xcf2f93ca", "0x2ebaaed0", "0xcbe3c595", "0xdd6d3669",
        "0xdd6d3670"]
 
+# 「Catholic Church」在叙述里译成「教会」是通顺的，和「教堂」这个建筑名不冲突
+[group.alt]
+"0xdc939a60" = ["教会"]
+
 [[group]]
 name = "界面"
+check = false
 note = "菜单与面板上的常用词；Load 在这套译文里有「装载（装货）」和「读取（存档）」两种意思，这里取后者"
 ids = ["0xca6a6869", "0x1426f58b", "0xff075dec", "0xec815821",
        "0xcbc60959", "0xe1598619", "0xc618cdea", "0xc595352c",
