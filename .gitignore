@@ -210,3 +210,6 @@ src/editor/.astro/
 HANDOFF.md
 pip-*/
 test_*.toml
+
+# 从 pr2_loca.cpr 导出的原版字体（纯拉丁，仅作对照，体积大，不进仓库）
+assets/fonts/original/

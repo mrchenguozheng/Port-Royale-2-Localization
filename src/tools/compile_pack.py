@@ -119,6 +119,26 @@ def is_placeholder(txt):
 RE_PIPE_BREAK = re.compile(r"(?<!<)\s*\|\s*(?!>)")
 
 
+#: 必须原样保留英文的条目：法律声明、内部编号、纯符号/数字。
+#: 清单在 src\translations\keep_original.toml，编译时强制写英文原文。
+KEEP_ORIGINAL = {}
+
+
+def load_keep_original():
+    """读 keep_original.toml，返回 {id: 分组名}。"""
+    import tomllib
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "translations", "keep_original.toml")
+    if not os.path.isfile(path):
+        return {"0xfc512ea5": "版权声明"}
+    data = tomllib.load(open(path, "rb"))
+    out = {}
+    for group, val in data.items():
+        for k in (val.get("ids") or []):
+            out[k.lower()] = group
+    return out
+
+
 def to_engine(txt):
     """把 toml 里的排版约定翻成引擎认的写法。
 
@@ -183,6 +203,7 @@ def build(lang, out_dir, strict):
     errors, warnings = [], []
 
     os.makedirs(out_dir, exist_ok=True)
+    KEEP_ORIGINAL.update(load_keep_original())
     path = os.path.join(out_dir, "%s.txt" % lang)
     lines = []
     n = n_ph = 0
@@ -192,6 +213,12 @@ def build(lang, out_dir, strict):
         txt = s.get(field)
         if not txt:
             continue
+        if h in KEEP_ORIGINAL:
+            eng = s.get(T.BASE_LANG, "") or txt
+            if txt != eng:
+                warnings.append("%s 是必须原样保留的文本（%s），已改用英文原文"
+                                % (h, KEEP_ORIGINAL[h]))
+            txt = eng
         # 占位译文跳过校验：它只有前 10 个字符，占位符必然不全。
         # 这不是放水 —— 它本来就没翻译，翻译后自然会进入校验。
         if not is_placeholder(txt):
