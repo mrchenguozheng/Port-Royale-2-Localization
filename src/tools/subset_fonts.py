@@ -19,7 +19,7 @@
 ----
     python src\\tools\\subset_fonts.py                 # 用 references + translations 的全部用字
     python src\\tools\\subset_fonts.py --out D:\\fonts  # 指定输出目录
-    python src\\tools\\subset_fonts.py --src "C:\\...\\fonts\\_orig_bak"
+    python src\\tools\\subset_fonts.py --src "<游戏目录>\\fonts\\_orig_bak"
 
 依赖
 ----
@@ -42,7 +42,7 @@ ROOT = os.path.dirname(SRC_DIR)                       # 仓库根
 STRINGS = os.path.join(SRC_DIR, "translations")
 REFS = os.path.join(STRINGS, "references")
 
-DEFAULT_SRC = r"<游戏目录>\fonts\_orig_bak"
+DEFAULT_SRC = os.path.join(ROOT, "assets", "fonts", "original")
 DEFAULT_OUT = os.path.join(ROOT, "build", "fonts")
 FONTS = ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf")
 

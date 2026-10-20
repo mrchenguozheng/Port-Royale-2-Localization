@@ -7,7 +7,7 @@
 #
 # 下面都是「可选增强」，缺了会自动降级，不会让构建失败。
 # 建议用主 Python 安装：
-#   python.exe -m pip install -r requirements.txt
+#   python -m pip install -r requirements.txt
 
 # 日语助词判定（normalize_text.py --particles）。装一个即可，两个都装更好：
 janome>=0.5.0
