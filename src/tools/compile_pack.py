@@ -119,6 +119,13 @@ def is_placeholder(txt):
 RE_PIPE_BREAK = re.compile(r"(?<!<)\s*\|\s*(?!>)")
 
 
+#: 必须原样保留英文的条目（法律声明、第三方版权）。
+#: 编译时强制用英文原文，译文里写成什么都覆盖掉。
+KEEP_ORIGINAL = {
+    "0xfc512ea5": "Miles Sound System / RAD Game Tools 版权声明",
+}
+
+
 def to_engine(txt):
     """把 toml 里的排版约定翻成引擎认的写法。
 
@@ -192,6 +199,12 @@ def build(lang, out_dir, strict):
         txt = s.get(field)
         if not txt:
             continue
+        if h in KEEP_ORIGINAL:
+            eng = s.get(T.BASE_LANG, "") or txt
+            if txt != eng:
+                warnings.append("%s 是必须原样保留的文本（%s），已改用英文原文"
+                                % (h, KEEP_ORIGINAL[h]))
+            txt = eng
         # 占位译文跳过校验：它只有前 10 个字符，占位符必然不全。
         # 这不是放水 —— 它本来就没翻译，翻译后自然会进入校验。
         if not is_placeholder(txt):
