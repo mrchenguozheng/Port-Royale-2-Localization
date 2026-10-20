@@ -41,7 +41,7 @@ Port Royale 2 Localization/
 ├─ src/
 │  ├─ translations/         译文人工维护源（唯一）
 │  │  ├─ zh.toml
-│  │  └─ references/        en.toml / fr.toml，只读参考原文
+│  │  └─ references/        en.gog_1.1.2.3.toml / fr.gog_1.1.2.42.toml，只读参考原文
 │  ├─ injector/             注入组件源码（纯 C++）
 │  ├─ tools/                语言包与译文处理脚本（Python）
 │  └─ locale.ini            语言选择模板
@@ -67,7 +67,7 @@ Port Royale 2 Localization/
 三步，不需要碰 C++：
 
 1. `python src\tools\new_lang.py --new-lang <代码>`
-   —— 复制一份 `references\en.toml` 为 `translations\<代码>.toml`
+   —— 复制一份 `references\en.gog_1.1.2.3.toml` 为 `translations\<代码>.toml`
 2. 逐条把每行右边的英文改成译文（没改的会显示英文），
    然后跑 `start.bat`，勾选新语言 → 构建 → 复制到游戏目录
 3. 在窗口的「启动语言」下拉里选它，然后点「保存语言设置」

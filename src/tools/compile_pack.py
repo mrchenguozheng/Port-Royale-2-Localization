@@ -30,9 +30,10 @@ SRC = os.path.dirname(HERE)                              # 仓库的 src\
 ROOT = os.path.dirname(SRC)                              # 仓库根
 DEFAULT_OUT = os.path.join(ROOT, "build", "PR2Packs")
 
-#: 只读参考语言：英文 / 法文原文。**不参与编辑，也不生成语言包**
-#: （用户2026-10-19 明确要求）。en 还兼作 id 顺序与校验的基准。
-REFERENCE_LANGS = ("en", "fr")
+#: 只读参考语言：英文 / 法文原文。**不参与编辑，也不生成语言包**。
+#: 实际名单以 translate.REFERENCE_LANGS 为准（这里是 import 不到时的兜底常量，
+#: 文件名带来源与版本：en.gog_1.1.2.3 / fr.gog_1.1.2.42）。
+REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42")
 
 # ---------------------------------------------------------------- 占位符
 
@@ -110,6 +111,24 @@ def is_placeholder(txt):
     return bool(RE_PLACEHOLDER.match(txt))
 
 
+#: 译文与原文里用 " | " 表示换行，而**引擎只认 <n>**。
+#: 这里必须换掉：把竖线原样交给引擎，屏幕上就是一行行竖线
+#: （实测：test_en 的段落处显示 "| Your convoy is in..."，而同一句在原版里是分段）。
+#: 只换被空白包着、或位于串首/串尾的竖线；`<|>` 里的字面竖线放过 ——
+#: 0x11f0398f 是字符清单，正文里就有 `<|>`。
+RE_PIPE_BREAK = re.compile(r"(?<!<)\s*\|\s*(?!>)")
+
+
+def to_engine(txt):
+    """把 toml 里的排版约定翻成引擎认的写法。
+
+    * `|`（段落/换行分隔符）  -> `<n>`
+    * 真正的换行符            -> `<n>`
+    两件事在同一个地方做，免得以后又有人只改一半。
+    """
+    return RE_PIPE_BREAK.sub("<n>", txt).replace("\n", "<n>")
+
+
 # ---------------------------------------------------------------- 输出
 
 # 语言包**不带任何说明头**，一个 hash 一行就完事。
@@ -146,12 +165,14 @@ def _default_lang():
 
 
 def build(lang, out_dir, strict):
-    # en / fr 是**只读参考语言**（用户 2026-10-19 明确：不参与编辑、不导出）。
-    # 它们是原文，不是译文 —— 生成 en.txt / fr.txt 交给引擎等于用「原始英文」
+    # 参考原文**不参与编译**：生成 en.txt / fr.txt 交给引擎等于用「原始英文」
     # 覆盖游戏，等于没汉化。所以直接拒绝，而不是打个警告继续跑。
-    if lang in REFERENCE_LANGS:
+    # 名单问 translate —— 那里是唯一一份（references\en.gog_1.1.2.3 之类）。
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import translate as T
+    if lang in T.REFERENCE_LANGS:
         print("拒绝：%s 是原文参考语言（%s），不生成语言包。"
-              % (lang, "/".join(REFERENCE_LANGS)))
+              % (lang, "/".join(T.REFERENCE_LANGS)))
         print("      英文/法文只用于校对译文与 id 顺序对照。")
         return 2
 
@@ -174,13 +195,13 @@ def build(lang, out_dir, strict):
         # 占位译文跳过校验：它只有前 10 个字符，占位符必然不全。
         # 这不是放水 —— 它本来就没翻译，翻译后自然会进入校验。
         if not is_placeholder(txt):
-            check_placeholders(h, s.get("en", ""), txt, errors, warnings)
+            check_placeholders(h, s.get(T.BASE_LANG, ""), txt, errors, warnings)
         # 【坑】hash 必须写成**大写**（0x30A45770），与既有语言包一致。
         # patch.js 的合并逻辑按大写规范化 hash，产物若写成小写，
         # 用户手改过的条目就识别不出来，合并会静默失效（测试 test_patch.js
         # 会抓到）。小写 id 只存在于 src/translations\*.toml 里作为内部键。
         lines.append("%s = %s\n" % (h.upper().replace("0X", "0x"),
-                                    txt.replace("\n", "<n>")))
+                                    to_engine(txt)))
         n += 1
         if is_placeholder(txt):
             n_ph += 1
