@@ -157,6 +157,18 @@ def deploy_steps(target, langs):
     """
     steps = [(n, os.path.join(BUILD, n), os.path.join(target, n))
              for n in FLAT_FILES]
+
+    # 字体：游戏自带的是纯拉丁字体，不换掉中文就画不出来。
+    # 由 src\tools\subset_fonts.py 生成到 build\fonts\；没有就跳过
+    # （旧版本的构建目录里可能还没有字体）。
+    font_dir = os.path.join(BUILD, "fonts")
+    if os.path.isdir(font_dir):
+        for name in sorted(os.listdir(font_dir)):
+            if name.lower().endswith(".ttf"):
+                steps.append(("fonts\\%s" % name,
+                              os.path.join(font_dir, name),
+                              os.path.join(target, "fonts", name)))
+
     steps.append(("%s\\" % PACK_DIR, None, os.path.join(target, PACK_DIR)))
     wanted = ["locale.ini"]
     if langs:
