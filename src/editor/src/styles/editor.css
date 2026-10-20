@@ -419,3 +419,6 @@ main {
 }
 
 .flags:empty { display: none; }
+
+/* 术语不一致：不是语法错误，用另一种颜色，别和占位符错误混在一起。 */
+.flags.term { color: var(--warn); }

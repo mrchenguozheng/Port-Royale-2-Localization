@@ -703,7 +703,9 @@ def build_pack(lang, out_dir, events):
     会把它复制过去的最后一道关口。
     """
     script = os.path.join(HERE, "compile_pack.py")
-    cmd = [sys.executable, script, "--lang", lang, "--out", out_dir]
+    # --no-fonts：字体由 run_build 在所有语言编完后统一做一次，
+    # 免得选三种语言就重裁三遍字体。
+    cmd = [sys.executable, script, "--lang", lang, "--out", out_dir, "--no-fonts"]
     events.put(("line", "[%s] 编译中…" % lang))
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -810,6 +812,36 @@ def run_build(langs, events):
                         % (LOCALE_INI, PACK_DIR)))
             events.put(("build_failed", ""))
             return
+
+        # 字体：语言包编完后统一检查一次。译文里出现新字而字体没跟上，
+        # 游戏里就画成空白 —— 所以并进同一个构建动作，别让人单记一步。
+        try:
+            sys.path.insert(0, HERE)
+            import subset_fonts
+            events.put(("line", "检查字体…"))
+            ok, msg = subset_fonts.ensure_fonts(
+                log=lambda m: events.put(("line", m)))
+            events.put(("line", "字体：" + msg))
+        except Exception as exc:                  # 字体失败不该让构建失败
+            events.put(("line", "字体检查跳过：%s" % exc))
+
+        # 术语对照表：同样是「跟着译文走」的产物，顺手重生成一份，
+        # 省得改完译文忘了同步。产物在 build\glossary\，不进仓库。
+        try:
+            script = os.path.join(HERE, "glossary.py")
+            events.put(("line", "生成术语对照…"))
+            cmd = [sys.executable, script]
+            for l in langs:
+                cmd += ["--lang", l]
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                cwd=ROOT, env=child_env())
+            read_lines(proc, events)
+            proc.wait()
+        except Exception as exc:
+            events.put(("line", "术语对照跳过：%s" % exc))
+
         events.put(("build_ok", list(langs)))
     except Exception as exc:                      # 兜底，别让线程静默死掉
         events.put(("line", "构建出错：%s" % exc))
