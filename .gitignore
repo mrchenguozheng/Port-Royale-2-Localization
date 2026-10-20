@@ -208,3 +208,5 @@ src/editor/.astro/
 .venv/
 
 HANDOFF.md
+pip-*/
+test_*.toml
