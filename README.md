@@ -46,6 +46,7 @@ Port Royale 2 Localization/
 │  ├─ tools/                语言包与译文处理脚本（Python）
 │  └─ locale.ini            语言选择模板
 ├─ build/                   产物，可整个删掉重建
+├─ glossary/                术语对照表（中文 zh.md，加语言后是 <语言>.md）
 ├─ docs/
 └─ README.md
 ```
@@ -85,6 +86,7 @@ Port Royale 2 Localization/
 | [构建与安装](docs/构建与安装.md) | 窗口按钮、单独构建、脚本一览 |
 | [注入组件](docs/注入组件.md) | 运行时原理、hook 三条路径、源码职责、编译 |
 | [译文与语言包](docs/译文与语言包.md) | toml 格式、校验规则、加一种语言 |
+| [术语对照](glossary/README.md) | 货物/船只/军衔/城镇等专名的英中对照，可扩展到别的语言 |
 
 ---
 
