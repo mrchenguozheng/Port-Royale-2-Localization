@@ -47,7 +47,7 @@ DEFAULT_OUT = os.path.join(ROOT, "build", "fonts")
 FONTS = ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf")
 
 #: 除了译文用字，还要保留的字符：ASCII、中文标点、数字全角等。
-EXTRA = ("，。、；：！？…—～·「」『』“”《》【】（）〔〕〈〉［］％０１２３４５６７８９"
+EXTRA = ("，。、；：！？…—～·「」『』“”《》【】（）〔〕〈〉［］※％０１２３４５６７８９"
          "　￥· ‐‑–")
 
 

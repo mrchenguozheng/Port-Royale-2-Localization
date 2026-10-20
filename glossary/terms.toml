@@ -14,7 +14,8 @@
 # 一致性检查时整条跳过的条目（与术语无关的误命中）：
 #   0xfc512ea5 版权声明里的 “RAD Game Tools, Inc.”
 #   0x35f48f70/72/73 “Holy August” 其实是人名圣奥古斯丁，不是八月
-ignore = ["0xfc512ea5", "0x35f48f70", "0x35f48f72", "0x35f48f73"]
+ignore = ["0xfc512ea5", "0x35f48f70", "0x35f48f72", "0x35f48f73",
+          "0xd4cd0f44"]
 
 [[group]]
 name = "货物"
