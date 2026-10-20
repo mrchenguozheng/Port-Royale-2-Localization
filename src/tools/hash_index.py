@@ -120,29 +120,17 @@ def main():
         for x in out:
             w.writerow([x["id"], x["cat"], x["brief"], x["en"], x["n"], x["vars"]])
 
-    by_cat = {}
-    for x in out:
-        by_cat.setdefault(x["cat"], []).append(x)
-
-    lines = ["# 字符串用途索引", "",
-             "> 由 `src\\tools\\hash_index.py` 生成；摘要取自 `%s`，没有译文时用英文。" % a.lang,
-             "", "共 %d 条，按用途分组：" % len(out), "",
-             "| 用途 | 条数 |", "|---|---|"]
-    for cat, items in sorted(by_cat.items(), key=lambda kv: -len(kv[1])):
-        lines.append("| %s | %d |" % (cat, len(items)))
-    for cat, items in sorted(by_cat.items(), key=lambda kv: -len(kv[1])):
-        lines += ["", "## %s（%d）" % (cat, len(items)), "",
-                  "| id | 摘要 | English |", "|---|---|---|"]
-        for x in items:
-            lines.append("| `%s` | %s | %s |"
-                         % (x["id"], x["brief"].replace("|", "\\|"),
-                            x["en"].replace("|", "\\|")))
+    # 按 hash 顺序输出（游戏表里的原始顺序），一条一行
+    lines = ["# 字符串用途索引（按 hash 顺序）", "",
+             "> 由 `src\\tools\\hash_index.py` 生成；用途按段落/关键词判定，"
+             "内容取自 `%s`（没有译文时退回英文）。" % a.lang, "",
+             "| # | hash | 作用 | 内容 | English |", "|---|---|---|---|---|"]
+    for i, x in enumerate(out, 1):
+        lines.append("| %d | `%s` | %s | %s | %s |" % (
+            i, x["id"], x["cat"],
+            x["brief"].replace("|", "\\|"), x["en"].replace("|", "\\|")))
     io.open(md_path, "w", encoding="utf-8", newline="\n").write("\n".join(lines) + "\n")
-
-    print("已生成 %s（%d 条）" % (csv_path, len(out)))
-    print("已生成 %s" % md_path)
-    for cat, items in sorted(by_cat.items(), key=lambda kv: -len(kv[1])):
-        print("  %-14s %d" % (cat, len(items)))
+    print("已生成 %s / %s（%d 条，按 hash 顺序）" % (csv_path, md_path, len(out)))
     return 0
 
 
