@@ -1,15 +1,19 @@
 # -*- coding: utf-8 -*-
-"""把 3548 条文本按「能不能判断说话人身份」分级，输出清单。
+"""按「能不能判断说话人」给 3,548 条文本分级，只依据英语/法语原文。
 
-生成：
-  docs/说话人分级.md      —— 方法、统计、分级示例、语体待查清单
-  docs/speaker-audit.csv —— 逐条明细（hash/tier/category/evidence/flag/en/ja）
+输出：
+  docs/说话人分级.md       —— 方法、统计、分级示例
+  docs/speaker-audit.csv   —— 逐条：hash / 级别 / 类别 / 规则 / 人称 / 英文 / 法文
 
-分级：
-  A 确定   —— 文本自己交代了身份（信件落款、自称、亲属/恋人称呼）
-  B 可推断 —— 有强线索词，能归到某一类说话人（公务/商人/海盗/财政官/酒馆/教程）
-  C 弱推断 —— 只能看出是「任务委托/感谢」，分不清是谁
-  N 无说话人 —— 系统提示、界面文案、事件旁白
+分级（2026-10-21 收紧定义）：
+  A 确定   —— 文本直接写明身份：落款、自称、头衔标签
+  B 可推断 —— 由内容可推断说话人的角色或与玩家的关系
+  C 通用   —— 只有第一人称或祈使，没有任何角色线索
+  N 无说话人 —— 系统界面、第三人称事件旁白
+
+注意：
+  * 日语不参与判定——日语是我们自己译的，用它反推说话人是循环论证；
+  * 「提到亲属」不等于「说话人是亲属」，旧版把两者混为一谈，导致 41 条误判为 A。
 """
 
 import csv
@@ -24,222 +28,177 @@ TRANS = os.path.join(ROOT, "src", "translations")
 REF = os.path.join(TRANS, "references")
 DOCS = os.path.join(ROOT, "docs")
 
-# ---------------------------------------------------------------- 分级规则
-A_SIGNATURE = re.compile(
-    r"(The\s+)?(Treasurer|Governor|Viceroy)\s+of\s+%\d"
-    r"|%\d\s*%\d,\s*(Governor|Viceroy|Treasurer)\s+of\s+%\d",
-    re.I,
-)
-A_SELFPROCLAIM = re.compile(
-    r"\bI am (the |a )?(Governor|Viceroy|treasurer|harbor master|mayor)\b"
-    r"|\bmy name is\b",
-    re.I,
-)
-A_FAMILY = re.compile(
-    r"\bmy (darling|beloved daughter|dear friend|wife|husband|father|mother"
-    r"|sister|brother-in-law|daughter)\b",
-    re.I,
-)
+# ---------------------------------------------------------------- 规则
+#: 落款必须落在文本末尾（允许结尾空白），否则正文里的「viceroy of %1」会被误判
+A_SIGNATURE = re.compile(r"(The\s+)?(Treasurer|Governor|Viceroy)\s+of\s+%\d\s*$", re.I)
+A_SIGNATURE2 = re.compile(r"%\d\s*%\d,\s*(Governor|Viceroy|Treasurer)\s+of\s+%\d\s*$", re.I)
+A_SELF = re.compile(r"\bmy name is\b|\bI am (the |a )?(Governor|Viceroy|treasurer|harbor master)\b", re.I)
+A_LABEL = re.compile(r"^(<n>)*\s*(%\d,?\s*)?(Viceroy|Governor|Treasurer)\s+of\s+%\d\s*$", re.I)
 
 N_SYSTEM = re.compile(
-    r"\b(click|right-click|left-click|button|menu|window|screen|toolbar"
-    r"|press|hotkey|Scenario objective|Event window|tab)\b",
-    re.I,
-)
+    r"\b(click|right-click|left-click|button|menu|window|toolbar|press|hotkey"
+    r"|Scenario objective|Event window|tab)\b", re.I)
 N_NARRATION = re.compile(
     r"^(Today\b|The pirate\b|The %\d buccaneer\b|A military convoy\b|A transport convoy\b"
     r"|A storm\b|A trade route\b|Natives\b|Famine\b|Plague\b|Gold discovered\b"
     r"|You have\b|You were\b|You cannot\b|You can\b|You must\b|Your convoy\b"
     r"|Your ships\b|Convoy %\w|Unfortunately\b|Congratulations\b|Well done\b"
-    r"|Excellent\b|Sorry\b|I see you\b|I hear\b|I am afraid\b)",
-)
-N_PAST3 = re.compile(
-    r"\b(has|have) (destroyed|broken through|attacked|looted|sunk|captured)\b", re.I)
+    r"|Excellent\b|Sorry\b|While you\b)")
+N_PAST3 = re.compile(r"\b(has|have)\s+(destroyed|broken through|attacked|looted|sunk|captured"
+                     r"|been dismissed|moved)\b", re.I)
 
 B_RULES = [
-    ("财政官/借贷", re.compile(
-        r"\b(loan|loans|repay\w*|debt\w*|interest|instalment|credit)\b", re.I)),
-    ("恋人/家人", re.compile(
-        r"\b(my dear|my darling|my beloved|my wife|my husband|my daughter|my father"
-        r"|my sister|my brother-in-law|wedding|marriage|betroth\w*)\b", re.I)),
-    ("酒馆/醉汉", re.compile(r"\b(rum|drunkard\w*|inn|inns|tavern|bottle)\b", re.I)),
+    ("财政官/借贷", re.compile(r"\b(loan|loans|repay\w*|debt\w*|interest|instalment)\b", re.I)),
+    ("亲属/恋人关系", re.compile(
+        r"\b(my (wife|husband|daughter|son|father|mother|sister|brother-in-law|darling"
+        r"|beloved|dear friend))\b", re.I)),
+    ("酒馆/醉汉", re.compile(r"\b(rum|drunkard\w*|inn|inns|tavern)\b", re.I)),
     ("海盗/私掠", re.compile(
-        r"\b(pirate\w*|buccaneer\w*|Blackbeard|hideout\w*|booty|privateer\w*"
+        r"\b(pirate\w*|buccaneer\w*|Blackbeard|hideout\w*|privateer\w*"
         r"|Letter of Marque|Letters of Marque)\b", re.I)),
-    ("总督/公务", re.compile(
-        r"\b(Governor|Viceroy|viceroy|building permit|nation|nations|war|peace treaty"
-        r"|town council|reputation|rank)\b", re.I)),
+    ("官员/公务", re.compile(
+        r"\b(Governor|Viceroy|viceroy|building permit|peace treaty|town council"
+        r"|reputation|rank)\b", re.I)),
     ("商人/交易", re.compile(
         r"\b(deliver\w*|barrel\w*|market\w*|price\w*|goods|warehouse\w*|trade route"
-        r"|convoy\w*|cargo|profit\w*|export\w*|import\w*)\b", re.I)),
-    ("教程/引导", re.compile(
-        r"\b(you should|you can now|your task|your mission|objective|hint)\b", re.I)),
+        r"|cargo|profit\w*|import\w*|export\w*)\b", re.I)),
+    ("教程/引导", re.compile(r"\b(you should|you can now|your task|your mission|objective|hint)\b", re.I)),
 ]
 
-#: 真正的「超出原文礼数」：谦让语/美化语。おめでとうございます 这类系统祝贺不算。
-POLITE = re.compile(r"差し上げ|お(受け取り|持ち|越し)|申し上げ|いたします")
+IMPERATIVE = re.compile(
+    r"^(Deliver|Go|Attack|Destroy|Capture|Find|Search|Bring|Take|Visit|Build|Construct"
+    r"|Buy|Sell|Hire|Return|Report|Pay|Set|Keep|Look|Use|Select|Click|Wait|Speak|Sail)\b")
+FIRST_PERSON = re.compile(r"\b(I|my|me|we|our|us|I'm|I'd|I'll)\b")
 
-ORDER = ["信件署名", "自称身份", "亲属/恋人称呼", "财政官/借贷", "恋人/家人",
-         "酒馆/醉汉", "海盗/私掠", "总督/公务", "商人/交易", "教程/引导",
-         "事件旁白", "界面/系统", "通用委托/应答"]
+ORDER = ["落款", "自称", "头衔标签", "财政官/借贷", "亲属/恋人关系", "酒馆/醉汉",
+         "海盗/私掠", "官员/公务", "商人/交易", "教程/引导", "事件旁白", "系统界面", "通用对白"]
 
 
-def classify(en, ja):
-    if A_SIGNATURE.search(en):
-        return "A", "信件署名", "落款：" + A_SIGNATURE.search(en).group(0)[:40]
-    if A_SELFPROCLAIM.search(en):
-        return "A", "自称身份", "自称：" + A_SELFPROCLAIM.search(en).group(0)[:40]
-    if A_FAMILY.search(en):
-        return "A", "亲属/恋人称呼", "称呼：" + A_FAMILY.search(en).group(0)[:40]
-    if N_SYSTEM.search(en):
-        return "N", "界面/系统", "界面词：" + N_SYSTEM.search(en).group(0)
-    if N_NARRATION.search(en) or N_PAST3.search(en):
-        return "N", "事件旁白", "第三人称通报"
+def person(en):
+    t = re.sub(r"<[^>]*>", " ", en).strip()
+    if N_PAST3.search(t) or t.startswith("Today"):
+        return "第3人称"
+    if IMPERATIVE.match(t):
+        return "祈使"
+    if FIRST_PERSON.search(t):
+        return "第1人称"
+    return "无"
+
+
+def classify(en):
+    e = en.strip()
+    # A：落款必须在结尾附近，否则正文里的「viceroy of %1」会被误判
+    tail = e[-90:]
+    if len(e) > 60 and (A_SIGNATURE.search(tail) or A_SIGNATURE2.search(tail)):
+        m = (A_SIGNATURE2.search(tail) or A_SIGNATURE.search(tail)).group(0)
+        return "A", "落款", "A1", "结尾落款：" + m[:40]
+    if A_LABEL.match(e):
+        return "A", "头衔标签", "A2", "整句就是「头衔 + 地名」标签"
+    if A_SELF.search(e):
+        return "A", "自称", "A3", "自称：" + A_SELF.search(e).group(0)[:30]
+    if N_SYSTEM.search(e):
+        return "N", "系统界面", "N1", "界面词：" + N_SYSTEM.search(e).group(0)
+    if N_NARRATION.search(e) or N_PAST3.search(e):
+        return "N", "事件旁白", "N2", "第三人称通报"
     for name, rx in B_RULES:
-        m = rx.search(en)
+        m = rx.search(e)
         if m:
-            return "B", name, "线索词：" + m.group(0)
-    return "C", "通用委托/应答", "无线索"
+            return "B", name, "B", "线索词：" + m.group(0)
+    return "C", "通用对白", "C", "只有人称/祈使，无角色线索"
+
+
+def load():
+    en = tomllib.load(open(os.path.join(REF, "en.gog_1.1.2.3.toml"), "rb"))
+    fr = tomllib.load(open(os.path.join(REF, "fr.gog_1.1.2.42.toml"), "rb"))
+    keep_doc = tomllib.load(open(os.path.join(TRANS, "keep_original.toml"), "rb"))
+    keep = {k for v in keep_doc.values() for k in (v.get("ids") or [])}
+    return en, fr, keep
 
 
 def build_rows():
-    en = tomllib.load(open(os.path.join(REF, "en.gog_1.1.2.3.toml"), "rb"))
-    ja = tomllib.load(open(os.path.join(TRANS, "ja.toml"), "rb"))
-    try:
-        keep_doc = tomllib.load(open(os.path.join(TRANS, "keep_original.toml"), "rb"))
-        keep = {k for v in keep_doc.values() for k in (v.get("ids") or [])}
-    except FileNotFoundError:
-        keep = set()
-
+    en, fr, keep = load()
     rows = []
-    for k in ja:
-        e = (en.get(k) or "").strip()
-        j = ja[k].strip()
-        tier, cat, why = classify(e, j)
-        flag = ""
-        if POLITE.search(j) and not e.startswith("Congratulations"):
-            flag = "谦让/美化语超出原文（建议平实化）"
-        rows.append({"hash": k, "tier": tier, "category": cat, "evidence": why,
-                     "flag": flag, "keep": "是" if k in keep else "", "en": e, "ja": j})
+    for k, e in en.items():
+        e = e.strip()
+        tier, cat, rule, why = classify(e)
+        rows.append({
+            "hash": k,
+            "tier": tier,
+            "category": cat,
+            "rule": rule,
+            "person": person(e) if tier != "N" or cat == "事件旁白" else "无",
+            "en": e,
+            "fr": fr.get(k, "").strip(),
+            "keep": "是" if k in keep else "",
+            "evidence": why,
+        })
     return rows
 
 
 def write_csv(rows):
-    os.makedirs(DOCS, exist_ok=True)
     path = os.path.join(DOCS, "speaker-audit.csv")
-    key = lambda r: (r["tier"], ORDER.index(r["category"]) if r["category"] in ORDER else 99,
-                     r["hash"])
+    key = lambda r: (r["tier"], ORDER.index(r["category"]) if r["category"] in ORDER else 99, r["hash"])
+    cols = ["hash", "tier", "category", "rule", "person", "en", "fr", "keep", "evidence"]
     with io.open(path, "w", encoding="utf-8-sig", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=["hash", "tier", "category", "evidence",
-                                           "flag", "keep", "en", "ja"])
+        w = csv.DictWriter(fh, fieldnames=cols)
         w.writeheader()
         w.writerows(sorted(rows, key=key))
     return path
 
 
 def write_md(rows):
+    tiers = Counter(r["tier"] for r in rows)
+    cats = Counter(r["category"] for r in rows)
     A = [r for r in rows if r["tier"] == "A"]
-    B = [r for r in rows if r["tier"] == "B"]
-    C = [r for r in rows if r["tier"] == "C"]
-    N = [r for r in rows if r["tier"] == "N"]
-    flags = [r for r in rows if r["flag"]]
 
-    L = []
-    L.append("# 说话人 / 语气 分级清单")
-    L.append("")
-    L.append("> 自动生成：`python src/tools/speaker_audit.py`。"
-             "逐条明细：[speaker-audit.csv](speaker-audit.csv)。")
-    L.append("")
-    L.append("这个清单回答一个问题：**从文本本身，能不能判断这句话是谁说的？**")
-    L.append("")
-    L.append("语言包里只有 `hash = 文本`，没有 speaker 字段；同一个 hash 由哪个 NPC 调用，"
-             "在包文件里看不出来。所以按「文本能否自证身份」分成四级。")
-    L.append("")
-    L.append("> 判定只依据**英语**与**法语**原文——这两个版本是权威文本。"
-             "荷兰语/西班牙语语音只用于核对同一句的发音，德语旁白没有权威文本，都不作为判定依据。")
-    L.append("")
-    L.append("**日语不参与对照**：日语是我们自己译的，用它反推说话人等于循环论证；"
-             "本清单的示例一律用英语原文。")
-    L.append("")
-    L.append("## 总览")
-    L.append("")
-    L.append("| 级别 | 含义 | 条数 |")
-    L.append("|---|---|---|")
-    L.append("| **A 确定** | 文本自己交代了身份（落款、自称、亲属/恋人称呼） | %d |" % len(A))
-    L.append("| **B 可推断** | 有强线索词，能归到某一类说话人 | %d |" % len(B))
-    L.append("| **C 弱推断** | 只看出是「委托/应答/感谢」，分不清是谁 | %d |" % len(C))
-    L.append("| **N 无说话人** | 界面文案、系统提示、事件旁白 | %d |" % len(N))
-    L.append("| 合计 | | %d |" % len(rows))
-    L.append("")
-    L.append("## 类别 × 级别")
-    L.append("")
-    L.append("| 类别 | A | B | C | N | 合计 |")
-    L.append("|---|---|---|---|---|---|")
+    L = ["# 说话人分级（只依据英/法原文）", "",
+         "> 自动生成：`python src/tools/speaker_audit.py`。逐条明细：[speaker-audit.csv](speaker-audit.csv)。",
+         "> 判定只使用**英语**和**法语**原文。日语是我们自己译的，用它反推说话人是循环论证，所以不参与。", "",
+         "## 分级定义", "",
+         "| 级别 | 含义 | 条数 |", "|---|---|---|",
+         "| **A 确定** | 文本直接写明身份：落款、自称、头衔标签 | %d |" % tiers["A"],
+         "| **B 可推断** | 由内容可推断说话人的角色或与玩家的关系 | %d |" % tiers["B"],
+         "| **C 通用** | 只有第一人称/祈使，没有角色线索 | %d |" % tiers["C"],
+         "| **N 无说话人** | 系统界面、第三人称事件旁白 | %d |" % tiers["N"],
+         "| 合计 | | %d |" % len(rows), "",
+         "## 上一版为什么显得乱", "",
+         "| 问题 | 旧规则 | 现规则 |", "|---|---|---|",
+         "| 把「提到亲属」当成「说话人是亲属」 | 出现 `my wife` / `my daughter` 就判 A 级，"
+         "于是旁白 `While you are looting the town, a young woman comes running up…` 也被算成亲属 | "
+         "改为 B 级「亲属/恋人关系」，只表示**可推断**关系，且另设 `person` 列标明是第几人称 |",
+         "| 落款规则匹配到正文 | 全文搜索 `viceroy of %1`，"
+         "事件通报 `The viceroy of %1 has moved to %2. Governor…` 被判成「信件署名」 | "
+         "只在**结尾 90 字**内找落款，且要求文本足够长 |",
+         "| CSV 带过期日语列 | 混入 `ja` 列，且换词后未同步（还显示 `総督代理`） | "
+         "删掉日语列，改成英语 + 法语两列（法语是另一份权威文本） |",
+         "| 没有可核查的依据 | 只有一句中文说明 | 新增 `rule`（A1/A2/A3/N1/N2/B/C）与 `person`（第1/第3人称/祈使/无） |",
+         "", "## 类别分布", "",
+         "| 类别 | 条数 |", "|---|---|"]
     for c in ORDER:
-        sub = [r for r in rows if r["category"] == c]
-        if not sub:
-            continue
-        cnt = Counter(r["tier"] for r in sub)
-        L.append("| %s | %d | %d | %d | %d | %d |" % (
-            c, cnt["A"], cnt["B"], cnt["C"], cnt["N"], len(sub)))
-    L.append("")
-    L.append("## A 级：能确定说话人（%d 条）" % len(A))
-    L.append("")
-    L.append("这些要么带落款，要么自称职务，要么有只可能出自某个关系人之口的称呼。")
-    L.append("")
+        if cats[c]:
+            L.append("| %s | %d |" % (c, cats[c]))
+    L += ["", "## A 级：文本自己写明身份（%d 条）" % len(A), "",
+          "| hash | 类别 | 规则 | 英文原文 |", "|---|---|---|---|"]
     for r in A:
-        L.append("- `%s`（%s，%s）" % (r["hash"], r["category"], r["evidence"]))
-        L.append("  - EN: %s" % r["en"][:150])
-    L.append("")
-    L.append("## B 级：能推断类别（%d 条）" % len(B))
-    L.append("")
-    L.append("有强线索词，能判断**这段话在谈什么**（场景/话题），"
-             "但不等于说话人就是那个角色 —— 例如「海盗」类里，"
-             "很多是总督在感谢你打掉海盗。判断语气时请把这一层区别记住。")
-    L.append("")
+        L.append("| `%s` | %s | %s | %s |" % (r["hash"], r["category"], r["rule"],
+                                              r["en"][:110].replace("|", "\\|")))
+    L += ["", "## B 级样例（每类 3 条）", ""]
     for c in ORDER:
-        sub = [r for r in B if r["category"] == c]
+        sub = [r for r in rows if r["tier"] == "B" and r["category"] == c]
         if not sub:
             continue
         L.append("### %s（%d 条）" % (c, len(sub)))
         L.append("")
-        for r in sub[:4]:
-            L.append("- `%s`（%s）" % (r["hash"], r["evidence"]))
-            L.append("  - EN: %s" % r["en"][:130])
+        for r in sub[:3]:
+            L.append("- `%s`（%s）" % (r["hash"], r["person"]))
+            L.append("  - EN: %s" % r["en"][:120])
+            L.append("  - FR: %s" % r["fr"][:120])
         L.append("")
-    L.append("## N 级：没有说话人（%d 条）" % len(N))
-    L.append("")
-    L.append("界面文案、系统提示、事件通报。不要按「对某人说话」来写："
-             "提示用中性语气，事件通报用第三人称过去时。")
-    L.append("")
-    for r in N[:6]:
-        L.append("- `%s`（%s，%s）" % (r["hash"], r["category"], r["evidence"]))
-        L.append("  - EN: %s" % r["en"][:130])
-    L.append("")
-    L.append("## C 级：无法判定（%d 条）" % len(C))
-    L.append("")
-    L.append("占大头：通用委托、感谢、奖励、条件说明，被多个角色复用。"
-             "只能按「公务/任务」的通用语体写，别绑定具体身份。")
-    L.append("")
-    for r in C[:6]:
-        L.append("- `%s`" % r["hash"])
-        L.append("  - EN: %s" % r["en"][:130])
-    L.append("")
-    L.append("## 怎么用")
-    L.append("")
-    L.append("1. 调语气先看 **A 级**：身份明确，按身份定敬体/常体；")
-    L.append("2. **B 级**按类别定基调：公务=です・ます，海盗/酒馆=常体，财政官=公文化；")
-    L.append("3. **N 级**一律中性，不出现对玩家的直接请求；")
-    L.append("4. **C 级**保持通用与克制，别加原文没有的敬语修饰。")
-    L.append("")
-    L.append("## 局限")
-    L.append("")
-    L.append("- 规则是启发式的，一条文本可能命中多个类别，取优先级最高者；")
-    L.append("- 「亲属/恋人称呼」能确定说话人与玩家的关系，确定不了具体是哪位 NPC；")
-    L.append("- 通用奖励/感谢文案被多个角色复用，任何「确定说话人」的判断都不成立；")
-    L.append("- 要从资源层面拿到真正的说话人，需要解析引擎的对话结构（不在语言包里）。")
-    L.append("")
-
+    L += ["## 局限", "",
+          "- 规则是启发式的：一条文本可能命中多个类别，取优先级最高者；",
+          "- B 级只表示「能推断角色」，不等于确定是哪位 NPC；",
+          "- 通用委托/感谢/奖励文案被多个角色复用，无法确定说话人；",
+          "- 要拿到真正的说话人，需要解析引擎的对话结构（语言包里没有）。", ""]
     path = os.path.join(DOCS, "说话人分级.md")
     io.open(path, "w", encoding="utf-8", newline="\n").write("\n".join(L))
     return path
@@ -247,16 +206,14 @@ def write_md(rows):
 
 def main():
     rows = build_rows()
-    csv_path = write_csv(rows)
-    md_path = write_md(rows)
+    write_csv(rows)
+    write_md(rows)
     tiers = Counter(r["tier"] for r in rows)
     cats = Counter(r["category"] for r in rows)
-    print("条目 %d｜A %d｜B %d｜C %d｜N %d｜语体待查 %d" % (
-        len(rows), tiers["A"], tiers["B"], tiers["C"], tiers["N"],
-        sum(1 for r in rows if r["flag"])))
+    print("条目 %d｜A %d｜B %d｜C %d｜N %d" % (len(rows), tiers["A"], tiers["B"], tiers["C"], tiers["N"]))
     for c, n in cats.most_common():
         print("  %-14s %d" % (c, n))
-    print("已写出：", os.path.relpath(md_path, ROOT), "、", os.path.relpath(csv_path, ROOT))
+    print("人称分布：", dict(Counter(r["person"] for r in rows)))
 
 
 if __name__ == "__main__":
