@@ -38,7 +38,7 @@ PUNCT = {
     "zh": {
         "open": "「『（［【〈〔",
         "close": "」』）］】〉〕",
-        "single": "，。、；：！？…・",
+        "single": "，。、；：！？…",
         "runs": "…—",
         "cjk": r"\u4e00-\u9fff\u3400-\u4dbf",
     },
@@ -52,6 +52,10 @@ PUNCT = {
 }
 
 VAR = re.compile(r"@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]")
+
+#: 日期格式串：占位符两侧**不加空格**，否则会渲染成「1600 年 4月 1 日」。
+#: 原文的「.」是德语的序数点（1. = 1 日）和分隔点，中日文里都不该保留。
+DATE_FORMAT_IDS = {"0x1ac38a65", "0x34d0f9eb", "0x22caa09f", "0x1813d72e"}
 
 #: 日语助词。长的写在前面（正则会先匹配到长的）。
 #: 只处理「汉字/片假名 + 助词 + 汉字/片假名或标点」的情况：
@@ -206,8 +210,34 @@ def make_fmt(sets):
     return fmt, punct
 
 
+def fix_ascii_punct(text, lang):
+    """把 CJK 文本里的半角标点换成全角（英文逗号混进来很扎眼）。
+
+    不动纯 ASCII 的格式串（%1:%2:%3 时间、1,000 千分位、ASCII 词内部）。
+    """
+    if not re.search(r"[\u3040-\u30ff\u4e00-\u9fff]", text):
+        return text
+    table = {"ja": {",": "、", ";": "；", ":": "：", "!": "！", "?": "？"},
+             "zh": {",": "，", ";": "；", ":": "：", "!": "！", "?": "？"}}[lang]
+    out = []
+    for i, ch in enumerate(text):
+        rep = table.get(ch)
+        if rep:
+            prev = text[i-1] if i else ""
+            nxt = text[i+1] if i+1 < len(text) else ""
+            if ch == ":" and prev.isdigit() and nxt.isdigit():
+                out.append(ch); continue
+            if prev.isascii() and prev.isalnum() and nxt.isascii() and nxt.isalnum():
+                out.append(ch); continue
+            out.append(rep); continue
+        out.append(ch)
+    return "".join(out)
+
+
 def fix_vars(text, punct, cjk):
-    rx = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff\uff66-\uff9f]")
+    # 【坑】不能把整个片假名区当「文字」：・(U+30FB) 和 ー(U+30FC) 也在里面，
+    # 一律加空格会把 迭戈・莫扎雷拉 / 小麦・果物 拆开。已把它们排除。
+    rx = re.compile(r"[\u3041-\u30fa\u30fd-\u30ff\u4e00-\u9fff\uff66-\uff9f]")
 
     def need(ch):
         return bool(ch) and (rx.match(ch) or ch in punct)
@@ -264,7 +294,12 @@ def main():
         if a.particles and a.lang == "ja":
             new = space_particles_analyzer(new)
         # 助词空格先做，再统一标点与占位符（占位符两侧的空格由 fix_vars 补回）
-        new = clean_n(fix_vars(fmt(new), punct, sets["cjk"]))
+        if k in DATE_FORMAT_IDS:
+            # 日期格式串（%3年%2%1日）不能让 fix_vars 在占位符两侧补空格，
+            # 否则会渲染成「1600 年 4月 1 日」。
+            new = clean_n(fmt(fix_ascii_punct(new, a.lang)))
+        else:
+            new = clean_n(fix_vars(fmt(fix_ascii_punct(new, a.lang)), punct, sets["cjk"]))
         if new != doc[k]:
             changed += 1
             doc[k] = new

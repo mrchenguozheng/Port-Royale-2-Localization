@@ -114,6 +114,9 @@ Port Royale 2 Localization/
 | [译文与语言包](docs/译文与语言包.md) | toml 格式、校验规则、加一种语言 |
 | [术语对照](glossary/README.md) | 货物/船只/军衔/城镇等专名的英中对照，可扩展到别的语言 |
 | [待定事项](docs/待定.md) | Steam 不生效、法文版未验证、hook 偏移等还没结论的问题 |
+| [说话人分级](docs/说话人分级.md) | 哪些台词能确定说话人、哪些只能猜（附逐条 CSV） |
+| [翻译局限](docs/翻译局限.md) | 哪些问题无法根除、实际验证到几成、要不要 hook |
+| [语体拟改清单](docs/语体拟改清单.md) | 能确定说话人的 41 条 + 待人工的 668 条 |
 
 ---
 
@@ -144,3 +147,9 @@ Port Royale 2 Localization/
 （`IDM_CONTEST_…`）、按键名（`ESC`/`CTRL`/`F10`）、版权声明与制作方名称。
 清单在 `src/translations/keep_original.toml`，编译时会强制写回英文原文。
 
+## 路径约定
+
+仓库里的文档与脚本**不写本机绝对路径**：游戏目录一律写作 `<游戏目录>`，
+用户目录用 `%USERPROFILE%` 之类的环境变量表示。
+`subset_fonts.py` 需要的原版字体默认读仓库内 `assets/fonts/original/`（已在 `.gitignore` 中忽略），
+不再指向某台机器的安装位置。
