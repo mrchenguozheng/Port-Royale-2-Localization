@@ -45,6 +45,8 @@ const LS_PAGE_SIZE = 'pr2.pageSize';
 const LS_LANG = 'pr2.lang';
 const LS_REFA = 'pr2.refA';
 const LS_REFB = 'pr2.refB';
+const LS_FILTER = 'pr2.filter';
+const LS_PAGE = 'pr2.page.';
 
 function saved(key: string): string | null {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -58,6 +60,7 @@ const S = {
   langs: [] as string[],
   refLangs: [] as string[],
   lang: 'zh',
+  filter: 'all',
   refA: 'en',
   refB: 'fr',
   //: 当前页的条目（已含服务端返回的全部语言字段）
@@ -132,6 +135,11 @@ async function boot() {
   if (savedA && S.refLangs.includes(savedA)) S.refA = savedA;
   const savedB = saved(LS_REFB);
   if (savedB !== null && (savedB === FOLLOW || S.refLangs.includes(savedB))) S.refB = savedB;
+
+  const savedFilter = saved(LS_FILTER);
+  if (savedFilter && ['all', 'unreviewed', 'reviewed', 'attention'].includes(savedFilter)) {
+    S.filter = savedFilter;
+  }
   // 参照默认取基准语言（en.gog_1.1.2.3 这类带来源与版本的名字）。
   S.refA = d.all.includes(d.base) ? d.base : (d.all[0] || '');
   S.refB = S.refLangs.includes('fr.gog_1.1.2.42') ? 'fr.gog_1.1.2.42' : FOLLOW;
@@ -155,18 +163,26 @@ async function boot() {
   fill($('refA'), S.refLangs, S.refA);
   fill($('refB'), [FOLLOW, ...S.refLangs], S.refB);
   fillPageSizes();
+  ($('filter') as HTMLSelectElement).value = S.filter;
 
   applySize();
-  await reload();
+  await reload(true);
+  const sp = Number(saved(pageKey()));
+  if (sp > 1) await renderPage(sp);
 }
 
-/** 重新取「一共多少条」，然后回到第 1 页。 */
-async function reload() {
-  const c = await api<{ count: number; ids: string[] }>('/api/count');
+function pageKey(): string {
+  return LS_PAGE + S.lang + '.' + S.filter;
+}
+
+/** 重新取「一共多少条」；resetPage=false 时留在当前页。 */
+async function reload(resetPage = true) {
+  const c = await api<{ count: number; ids: string[] }>(
+    `/api/count?filter=${S.filter}&lang=${encodeURIComponent(S.lang)}`);
   S.filtered = null;
   S.total = c.count;
-  S.page = 1;
-  await renderPage(1);
+  if (resetPage) S.page = 1;
+  await renderPage(S.page);
 }
 
 function pageCount(): number {
@@ -179,6 +195,7 @@ async function renderPage(p: number) {
   p = Math.min(Math.max(1, p), pages);
   S.page = p;
 
+  remember(pageKey(), String(p));
   const off = (p - 1) * S.pageSize;
   let rows: Entry[];
 
@@ -187,7 +204,9 @@ async function renderPage(p: number) {
     rows = S.filtered.slice(off, off + S.pageSize);
   } else {
     const want = Math.min(S.pageSize, S.total - off);
-    rows = await api<Entry[]>(`/api/entries?offset=${off}&limit=${want}`);
+    rows = await api<Entry[]>(
+      `/api/entries?offset=${off}&limit=${want}`
+      + `&filter=${S.filter}&lang=${encodeURIComponent(S.lang)}`);
   }
 
   S.rows = rows;
@@ -274,7 +293,9 @@ async function filter() {
 
   S.loading = true;
   try {
-    const found = await api<Entry[]>('/api/search?q=' + encodeURIComponent(q));
+    const found = await api<Entry[]>(
+      '/api/search?q=' + encodeURIComponent(q)
+      + `&filter=${S.filter}&lang=${encodeURIComponent(S.lang)}`);
     S.filtered = found;
     S.total = found.length;
     S.page = 1;
@@ -317,6 +338,7 @@ function rowOf(e: Entry): HTMLElement {
     lab.textContent = box.checked ? '已审' : '待审';
     row.classList.toggle('reviewed', box.checked);
     updateStat();
+    if (S.filter !== 'all') void reload(false);
   });
   wrap.appendChild(box);
   wrap.appendChild(lab);
@@ -612,6 +634,12 @@ async function createLang() {
 
 // ── 事件 ────────────────────────────────────────────────
 
+$('filter').addEventListener('change', (ev) => {
+  S.filter = (ev.target as HTMLSelectElement).value;
+  remember(LS_FILTER, S.filter);
+  void reload(true);
+});
+
 let qTimer = 0;
 $('q').addEventListener('input', () => {
   // 搜索要等服务端，别每个键都发一次
@@ -655,7 +683,9 @@ $('lang').addEventListener('change', (ev) => {
       S.reviewed = new Set(f.ids || []);
       S.reviewedCount = f.count || 0;
     } catch { S.reviewed = new Set(); S.reviewedCount = 0; }
-    await renderPage(S.page);
+    await reload(true);
+    const sp = Number(saved(pageKey()));
+    if (sp > 1) await renderPage(sp);
   })();
 });
 $('refA').addEventListener('change', (ev) => {

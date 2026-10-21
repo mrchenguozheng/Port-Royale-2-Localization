@@ -129,6 +129,60 @@ def _canon_breaks(s):
     return re.sub(r"<n>", "|", s or "")
 
 
+# ---------------------------------------------------------------- 筛选
+
+_ATTN_CACHE = {}
+
+
+def attention_ids(lang):
+    """有问题的条目：占位符/标签错误、空译文、术语不一致。
+
+    check_one 是纯正则，但 3500 条也不便宜，按译文文件 mtime 缓存。
+    """
+    try:
+        files = [T.lang_path(lang),
+                 os.path.join(os.path.dirname(SRC), "glossary", "terms.toml")]
+        key = (lang, tuple(os.path.getmtime(f) for f in files if os.path.isfile(f)))
+    except OSError:
+        key = (lang, 0)
+    if key in _ATTN_CACHE:
+        return _ATTN_CACHE[key]
+
+    rows = load_all()
+    bad = []
+    for r in rows:
+        text = r.get(lang, "") or ""
+        probs = check_one(r, lang, text)
+        if any(p.get("level") in ("error", "warn") for p in probs):
+            bad.append(r["id"])
+    try:
+        groups, ignore = terms_check.load_terms()
+        if groups:
+            en = {r["id"]: r.get(T.BASE_LANG, "") for r in rows}
+            doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in ignore}
+            for x in terms_check.check_lang(lang, groups, en, doc):
+                if x["id"] not in bad:
+                    bad.append(x["id"])
+    except Exception:
+        pass
+    _ATTN_CACHE[key] = bad
+    return bad
+
+
+def filter_ids(kind, lang):
+    rows = load_all()
+    if kind == "reviewed":
+        flags = set(load_flags().get(lang, []))
+        return [r["id"] for r in rows if r["id"] in flags]
+    if kind == "unreviewed":
+        flags = set(load_flags().get(lang, []))
+        return [r["id"] for r in rows if r["id"] not in flags]
+    if kind == "attention":
+        keep = set(attention_ids(lang))
+        return [r["id"] for r in rows if r["id"] in keep]
+    return [r["id"] for r in rows]
+
+
 # ---------------------------------------------------------------- 数据
 
 def load_all():
@@ -577,9 +631,11 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/count":
             # 只报条数与 id 顺序，不带正文：首屏拿到它就能把滚动条画对。
-            rows = load_all()
-            return self.send_json({"count": len(rows),
-                                   "ids": [r["id"] for r in rows]})
+            kind = (query.get("filter") or ["all"])[0]
+            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
+            ids = filter_ids(kind, lang)
+            return self.send_json({"count": len(ids), "ids": ids,
+                                   "filter": kind, "lang": lang})
 
         if path == "/api/terms":
             # 术语一致性：术语表（glossary\terms.toml）当规则用。
@@ -603,7 +659,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/entries":
             offset = int((query.get("offset") or ["0"])[0])
             limit = int((query.get("limit") or ["0"])[0])
+            kind = (query.get("filter") or ["all"])[0]
+            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
             rows = load_all()
+            if kind != "all":
+                keep = set(filter_ids(kind, lang))
+                rows = [r for r in rows if r["id"] in keep]
             if limit <= 0:
                 return self.send_json(rows)
             if offset < 0:
@@ -619,7 +680,12 @@ class Handler(BaseHTTPRequestHandler):
             rows = load_all()
             langs = T.all_langs()
             out = []
+            kind = (query.get("filter") or ["all"])[0]
+            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
+            keep = None if kind == "all" else set(filter_ids(kind, lang))
             for e in rows:
+                if keep is not None and e["id"] not in keep:
+                    continue
                 if q in e["id"].lower():
                     out.append(e)
                     continue
