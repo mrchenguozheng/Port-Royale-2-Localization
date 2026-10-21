@@ -200,6 +200,8 @@ def main():
     io.open(DST, "w", encoding="utf-8", newline="\n").write(
         header + "\n".join('"%s" = "%s"' % (k, esc(out[k])) for k in order) + "\n")
     print("已写入", DST)
+    print("提示：文本源改过的话，用 python src/tools/zh_review.py --diff 人工审核，"
+          "审完 --accept 或 --sync。")
 
 
 if __name__ == "__main__":

@@ -30,6 +30,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 
 import build_install as B  # noqa: E402
+import zh_review  # noqa: E402
 
 PACK_OUT = os.path.join(ROOT, "build", "PR2Packs")
 
@@ -148,6 +149,15 @@ def main():
         if args.no_fonts:
             cmd.append("--no-fonts")
         run("编译 %s" % lang, cmd)
+
+    if "zh" in langs:
+        st = zh_review.status()
+        if st.get("status") != "ok":
+            n = st.get("count")
+            print("\n   ⚠ 中文需要人工审核：%s" % (
+                "还没有接受过审核稿" if n is None else "%d 条待看" % n))
+            print("     跑 python src/tools/zh_review.py --diff 查看，"
+                  "审完 --accept；改字用 --sync。")
 
     # 2) 注入器产物必须已在 build\ 里
     missing = [n for n in B.FLAT_FILES if not os.path.isfile(os.path.join(ROOT, "build", n))]

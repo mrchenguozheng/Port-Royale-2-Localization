@@ -20,6 +20,7 @@
 
 import argparse
 import hashlib
+import time
 import io
 import json
 import os
@@ -37,6 +38,7 @@ import apply_zh_rules as GEN  # noqa: E402
 REF = os.path.join(ROOT, "src", "references", "zh.gog_1.1.2.3.toml")
 ZH = os.path.join(ROOT, "src", "translations", "zh.toml")
 MARK = os.path.join(ROOT, "build", "zh.reviewed.json")
+ACCEPTED = os.path.join(ROOT, "build", "zh.accepted.toml")
 
 
 def sha(path):
@@ -82,8 +84,18 @@ def load_zh():
     return tomllib.load(open(ZH, "rb"))
 
 
+def baseline():
+    """对比基准：上次已接受的审核稿；没有就现生成一份。"""
+    if os.path.isfile(ACCEPTED):
+        try:
+            return tomllib.load(open(ACCEPTED, "rb"))
+        except (OSError, ValueError):
+            pass
+    return generate_all()
+
+
 def diff():
-    gen = generate_all()
+    gen = baseline()
     cur = load_zh()
     real, fmt = [], []
     for h, text in gen.items():
@@ -100,12 +112,42 @@ def diff():
     return real, fmt
 
 
-def marker_ok():
+def load_state():
     try:
-        m = json.load(open(MARK, encoding="utf-8"))
+        return json.load(open(MARK, encoding="utf-8"))
     except (OSError, ValueError):
-        return False
-    return m.get("ref") == sha(REF) and m.get("zh") == sha(ZH)
+        return {}
+
+
+def marker_ok():
+    st = load_state()
+    return (st.get("status") == "ok" and st.get("ref") == sha(REF)
+            and st.get("zh") == sha(ZH))
+
+
+def changed_since_accepted():
+    """文本源变了之后，和上次已接受的 zh.toml 比，哪些条目变了。"""
+    if not os.path.isfile(ACCEPTED):
+        return None
+    try:
+        old = tomllib.load(open(ACCEPTED, "rb"))
+    except (OSError, ValueError):
+        return None
+    cur = load_zh()
+    return sorted(h for h in cur if old.get(h) != cur.get(h))
+
+
+def status():
+    """给构建脚本和编辑器看的状态：要不要人工审核、哪些条目。"""
+    st = load_state()
+    cur_ref = sha(REF)
+    if st.get("status") == "ok" and st.get("ref") == cur_ref and st.get("zh") == sha(ZH):
+        return {"status": "ok", "changed": [], "count": 0}
+    changed = changed_since_accepted()
+    if changed is None:
+        return {"status": "needs_review", "changed": None, "count": None,
+                "note": "还没有接受过审核稿"}
+    return {"status": "needs_review", "changed": changed, "count": len(changed)}
 
 
 def main():
@@ -118,13 +160,15 @@ def main():
     args = ap.parse_args()
 
     if args.clear:
-        if os.path.isfile(MARK):
-            os.remove(MARK)
-            print("已清除审核标记")
-        else:
-            print("没有审核标记")
+        for p in (MARK, ACCEPTED):
+            if os.path.isfile(p):
+                os.remove(p)
+        print("已清除审核标记")
         return
 
+    st = status()
+    print("审核状态：%s%s" % (st["status"],
+                          "" if st["count"] is None else "（%d 条待看）" % st["count"]))
     real, fmt = diff()
     print("只改格式（空白）：%d 条；真改字：%d 条" % (len(fmt), len(real)))
 
@@ -139,9 +183,12 @@ def main():
         if real:
             print("还有 %d 条真改字，先 --sync 或人工确认，不能直接接受格式。" % len(real))
             return
-        m = {"ref": sha(REF), "zh": sha(ZH)}
+        m = {"ref": sha(REF), "zh": sha(ZH), "status": "ok",
+             "at": time.strftime("%Y-%m-%d %H:%M:%S")}
         os.makedirs(os.path.dirname(MARK), exist_ok=True)
         json.dump(m, open(MARK, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        import shutil
+        shutil.copyfile(ZH, ACCEPTED)
         print("已接受审核稿：以后构建直接用当前 zh.toml（文本源或 zh.toml 一变就失效）")
         return
 
@@ -166,7 +213,10 @@ def main():
             return t.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
         io.open(REF, "w", encoding="utf-8", newline="\n").write(
             "\n".join(head + ['"%s" = "%s"' % (k, esc(ref[k])) for k in order]) + "\n")
-        print("文本源已更新；接下来跑 apply_zh_rules.py 重新生成（格式审核标记会失效）")
+        for p in (MARK, ACCEPTED):
+            if os.path.isfile(p):
+                os.remove(p)
+        print("文本源已更新；审核标记已清除，重新生成后需要再人工过一遍格式。")
 
 
 if __name__ == "__main__":

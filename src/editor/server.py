@@ -49,6 +49,7 @@ if TOOLS not in sys.path:
 import translate as T          # noqa: E402
 import compile_pack as C       # noqa: E402
 import terms_check             # noqa: E402
+import zh_review              # noqa: E402
 
 
 #: 真实端口，由 main() 在启动前填上。工具窗口靠 /api/health 判断
@@ -460,6 +461,9 @@ class Handler(BaseHTTPRequestHandler):
             ctype += "; charset=utf-8"
         with open(path, "rb") as f:
             data = f.read()
+        if os.path.basename(path) == "index.html":
+            data = data.replace(b"</body>",
+                                b'<script src="/zh-review-banner.js"></script></body>')
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
@@ -495,7 +499,38 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- GET
 
+    BANNER_JS = """
+(() => {
+  const box = document.createElement('div');
+  box.id = 'zh-review-banner';
+  box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;'
+    + 'background:#b45309;color:#fff;font:14px/1.6 sans-serif;padding:6px 12px;'
+    + 'text-align:center;cursor:pointer;display:none';
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const r = await fetch('/api/zh-review');
+      const st = await r.json();
+      if (st.status === 'ok') return;
+      box.textContent = st.count == null
+        ? '中文文本源已变更：还没有接受过审核稿，需要人工审核'
+        : '中文文本源已变更：' + st.count + ' 条待人工审核（点此查看 hash）';
+      box.onclick = () => alert((st.changed || []).join('\\n') || '（无清单）');
+      document.body.appendChild(box);
+      box.style.display = 'block';
+    } catch (e) {}
+  });
+})();
+"""
+
     def get_static(self, path):
+        if path == "/zh-review-banner.js":
+            data = self.BANNER_JS.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         rel = path.lstrip("/") or "index.html"
         full = os.path.normpath(os.path.join(DIST, rel))
         # 目录穿越：拼出来的路径必须还在 dist\ 里
@@ -506,6 +541,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_file(full)
 
     def get_api(self, path, query):
+        if path == "/api/zh-review":
+            return self.send_json(zh_review.status())
         if path == "/api/health":
             return self.send_json({"app": "pr2-editor", "pid": os.getpid(),
                                    "port": CURRENT_PORT, "token": CURRENT_TOKEN})
