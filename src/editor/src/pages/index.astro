@@ -33,13 +33,16 @@ const title = 'PR2 本地化编辑器';
       <div class="srow">
         <span class="slabel">字号</span>
         <select id="size">
-          <option value="32" selected>32</option>
-          <option value="36">36</option>
+          <option value="14">14</option>
+          <option value="16">16</option>
+          <option value="18">18</option>
+          <option value="20">20</option>
+          <option value="24" selected>24</option>
+          <option value="28">28</option>
+          <option value="32">32</option>
           <option value="40">40</option>
-          <option value="44">44</option>
           <option value="48">48</option>
         </select>
-        <button id="theme" class="mini theme-btn" title="切换浅色/深色">🌙</button>
       </div>
       <div class="srow">
         <span class="slabel">未审</span>
@@ -59,11 +62,6 @@ const title = 'PR2 本地化编辑器';
       </div>
     </div>
 
-    <div class="workspace">
-      <aside id="list" class="side-list" aria-label="条目列表"></aside>
-      <main id="rows"></main>
-    </div>
-
     <footer class="statusbar">
       <button id="first" class="mini" hidden>首条</button>
       <button id="prev" class="mini">‹ 上一条</button>
@@ -75,6 +73,12 @@ const title = 'PR2 本地化编辑器';
       <span id="stat"></span>
       <span id="dirty" class="dirty"></span>
     </footer>
+
+    <div class="workspace">
+      <aside id="list" class="side-list" aria-label="条目列表"></aside>
+      <main id="rows"></main>
+    </div>
+
 
     <!-- 语境推断 -->
     <div id="ctxModal" class="modal" hidden>

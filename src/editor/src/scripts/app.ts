@@ -75,7 +75,7 @@ const S = {
   //: id -> 加载时的原文。改回原样就把这条从"未保存"里去掉。
   orig: new Map<string, string>(),
   dirtyIds: [] as string[],
-  size: 32,
+  size: 24,
   problems: {} as Record<string, Problem[]>,
   /** 术语一致性： id -> ["Frigate：应为「巡防舰」", …] */
   terms: {} as Record<string, string[]>,
@@ -119,17 +119,7 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
 
 // ── 载入 ────────────────────────────────────────────────
 
-const LS_THEME = 'pr2.theme';
-
-function applyTheme(theme: string) {
-  document.documentElement.dataset.theme = theme;
-  const btn = $('theme');
-  if (btn) btn.textContent = theme === 'light' ? '☀' : '🌙';
-  try { localStorage.setItem(LS_THEME, theme); } catch { /* ignore */ }
-}
-
 async function boot() {
-  applyTheme(saved(LS_THEME) === 'light' ? 'light' : 'dark');
   const d = await api<{ editable: string[]; all: string[]; base: string }>('/api/langs');
   S.langs = d.editable;
   S.refLangs = d.all;
@@ -319,7 +309,9 @@ async function loadSideList() {
   try {
     sideItems = await api<ListItem[]>('/api/list?lang=' + encodeURIComponent(S.lang));
     drawSideList();
-  } catch { /* 列表只是导航，失败不影响编辑 */ }
+  } catch {
+    $('list').textContent = '列表加载失败：后端版本可能过旧，重启编辑器再试。';
+  }
 }
 
 function drawSideList() {
@@ -994,10 +986,6 @@ document.addEventListener('keydown', (ev) => {
 $('settingsBtn').addEventListener('click', () => {
   const panel = $('settings');
   panel.hidden = !panel.hidden;
-});
-
-$('theme').addEventListener('click', () => {
-  applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
 });
 
 $('randomUnrev').addEventListener('click', () => void randomUnreviewed());
