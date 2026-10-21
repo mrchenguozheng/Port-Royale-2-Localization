@@ -83,6 +83,8 @@ const S = {
   /** 人工审核勾选：当前语言已勾选的 id 集合 */
   reviewed: new Set<string>(),
   reviewedCount: 0,
+  /** 当前正在编辑的那一条（同一时间只允许一条） */
+  activeId: null as string | null,
   loading: false,
 };
 
@@ -226,6 +228,8 @@ function drawRows() {
   for (const e of S.rows) frag.appendChild(rowOf(e));
   $('rows').appendChild(frag);
   for (const ta of $('rows').querySelectorAll('textarea')) grow(ta);
+  S.activeId = null;
+  void loadContexts(S.rows);
 }
 
 /** 只清 .row，别动 #rows 本身。 */
@@ -349,17 +353,10 @@ function rowOf(e: Entry): HTMLElement {
 
   const stack = el('div', 'stack');
 
-  // 语境推断入口：内容区右上角，不挤 id 列
-  const tools = el('div', 'row-tools');
-  const ctxBtn = el('button', 'ctx-btn', '语境') as HTMLButtonElement;
-  ctxBtn.type = 'button';
-  ctxBtn.title = '推断这条的语境与用途';
-  ctxBtn.addEventListener('click', (ev) => {
-    ev.preventDefault();
-    void openCtx(e.id);
-  });
-  tools.appendChild(ctxBtn);
-  stack.appendChild(tools);
+  // 语境推断：直接显示，不用点
+  const ctx = el('div', 'ctx-inline');
+  ctx.dataset.id = e.id;
+  stack.appendChild(ctx);
 
   const refs = refList();
   if (!refs.length) {
@@ -434,6 +431,7 @@ function zhCell(e: Entry): HTMLElement {
     }
     setDirty(S.dirtyIds.length > 0);
   });
+  ta.addEventListener('focus', () => { void activateRow(e.id, ta); });
   ta.addEventListener('blur', () => void check(e.id));
   ta.addEventListener('keydown', (ev) => {
     // Ctrl+Enter：去下一条 —— 翻译时最常用的动作（页内最后一条就停）
@@ -443,7 +441,7 @@ function zhCell(e: Entry): HTMLElement {
       const row = ta.closest('.row') as HTMLElement | null;
       const next = row && row.nextElementSibling;
       const nx = next && next.querySelector('textarea');
-      if (nx) nx.focus();
+      void saveOne(e.id).then(() => { if (nx) nx.focus(); });
     }
   });
 
@@ -474,6 +472,62 @@ function highlightSpaces(text: string): DocumentFragment {
   }
   flush();
   return f;
+}
+
+async function loadContexts(rows: Entry[]) {
+  if (!rows.length) return;
+  const ids = rows.map((r) => r.id);
+  try {
+    const data = await api<Record<string, {
+      category: string; placeholders: { token: string; meaning: string }[];
+    }>>(`/api/context-batch?ids=${ids.join(',')}&lang=${encodeURIComponent(S.lang)}`);
+    for (const r of rows) {
+      const box = document.querySelector(
+        `.ctx-inline[data-id="${cssEsc(r.id)}"]`) as HTMLElement | null;
+      if (!box) continue;
+      const c = data[r.id];
+      if (!c) { box.textContent = ''; continue; }
+      const ph = (c.placeholders || [])
+        .map((p) => `${p.token}=${p.meaning}`).join('，');
+      box.textContent = `语境：${c.category}` + (ph ? ` ｜ ${ph}` : '');
+      box.title = '来自字符串表相邻条目与占位符用法的推断';
+    }
+  } catch { /* 语境只是辅助，取不到不影响编辑 */ }
+}
+
+/** 同一时间只编辑一条：切换时把上一条自动存盘，其余行只读。 */
+async function activateRow(id: string, ta: HTMLTextAreaElement) {
+  if (S.activeId === id) return;
+  if (S.activeId) await saveOne(S.activeId);
+  S.activeId = id;
+  for (const t of $('rows').querySelectorAll('textarea') as NodeListOf<HTMLTextAreaElement>) {
+    const row = t.closest('.row') as HTMLElement | null;
+    const rid = (row && row.dataset.id) || '';
+    t.readOnly = rid !== id;
+    t.classList.toggle('ro', rid !== id);
+  }
+  ta.readOnly = false;
+  ta.classList.remove('ro');
+}
+
+/** 单条存盘：只提交这一条，不碰其它行。 */
+async function saveOne(id: string) {
+  const text = S.edits.get(id);
+  if (text === undefined) return;
+  if (text === (S.orig.get(id) ?? '')) {
+    S.edits.delete(id);
+    S.dirtyIds = S.dirtyIds.filter((x) => x !== id);
+    setDirty(S.dirtyIds.length > 0);
+    return;
+  }
+  try {
+    await api('/api/patch', { lang: S.lang, rows: [{ id, text }] });
+    S.orig.set(id, text);
+    S.edits.delete(id);
+    S.dirtyIds = S.dirtyIds.filter((x) => x !== id);
+    setDirty(S.dirtyIds.length > 0);
+    void check(id);
+  } catch { /* 失败就留着改动，等手动保存 */ }
 }
 
 function isPlaceholder(t: string): boolean {

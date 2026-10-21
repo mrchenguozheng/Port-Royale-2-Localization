@@ -768,6 +768,16 @@ class Handler(BaseHTTPRequestHandler):
             # 输入框一边打字一边问：这个名字能不能用、是不是已经有一份了。
             return self.send_json(lang_status((query.get("code") or [""])[0]))
 
+        if path == "/api/context-batch":
+            ids = [x for x in (query.get("ids") or [""])[0].split(",") if x]
+            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
+            out = {}
+            for hid in ids[:200]:
+                c = context_of(hid, lang)
+                if c:
+                    out[hid] = c
+            return self.send_json(out)
+
         if path == "/api/context":
             hid = (query.get("id") or [""])[0]
             lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]

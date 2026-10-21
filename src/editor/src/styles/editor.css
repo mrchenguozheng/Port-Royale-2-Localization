@@ -492,3 +492,14 @@ main {
 .ctx-neigh-zh { grid-column: 2; color: var(--fg-dim); }
 
 .row-tools { display: flex; justify-content: flex-end; padding: 0 0.7rem 0.1rem 0; }
+
+/* 常显语境行 */
+.ctx-inline {
+  margin: 0.35rem 0 0;
+  padding: 0.2rem 0.7rem 0 0.7rem;
+  font-size: 0.82em;
+  color: var(--fg-dim);
+  border-top: 1px dashed var(--line-soft);
+}
+/* 同一时间只有一条可编辑，其余只读 */
+.cell-zh textarea.ro { color: var(--fg-dim); opacity: 0.75; }
