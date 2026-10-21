@@ -38,7 +38,7 @@ interface Entry {
 
 const FOLLOW = '';                 // 参照下拉里的「（无）」
 
-const PAGE_SIZES = [50, 100, 200];
+const PAGE_SIZES = [5, 10, 50, 100, 200];
 const DEFAULT_PAGE_SIZE = 100;
 
 const S = {
