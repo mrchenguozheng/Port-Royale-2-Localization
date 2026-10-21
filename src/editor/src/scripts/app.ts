@@ -38,10 +38,9 @@ interface Entry {
 
 const FOLLOW = '';                 // 参照下拉里的「（无）」
 
-const PAGE_SIZES = [5, 10, 20, 50, 100, 200];
-const DEFAULT_PAGE_SIZE = 5;
+//: 每页固定一条：翻页就是逐条过。
+const PAGE_SIZE = 1;
 //: 每页条数存在浏览器里，下次打开沿用上次的选择。
-const LS_PAGE_SIZE = 'pr2.pageSize';
 const LS_LANG = 'pr2.lang';
 const LS_REFA = 'pr2.refA';
 const LS_REFB = 'pr2.refB';
@@ -66,7 +65,7 @@ const S = {
   //: 当前页的条目（已含服务端返回的全部语言字段）
   rows: [] as Entry[],
   page: 1,
-  pageSize: DEFAULT_PAGE_SIZE,
+  pageSize: PAGE_SIZE,
   //: 全部条数：未搜索时是总条数，搜索时是命中数
   total: 0,
   //: 搜索结果。null 表示没在搜索，整表按 offset/limit 分页取
@@ -127,8 +126,6 @@ async function boot() {
 
   S.lang = S.langs.includes('zh') ? 'zh' : (S.langs[0] || '');
 
-  const savedSize = Number(saved(LS_PAGE_SIZE));
-  if (PAGE_SIZES.indexOf(savedSize) >= 0) S.pageSize = savedSize;
 
   // 上次选的编辑语言与参照语言
   const savedLang = saved(LS_LANG);
@@ -164,7 +161,6 @@ async function boot() {
   fill($('lang'), S.langs, S.lang);
   fill($('refA'), S.refLangs, S.refA);
   fill($('refB'), [FOLLOW, ...S.refLangs], S.refB);
-  fillPageSizes();
   ($('filter') as HTMLSelectElement).value = S.filter;
 
   applySize();
@@ -263,17 +259,6 @@ function fill(sel: HTMLSelectElement, items: string[], cur: string) {
     sel.appendChild(o);
   }
   sel.value = cur;
-}
-
-function fillPageSizes() {
-  const sel = $('pageSize') as HTMLSelectElement;
-  sel.innerHTML = '';
-  for (const n of PAGE_SIZES) {
-    const o = el('option', undefined, String(n));
-    (o as HTMLOptionElement).value = String(n);
-    sel.appendChild(o);
-  }
-  sel.value = String(S.pageSize);
 }
 
 function applySize() {
@@ -761,11 +746,6 @@ $('pageInput').addEventListener('change', () => {
   const v = Number(($('pageInput') as HTMLInputElement).value);
   if (Number.isFinite(v)) void renderPage(Math.floor(v));
 });
-$('pageSize').addEventListener('change', () => {
-  S.pageSize = Number(($('pageSize') as HTMLSelectElement).value) || DEFAULT_PAGE_SIZE;
-  remember(LS_PAGE_SIZE, String(S.pageSize));
-  void renderPage(1);
-});
 
 $('lang').addEventListener('change', (ev) => {
   S.lang = (ev.target as HTMLSelectElement).value;
@@ -853,6 +833,35 @@ async function jumpToId(id: string): Promise<boolean> {
   }
   return true;
 }
+
+async function randomJump() {
+  try {
+    const c = await api<{ count: number; ids: string[] }>(
+      `/api/count?filter=${S.filter}&lang=${encodeURIComponent(S.lang)}`);
+    if (!c.count) { $('stat').textContent = '当前筛选下没有条目'; return; }
+    const id = c.ids[Math.floor(Math.random() * c.ids.length)];
+    await jumpToId(id);
+  } catch (err) {
+    $('stat').textContent = '随机跳转失败：' + (err as Error).message;
+  }
+}
+
+async function jumpToHash(raw: string) {
+  let id = raw.trim().toLowerCase();
+  if (id.startsWith('0x')) id = id.slice(2);
+  if (!/^[0-9a-f]{8}$/.test(id)) {
+    $('stat').textContent = 'hash 格式不对：应是 0x 加 8 位十六进制';
+    return;
+  }
+  const ok = await jumpToId('0x' + id);
+  if (!ok) $('stat').textContent = '找不到 ' + '0x' + id;
+}
+
+$('random').addEventListener('click', () => void randomJump());
+$('jumpGo').addEventListener('click', () => void jumpToHash($('jumpHash').value));
+$('jumpHash').addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter') void jumpToHash($('jumpHash').value);
+});
 
 (window as any).pr2JumpTo = jumpToId;
 

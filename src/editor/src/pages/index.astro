@@ -81,7 +81,12 @@ const title = 'PR2 本地化编辑器';
         <span id="pageCount">/ 1</span>
         <button id="next" class="pg" title="下一页 (→)">›</button>
         <button id="last" class="pg" title="最后一页 (End)">»</button>
-        <select id="pageSize" title="每页条数"></select>
+      </span>
+
+      <span class="jump">
+        <button id="random" title="随机跳到一条">随机</button>
+        <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false" />
+        <button id="jumpGo" title="跳到指定 hash">跳转</button>
       </span>
 
       <span class="hint">Ctrl+Enter 下一条</span>

@@ -503,3 +503,11 @@ main {
 }
 /* 同一时间只有一条可编辑，其余只读 */
 .cell-zh textarea.ro { color: var(--fg-dim); opacity: 0.75; }
+
+/* 随机 / 按 hash 跳转 */
+.jump { display: inline-flex; align-items: center; gap: 0.3rem; }
+.jump input {
+  width: 9.5rem;
+  font-family: var(--font-mono);
+  padding: 0.2rem 0.35rem;
+}
