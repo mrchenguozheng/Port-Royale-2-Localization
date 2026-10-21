@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""apply_zh_rules.py —— 从 references/zh.toml 生成 src/translations/zh.toml。
+"""apply_zh_rules.py —— 从 references/zh.gog_1.1.2.3.toml 生成 src/translations/zh.toml。
 
 工作流变了：
-  · 以后**只改** references/zh.toml（不带任何为引擎服务的人为空格）；
+  · 以后**只改** references/zh.gog_1.1.2.3.toml（不带任何为引擎服务的人为空格）；
   · 本脚本按规则生成上一层的 zh.toml：
       1. 标点与占位符：全角化、单标点后空格、成对标点外侧空格；
       2. 连词：标点后的连词后面补一个空格（不在句末才补）；
@@ -27,7 +27,7 @@ sys.path.insert(0, HERE)
 
 import normalize_text as N  # noqa: E402
 
-SRC = os.path.join(ROOT, "src", "references", "zh.toml")
+SRC = os.path.join(ROOT, "src", "references", "zh.gog_1.1.2.3.toml")
 DST = os.path.join(ROOT, "src", "translations", "zh.toml")
 
 TAG = re.compile(r"(<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z])")
