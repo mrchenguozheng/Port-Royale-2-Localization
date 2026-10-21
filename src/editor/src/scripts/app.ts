@@ -859,8 +859,76 @@ async function jumpToHash(raw: string) {
 
 $('random').addEventListener('click', () => void randomJump());
 $('jumpGo').addEventListener('click', () => void jumpToHash($('jumpHash').value));
+let jumpTimer = 0;
+let jumpItems: { id: string; en: string; zh: string }[] = [];
+let jumpSel = -1;
+
+function hideJumpList() {
+  $('jumpList').hidden = true;
+  jumpSel = -1;
+}
+
+function drawJumpList() {
+  const box = $('jumpList');
+  box.innerHTML = '';
+  if (!jumpItems.length) { box.hidden = true; return; }
+  jumpItems.forEach((it, i) => {
+    const row = el('div', 'jump-item' + (i === jumpSel ? ' sel' : ''));
+    row.appendChild(el('span', 'jump-id', it.id));
+    row.appendChild(el('span', 'jump-en', it.en || '（空）'));
+    row.addEventListener('mousedown', (ev) => {
+      ev.preventDefault();
+      void jumpToHash(it.id);
+      hideJumpList();
+    });
+    box.appendChild(row);
+  });
+  box.hidden = false;
+}
+
+async function suggestHashes() {
+  const raw = $('jumpHash').value.trim().toLowerCase();
+  const q = raw.startsWith('0x') ? raw.slice(2) : raw;
+  if (q.length < 2) { jumpItems = []; hideJumpList(); return; }
+  try {
+    const r = await api<{ ids: { id: string; en: string; zh: string }[]; count: number }>(
+      `/api/ids?q=${encodeURIComponent(q)}&lang=${encodeURIComponent(S.lang)}`);
+    jumpItems = r.ids;
+    jumpSel = -1;
+    drawJumpList();
+    if (r.count > r.ids.length) {
+      $('stat').textContent = `匹配 ${r.count} 条，显示前 ${r.ids.length} 条`;
+    }
+  } catch { hideJumpList(); }
+}
+
+$('jumpHash').addEventListener('input', () => {
+  clearTimeout(jumpTimer);
+  jumpTimer = window.setTimeout(() => void suggestHashes(), 150);
+});
+$('jumpHash').addEventListener('blur', () => {
+  window.setTimeout(hideJumpList, 150);
+});
 $('jumpHash').addEventListener('keydown', (ev) => {
-  if (ev.key === 'Enter') void jumpToHash($('jumpHash').value);
+  if (ev.key === 'ArrowDown' && jumpItems.length) {
+    ev.preventDefault();
+    jumpSel = (jumpSel + 1) % jumpItems.length;
+    drawJumpList();
+  } else if (ev.key === 'ArrowUp' && jumpItems.length) {
+    ev.preventDefault();
+    jumpSel = (jumpSel - 1 + jumpItems.length) % jumpItems.length;
+    drawJumpList();
+  } else if (ev.key === 'Enter') {
+    ev.preventDefault();
+    if (jumpSel >= 0 && jumpItems[jumpSel]) {
+      void jumpToHash(jumpItems[jumpSel].id);
+      hideJumpList();
+    } else {
+      void jumpToHash($('jumpHash').value);
+    }
+  } else if (ev.key === 'Escape') {
+    hideJumpList();
+  }
 });
 
 (window as any).pr2JumpTo = jumpToId;

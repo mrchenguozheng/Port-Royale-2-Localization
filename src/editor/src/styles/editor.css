@@ -511,3 +511,28 @@ main {
   font-family: var(--font-mono);
   padding: 0.2rem 0.35rem;
 }
+
+/* hash 输入提示 */
+.jump-box { position: relative; display: inline-block; }
+.jump-list {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  z-index: 50;
+  min-width: 26rem;
+  max-height: 18rem;
+  overflow: auto;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 18px rgba(0,0,0,.35);
+}
+.jump-item {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+}
+.jump-item:hover, .jump-item.sel { background: var(--bg-row); }
+.jump-id { font-family: var(--font-mono); color: var(--fg-id); }
+.jump-en { color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

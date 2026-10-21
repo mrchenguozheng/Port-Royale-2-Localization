@@ -85,7 +85,11 @@ const title = 'PR2 本地化编辑器';
 
       <span class="jump">
         <button id="random" title="随机跳到一条">随机</button>
-        <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false" />
+        <span class="jump-box">
+          <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false"
+                 autocomplete="off" />
+          <div id="jumpList" class="jump-list" hidden></div>
+        </span>
         <button id="jumpGo" title="跳到指定 hash">跳转</button>
       </span>
 
