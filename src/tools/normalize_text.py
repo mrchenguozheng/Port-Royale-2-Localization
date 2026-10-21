@@ -217,8 +217,10 @@ def fix_ascii_punct(text, lang):
     """
     if not re.search(r"[\u3040-\u30ff\u4e00-\u9fff]", text):
         return text
-    table = {"ja": {",": "、", ";": "；", ":": "：", "!": "！", "?": "？"},
-             "zh": {",": "，", ";": "；", ":": "：", "!": "！", "?": "？"}}[lang]
+    table = {"ja": {",": "、", ";": "；", ":": "：", "!": "！", "?": "？",
+                    "(": "（", ")": "）"},
+             "zh": {",": "，", ";": "；", ":": "：", "!": "！", "?": "？",
+                    "(": "（", ")": "）"}}[lang]
     out = []
     for i, ch in enumerate(text):
         rep = table.get(ch)
@@ -232,6 +234,13 @@ def fix_ascii_punct(text, lang):
             out.append(rep); continue
         out.append(ch)
     return "".join(out)
+
+
+def tighten_brackets(text):
+    """全角括号两侧不留空格：「蒂奇（即黑胡子）搅得」。"""
+    text = re.sub(r"[ \u3000]*（[ \u3000]*", "（", text)
+    text = re.sub(r"[ \u3000]*）[ \u3000]*", "）", text)
+    return text
 
 
 def fix_vars(text, punct, cjk):
@@ -297,9 +306,10 @@ def main():
         if k in DATE_FORMAT_IDS:
             # 日期格式串（%3年%2%1日）不能让 fix_vars 在占位符两侧补空格，
             # 否则会渲染成「1600 年 4月 1 日」。
-            new = clean_n(fmt(fix_ascii_punct(new, a.lang)))
+            new = clean_n(tighten_brackets(fmt(fix_ascii_punct(new, a.lang))))
         else:
-            new = clean_n(fix_vars(fmt(fix_ascii_punct(new, a.lang)), punct, sets["cjk"]))
+            new = clean_n(tighten_brackets(
+                fix_vars(fmt(fix_ascii_punct(new, a.lang)), punct, sets["cjk"])))
         if new != doc[k]:
             changed += 1
             doc[k] = new
