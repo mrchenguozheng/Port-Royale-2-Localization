@@ -1141,6 +1141,9 @@ class App(tk.Tk):
         self.var_lang = tk.StringVar(value=FOLLOW_LANG)
         #: 缓存游戏目录里已装的语言，换目录时用它判断列表要不要刷新。
         self.installed = []
+        #: 下拉显示项（缺包时带「（未构建）」）与代码的映射。
+        self.lang_items = []
+        self.lang_map = {}
 
         langs = available_langs()
         self.vars = {}
@@ -1831,24 +1834,37 @@ class App(tk.Tk):
                             % (PACK_DIR, code, code))
 
     def refresh_langs(self):
-        """按游戏目录里实际存在的语言包重建下拉列表。
+        """列出 src\\translations 里的全部语言；游戏目录里没有包的标「（未构建）」。
 
         列表变过才重设 values：Combobox.configure 同样是重绘，
         在 80ms 的轮询路径上无条件写会连带影响交互。
         """
-        langs = installed_langs(self.var_dir.get())
-        if langs == self.installed:
+        codes = available_langs()
+        installed = installed_langs(self.var_dir.get())
+        items = [c if c in installed else c + "（未构建）" for c in codes]
+        if items == self.lang_items:
             return
-        self.installed = langs
-        self.lang_box.configure(values=[FOLLOW_LANG] + langs)
-        # 换目录等于换了一份 locale.ini，当前选择可能在新目录里不存在，
+        self.lang_items = items
+        self.installed = installed
+        self.lang_map = {it: c for it, c in zip(items, codes)}
+        self.lang_box.configure(values=[FOLLOW_LANG] + items)
+        # 换目录等于换了一份 locale.ini，当前选择可能在新列表里不存在，
         # 这时按新目录的设置重新对齐，而不是留一个选不中的值。
         cur = self.var_lang.get()
-        if cur != FOLLOW_LANG and cur not in langs:
-            cur = self.ini_lang() or FOLLOW_LANG
-            if cur != FOLLOW_LANG and cur not in langs:
+        valid = {FOLLOW_LANG} | set(items)
+        if cur not in valid:
+            ini = self.ini_lang()
+            cur = self.display_for(ini) if ini else FOLLOW_LANG
+            if cur not in valid:
                 cur = FOLLOW_LANG
         self.var_lang.set(cur)
+
+    def display_for(self, code):
+        """语言代码 -> 下拉显示项；找不到返回「跟随」。"""
+        for item, c in self.lang_map.items():
+            if c == code:
+                return item
+        return FOLLOW_LANG
 
     def ini_lang(self):
         """游戏目录 locale.ini 里设的语言；读不到返回 None。"""
@@ -1860,7 +1876,9 @@ class App(tk.Tk):
     def chosen_lang(self):
         """下拉当前选中的语言代码；选「跟随 locale.ini」时返回 None。"""
         v = self.var_lang.get()
-        return None if v == FOLLOW_LANG else v
+        if v == FOLLOW_LANG:
+            return None
+        return self.lang_map.get(v, v)
 
     def lang_to_save(self):
         """真正需要落盘的语言代码；没有需要保存的返回 None。
@@ -1912,6 +1930,10 @@ class App(tk.Tk):
         code = self.lang_to_save()
         if code is None:
             return True, "语言没有变化，未写入任何文件。"
+        if code not in self.installed:
+            return False, ("选了 %s，但游戏目录里还没有 %s.txt —— "
+                           "先勾选它构建，再点「部署到游戏目录」。"
+                           % (code, code))
 
         targets = [os.path.join(PACK_OUT, "locale.ini")]
         d = self.var_dir.get()
@@ -1937,8 +1959,15 @@ class App(tk.Tk):
         单独的「保存语言设置」是给「不想进游戏、只想改配置」用的入口，
         走的是同一条路径，不会出现两套保存逻辑。
         """
-        saved, note = self.save_lang_choice()
         lang = self.chosen_lang()
+        if lang and lang not in self.installed:
+            messagebox.showerror(
+                "语言包未构建",
+                "选了 %s，但游戏目录里还没有 %s.txt。\n\n"
+                "先在上面的「构建」里勾选 %s 构建，再点「部署到游戏目录」。"
+                % (lang, lang, lang))
+            return
+        saved, note = self.save_lang_choice()
         ok, message = launch_game(self.var_dir.get(), lang)
         if not ok:
             messagebox.showerror("无法启动", message)
