@@ -17,14 +17,19 @@ const title = 'PR2 本地化编辑器';
     <title>{title}</title>
   </head>
   <body>
-    <div class="panel">
-      <div class="srow">
-        <span class="brand">PR2 本地化编辑器</span>
-        <span class="slabel">编辑</span>
+    <header class="toolbar">
+      <span class="brand">PR2 本地化编辑器</span>
+      <label class="tb">编辑
         <select id="lang"></select>
-        <button id="addLang" class="mini" title="添加一种语言">＋</button>
-      </div>
+      </label>
+      <button id="addLang" class="mini" title="添加一种语言">＋</button>
+      <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…"
+             spellcheck="false" />
+      <button id="save" disabled>保存</button>
+      <button id="settingsBtn" class="mini" title="设置">⚙</button>
+    </header>
 
+    <div id="settings" class="settings-panel" hidden>
       <div class="srow">
         <span class="slabel">字号</span>
         <select id="size">
@@ -36,49 +41,40 @@ const title = 'PR2 本地化编辑器';
         </select>
         <button id="theme" class="mini theme-btn" title="切换浅色/深色">🌙</button>
       </div>
-
       <div class="srow">
-        <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…" spellcheck="false" />
+        <span class="slabel">未审</span>
+        <button id="prevUnrev">上一条未审</button>
+        <button id="nextUnrev">下一条未审</button>
+        <button id="randomUnrev">随机未审</button>
       </div>
-
-      <div class="srow">
-        <span class="slabel">条目</span>
-        <button id="first" class="pg" title="第一条 (Home)">首条</button>
-        <button id="prev" class="pg" title="上一条 (←)">上一条</button>
-        <input id="pageInput" class="page-num" type="number" min="1" step="1"
-               aria-label="第几条" />
-        <span id="pageCount">共 0 条</span>
-        <button id="next" class="pg" title="下一条 (→)">下一条</button>
-        <button id="last" class="pg" title="最后一条 (End)">末条</button>
-      </div>
-
-      <div class="srow">
-        <span class="slabel">审核</span>
-        <span id="stat">载入中…</span>
-        <span id="dirty" class="dirty"></span>
-      </div>
-
       <div class="srow">
         <span class="slabel">跳转</span>
-        <button id="randomUnrev" title="随机跳到一条未审核的">随机未审</button>
-        <button id="prevUnrev" title="跳到上一条未审核的">上一条未审</button>
-        <button id="nextUnrev" title="跳到下一条未审核的">下一条未审</button>
         <span class="jump-box">
           <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false"
                  autocomplete="off" />
           <div id="jumpList" class="jump-list" hidden></div>
         </span>
-        <button id="jumpGo" title="跳到指定 hash">跳转</button>
-        <span class="hint">Ctrl+Enter 下一条</span>
-      </div>
-
-      <div class="srow">
-        <button id="save" disabled>保存</button>
+        <button id="jumpGo">跳转</button>
+        <span class="hint">Ctrl+Enter 下一条 · Ctrl+S 保存</span>
       </div>
     </div>
 
-    <main id="rows"></main>
+    <div class="workspace">
+      <aside id="list" class="side-list" aria-label="条目列表"></aside>
+      <main id="rows"></main>
+    </div>
 
+    <footer class="statusbar">
+      <button id="first" class="mini" hidden>首条</button>
+      <button id="prev" class="mini">‹ 上一条</button>
+      <input id="pageInput" class="page-num" type="number" min="1" step="1"
+             aria-label="第几条" />
+      <span id="pageCount">共 0 条</span>
+      <button id="next" class="mini">下一条 ›</button>
+      <button id="last" class="mini" hidden>末条</button>
+      <span id="stat"></span>
+      <span id="dirty" class="dirty"></span>
+    </footer>
 
     <!-- 语境推断 -->
     <div id="ctxModal" class="modal" hidden>

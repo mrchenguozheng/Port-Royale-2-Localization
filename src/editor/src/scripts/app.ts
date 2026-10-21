@@ -169,6 +169,7 @@ async function boot() {
   } catch { S.reviewed = new Set(); S.reviewedCount = 0; }
 
   fill($('lang'), S.langs, S.lang);
+  await loadSideList();
 
   applySize();
   await reload(true);
@@ -232,6 +233,7 @@ function drawRows() {
   $('rows').appendChild(frag);
   for (const ta of $('rows').querySelectorAll('textarea')) grow(ta);
   S.activeId = null;
+  if (S.rows.length) markActiveInList(S.rows[0].id);
   void loadContexts(S.rows);
 }
 
@@ -307,6 +309,44 @@ async function filter() {
   }
 }
 
+// ── 左侧条目列表 ────────────────────────────────────────
+
+interface ListItem { id: string; en: string; zh: string; reviewed: boolean; }
+
+let sideItems: ListItem[] = [];
+
+async function loadSideList() {
+  try {
+    sideItems = await api<ListItem[]>('/api/list?lang=' + encodeURIComponent(S.lang));
+    drawSideList();
+  } catch { /* 列表只是导航，失败不影响编辑 */ }
+}
+
+function drawSideList() {
+  const box = $('list');
+  box.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for (const it of sideItems) {
+    const d = el('div', 'list-item' + (it.reviewed ? ' done' : ''));
+    d.dataset.id = it.id;
+    d.appendChild(el('div', 'li-id', it.id));
+    d.appendChild(el('div', 'li-text', it.en || it.zh || '（空）'));
+    d.addEventListener('click', () => void jumpToId(it.id));
+    frag.appendChild(d);
+  }
+  box.appendChild(frag);
+}
+
+function markActiveInList(id: string) {
+  const box = $('list');
+  for (const it of box.querySelectorAll('.list-item.active')) it.classList.remove('active');
+  const cur = box.querySelector(`.list-item[data-id="${cssEsc(id)}"]`);
+  if (cur) {
+    cur.classList.add('active');
+    cur.scrollIntoView({ block: 'nearest' });
+  }
+}
+
 // ── 渲染 ────────────────────────────────────────────────
 
 /* 一行 = id + 上下堆叠的「参照…参照 / 译文」。
@@ -360,9 +400,7 @@ function rowOf(e: Entry): HTMLElement {
   ctx.dataset.id = e.id;
   ctx.appendChild(el('div', 'ctx-head', '语境'));
   side.appendChild(ctx);
-  row.appendChild(side);
 
-  // 右：主体
   const main = el('div', 'card-main');
 
   const top = el('div', 'card-top');
@@ -386,6 +424,8 @@ function rowOf(e: Entry): HTMLElement {
     if (box.checked) S.reviewed.add(e.id); else S.reviewed.delete(e.id);
     lab.textContent = box.checked ? '已审' : '待审';
     row.classList.toggle('reviewed', box.checked);
+    const li = $('list').querySelector(`.list-item[data-id="${cssEsc(e.id)}"]`);
+    if (li) li.classList.toggle('done', box.checked);
     updateStat();
   });
   wrap.appendChild(box);
@@ -394,14 +434,19 @@ function rowOf(e: Entry): HTMLElement {
   main.appendChild(top);
   if (box.checked) row.classList.add('reviewed');
 
-  const stack = el('div', 'stack');
-  stack.appendChild(refLine('A', e));
-  stack.appendChild(refLine('B', e));
+  const compare = el('div', 'compare');
+  const src = el('div', 'col-src');
+  src.appendChild(refLine('A', e));
+  src.appendChild(refLine('B', e));
+  compare.appendChild(src);
+
+  const dst = el('div', 'col-dst');
   const zhBlock = el('div', 'zh-block');
   zhBlock.appendChild(el('div', 'zh-head', langName(S.lang)));
   zhBlock.appendChild(zhCell(e));
-  stack.appendChild(zhBlock);
-  main.appendChild(stack);
+  dst.appendChild(zhBlock);
+  compare.appendChild(dst);
+  main.appendChild(compare);
 
   const flags = el('div', 'flags');
   const ps = S.problems[e.id];
@@ -416,6 +461,7 @@ function rowOf(e: Entry): HTMLElement {
   if (ps && ps.some((p) => p.level === 'error')) row.classList.add('bad');
 
   row.appendChild(main);
+  row.appendChild(side);
   return row;
 }
 
@@ -815,6 +861,7 @@ $('lang').addEventListener('change', (ev) => {
       S.reviewed = new Set(f.ids || []);
       S.reviewedCount = f.count || 0;
     } catch { S.reviewed = new Set(); S.reviewedCount = 0; }
+    await loadSideList();
     await reload(true);
     const sp = Number(saved(pageKey()));
     if (sp > 1) await renderPage(sp);
@@ -942,6 +989,11 @@ document.addEventListener('keydown', (ev) => {
     ev.preventDefault();
     if (S.activeId) void saveOne(S.activeId); else void save();
   }
+});
+
+$('settingsBtn').addEventListener('click', () => {
+  const panel = $('settings');
+  panel.hidden = !panel.hidden;
 });
 
 $('theme').addEventListener('click', () => {

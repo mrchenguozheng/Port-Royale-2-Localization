@@ -786,6 +786,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_error_json(404, "没有这个 id：%s" % hid)
             return self.send_json(ctx)
 
+        if path == "/api/list":
+            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
+            flags = set(load_flags().get(lang, []))
+            rows = load_all()
+            return self.send_json([
+                {"id": r["id"],
+                 "en": (r.get(T.BASE_LANG, "") or "")[:60],
+                 "zh": (r.get(lang, "") or "")[:60],
+                 "reviewed": r["id"] in flags}
+                for r in rows])
+
         if path == "/api/ids":
             q = (query.get("q") or [""])[0].strip().lower()
             if q.startswith("0x"):
