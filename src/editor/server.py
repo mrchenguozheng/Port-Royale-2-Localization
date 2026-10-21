@@ -185,6 +185,120 @@ def filter_ids(kind, lang):
     return [r["id"] for r in rows]
 
 
+
+# ---------------------------------------------------------------- 语境推断
+
+ORDER_FILE = os.path.join(HERE, "data", "table-order.txt")
+_ORDER = None
+
+PH_MEAN = {
+    "@T$": "城镇名", "@N$": "人名", "@n$": "国家", "@D$": "日期",
+    "@I$": "整数", "@a$": "数量", "@G$": "货物/商品", "@g$": "金额",
+    "@S$": "船型", "@l$": "位置（海图）", "@C$": "船队", "@P$": "海盗名",
+}
+TAG_MEAN = [
+    ("<n:", "段落间距"), ("<n>", "换行"), ("<c>", "颜色：开始"), ("<o:", "颜色值"),
+    ("<r>", "红色文字"), ("<t>", "制表"), ("<ts:", "制表位"), ("<g:", "图标/图形"),
+    ("<gs:", "图形脚本标记（需原样保留）"), ("<f:", "字体"),
+]
+
+
+def table_order():
+    global _ORDER
+    if _ORDER is None:
+        try:
+            with open(ORDER_FILE, encoding="utf-8") as fh:
+                _ORDER = [l.strip() for l in fh if l.strip()]
+        except OSError:
+            _ORDER = []
+    return _ORDER
+
+
+def placeholders_of(text):
+    out = []
+    for m in re.finditer(r"@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]", text):
+        tok = m.group(0)
+        if tok in out:
+            continue
+        out.append(tok)
+    return out
+
+
+def context_of(hid, lang):
+    rows = {r["id"]: r for r in load_all()}
+    row = rows.get(hid)
+    if row is None:
+        return None
+    en = row.get(T.BASE_LANG, "") or ""
+    zh = row.get(lang, "") or ""
+    reasons = []
+
+    ph = []
+    for tok in placeholders_of(en):
+        mean = next((v for k, v in PH_MEAN.items() if tok.startswith(k)), "变量/参数")
+        ph.append({"token": tok, "meaning": mean})
+
+    tags = []
+    for tok, mean in TAG_MEAN:
+        if tok in en and mean not in tags:
+            tags.append(mean)
+
+    cat = "通用文本"
+    try:
+        ko = C.load_keep_original()
+    except Exception:
+        ko = {}
+    group = ko.get(hid) or ko.get(hid.lower())
+    if group:
+        cat = "原样保留：%s" % group
+        reasons.append("在 keep_original 清单里，编译时强制输出英文原文")
+    elif not zh:
+        cat = "空译文"
+        reasons.append("这条还没有译文，游戏里会显示英文")
+    elif not re.sub(r"<[^>]*>|@[A-Za-z]\$[^$]*\$|%[0-9A-Za-z]+", "", en).strip():
+        cat = "格式串（只有占位符/标签）"
+        reasons.append("去掉标签和占位符后没有正文")
+    elif re.search(r"(?i)\b(producer|manager|director|qa|ascaron|programming|music|sound)\b", en) and len(en) < 60:
+        cat = "职员表条目"
+        reasons.append("匹配到制作名单/职位用语")
+    elif ph and re.search(r"(?i)(until|before|destroy|deliver|supply|build|bring|escort|attack|capture)", en):
+        cat = "任务目标/委托"
+        reasons.append("含占位符，且出现 until/before/destroy/deliver 这类任务用语")
+    elif "?" in en or "!" in en:
+        cat = "对话/口气句"
+        reasons.append("含问号或感叹号")
+    elif len(en) <= 24 and not re.search(r"[.。!?]", en):
+        cat = "界面标签/短标题"
+        reasons.append("很短且没有句末标点，常见于按钮、标题、列表项")
+    elif "<n><n>" in en or len(en) > 200:
+        cat = "长文本（帮助/编年史/教程）"
+        reasons.append("多段或篇幅长，通常出现在帮助、编年史、教程窗口")
+    if tags:
+        reasons.append("含格式标记：" + "、".join(tags))
+
+    ids = table_order()
+    try:
+        idx = ids.index(hid)
+    except ValueError:
+        idx = -1
+    neigh = []
+    if idx >= 0:
+        for j in range(max(0, idx - 3), min(len(ids), idx + 4)):
+            if j == idx:
+                continue
+            r = rows.get(ids[j])
+            if not r:
+                continue
+            neigh.append({"id": r["id"],
+                          "en": (r.get(T.BASE_LANG, "") or "")[:120],
+                          "zh": (r.get(lang, "") or "")[:120]})
+
+    flags = set(load_flags().get(lang, []))
+    return {"id": hid, "category": cat, "reasons": reasons,
+            "placeholders": ph, "tags": tags, "en": en, "zh": zh,
+            "reviewed": hid in flags, "neighbors": neigh}
+
+
 # ---------------------------------------------------------------- 数据
 
 def load_all():
@@ -653,6 +767,14 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/lang-exists":
             # 输入框一边打字一边问：这个名字能不能用、是不是已经有一份了。
             return self.send_json(lang_status((query.get("code") or [""])[0]))
+
+        if path == "/api/context":
+            hid = (query.get("id") or [""])[0]
+            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
+            ctx = context_of(hid, lang)
+            if ctx is None:
+                return self.send_error_json(404, "没有这个 id：%s" % hid)
+            return self.send_json(ctx)
 
         if path == "/api/find":
             hid = (query.get("id") or [""])[0]

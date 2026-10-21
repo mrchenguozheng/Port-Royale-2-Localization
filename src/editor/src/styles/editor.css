@@ -456,3 +456,39 @@ main {
   background: #3a2f0c !important;
   box-shadow: inset 0 0 0 2px var(--warn, #d97706);
 }
+
+/* 语境推断 */
+.ctx-btn {
+  margin-left: 0.4rem;
+  font-size: 0.75em;
+  padding: 0.05rem 0.35rem;
+  cursor: pointer;
+  color: var(--fg-dim);
+}
+.ctx-btn:hover { color: var(--fg); }
+.ctx-body {
+  max-height: 60vh;
+  overflow: auto;
+  font-size: 0.92em;
+  line-height: 1.6;
+}
+.ctx-line { display: flex; gap: 0.6rem; margin: 0.25rem 0; }
+.ctx-label {
+  flex: 0 0 5.5rem;
+  color: var(--fg-id);
+  text-align: right;
+}
+.ctx-value { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ctx-head { margin: 0.9rem 0 0.4rem; color: var(--fg-id); }
+.ctx-neigh {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 0.2rem 0.6rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--line-soft);
+}
+.ctx-id { font-family: var(--font-mono); color: var(--fg-id); }
+.ctx-neigh-en { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ctx-neigh-zh { grid-column: 2; color: var(--fg-dim); }
+
+.row-tools { display: flex; justify-content: flex-end; padding: 0 0.7rem 0.1rem 0; }

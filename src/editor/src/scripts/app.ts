@@ -318,7 +318,16 @@ function rowOf(e: Entry): HTMLElement {
   const row = el('div', 'row');
   row.dataset.id = e.id;
 
-  row.appendChild(el('div', 'cell-id', e.id));
+  const idCell = el('div', 'cell-id', e.id);
+  const ctxBtn = el('button', 'ctx-btn', '语境') as HTMLButtonElement;
+  ctxBtn.type = 'button';
+  ctxBtn.title = '推断这条的语境与用途';
+  ctxBtn.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    void openCtx(e.id);
+  });
+  idCell.appendChild(ctxBtn);
+  row.appendChild(idCell);
 
   // 人工审核：勾上 = 这条已过目。文字常显，不靠 hover 提示。
   const wrap = el('label', 'chk-wrap');
@@ -789,6 +798,59 @@ async function jumpToId(id: string): Promise<boolean> {
 }
 
 (window as any).pr2JumpTo = jumpToId;
+
+// ── 语境推断 ────────────────────────────────────────────
+
+async function openCtx(id: string) {
+  const modal = $('ctxModal');
+  const body = $('ctxBody');
+  body.textContent = '正在分析…';
+  modal.hidden = false;
+  try {
+    const c = await api<{
+      id: string; category: string; reasons: string[];
+      placeholders: { token: string; meaning: string }[];
+      tags: string[]; en: string; zh: string; reviewed: boolean;
+      neighbors: { id: string; en: string; zh: string }[];
+    }>(`/api/context?id=${encodeURIComponent(id)}&lang=${encodeURIComponent(S.lang)}`);
+
+    body.innerHTML = '';
+    const line = (label: string, value: string) => {
+      const d = el('div', 'ctx-line');
+      d.appendChild(el('span', 'ctx-label', label));
+      d.appendChild(el('span', 'ctx-value', value || '（无）'));
+      body.appendChild(d);
+    };
+    line('ID', c.id);
+    line('推断用途', c.category);
+    line('依据', c.reasons.join('；') || '（无）');
+    if (c.placeholders.length) {
+      line('占位符', c.placeholders.map((p) => `${p.token} → ${p.meaning}`).join('；'));
+    }
+    if (c.tags.length) line('格式标记', c.tags.join('、'));
+    line('原文', c.en);
+    line('当前译文', c.zh);
+    line('审核', c.reviewed ? '已勾选' : '未勾选');
+
+    if (c.neighbors.length) {
+      body.appendChild(el('div', 'ctx-head', '表格中相邻的条目（同屏/同功能的可能性高）'));
+      for (const n of c.neighbors) {
+        const d = el('div', 'ctx-neigh');
+        d.appendChild(el('span', 'ctx-id', n.id));
+        d.appendChild(el('span', 'ctx-neigh-en', n.en));
+        if (n.zh) d.appendChild(el('span', 'ctx-neigh-zh', n.zh));
+        body.appendChild(d);
+      }
+    }
+  } catch (err) {
+    body.textContent = '读取失败：' + (err as Error).message;
+  }
+}
+
+$('ctxClose').addEventListener('click', () => { $('ctxModal').hidden = true; });
+$('ctxModal').addEventListener('click', (ev) => {
+  if (ev.target === $('ctxModal')) $('ctxModal').hidden = true;
+});
 
 boot().catch((err) => {
   $('stat').textContent = '载入失败：' + err.message;
