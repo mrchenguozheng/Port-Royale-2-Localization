@@ -39,6 +39,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.dirname(HERE)                                  # 仓库的 src\
 TOOLS = os.path.join(SRC, "tools")
 DIST = os.path.join(HERE, "dist")                            # astro build 的产物
+#: 人工审核勾选：build\zh.review-flags.json，按语言存 id 列表。
+FLAGS = os.path.join(os.path.dirname(SRC), "build", "zh.review-flags.json")
 DEFAULT_PORT = 8777
 
 # translate / compile_pack 是脚本不是包，直接把 tools\ 加进 sys.path 来 import。
@@ -212,6 +214,19 @@ def _keep_header(path, lines):
     except OSError:
         pass
     return head + lines
+
+
+def load_flags():
+    try:
+        return json.load(open(FLAGS, encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def save_flags(d):
+    os.makedirs(os.path.dirname(FLAGS), exist_ok=True)
+    with open(FLAGS, "w", encoding="utf-8") as fh:
+        json.dump(d, fh, ensure_ascii=False, indent=1)
 
 
 def save_all(lang, rows):
@@ -541,6 +556,10 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_file(full)
 
     def get_api(self, path, query):
+        if path == "/api/review-flags":
+            lang = (query.get("lang") or ["zh"])[0]
+            ids = sorted(load_flags().get(lang, []))
+            return self.send_json({"lang": lang, "ids": ids, "count": len(ids)})
         if path == "/api/zh-review":
             return self.send_json(zh_review.status())
         if path == "/api/health":
@@ -616,6 +635,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def post_api(self, path):
         body = self.read_json()
+
+        if path == "/api/review-flags":
+            lang = body.get("lang", "zh")
+            hid = body.get("id", "")
+            on = bool(body.get("on"))
+            d = load_flags()
+            cur = set(d.get(lang, []))
+            if on:
+                cur.add(hid)
+            else:
+                cur.discard(hid)
+            d[lang] = sorted(cur)
+            save_flags(d)
+            return self.send_json({"ok": True, "count": len(d[lang])})
 
         if path == "/api/check":
             text = body.get("text", "")

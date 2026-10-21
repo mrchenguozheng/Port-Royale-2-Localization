@@ -39,6 +39,7 @@ REF = os.path.join(ROOT, "src", "references", "zh.gog_1.1.2.3.toml")
 ZH = os.path.join(ROOT, "src", "translations", "zh.toml")
 MARK = os.path.join(ROOT, "build", "zh.reviewed.json")
 ACCEPTED = os.path.join(ROOT, "build", "zh.accepted.toml")
+FLAGS = os.path.join(ROOT, "build", "zh.review-flags.json")
 
 
 def sha(path):
@@ -138,6 +139,13 @@ def changed_since_accepted():
     return sorted(h for h in cur if old.get(h) != cur.get(h))
 
 
+def reviewed_ids(lang="zh"):
+    try:
+        return set(json.load(open(FLAGS, encoding="utf-8")).get(lang, []))
+    except (OSError, ValueError):
+        return set()
+
+
 def status():
     """给构建脚本和编辑器看的状态：要不要人工审核、哪些条目。"""
     st = load_state()
@@ -145,10 +153,13 @@ def status():
     if st.get("status") == "ok" and st.get("ref") == cur_ref and st.get("zh") == sha(ZH):
         return {"status": "ok", "changed": [], "count": 0}
     changed = changed_since_accepted()
+    flags = reviewed_ids()
     if changed is None:
         return {"status": "needs_review", "changed": None, "count": None,
                 "note": "还没有接受过审核稿"}
-    return {"status": "needs_review", "changed": changed, "count": len(changed)}
+        return {"status": "needs_review", "changed": changed, "count": len(changed)}
+    return {"status": "needs_review", "changed": changed, "count": len(changed),
+            "reviewed": len(flags), "reviewed_changed": len([h for h in changed if h in flags])}
 
 
 def main():

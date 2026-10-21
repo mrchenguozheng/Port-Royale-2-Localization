@@ -64,6 +64,9 @@ const S = {
   problems: {} as Record<string, Problem[]>,
   /** 术语一致性： id -> ["Frigate：应为「巡防舰」", …] */
   terms: {} as Record<string, string[]>,
+  /** 人工审核勾选：当前语言已勾选的 id 集合 */
+  reviewed: new Set<string>(),
+  reviewedCount: 0,
   loading: false,
 };
 
@@ -116,6 +119,13 @@ async function boot() {
   } catch {
     S.terms = {};
   }
+
+  try {
+    const f = await api<{ ids: string[]; count: number }>(
+      '/api/review-flags?lang=' + encodeURIComponent(S.lang));
+    S.reviewed = new Set(f.ids || []);
+    S.reviewedCount = f.count || 0;
+  } catch { S.reviewed = new Set(); S.reviewedCount = 0; }
 
   fill($('lang'), S.langs, S.lang);
   fill($('refA'), S.refLangs, S.refA);
@@ -192,7 +202,8 @@ function updateStat() {
   const pages = pageCount();
   const n = Object.keys(S.terms).length;
   $('stat').textContent = `第 ${S.page} / ${pages} 页 · 共 ${S.total} 条`
-    + (n ? ` · 术语待统一 ${n} 条` : '');
+    + (n ? ` · 术语待统一 ${n} 条` : '')
+    + (S.reviewedCount ? ` · 已审 ${S.reviewedCount} 条` : '');
 }
 
 function fill(sel: HTMLSelectElement, items: string[], cur: string) {
@@ -260,7 +271,30 @@ function rowOf(e: Entry): HTMLElement {
   const row = el('div', 'row');
   row.dataset.id = e.id;
 
+  // 人工审核勾选：勾上 = 这条已过目。只记录标记，不改译文。
+  const wrap = el('label', 'chk-wrap');
+  const box = el('input', 'chk') as HTMLInputElement;
+  box.type = 'checkbox';
+  box.checked = S.reviewed.has(e.id);
+  box.title = '标记这条已审核';
+  box.addEventListener('change', async () => {
+    try {
+      const r = await api<{ count: number }>('/api/review-flags',
+        { lang: S.lang, id: e.id, on: box.checked });
+      S.reviewedCount = r.count;
+    } catch {
+      box.checked = !box.checked;      // 后端失败就退回，别假装勾上了
+      return;
+    }
+    if (box.checked) S.reviewed.add(e.id); else S.reviewed.delete(e.id);
+    row.classList.toggle('reviewed', box.checked);
+    updateStat();
+  });
+  wrap.appendChild(box);
+  row.appendChild(wrap);
+
   row.appendChild(el('div', 'cell-id', e.id));
+  if (box.checked) row.classList.add('reviewed');
 
   const stack = el('div', 'stack');
 
@@ -584,8 +618,16 @@ $('pageSize').addEventListener('change', () => {
 
 $('lang').addEventListener('change', (ev) => {
   S.lang = (ev.target as HTMLSelectElement).value;
-  // 换编辑语言等于换了一列数据：把当前页重画，改动仍按 id 留在 edits 里。
-  void renderPage(S.page);
+  // 换编辑语言等于换了一列数据：审核勾选也要换一份，再把当前页重画。
+  void (async () => {
+    try {
+      const f = await api<{ ids: string[]; count: number }>(
+        '/api/review-flags?lang=' + encodeURIComponent(S.lang));
+      S.reviewed = new Set(f.ids || []);
+      S.reviewedCount = f.count || 0;
+    } catch { S.reviewed = new Set(); S.reviewedCount = 0; }
+    await renderPage(S.page);
+  })();
 });
 $('refA').addEventListener('change', (ev) => {
   S.refA = (ev.target as HTMLSelectElement).value;
