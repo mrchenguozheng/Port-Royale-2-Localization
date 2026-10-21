@@ -239,6 +239,8 @@ function updatePager() {
   $('pageCount').textContent = '/ ' + pages;
   ($('prev') as HTMLButtonElement).disabled = S.page <= 1;
   ($('next') as HTMLButtonElement).disabled = S.page >= pages;
+  ($('first') as HTMLButtonElement).disabled = S.page <= 1;
+  ($('last') as HTMLButtonElement).disabled = S.page >= pages;
 }
 
 function updateStat() {
@@ -661,6 +663,33 @@ $('prev').addEventListener('click', () => {
 });
 $('next').addEventListener('click', () => {
   if (S.page < pageCount()) void renderPage(S.page + 1);
+});
+$('first').addEventListener('click', () => { if (S.page > 1) void renderPage(1); });
+$('last').addEventListener('click', () => {
+  const pages = pageCount();
+  if (S.page < pages) void renderPage(pages);
+});
+
+// 翻页快捷键：焦点不在输入框/文本框/下拉里时，←/→ 翻页，Home/End 首末页。
+document.addEventListener('keydown', (ev) => {
+  const t = ev.target as HTMLElement | null;
+  const tag = (t && t.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) {
+    return;
+  }
+  if (ev.key === 'ArrowLeft' || ev.key === 'PageUp') {
+    ev.preventDefault();
+    if (S.page > 1) void renderPage(S.page - 1);
+  } else if (ev.key === 'ArrowRight' || ev.key === 'PageDown') {
+    ev.preventDefault();
+    if (S.page < pageCount()) void renderPage(S.page + 1);
+  } else if (ev.key === 'Home') {
+    ev.preventDefault();
+    void renderPage(1);
+  } else if (ev.key === 'End') {
+    ev.preventDefault();
+    void renderPage(pageCount());
+  }
 });
 $('pageInput').addEventListener('change', () => {
   const v = Number(($('pageInput') as HTMLInputElement).value);

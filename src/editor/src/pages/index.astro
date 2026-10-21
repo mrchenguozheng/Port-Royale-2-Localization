@@ -74,11 +74,13 @@ const title = 'PR2 本地化编辑器';
       <span id="dirty" class="dirty"></span>
 
       <span class="pager">
-        <button id="prev" title="上一页">‹</button>
+        <button id="first" class="pg" title="第一页 (Home)">«</button>
+        <button id="prev" class="pg" title="上一页 (←)">‹</button>
         <input id="pageInput" class="page-num" type="number" min="1" step="1"
                aria-label="页码" />
         <span id="pageCount">/ 1</span>
-        <button id="next" title="下一页">›</button>
+        <button id="next" class="pg" title="下一页 (→)">›</button>
+        <button id="last" class="pg" title="最后一页 (End)">»</button>
         <select id="pageSize" title="每页条数"></select>
       </span>
 
