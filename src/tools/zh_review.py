@@ -42,10 +42,11 @@ ACCEPTED = os.path.join(ROOT, "build", "zh.accepted.toml")
 
 
 def sha(path):
+    """按内容算哈希；CRLF/LF 视为同一份（git checkout 会改行尾）。"""
     h = hashlib.sha256()
     with open(path, "rb") as fh:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
-            h.update(chunk)
+            h.update(chunk.replace(b"\r\n", b"\n"))
     return h.hexdigest()
 
 
