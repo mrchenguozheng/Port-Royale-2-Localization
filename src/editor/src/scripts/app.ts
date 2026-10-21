@@ -242,15 +242,39 @@ function updatePager() {
   ($('last') as HTMLButtonElement).disabled = S.page >= pages;
 }
 
+function nextTermIssue() {
+  const issues = Object.keys(S.terms);
+  if (!issues.length) return;
+  const bad = new Set(issues);
+  const order = sideItems.map((x) => x.id);
+  const cur = S.rows.length ? S.rows[0].id : '';
+  const start = cur ? Math.max(0, order.indexOf(cur)) : -1;
+  for (let k = 1; k <= order.length; k++) {
+    const id = order[(start + k) % order.length];
+    if (bad.has(id)) { void jumpToId(id); return; }
+  }
+}
+
 function updateStat() {
   const n = Object.keys(S.terms).length;
   const reviewed = Math.min(S.reviewedCount, S.total);
   const pending = Math.max(0, S.total - reviewed);
-  $('stat').textContent =
-    `已审 ${reviewed} 条 · 待审 ${pending} 条 · 共 ${S.total} 条`
-    + (n ? ` · 术语待统一 ${n} 条` : '');
-}
+  const box = $('stat');
+  box.innerHTML = '';
 
+  const plain = (text: string) => box.appendChild(el('span', 'stat-item', text));
+
+  plain(`已审 ${reviewed} 条`);
+  const todo = el('a', 'stat-item link', `待审 ${pending} 条`);
+  todo.addEventListener('click', () => void nextUnreviewed());
+  box.appendChild(todo);
+  plain(`共 ${S.total} 条`);
+  if (n) {
+    const term = el('a', 'stat-item link', `术语待统一 ${n} 条`);
+    term.addEventListener('click', () => nextTermIssue());
+    box.appendChild(term);
+  }
+}
 function fill(sel: HTMLSelectElement, items: string[], cur: string) {
   sel.innerHTML = '';
   for (const v of items) {

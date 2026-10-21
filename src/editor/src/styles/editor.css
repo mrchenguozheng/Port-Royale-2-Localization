@@ -58,7 +58,8 @@ html, body {
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-zh);
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei",
+               "PingFang SC", sans-serif;
   font-size: 14px;
   line-height: 1.6;
   display: flex;
@@ -1075,21 +1076,44 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .li-head { display: flex; align-items: baseline; gap: 0.35rem; }
 .li-no { font-family: var(--font-mono); font-size: 0.72em; color: var(--fg-id); }
 
-/* 图标字体（由 src/tools/make_icon_font.py 生成） */
+/* Font Awesome 6 Free（随仓库分发，见 fonts/LICENSE-fontawesome.txt） */
 @font-face {
-  font-family: "PR2 Editor Icons";
-  src: url("/fonts/icons.ttf") format("truetype");
-  font-weight: normal;
+  font-family: "Font Awesome 6 Free";
   font-style: normal;
+  font-weight: 900;
   font-display: block;
+  src: url("/fonts/fa-solid-900.woff2") format("woff2");
 }
 .ic {
-  font-family: "PR2 Editor Icons", sans-serif;
+  font-family: "Font Awesome 6 Free", sans-serif;
+  font-weight: 900;
   font-style: normal;
-  font-weight: normal;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
   display: inline-block;
 }
-.ic-plus::before { content: "\e000"; }
-.ic-gear::before { content: "\e001"; }
+.ic-plus::before { content: "\f067"; }
+.ic-gear::before { content: "\f013"; }
+
+/* 空格高亮层：与 textarea 用完全相同的排版参数，避免偏移 */
+#rows .cell-zh textarea,
+#rows .sp-layer {
+  margin: 0;
+  border: 0;
+  padding: 0.2rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-size);
+  line-height: 1.6;
+  letter-spacing: normal;
+  word-spacing: normal;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  tab-size: 4;
+}
+#rows .sp-layer { box-sizing: border-box; }
+
+/* 状态行可点击项 */
+.stat-item { margin-right: 0.5rem; }
+.stat-item.link { color: var(--accent); cursor: pointer; text-decoration: none; }
+.stat-item.link:hover { text-decoration: underline; }
