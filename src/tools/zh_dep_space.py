@@ -56,13 +56,27 @@ def cuts_for(text, nlp, min_nsubj):
             if len(re.findall(r"[\u4e00-\u9fff]", text[lo:hi])) < min_nsubj:
                 continue
             cut = hi if hi <= t.idx else lo
+            # 「把/被 + 长宾语 + 状语」被整体当成主语时，断在宾语后面、状语前面：
+            # 「把生产出来的货物 | 高价卖出」，而不是「…高价 | 卖出」。
+            special = False
+            has_ba = any(x.dep_ == "aux:ba" or x.text == "把" for x in sub)
+            if has_ba:
+                # 「把/被 + 宾语 + 状语」被并进 nsubj 时，断在状语前：
+                # 把生产出来的货物 | 高价卖出
+                nom = sorted((x for x in sub if x.pos_ in ("NOUN", "PROPN", "ADV", "ADJ")),
+                             key=lambda x: x.idx)
+                if len(nom) >= 2:
+                    cut = nom[-1].idx
+                    special = True
             if not (0 < cut < len(text)):
                 continue
             # 断点右边那个词不能是名词/形容词这类「还在短语里」的成分，
             # 否则会把「大片|陆地」这种名词短语切开。
             nxt = next((x for x in doc if x.idx == cut), None)
             prev = next((x for x in doc if x.idx + len(x.text) == cut), None)
-            if hi <= t.idx:
+            if special:
+                pass
+            elif hi <= t.idx:
                 if nxt is None or nxt.pos_ in ("NOUN", "PROPN", "NUM", "ADJ", "DET", "PART"):
                     continue
             else:
