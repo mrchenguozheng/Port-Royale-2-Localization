@@ -119,7 +119,25 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
 
 // ── 载入 ────────────────────────────────────────────────
 
+const ICONS: Record<string, string> = {
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+    + 'stroke-linecap="round" stroke-linejoin="round">'
+    + '<circle cx="12" cy="12" r="3.2"/>'
+    + '<path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/>'
+    + '</svg>',
+};
+
+function setIcon(id: string, name: string) {
+  const b = $(id);
+  if (b) b.innerHTML = ICONS[name] || '';
+  if (b) b.classList.add('icon-btn');
+}
+
 async function boot() {
+  setIcon('addLang', 'plus');
+  setIcon('settingsBtn', 'gear');
   const d = await api<{ editable: string[]; all: string[]; base: string }>('/api/langs');
   S.langs = d.editable;
   S.refLangs = d.all;
@@ -318,14 +336,17 @@ function drawSideList() {
   const box = $('list');
   box.innerHTML = '';
   const frag = document.createDocumentFragment();
-  for (const it of sideItems) {
+  sideItems.forEach((it, i) => {
     const d = el('div', 'list-item' + (it.reviewed ? ' done' : ''));
     d.dataset.id = it.id;
-    d.appendChild(el('div', 'li-id', it.id));
+    const head = el('div', 'li-head');
+    head.appendChild(el('span', 'li-no', '#' + (i + 1)));
+    head.appendChild(el('span', 'li-id', it.id));
+    d.appendChild(head);
     d.appendChild(el('div', 'li-text', it.en || it.zh || '（空）'));
     d.addEventListener('click', () => void jumpToId(it.id));
     frag.appendChild(d);
-  }
+  });
   box.appendChild(frag);
 }
 
@@ -396,6 +417,7 @@ function rowOf(e: Entry): HTMLElement {
   const main = el('div', 'card-main');
 
   const top = el('div', 'card-top');
+  top.appendChild(el('span', 'cell-no', '#' + S.page));
   top.appendChild(el('div', 'cell-id', e.id));
 
   const wrap = el('label', 'chk-wrap');
