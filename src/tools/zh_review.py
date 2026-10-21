@@ -63,7 +63,7 @@ def generate_all():
              (re.match(r'^"([^"]+)"\s*=', l) for l in io.open(REF, encoding="utf-8"))
              if m]
     zh_rules = lang_rules.get("zh")
-    given, surn, extras = GEN.build_names(doc)
+    given, surn, extras, towns = GEN.build_names(doc)
     out = {}
     for h in order:
         text = doc[h]
@@ -78,8 +78,8 @@ def generate_all():
             if i % 2 == 1 or not part:
                 res.append(part)
                 continue
-            spans = GEN.find_names(part, given, surn, extras)
-            res.append(GEN.pad_names(part, spans) if spans else part)
+            spans = GEN.find_names(part, given, surn, extras + towns)
+            res.append(GEN.pad_names(part, spans, towns) if spans else part)
         out[h] = "".join(res)
     return out
 
