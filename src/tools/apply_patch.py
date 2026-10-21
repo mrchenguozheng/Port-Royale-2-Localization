@@ -82,6 +82,14 @@ def pick_game_dir(explicit):
     sys.exit("找不到游戏目录：用 --game-dir 指定，或先在 start.bat 里选一次。")
 
 
+def spacy_python():
+    explicit = os.environ.get("PR2_SPACY_PYTHON")
+    if explicit:
+        return explicit
+    local = os.path.join(ROOT, ".venv-spacy", "Scripts", "python.exe")
+    return local if os.path.isfile(local) else ""
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--langs", default="", help="逗号分隔，默认 ja,zh")
@@ -90,6 +98,8 @@ def main():
     ap.add_argument("--no-check", action="store_true", help="跳过 check_breaks")
     ap.add_argument("--no-fonts", action="store_true", help="编译时不重裁字体")
     ap.add_argument("--launch", action="store_true", help="部署完成后启动游戏")
+    ap.add_argument("--dep", action="store_true",
+                    help="中文：用依存句法给 ≥60 字的段落补空格（需要 .venv-spacy）")
     ap.add_argument("--dry-run", action="store_true", help="只打印计划，不写文件")
     args = ap.parse_args()
 
