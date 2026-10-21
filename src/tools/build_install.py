@@ -95,7 +95,8 @@ def available_langs():
     """
     sys.path.insert(0, HERE)
     import translate as T
-    return T.target_langs()
+    # test_en 这类测试用语言不进界面（与 apply_patch 的过滤一致）
+    return [c for c in T.target_langs() if not c.startswith("test_")]
 
 
 # ------------------------------------------------------------ 构建产物
