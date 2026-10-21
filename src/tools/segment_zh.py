@@ -11,9 +11,11 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-sys.path.insert(0, os.path.join(ROOT, ".tmp", "spacy37"))
-
-import spacy  # noqa: E402
+try:
+    import spacy  # noqa: E402
+except ImportError:                      # 老环境：spaCy 装在 .tmp/spacy37
+    sys.path.insert(0, os.path.join(ROOT, ".tmp", "spacy37"))
+    import spacy  # noqa: E402
 
 _model = os.environ.get("PR2_SPACY_MODEL", "zh_core_web_sm")
 _nlp = spacy.load(_model)

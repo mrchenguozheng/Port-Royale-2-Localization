@@ -13,7 +13,7 @@ token 比控件宽时，要么整行被丢弃（空白），要么被裁掉（�
 （spaCy 的依赖在 3.14 上还没有轮子），所以脚本通过子进程调用
 `segment_zh.py`，用环境变量 `PR2_SPACY_PYTHON` 指定那个解释器：
 
-    set PR2_SPACY_PYTHON=C:\...\Python311\python.exe
+    set PR2_SPACY_PYTHON=<venv-spacy>\\Scripts\\python.exe
 
 装法（3.11）：
 
@@ -63,8 +63,15 @@ CACHE = {}
 
 
 def spacy_python():
-    """找一个装了 spaCy 的 Python 3.11。"""
-    return os.environ.get("PR2_SPACY_PYTHON") or ""
+    """找一个装了 spaCy 的 Python。
+
+    优先级：环境变量 PR2_SPACY_PYTHON > 仓库里的 .venv-spacy > 空（退回 jieba）。
+    """
+    explicit = os.environ.get("PR2_SPACY_PYTHON")
+    if explicit:
+        return explicit
+    local = os.path.join(ROOT, ".venv-spacy", "Scripts", "python.exe")
+    return local if os.path.isfile(local) else ""
 
 
 def segment_spacy(runs):
@@ -74,8 +81,8 @@ def segment_spacy(runs):
         return None
     helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), "segment_zh.py")
     env = dict(os.environ)
-    env["PYTHONPATH"] = os.pathsep.join(
-        [os.path.join(ROOT, ".tmp", "spacy37"), env.get("PYTHONPATH", "")]).strip(os.pathsep)
+    # 不要在这里塞 .tmp/spacy37：那是 3.11 的 numpy，给 3.12 的 venv 会直接炸。
+    # segment_zh.py 自己会在 import 失败时再补。
     try:
         proc = subprocess.run([py, helper], input=json.dumps(runs, ensure_ascii=False).encode(),
                               capture_output=True, env=env, timeout=600)
