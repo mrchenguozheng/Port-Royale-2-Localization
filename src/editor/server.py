@@ -54,6 +54,7 @@ import translate as T          # noqa: E402
 import compile_pack as C       # noqa: E402
 import terms_check             # noqa: E402
 import zh_review              # noqa: E402
+import pr2ctl as P            # noqa: E402
 
 
 #: 真实端口，由 main() 在启动前填上。工具窗口靠 /api/health 判断
@@ -129,6 +130,79 @@ def _canon_breaks(s):
     <n>」会被判成"擅自加标签"，而这种写法正是编译期会生成的。
     """
     return re.sub(r"<n>", "|", s or "")
+
+
+# ---------------------------------------------------------------- 安装页
+
+START_JOB = {"running": False, "lines": [], "done": False, "ok": False,
+             "kind": "", "error": ""}
+START_LOCK = threading.Lock()
+
+
+def start_dir():
+    """当前游戏目录。current 存的是 PR2.exe 的 SHA，不是路径。"""
+    st = P.load_settings()
+    cur = st.get("current") or ""
+    entry = (st.get("dirs") or {}).get(cur)
+    if entry and entry.get("dir"):
+        return entry["dir"]
+    return cur if os.path.isdir(cur) else (st.get("last_dir") or "")
+
+
+def start_status():
+    d = start_dir()
+    info = {"dir": d, "valid": False, "langs": P.available_langs()}
+    if d and P.is_game_dir(d):
+        sha, build = P.identify_dir(d)
+        info.update({
+            "valid": True,
+            "version": P.version_label(sha),
+            "sha": sha,
+            "patches": [{"name": n, "exists": True} for n, _p, _d in P.patch_items(d)],
+            "packs": P.installed_langs(d),
+            "locale": P.read_ini_language(os.path.join(d, P.PACK_DIR, "locale.ini")),
+        })
+    return info
+
+
+class _StartEvents:
+    """把 core 的事件流写进 START_JOB。"""
+
+    def put(self, ev):
+        kind, payload = ev if isinstance(ev, tuple) else ("line", str(ev))
+        with START_LOCK:
+            if kind == "line":
+                START_JOB["lines"].append(payload)
+                if len(START_JOB["lines"]) > 500:
+                    del START_JOB["lines"][:-500]
+            elif kind.endswith("_ok"):
+                START_JOB["ok"] = True
+            elif kind.endswith("_failed"):
+                START_JOB["ok"] = False
+
+
+def start_run(kind, fn):
+    with START_LOCK:
+        if START_JOB["running"]:
+            return {"ok": False, "error": "已有任务在运行"}
+        START_JOB.update(running=True, lines=[], done=False, ok=False,
+                         kind=kind, error="")
+    ev = _StartEvents()
+
+    def worker():
+        try:
+            fn(ev)
+        except Exception as exc:
+            with START_LOCK:
+                START_JOB["error"] = str(exc)
+                START_JOB["ok"] = False
+        finally:
+            with START_LOCK:
+                START_JOB["running"] = False
+                START_JOB["done"] = True
+
+    threading.Thread(target=worker, daemon=True).start()
+    return {"ok": True, "kind": kind}
 
 
 # ---------------------------------------------------------------- 筛选
@@ -749,6 +823,48 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_file(full)
 
     def get_api(self, path, query):
+        if path == "/api/start/dir":
+            d = (body.get("path") or "").strip()
+            if not P.is_game_dir(d):
+                return self.send_json({"ok": False,
+                                       "error": "该目录里没有 %s" % P.GAME_EXE})
+            st = P.load_settings()
+            sha, _build = P.identify_dir(d)
+            st.setdefault("dirs", {})[sha] = {
+                "dir": d,
+                "label": P.version_label(sha),
+                "last_used": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            st["current"] = sha
+            st["last_dir"] = d
+            P.save_settings(st)
+            return self.send_json({"ok": True, **start_status()})
+
+        if path == "/api/start/build":
+            langs = [x for x in (body.get("langs") or []) if x in P.available_langs()]
+            if not langs:
+                return self.send_json({"ok": False, "error": "没有勾选语言"})
+            return self.send_json(start_run("build", lambda ev: P.run_build(langs, ev)))
+
+        if path == "/api/start/deploy":
+            langs = [x for x in (body.get("langs") or []) if x in P.available_langs()]
+            d = start_dir()
+            if not d or not P.is_game_dir(d):
+                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
+            return self.send_json(start_run(
+                "deploy", lambda ev: P.run_deploy(d, langs or None, ev)))
+
+        if path == "/api/start/launch":
+            d = start_dir()
+            if not d or not P.is_game_dir(d):
+                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
+            lang = body.get("lang") or None
+            if body.get("vanilla"):
+                ok, msg = P.launch_vanilla(d)
+            else:
+                ok, msg = P.launch_game(d, lang)
+            return self.send_json({"ok": ok, "message": msg})
+
         if path == "/api/review-flags":
             lang = (query.get("lang") or ["zh"])[0]
             ids = sorted(load_flags().get(lang, []))
@@ -767,6 +883,13 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/lang-exists":
             # 输入框一边打字一边问：这个名字能不能用、是不是已经有一份了。
             return self.send_json(lang_status((query.get("code") or [""])[0]))
+
+        if path == "/api/start/status":
+            return self.send_json(start_status())
+
+        if path == "/api/start/job":
+            with START_LOCK:
+                return self.send_json(dict(START_JOB))
 
         if path == "/api/context-batch":
             ids = [x for x in (query.get("ids") or [""])[0].split(",") if x]
@@ -897,6 +1020,48 @@ class Handler(BaseHTTPRequestHandler):
 
     def post_api(self, path):
         body = self.read_json()
+
+        if path == "/api/start/dir":
+            d = (body.get("path") or "").strip()
+            if not P.is_game_dir(d):
+                return self.send_json({"ok": False,
+                                       "error": "该目录里没有 %s" % P.GAME_EXE})
+            st = P.load_settings()
+            sha, _build = P.identify_dir(d)
+            st.setdefault("dirs", {})[sha] = {
+                "dir": d,
+                "label": P.version_label(sha),
+                "last_used": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            st["current"] = sha
+            st["last_dir"] = d
+            P.save_settings(st)
+            return self.send_json({"ok": True, **start_status()})
+
+        if path == "/api/start/build":
+            langs = [x for x in (body.get("langs") or []) if x in P.available_langs()]
+            if not langs:
+                return self.send_json({"ok": False, "error": "没有勾选语言"})
+            return self.send_json(start_run("build", lambda ev: P.run_build(langs, ev)))
+
+        if path == "/api/start/deploy":
+            langs = [x for x in (body.get("langs") or []) if x in P.available_langs()]
+            d = start_dir()
+            if not d or not P.is_game_dir(d):
+                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
+            return self.send_json(start_run(
+                "deploy", lambda ev: P.run_deploy(d, langs or None, ev)))
+
+        if path == "/api/start/launch":
+            d = start_dir()
+            if not d or not P.is_game_dir(d):
+                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
+            lang = body.get("lang") or None
+            if body.get("vanilla"):
+                ok, msg = P.launch_vanilla(d)
+            else:
+                ok, msg = P.launch_game(d, lang)
+            return self.send_json({"ok": ok, "message": msg})
 
         if path == "/api/review-flags":
             lang = body.get("lang", "zh")
