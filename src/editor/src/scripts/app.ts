@@ -39,7 +39,9 @@ interface Entry {
 const FOLLOW = '';                 // 参照下拉里的「（无）」
 
 const PAGE_SIZES = [5, 10, 50, 100, 200];
-const DEFAULT_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 5;
+//: 每页条数存在浏览器里，下次打开沿用上次的选择。
+const LS_PAGE_SIZE = 'pr2.pageSize';
 
 const S = {
   langs: [] as string[],
@@ -108,6 +110,9 @@ async function boot() {
   S.refLangs = d.all;
 
   S.lang = S.langs.includes('zh') ? 'zh' : (S.langs[0] || '');
+
+  const savedSize = Number(localStorage.getItem(LS_PAGE_SIZE));
+  if (PAGE_SIZES.indexOf(savedSize) >= 0) S.pageSize = savedSize;
   // 参照默认取基准语言（en.gog_1.1.2.3 这类带来源与版本的名字）。
   S.refA = d.all.includes(d.base) ? d.base : (d.all[0] || '');
   S.refB = S.refLangs.includes('fr.gog_1.1.2.42') ? 'fr.gog_1.1.2.42' : FOLLOW;
@@ -616,6 +621,7 @@ $('pageInput').addEventListener('change', () => {
 });
 $('pageSize').addEventListener('change', () => {
   S.pageSize = Number(($('pageSize') as HTMLSelectElement).value) || DEFAULT_PAGE_SIZE;
+  try { localStorage.setItem(LS_PAGE_SIZE, String(S.pageSize)); } catch {}
   void renderPage(1);
 });
 
