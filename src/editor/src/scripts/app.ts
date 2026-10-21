@@ -89,6 +89,28 @@ const S = {
 
 const $ = (id: string) => document.getElementById(id)!;
 
+let loadingTimer = 0;
+let loadingShown = false;
+
+/** 载入提示：超过 120ms 才显示，避免本地快速请求闪一下。 */
+function setLoading(on: boolean) {
+  const box = () => document.getElementById('loading');
+  if (on) {
+    clearTimeout(loadingTimer);
+    loadingTimer = window.setTimeout(() => {
+      const b = box();
+      if (b) { b.hidden = false; loadingShown = true; }
+    }, 120);
+  } else {
+    clearTimeout(loadingTimer);
+    if (loadingShown) {
+      const b = box();
+      if (b) b.hidden = true;
+      loadingShown = false;
+    }
+  }
+}
+
 function el(tag: string, cls?: string, text?: string): HTMLElement {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -120,6 +142,7 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
 // ── 载入 ────────────────────────────────────────────────
 
 async function boot() {
+  setLoading(true);
   const d = await api<{ editable: string[]; all: string[]; base: string }>('/api/langs');
   S.langs = d.editable;
   S.refLangs = d.all;
@@ -163,6 +186,7 @@ async function boot() {
 
   applySize();
   await reload(true);
+  setLoading(false);
   const sp = Number(saved(pageKey()));
   if (sp > 1) await renderPage(sp);
 }
@@ -187,6 +211,7 @@ function pageCount(): number {
 
 /** 取第 p 页并渲染。越界会被夹回有效范围。 */
 async function renderPage(p: number) {
+  setLoading(true);
   const pages = pageCount();
   p = Math.min(Math.max(1, p), pages);
   S.page = p;
@@ -205,6 +230,7 @@ async function renderPage(p: number) {
       + `&filter=${S.filter}&lang=${encodeURIComponent(S.lang)}`);
   }
 
+  setLoading(false);
   S.rows = rows;
   for (const e of rows) {
     if (!S.orig.has(e.id)) S.orig.set(e.id, (e[S.lang] as string) || '');
@@ -305,6 +331,7 @@ async function filter() {
     return;
   }
 
+  setLoading(true);
   S.loading = true;
   try {
     const found = await api<Entry[]>(
@@ -319,6 +346,7 @@ async function filter() {
     $('stat').textContent = '搜索失败：' + (err as Error).message;
   } finally {
     S.loading = false;
+    setLoading(false);
   }
 }
 

@@ -1131,3 +1131,16 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 }
 .cell-zh .edit.ro { color: var(--fg-dim); opacity: 0.8; }
 .cell-zh .edit[contenteditable="false"] { cursor: default; }
+
+.loading {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center; gap: 0.8rem;
+  background: rgba(10, 13, 18, 0.55); color: var(--fg); font-size: 1rem;
+}
+.loading[hidden] { display: none; }
+.spinner {
+  width: 26px; height: 26px; border: 3px solid var(--line);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
