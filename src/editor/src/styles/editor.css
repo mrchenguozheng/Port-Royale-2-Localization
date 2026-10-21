@@ -832,3 +832,63 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 }
 .srow .pg:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
 .pager { flex-wrap: wrap; }
+
+/* ── 卡片左右布局：语境在左，参照/译文在右 ───────────── */
+#rows .row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 1rem;
+  padding: 1rem 1.2rem 1.2rem;
+}
+#rows .row > .ctx-side {
+  flex: 0 1 300px;
+  min-width: 240px;
+}
+#rows .row > .card-main {
+  flex: 1 1 360px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+.card-main .stack { display: flex; flex-direction: column; min-width: 0; }
+.card-main .flags { padding-left: 0; }
+
+/* 语境占满左栏，且不再当底部横条 */
+.ctx-side .ctx-inline {
+  height: 100%;
+  margin: 0;
+  border-top: none;
+  border-right: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: var(--bg-row-alt);
+}
+.ctx-head {
+  color: var(--fg-dim);
+  font-size: 0.9em;
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.05em;
+}
+.ctx-cat { font-weight: 600; }
+
+/* 参照语言选择器就放在参照文本前面 */
+.ref-tag { padding-left: 0; }
+.ref-pick {
+  max-width: 11rem;
+  font-size: 0.82em;
+  padding: 0.1rem 0.3rem;
+  color: var(--fg-dim);
+}
+#rows .line { grid-template-columns: max-content minmax(0, 1fr); }
+
+/* 窄宽度：语境整块落到上面，不和正文抢宽度 */
+@media (max-width: 780px) {
+  #rows .row > .ctx-side { flex: 1 1 100%; min-width: 0; }
+}

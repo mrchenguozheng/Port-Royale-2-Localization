@@ -180,8 +180,6 @@ async function boot() {
   } catch { S.reviewed = new Set(); S.reviewedCount = 0; }
 
   fill($('lang'), S.langs, S.lang);
-  fill($('refA'), S.refLangs, S.refA);
-  fill($('refB'), [FOLLOW, ...S.refLangs], S.refB);
 
   applySize();
   await reload(true);
@@ -324,13 +322,63 @@ async function filter() {
 
 /* 一行 = id + 上下堆叠的「参照…参照 / 译文」。
  * 译文在中间：它是唯一要改的那块，放中间视线落点正好。 */
+function refLine(which: 'A' | 'B', e: Entry): HTMLElement {
+  const d = el('div', 'line');
+  const tag = el('div', 'tag ref-tag');
+
+  const sel = el('select', 'ref-pick') as HTMLSelectElement;
+  for (const code of S.refLangs) {
+    const o = el('option', undefined, code) as HTMLOptionElement;
+    o.value = code;
+    sel.appendChild(o);
+  }
+  const none = el('option', undefined, '（无）') as HTMLOptionElement;
+  none.value = FOLLOW;
+  sel.appendChild(none);
+  sel.value = which === 'A' ? S.refA : S.refB;
+  sel.addEventListener('change', () => {
+    if (which === 'A') { S.refA = sel.value; remember(LS_REFA, sel.value); }
+    else { S.refB = sel.value; remember(LS_REFB, sel.value); }
+    drawRows();
+    void loadContexts(S.rows);
+  });
+  tag.appendChild(sel);
+  d.appendChild(tag);
+
+  const chosen = which === 'A' ? S.refA : S.refB;
+  let cell: HTMLElement;
+  if (!chosen || chosen === FOLLOW) {
+    cell = el('div', 'body cell-ref', '（未选参照）');
+  } else {
+    const gone = !!e.missing && e.missing.indexOf(chosen) >= 0;
+    cell = gone
+      ? el('div', 'body cell-ref miss', '（该版本无此条）')
+      : el('div', 'body cell-ref', (e[chosen] as string) || '（空）');
+  }
+  d.appendChild(cell);
+  return d;
+}
+
+/* 一条 = 左「语境」+ 右「id/审核 + 参照 A/B + 译文」。
+ * 参照语言的选择器就贴在参照文本前面，换语言不用回头顶。 */
 function rowOf(e: Entry): HTMLElement {
   const row = el('div', 'row');
   row.dataset.id = e.id;
 
-  row.appendChild(el('div', 'cell-id', e.id));
+  // 左：语境（展开）
+  const side = el('div', 'ctx-side');
+  const ctx = el('div', 'ctx-inline');
+  ctx.dataset.id = e.id;
+  ctx.appendChild(el('div', 'ctx-head', '语境'));
+  side.appendChild(ctx);
+  row.appendChild(side);
 
-  // 人工审核：勾上 = 这条已过目。文字常显，不靠 hover 提示。
+  // 右：主体
+  const main = el('div', 'card-main');
+
+  const top = el('div', 'card-top');
+  top.appendChild(el('div', 'cell-id', e.id));
+
   const wrap = el('label', 'chk-wrap');
   const box = el('input', 'chk') as HTMLInputElement;
   box.type = 'checkbox';
@@ -343,43 +391,25 @@ function rowOf(e: Entry): HTMLElement {
         { lang: S.lang, id: e.id, on: box.checked });
       S.reviewedCount = r.count;
     } catch {
-      box.checked = !box.checked;      // 后端失败就退回，别假装勾上了
+      box.checked = !box.checked;
       return;
     }
     if (box.checked) S.reviewed.add(e.id); else S.reviewed.delete(e.id);
     lab.textContent = box.checked ? '已审' : '待审';
     row.classList.toggle('reviewed', box.checked);
     updateStat();
-    if (S.filter !== 'all') void reload(false);
   });
   wrap.appendChild(box);
   wrap.appendChild(lab);
-  row.appendChild(wrap);
+  top.appendChild(wrap);
+  main.appendChild(top);
   if (box.checked) row.classList.add('reviewed');
 
   const stack = el('div', 'stack');
-
-  // 语境推断：直接显示，不用点
-  const ctx = el('div', 'ctx-inline');
-  ctx.dataset.id = e.id;
-  stack.appendChild(ctx);
-
-  const refs = refList();
-  if (!refs.length) {
-    stack.appendChild(line('参照', el('div', 'body cell-ref', '（未选参照）')));
-  } else {
-    for (const k of refs) {
-      // 这一版原版表里没有这个 id：明确标出来，别让它和「空字符串」混为一谈。
-      const gone = !!e.missing && e.missing.indexOf(k) >= 0;
-      const cell = gone
-        ? el('div', 'body cell-ref miss', '（该版本无此条）')
-        : el('div', 'body cell-ref', (e[k] as string) || '（空）');
-      stack.appendChild(line(k, cell));
-    }
-  }
-
+  stack.appendChild(refLine('A', e));
+  stack.appendChild(refLine('B', e));
   stack.appendChild(line(S.lang, zhCell(e)));
-  row.appendChild(stack);
+  main.appendChild(stack);
 
   const flags = el('div', 'flags');
   const ps = S.problems[e.id];
@@ -387,12 +417,13 @@ function rowOf(e: Entry): HTMLElement {
   const parts = (ps || []).map((p) => p.text).concat(ts || []);
   if (parts.length) flags.textContent = parts.join('\n');
   if (ts && ts.length) flags.classList.add('term');
-  row.appendChild(flags);
+  main.appendChild(flags);
 
   const zh = textOf(e);
   if (isPlaceholder(zh)) row.classList.add('untranslated');
   if (ps && ps.some((p) => p.level === 'error')) row.classList.add('bad');
 
+  row.appendChild(main);
   return row;
 }
 
@@ -709,7 +740,6 @@ async function createLang() {
   setDirty(false);
 
   fill($('lang'), S.langs, code);
-  fill($('refB'), [FOLLOW, ...S.refLangs], S.refB);
   await reload();
   $('stat').textContent = `已新建 ${code}（复制自 ${from}），共 ${S.total} 条待改`;
 }
@@ -786,16 +816,6 @@ $('lang').addEventListener('change', (ev) => {
     if (sp > 1) await renderPage(sp);
   })();
 });
-$('refA').addEventListener('change', (ev) => {
-  S.refA = (ev.target as HTMLSelectElement).value;
-  remember(LS_REFA, S.refA);
-  drawRows();
-});
-$('refB').addEventListener('change', (ev) => {
-  S.refB = (ev.target as HTMLSelectElement).value;
-  remember(LS_REFB, S.refB);
-  drawRows();
-});
 $('size').addEventListener('change', (ev) => {
   S.size = Number((ev.target as HTMLSelectElement).value);
   applySize();
@@ -856,13 +876,24 @@ async function unreviewedIds(): Promise<string[]> {
   return c.ids || [];
 }
 
+let randomBusy = false;
+
 async function randomUnreviewed() {
+  if (randomBusy) return;
+  randomBusy = true;
+  const btn = $('randomUnrev') as HTMLButtonElement;
+  if (btn) btn.disabled = true;
   try {
     const ids = await unreviewedIds();
     if (!ids.length) { $('stat').textContent = '没有未审核的条目了'; return; }
     await jumpToId(ids[Math.floor(Math.random() * ids.length)]);
   } catch (err) {
     $('stat').textContent = '随机跳转失败：' + (err as Error).message;
+  } finally {
+    window.setTimeout(() => {
+      randomBusy = false;
+      if (btn) btn.disabled = false;
+    }, 400);
   }
 }
 
