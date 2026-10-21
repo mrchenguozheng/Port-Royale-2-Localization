@@ -38,10 +38,21 @@ interface Entry {
 
 const FOLLOW = '';                 // 参照下拉里的「（无）」
 
-const PAGE_SIZES = [5, 10, 50, 100, 200];
+const PAGE_SIZES = [5, 10, 20, 50, 100, 200];
 const DEFAULT_PAGE_SIZE = 5;
 //: 每页条数存在浏览器里，下次打开沿用上次的选择。
 const LS_PAGE_SIZE = 'pr2.pageSize';
+const LS_LANG = 'pr2.lang';
+const LS_REFA = 'pr2.refA';
+const LS_REFB = 'pr2.refB';
+
+function saved(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
+function remember(key: string, value: string): void {
+  try { localStorage.setItem(key, value); } catch { /* 隐私模式等，忽略 */ }
+}
 
 const S = {
   langs: [] as string[],
@@ -111,8 +122,16 @@ async function boot() {
 
   S.lang = S.langs.includes('zh') ? 'zh' : (S.langs[0] || '');
 
-  const savedSize = Number(localStorage.getItem(LS_PAGE_SIZE));
+  const savedSize = Number(saved(LS_PAGE_SIZE));
   if (PAGE_SIZES.indexOf(savedSize) >= 0) S.pageSize = savedSize;
+
+  // 上次选的编辑语言与参照语言
+  const savedLang = saved(LS_LANG);
+  if (savedLang && S.langs.includes(savedLang)) S.lang = savedLang;
+  const savedA = saved(LS_REFA);
+  if (savedA && S.refLangs.includes(savedA)) S.refA = savedA;
+  const savedB = saved(LS_REFB);
+  if (savedB !== null && (savedB === FOLLOW || S.refLangs.includes(savedB))) S.refB = savedB;
   // 参照默认取基准语言（en.gog_1.1.2.3 这类带来源与版本的名字）。
   S.refA = d.all.includes(d.base) ? d.base : (d.all[0] || '');
   S.refB = S.refLangs.includes('fr.gog_1.1.2.42') ? 'fr.gog_1.1.2.42' : FOLLOW;
@@ -621,12 +640,13 @@ $('pageInput').addEventListener('change', () => {
 });
 $('pageSize').addEventListener('change', () => {
   S.pageSize = Number(($('pageSize') as HTMLSelectElement).value) || DEFAULT_PAGE_SIZE;
-  try { localStorage.setItem(LS_PAGE_SIZE, String(S.pageSize)); } catch {}
+  remember(LS_PAGE_SIZE, String(S.pageSize));
   void renderPage(1);
 });
 
 $('lang').addEventListener('change', (ev) => {
   S.lang = (ev.target as HTMLSelectElement).value;
+  remember(LS_LANG, S.lang);
   // 换编辑语言等于换了一列数据：审核勾选也要换一份，再把当前页重画。
   void (async () => {
     try {
@@ -640,10 +660,12 @@ $('lang').addEventListener('change', (ev) => {
 });
 $('refA').addEventListener('change', (ev) => {
   S.refA = (ev.target as HTMLSelectElement).value;
+  remember(LS_REFA, S.refA);
   drawRows();
 });
 $('refB').addEventListener('change', (ev) => {
   S.refB = (ev.target as HTMLSelectElement).value;
+  remember(LS_REFB, S.refB);
   drawRows();
 });
 $('size').addEventListener('change', (ev) => {
