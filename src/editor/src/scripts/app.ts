@@ -936,6 +936,14 @@ async function jumpToHash(raw: string) {
   if (!ok) $('stat').textContent = '找不到 ' + '0x' + id;
 }
 
+// 编辑器习惯：Ctrl+S 保存当前条（没有活动条就整批保存）
+document.addEventListener('keydown', (ev) => {
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') {
+    ev.preventDefault();
+    if (S.activeId) void saveOne(S.activeId); else void save();
+  }
+});
+
 $('theme').addEventListener('click', () => {
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
 });

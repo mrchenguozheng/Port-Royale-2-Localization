@@ -646,8 +646,8 @@ body, .bar, .head, .row, .stack, .cell-zh, .cell-zh textarea, .sp-layer,
 #rows .line + .line { margin-top: 0.55rem; }
 
 /* 译文区撑开，写长句时有地方 */
-.cell-zh { min-height: 30vh; }
-.cell-zh textarea, .sp-layer { min-height: 30vh; }
+.cell-zh { min-height: 38vh; }
+.cell-zh textarea, .sp-layer { min-height: 38vh; }
 
 /* 语境块 */
 .ctx-inline {
@@ -926,3 +926,80 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 }
 .ctx-nb-id { font-family: var(--font-mono); color: var(--fg-id); font-size: 0.85em; }
 .ctx-nb-text { white-space: normal; overflow-wrap: anywhere; }
+
+/* ── 编辑器观感：紧凑工具栏 + 文档卡片 ───────────────── */
+
+.brand {
+  font-weight: 600;
+  color: var(--fg);
+  margin-right: 0.6rem;
+  white-space: nowrap;
+}
+
+.panel { gap: 0.22rem; padding: 0.45rem 0.9rem; }
+.srow { min-height: 1.95rem; }
+.slabel { flex: 0 0 3.6rem; font-size: 0.85em; }
+.srow select { min-width: 7rem; }
+
+#rows { padding: 1.1rem 1.5rem 2rem; }
+#rows .row {
+  border-radius: 10px;
+  padding: 1.1rem 1.4rem 1.3rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+/* 卡片头：id + 审核，像文档标题行 */
+.card-top {
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--line-soft);
+}
+.card-top .cell-id {
+  font-size: 1.5em;
+  letter-spacing: 0.02em;
+}
+.card-top .chk-label { font-size: 0.9em; }
+
+/* 参照块：像只读的引文区 */
+.ref-block {
+  background: var(--bg-row-alt);
+  border-radius: 6px;
+  padding: 0.45rem 0.65rem;
+}
+.ref-block .body { color: var(--fg-dim); }
+.ref-pick {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--fg-dim);
+  font-size: 0.75em;
+  padding: 0.05rem 0.2rem;
+  max-width: 18rem;
+}
+.ref-pick:hover, .ref-pick:focus { border-color: var(--line); }
+
+/* 译文块：编辑器主体，左侧强调线 */
+.zh-block {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.9rem;
+  margin-top: 0.2rem;
+}
+.cell-zh { background: var(--bg); border-color: var(--line); }
+
+/* 语境侧栏：分组标题 + 分隔线 */
+.ctx-side .ctx-inline {
+  background: transparent;
+  border-right: 1px solid var(--line-soft);
+  border-radius: 0;
+  padding: 0 0.9rem 0 0;
+}
+.ctx-head {
+  font-weight: 600;
+  font-size: 0.95em;
+  color: var(--fg);
+  margin-bottom: 0.4rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+/* 状态文字做成小标签 */
+#stat { color: var(--fg-dim); }
+#dirty { color: var(--warn); }
