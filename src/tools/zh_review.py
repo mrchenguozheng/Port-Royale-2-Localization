@@ -40,6 +40,8 @@ ZH = os.path.join(ROOT, "src", "translations", "zh.toml")
 MARK = os.path.join(ROOT, "build", "zh.reviewed.json")
 ACCEPTED = os.path.join(ROOT, "build", "zh.accepted.toml")
 FLAGS = os.path.join(ROOT, "build", "zh.review-flags.json")
+EDITLOG = os.path.join(ROOT, "build", "review-edits.jsonl")
+CORRECTIONS = os.path.join(ROOT, "docs", "人工修订.csv")
 
 
 def sha(path):
@@ -119,6 +121,66 @@ def load_state():
         return json.load(open(MARK, encoding="utf-8"))
     except (OSError, ValueError):
         return {}
+
+
+def editlog_ids():
+    """编辑器里人工改过字的 id -> 最新一次改后的文本。"""
+    latest = {}
+    try:
+        for line in io.open(EDITLOG, encoding="utf-8"):
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            if rec.get("lang") != "zh":
+                continue
+            latest[rec["id"]] = rec.get("new", "")
+    except OSError:
+        pass
+    return latest
+
+
+def unsynced_edits():
+    """还没进文本源的人工修订：id -> (旧, 新)。
+
+    判据（两条任一）：
+      · 编辑器保存时记过一笔（build\\review-edits.jsonl）；
+      · 文本源没动过，但 zh.toml 与上次接受稿的文字不同。
+    """
+    cur = load_zh()
+    gen = generate_all()
+    st = load_state()
+    out = {}
+    logged = editlog_ids()
+    for h in cur:
+        if h not in gen:
+            continue
+        if h in logged and norm(cur[h]) != norm(gen[h]):
+            out[h] = (gen[h], cur[h])
+    if st.get("ref") == sha(REF) and os.path.isfile(ACCEPTED):
+        try:
+            old = tomllib.load(open(ACCEPTED, "rb"))
+        except (OSError, ValueError):
+            old = {}
+        for h in cur:
+            if h in out or h not in old:
+                continue
+            if norm(cur[h]) != norm(old[h]):
+                out[h] = (old[h], cur[h])
+    return out
+
+
+def human_edits():
+    """人工审核改过字、但还没进文本源的条目：id -> (旧, 新)。"""
+    gen = generate_all()
+    cur = load_zh()
+    out = {}
+    for h, new in cur.items():
+        if h not in gen:
+            continue
+        if norm(new) != norm(gen[h]):
+            out[h] = (gen[h], new)
+    return out
 
 
 def marker_ok():
@@ -205,10 +267,13 @@ def main():
         return
 
     if args.sync:
-        if not real:
-            print("没有真改字，无需同步。")
+        edits = human_edits()
+        logged = editlog_ids()
+        todo = sorted(set(edits) | {h for h in logged if h in load_zh()})
+        if not todo:
+            print("没有人工改字，无需同步。")
             return
-        print("同步 %d 条到文本源…" % len(real))
+        print("同步 %d 条人工修订到文本源…" % len(todo))
         ref = tomllib.load(open(REF, "rb"))
         order = [m.group(1) for m in
                  (re.match(r'^"([^"]+)"\s*=', l) for l in io.open(REF, encoding="utf-8"))
@@ -219,8 +284,13 @@ def main():
                 head.append(ln.rstrip("\n"))
             else:
                 break
-        for h, _old, new in real:
+        cur = load_zh()
+        rows = []
+        for h in todo:
+            new = cur.get(h, "")
+            old = ref.get(h, "")
             ref[h] = GEN.strip_padding(new)
+            rows.append((h, old, new))
         def esc(t):
             return t.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
         io.open(REF, "w", encoding="utf-8", newline="\n").write(
@@ -228,6 +298,19 @@ def main():
         for p in (MARK, ACCEPTED):
             if os.path.isfile(p):
                 os.remove(p)
+        # 记一份「人工认为原译不对」的清单，供翻译工作流复查
+        import csv as _csv
+        first = not os.path.isfile(CORRECTIONS)
+        with io.open(CORRECTIONS, "a", encoding="utf-8-sig", newline="") as fh:
+            wr = _csv.writer(fh)
+            if first:
+                wr.writerow(["hash", "原译", "人工改为", "日期"])
+            day = time.strftime("%Y-%m-%d")
+            for h, old, new in rows:
+                if old == new:
+                    continue
+                wr.writerow([h, old, new, day])
+        print("已记录到", CORRECTIONS)
         print("文本源已更新；审核标记已清除，重新生成后需要再人工过一遍格式。")
 
 

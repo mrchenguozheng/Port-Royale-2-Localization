@@ -41,6 +41,8 @@ TOOLS = os.path.join(SRC, "tools")
 DIST = os.path.join(HERE, "dist")                            # astro build 的产物
 #: 人工审核勾选：build\zh.review-flags.json，按语言存 id 列表。
 FLAGS = os.path.join(os.path.dirname(SRC), "build", "zh.review-flags.json")
+#: 人工审核时改过文字的记录（谁在什么时候把哪条从什么改成了什么）。
+EDITLOG = os.path.join(os.path.dirname(SRC), "build", "review-edits.jsonl")
 DEFAULT_PORT = 8777
 
 # translate / compile_pack 是脚本不是包，直接把 tools\ 加进 sys.path 来 import。
@@ -283,6 +285,20 @@ def save_flags(d):
         json.dump(d, fh, ensure_ascii=False, indent=1)
 
 
+def log_edit(lang, hid, old, new):
+    """记一条人工改字：审核时改动的条目要能追溯、能进翻译工作流。"""
+    if old == new:
+        return
+    rec = {"ts": time.strftime("%Y-%m-%d %H:%M:%S"), "lang": lang,
+           "id": hid, "old": old, "new": new}
+    try:
+        os.makedirs(os.path.dirname(EDITLOG), exist_ok=True)
+        with open(EDITLOG, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
 def save_all(lang, rows):
     r"""把译文写回 translations\<lang>.toml（整表写，要求顺序完整）。
 
@@ -362,6 +378,8 @@ def patch_all(lang, rows):
         text = upd.get(rid)
         if text is None:
             text = cur.get(rid, "")      # 没传的保持原样
+        if rid in upd and rid in cur:
+            log_edit(lang, rid, cur[rid], text)
         lines.append('"%s" = "%s"' % (rid, toml_escape(text)))
     lines = _keep_header(path, lines)
 
