@@ -826,6 +826,8 @@ def main():
     ap.add_argument("--host", default="127.0.0.1",
                     help="只监听本机。有接口能写文件，不要改成 0.0.0.0。")
     ap.add_argument("--no-open", action="store_true", help="不自动开浏览器")
+    ap.add_argument("--restart", action="store_true",
+                    help="若已有编辑器在跑，先停掉它再用新代码启动")
     a = ap.parse_args()
 
     if not os.path.isdir(DIST):
@@ -833,29 +835,62 @@ def main():
         _say("      先构建：cd src\\editor && npm install && npm run build")
 
     port = a.port
+    restarted = False
     if port_in_use(a.host, port):
-        # 编辑器是**常驻服务**，关掉浏览器不会停它，所以「端口被占」
-        # 最常见的意思是「它已经在跑了」。但必须问一句是不是**我们**的 ——
-        # 别的程序占着这个端口时，打开浏览器只会看到一个不相干的页面。
         if editor_on(a.host, port):
-            _say("编辑器已在运行：http://%s:%d/" % (a.host, port))
-            if not a.no_open:
-                webbrowser.open("http://%s:%d/" % (a.host, port))
-            return 0
+            if a.restart:
+                _say("检测到旧编辑器在运行，正在重启以加载最新代码…")
+                try:
+                    with urllib.request.urlopen(
+                            "http://%s:%d/api/health" % (a.host, port), timeout=2) as r:
+                        old = json.load(r).get("pid")
+                    if old:
+                        import subprocess
+                        subprocess.run(["taskkill", "/PID", str(old), "/F"],
+                                       capture_output=True)
+                        import time as _t
+                        for _ in range(30):
+                            if not port_in_use(a.host, port):
+                                break
+                            _t.sleep(0.2)
+                except Exception as exc:
+                    _say("重启失败：%s" % exc)
+                restarted = True
+            else:
+                _say("编辑器已在运行：http://%s:%d/" % (a.host, port))
+                if not a.no_open:
+                    webbrowser.open("http://%s:%d/" % (a.host, port))
+                return 0
 
-        # 被别的程序占着 —— 往上找一个空位。
-        for p in range(a.port + 1, a.port + 20):
-            if not port_in_use(a.host, p):
-                _say("端口 %d 被占，改用 %d。" % (a.port, p))
-                port = p
-                break
-        else:
-            _say("从 %d 往上 20 个端口都被占了。" % a.port)
-            return 1
+        if not restarted:
+            # 被别的程序占着 —— 往上找一个空位。
+            for p in range(a.port + 1, a.port + 20):
+                if not port_in_use(a.host, p):
+                    _say("端口 %d 被占，改用 %d。" % (a.port, p))
+                    port = p
+                    break
+            else:
+                _say("从 %d 往上 20 个端口都被占了。" % a.port)
+                return 1
 
     global SERVER, CURRENT_PORT
     CURRENT_PORT = port
-    httpd = ThreadingHTTPServer((a.host, port), Handler)
+    try:
+        httpd = ThreadingHTTPServer((a.host, port), Handler)
+    except OSError:
+        # 刚重启时端口可能还在 TIME_WAIT：换个口也要能起来。
+        httpd = None
+        for p in range(a.port + 1, a.port + 30):
+            try:
+                httpd = ThreadingHTTPServer((a.host, p), Handler)
+                port = p
+                CURRENT_PORT = p
+                break
+            except OSError:
+                continue
+        if httpd is None:
+            _say("端口都被占用，编辑器没能启动。")
+            return 1
     httpd.daemon_threads = True
     SERVER = httpd
 
