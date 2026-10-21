@@ -25,7 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 
-import normalize_text as N  # noqa: E402
+import lang_rules  # noqa: E402
 
 SRC = os.path.join(ROOT, "src", "references", "zh.gog_1.1.2.3.toml")
 DST = os.path.join(ROOT, "src", "translations", "zh.toml")
@@ -143,8 +143,7 @@ def main():
              (re.match(r'^"([^"]+)"\s*=', ln) for ln in io.open(SRC, encoding="utf-8"))
              if m]
 
-    sets = N.PUNCT["zh"]
-    fmt, punct = N.make_fmt(sets)
+    zh_rules = lang_rules.get("zh")
     given, surn, extras = build_names(doc)
 
     out, stats = {}, {"punct": 0, "conj": 0, "name": 0}
@@ -153,7 +152,7 @@ def main():
         if not text:
             out[h] = text
             continue
-        a = N.clean_n(N.fix_vars(fmt(N.fix_ascii_punct(text, "zh")), punct, sets["cjk"]))
+        a = zh_rules.normalize(text)
         b = fix_conj(a)
         parts = TAG.split(b)
         res = []
