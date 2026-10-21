@@ -36,6 +36,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.dirname(HERE)                     # 仓库的 src\
 ROOT = os.path.dirname(SRC)                     # 仓库根
 STRINGS_DIR = os.path.join(SRC, "translations")
+REFERENCES_DIR = os.path.join(SRC, "references")
 
 #: 译文主源：translations\<语言>.toml，**每条一行**：
 #:     "0xd2d0a572" = "萧条"
@@ -60,9 +61,8 @@ FR_LANG = "fr.gog_1.1.2.42"
 
 def lang_path(code):
     """语言代码 -> 文件路径。只读参考在 references\\ 子目录下。"""
-    return os.path.join(STRINGS_DIR,
-                        "references" if code in REFERENCE_LANGS else "",
-                        code + ".toml")
+    base = REFERENCES_DIR if code in REFERENCE_LANGS else STRINGS_DIR
+    return os.path.join(base, code + ".toml")
 
 
 def target_langs():

@@ -116,7 +116,7 @@ def main():
     for lang in langs:
         # 中文：先由 references/zh.toml 生成 zh.toml（文本只改 references）
         if lang == "zh":
-            ref = os.path.join(HERE, "..", "translations", "references", "zh.toml")
+            ref = os.path.join(HERE, "..", "references", "zh.toml")
             if os.path.isfile(ref):
                 run("生成 zh.toml（references/zh.toml → 规则）",
                     [sys.executable, os.path.join(HERE, "apply_zh_rules.py")])

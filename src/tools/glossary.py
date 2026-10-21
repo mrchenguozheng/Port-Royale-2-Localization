@@ -109,7 +109,7 @@ def render(target, target_doc, groups, en, others):
     lines.append("# 术语对照表（%s）" % lang_name(target))
     lines.append("")
     srcs = ["`src\\translations\\%s.toml`" % target]
-    srcs += ["`src\\translations\\references\\%s.toml`" % c for c, _l, _d in others]
+    srcs += ["`src\\references\\%s.toml`" % c for c, _l, _d in others]
     lines.append("> 由 `src\\tools\\glossary.py` 生成，数据来自 %s。"
                  "改译文后重新生成，不要手改本文件。" % "、".join(srcs))
     lines.append("")

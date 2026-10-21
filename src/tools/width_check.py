@@ -89,7 +89,7 @@ def main():
     ap.add_argument("--size", type=float, default=14.0)
     args = ap.parse_args()
 
-    en = tomllib.load(open(os.path.join(ROOT, "src", "translations", "references",
+    en = tomllib.load(open(os.path.join(ROOT, "src", "references",
                                        "en.gog_1.1.2.3.toml"), "rb"))
     tr = tomllib.load(open(os.path.join(ROOT, "src", "translations", "%s.toml" % args.lang), "rb"))
     w = load_font(args.font)

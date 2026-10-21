@@ -71,7 +71,7 @@ Port Royale 2 Localization/
 │  ├─ translations/         译文人工维护源（唯一）
 │  │  ├─ zh.toml
 │  │  ├─ ja.toml           日语（3548 条已完成）
-│  │  └─ references/        en.gog_1.1.2.3.toml / fr.gog_1.1.2.42.toml，只读参考原文
+│  └─ references/           en.gog_1.1.2.3.toml / fr.gog_1.1.2.42.toml / zh.toml（文本源）
 │  ├─ injector/             注入组件源码（纯 C++）
 │  ├─ tools/                语言包与译文处理脚本（Python）
 │  └─ locale.ini            语言选择模板
@@ -146,7 +146,7 @@ Port Royale 2 Localization/
 |---|---|---|
 | 中文 `zh` | 3548 | ✅ 全部完成（含排版与占位符校验） |
 | 日语 `ja` | 3548 | ✅ 全部完成（3370 条译文 + 178 条「原样保留」） |
-| 英文/法文 | 3548 | 参照原文（`translations/references/`），不生成语言包 |
+| 英文/法文 | 3548 | 参照原文（`src/references/`），不生成语言包 |
 
 日语里的「原样保留」指本来就不该翻译的 178 条：纯符号/数字、引擎编号
 （`IDM_CONTEST_…`）、按键名（`ESC`/`CTRL`/`F10`）、版权声明与制作方名称。

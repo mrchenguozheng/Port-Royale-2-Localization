@@ -8,7 +8,7 @@ r"""src/tools/compile_pack.py — 把 translations\<语言>.toml 编译成引擎
 只做一件事：**占位符校验**。译文里的 %1 / @D$EndDate$ 必须与原文
 一一对应，种类、数量、写法全都要对；顺序可以按中文语序调。
 
-references\ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
+src\references\ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
 合并层（translate.load_toml）本身就是从这两个文件读出 en / fr 的，
 拿它们校验自己永远相等，报不出任何东西。
 
@@ -187,7 +187,7 @@ def _default_lang():
 def build(lang, out_dir, strict):
     # 参考原文**不参与编译**：生成 en.txt / fr.txt 交给引擎等于用「原始英文」
     # 覆盖游戏，等于没汉化。所以直接拒绝，而不是打个警告继续跑。
-    # 名单问 translate —— 那里是唯一一份（references\en.gog_1.1.2.3 之类）。
+    # 名单问 translate —— 那里是唯一一份（src\references\en.gog_1.1.2.3 之类）。
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import translate as T
     if lang in T.REFERENCE_LANGS:

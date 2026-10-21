@@ -40,7 +40,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.dirname(HERE)                       # 仓库的 src\
 ROOT = os.path.dirname(SRC_DIR)                       # 仓库根
 STRINGS = os.path.join(SRC_DIR, "translations")
-REFS = os.path.join(STRINGS, "references")
+REFS = os.path.join(SRC_DIR, "references")
 
 DEFAULT_SRC = os.path.join(ROOT, "assets", "fonts", "original")
 DEFAULT_OUT = os.path.join(ROOT, "build", "fonts")

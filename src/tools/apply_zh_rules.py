@@ -27,7 +27,7 @@ sys.path.insert(0, HERE)
 
 import normalize_text as N  # noqa: E402
 
-SRC = os.path.join(ROOT, "src", "translations", "references", "zh.toml")
+SRC = os.path.join(ROOT, "src", "references", "zh.toml")
 DST = os.path.join(ROOT, "src", "translations", "zh.toml")
 
 TAG = re.compile(r"(<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z])")
