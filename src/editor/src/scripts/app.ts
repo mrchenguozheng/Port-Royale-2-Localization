@@ -271,12 +271,15 @@ function rowOf(e: Entry): HTMLElement {
   const row = el('div', 'row');
   row.dataset.id = e.id;
 
-  // 人工审核勾选：勾上 = 这条已过目。只记录标记，不改译文。
+  row.appendChild(el('div', 'cell-id', e.id));
+
+  // 人工审核：勾上 = 这条已过目。文字常显，不靠 hover 提示。
   const wrap = el('label', 'chk-wrap');
   const box = el('input', 'chk') as HTMLInputElement;
   box.type = 'checkbox';
   box.checked = S.reviewed.has(e.id);
-  box.title = '标记这条已审核';
+  box.setAttribute('aria-label', '标记这条已审核');
+  const lab = el('span', 'chk-label', box.checked ? '已审' : '待审');
   box.addEventListener('change', async () => {
     try {
       const r = await api<{ count: number }>('/api/review-flags',
@@ -287,13 +290,13 @@ function rowOf(e: Entry): HTMLElement {
       return;
     }
     if (box.checked) S.reviewed.add(e.id); else S.reviewed.delete(e.id);
+    lab.textContent = box.checked ? '已审' : '待审';
     row.classList.toggle('reviewed', box.checked);
     updateStat();
   });
   wrap.appendChild(box);
+  wrap.appendChild(lab);
   row.appendChild(wrap);
-
-  row.appendChild(el('div', 'cell-id', e.id));
   if (box.checked) row.classList.add('reviewed');
 
   const stack = el('div', 'stack');

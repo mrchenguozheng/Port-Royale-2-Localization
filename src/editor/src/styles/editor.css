@@ -221,16 +221,14 @@ main {
   top: 0;
   z-index: 2;
   display: grid;
-  /* 与 .row 对齐：勾选列留空 */
-  grid-template-columns: 1.6rem var(--w-id) minmax(0, 1fr);
+  /* 与 .row 对齐：id | 审核 | 翻译对照 */
+  grid-template-columns: var(--w-id) 5.4rem minmax(0, 1fr);
   background: var(--bg-soft);
   border-bottom: 1px solid var(--line);
   color: var(--fg-dim);
   font-size: 0.85em;
   user-select: none;
 }
-
-.head::before { content: ""; }
 
 .head > div {
   padding: 0.35rem 0.7rem;
@@ -241,8 +239,8 @@ main {
 
 .row {
   display: grid;
-  /* 勾选 | id | 内容 */
-  grid-template-columns: 1.6rem var(--w-id) minmax(0, 1fr);
+  /* id | 审核 | 内容 */
+  grid-template-columns: var(--w-id) 5.4rem minmax(0, 1fr);
   border-bottom: 1px solid var(--line-soft);
 }
 
@@ -297,7 +295,7 @@ main {
 .cell-ref { color: var(--fg-dim); }
 
 .cell-id {
-  grid-column: 2;
+  grid-column: 1;
   padding: 0.3rem 0.5rem 0 0.7rem;
   font-family: var(--font-mono);
   font-size: 0.85em;
@@ -431,10 +429,19 @@ main {
 
 /* 人工审核勾选 */
 .chk-wrap {
-  grid-column: 1;
-  display: flex; align-items: flex-start; justify-content: center;
-  padding: 0.45rem 0 0 0.4rem;
+  grid-column: 2;
+  display: flex; align-items: flex-start; gap: 0.4rem;
+  padding: 0.4rem 0.4rem 0 0.2rem;
+  cursor: pointer;
 }
-.chk-wrap .chk { width: 16px; height: 16px; cursor: pointer; }
+.chk-wrap .chk {
+  width: 22px; height: 22px; cursor: pointer;
+  accent-color: var(--accent, #4f9cf9); flex: 0 0 auto;
+}
+.chk-wrap .chk-label {
+  font-size: 0.8em; color: var(--fg-dim); user-select: none;
+  line-height: 22px; white-space: nowrap;
+}
+.row.reviewed .chk-label { color: var(--ok, #16a34a); }
 .row.reviewed { box-shadow: inset 3px 0 0 var(--ok, #16a34a); }
 .row.reviewed .cell-id { color: var(--ok, #16a34a); }
