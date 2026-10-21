@@ -243,7 +243,7 @@ function clearRows() {
 function updatePager() {
   const pages = pageCount();
   ($('pageInput') as HTMLInputElement).value = String(S.page);
-  $('pageCount').textContent = '/ ' + pages;
+  $('pageCount').textContent = `共 ${S.total} 条`;
   ($('prev') as HTMLButtonElement).disabled = S.page <= 1;
   ($('next') as HTMLButtonElement).disabled = S.page >= pages;
   ($('first') as HTMLButtonElement).disabled = S.page <= 1;
@@ -255,7 +255,7 @@ function updateStat() {
   const reviewed = Math.min(S.reviewedCount, S.total);
   const pending = Math.max(0, S.total - reviewed);
   $('stat').textContent =
-    `已审 ${reviewed} 条 · 待审 ${pending} 条 · 当前筛选共 ${S.total} 条`
+    `已审 ${reviewed} 条 · 待审 ${pending} 条 · 共 ${S.total} 条`
     + (n ? ` · 术语待统一 ${n} 条` : '');
 }
 
