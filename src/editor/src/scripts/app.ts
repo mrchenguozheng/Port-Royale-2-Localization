@@ -1094,26 +1094,6 @@ document.addEventListener('keydown', (ev) => {
   }
 });
 
-function closeSettings() { $('settings').hidden = true; }
-
-$('settingsBtn').addEventListener('click', (ev) => {
-  ev.stopPropagation();
-  const panel = $('settings');
-  panel.hidden = !panel.hidden;
-});
-
-document.addEventListener('click', (ev) => {
-  const panel = $('settings');
-  if (panel.hidden) return;
-  const t = ev.target as Node;
-  if (panel.contains(t) || $('settingsBtn').contains(t)) return;
-  closeSettings();
-});
-
-document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape') closeSettings();
-});
-
 $('randomUnrev').addEventListener('click', () => void randomUnreviewed());
 $('prevUnrev').addEventListener('click', () => void prevUnreviewed());
 $('nextUnrev').addEventListener('click', () => void nextUnreviewed());

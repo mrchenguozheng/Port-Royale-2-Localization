@@ -1151,3 +1151,11 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 状态条：导航 / 未审 / 跳转分段排列，窄了自动换行 */
+.statusbar { flex-wrap: wrap; row-gap: 0.35rem; }
+.nav-group { display: inline-flex; align-items: center; gap: 0.35rem; }
+.statusbar .jump-box { display: inline-flex; position: relative; }
+.statusbar .jump-box input { width: 10rem; font-family: var(--font-mono); }
+.statusbar .nav-group + .nav-group { padding-left: 0.6rem; border-left: 1px solid var(--line); }
+.statusbar #stat { margin-left: auto; }

@@ -25,12 +25,7 @@ const title = 'PR2 本地化编辑器';
       <button id="addLang" class="mini icon-btn" title="添加一种语言"><span class="ic ic-plus" aria-hidden="true"></span></button>
       <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…"
              spellcheck="false" />
-      <button id="save" disabled>保存</button>
-      <span class="menu-wrap">
-        <button id="settingsBtn" class="mini icon-btn" title="设置"><span class="ic ic-gear" aria-hidden="true"></span></button>
-        <div id="settings" class="settings-panel" hidden>
-      <div class="srow">
-        <span class="slabel">字号</span>
+      <label class="tb">字号
         <select id="size">
           <option value="14">14</option>
           <option value="16">16</option>
@@ -42,35 +37,34 @@ const title = 'PR2 本地化编辑器';
           <option value="40">40</option>
           <option value="48">48</option>
         </select>
-      </div>
-      <div class="srow">
-        <span class="slabel">未审</span>
-        <button id="prevUnrev">上一条未审</button>
-        <button id="nextUnrev">下一条未审</button>
-        <button id="randomUnrev">随机未审</button>
-      </div>
-      <div class="srow">
-        <span class="slabel">跳转</span>
-        <span class="jump-box">
-          <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false"
-                 autocomplete="off" />
-          <div id="jumpList" class="jump-list" hidden></div>
-        </span>
-        <button id="jumpGo">跳转</button>
-        <span class="hint">Ctrl+Enter 下一条 · Ctrl+S 保存</span>
-      </div>
-    </div>
-      </span>
+      </label>
+      <button id="save" disabled>保存</button>
     </header>
 
     <footer class="statusbar">
-      <button id="first" class="mini" hidden>首条</button>
-      <button id="prev" class="mini">‹ 上一条</button>
-      <input id="pageInput" class="page-num" type="number" min="1" step="1"
-             aria-label="第几条" />
-      <span id="pageCount">共 0 条</span>
-      <button id="next" class="mini">下一条 ›</button>
-      <button id="last" class="mini" hidden>末条</button>
+      <span class="nav-group">
+        <button id="first" class="mini" hidden>首条</button>
+        <button id="prev" class="mini">‹ 上一条</button>
+        <input id="pageInput" class="page-num" type="number" min="1" step="1"
+               aria-label="第几条" />
+        <span id="pageCount">共 0 条</span>
+        <button id="next" class="mini">下一条 ›</button>
+        <button id="last" class="mini" hidden>末条</button>
+      </span>
+
+      <span class="nav-group">
+        <button id="prevUnrev">上一条未审</button>
+        <button id="nextUnrev">下一条未审</button>
+        <button id="randomUnrev">随机未审</button>
+      </span>
+
+      <span class="jump-box">
+        <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false"
+               autocomplete="off" />
+        <div id="jumpList" class="jump-list" hidden></div>
+      </span>
+      <button id="jumpGo">跳转</button>
+
       <span id="stat"></span>
       <span id="dirty" class="dirty"></span>
     </footer>
