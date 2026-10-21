@@ -58,17 +58,23 @@ def fix_conj(text):
         text)
 
 
+def load_list(name):
+    path = os.path.join(HERE, name)
+    out = []
+    if os.path.isfile(path):
+        for line in io.open(path, encoding="utf-8"):
+            line = line.strip()
+            if line and not line.startswith("#"):
+                out.append(line)
+    return out
+
+
 def build_names(doc):
     given = {v for h, v in doc.items() if h.startswith("0xfc51") and 1 <= len(v) <= 5}
     surn = {v for h, v in doc.items() if h.startswith("0xcf57") and 1 <= len(v) <= 6}
-    extras = []
-    extra_path = os.path.join(HERE, "zh_names.txt")
-    if os.path.isfile(extra_path):
-        for line in io.open(extra_path, encoding="utf-8"):
-            line = line.strip()
-            if line and not line.startswith("#"):
-                extras.append(line)
-    return given, surn, extras
+    extras = load_list("zh_names.txt")
+    towns = load_list("zh_towns.txt")
+    return given, surn, extras, towns
 
 
 name_re = None
@@ -99,7 +105,7 @@ def find_names(text, given, surn, extras):
     return merged
 
 
-def pad_names(text, spans):
+def pad_names(text, spans, towns=()):
     out, last = [], 0
     for start, end in spans:
         before = text[start - 1] if start > 0 else None
@@ -117,6 +123,8 @@ def pad_names(text, spans):
 
         need_before = (not at_start) and before is not None and before not in SPACE and before not in PUNCT_CHARS
         need_after = (not at_end) and after is not None and after not in SPACE and after not in PUNCT_CHARS
+        if need_after and text[start:end] in towns and after in "的地得们等城人镇岛港":
+            need_after = False
 
         out.append(text[last:start])
         if need_before:
@@ -164,7 +172,7 @@ def main():
              if m]
 
     zh_rules = lang_rules.get("zh")
-    given, surn, extras = build_names(doc)
+    given, surn, extras, towns = build_names(doc)
 
     out, stats = {}, {"punct": 0, "conj": 0, "name": 0}
     for h in order:
@@ -180,8 +188,8 @@ def main():
             if i % 2 == 1 or not part:
                 res.append(part)
                 continue
-            spans = find_names(part, given, surn, extras)
-            res.append(pad_names(part, spans) if spans else part)
+            spans = find_names(part, given, surn, extras + towns)
+            res.append(pad_names(part, spans, towns) if spans else part)
         c = "".join(res)
         stats["punct"] += a != text
         stats["conj"] += b != a
