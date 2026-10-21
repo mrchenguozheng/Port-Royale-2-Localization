@@ -730,7 +730,7 @@ html[data-theme="light"] {
 .topbar #pageCount { color: var(--fg-dim); }
 
 /* ── 固定页面宽度：不再铺满整个屏幕 ───────────────────── */
-:root { --page-w: 900px; }
+:root { --page-w: 100%; --text-size: 32px; }
 
 body {
   align-items: center;
@@ -739,9 +739,7 @@ body {
 body > .bar,
 body > .topbar,
 body > #rows {
-  width: min(100%, var(--page-w));
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
 }
 /* 顶部两条栏背景只铺自己的宽度，两侧露出底色即可 */
 body > .bar { border-top: none; }
@@ -777,7 +775,7 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 #rows .body { overflow-wrap: anywhere; }
 
 /* 候选列表不能比页面还宽 */
-.jump-list { width: min(26rem, calc(var(--page-w) - 2rem)); min-width: 0; }
+.jump-list { width: min(30rem, 90vw); min-width: 0; }
 
 /* 窄页面：参照标签列收窄 */
 @media (max-width: 760px) {
@@ -786,7 +784,7 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 
 /* ── 竖排设置面板 ─────────────────────────────────────── */
 .panel {
-  width: min(100%, var(--page-w));
+  width: 100%;
   margin: 0 auto;
   padding: 0.5rem 0.9rem;
   background: var(--head-bg);
@@ -842,8 +840,8 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   padding: 1rem 1.2rem 1.2rem;
 }
 #rows .row > .ctx-side {
-  flex: 0 1 300px;
-  min-width: 240px;
+  flex: 0 1 340px;
+  min-width: 260px;
 }
 #rows .row > .card-main {
   flex: 1 1 360px;
@@ -892,3 +890,39 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 @media (max-width: 780px) {
   #rows .row > .ctx-side { flex: 1 1 100%; min-width: 0; }
 }
+
+/* ── 大字号阅读区 ─────────────────────────────────────── */
+#rows .body,
+#rows .cell-zh textarea,
+#rows .sp-layer {
+  font-size: var(--text-size);
+}
+#rows .tag,
+#rows .ref-head,
+#rows .zh-head {
+  font-size: max(12px, calc(var(--text-size) * 0.5));
+}
+.ctx-inline { font-size: max(13px, calc(var(--text-size) * 0.45)); }
+
+/* 参照：选择器在文本上方 */
+.ref-block { display: flex; flex-direction: column; gap: 0.15rem; margin-bottom: 0.6rem; }
+.ref-head { display: flex; align-items: center; }
+.ref-pick { font-size: 0.8em; max-width: 16rem; padding: 0.1rem 0.35rem; }
+#rows .ref-block .body { padding-left: 0; }
+
+/* 译文：语言名在编辑框上方 */
+.zh-block { display: flex; flex-direction: column; gap: 0.2rem; }
+.zh-head { color: var(--accent); font-weight: 600; }
+
+/* 相邻条目：逐行显示，可换行 */
+.ctx-nb-head { margin-top: 0.7rem; color: var(--fg-dim); }
+.ctx-nb-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.3rem 0;
+  border-top: 1px dashed var(--line-soft);
+  white-space: normal;
+}
+.ctx-nb-id { font-family: var(--font-mono); color: var(--fg-id); font-size: 0.85em; }
+.ctx-nb-text { white-space: normal; overflow-wrap: anywhere; }

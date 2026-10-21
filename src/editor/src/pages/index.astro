@@ -25,20 +25,13 @@ const title = 'PR2 本地化编辑器';
       </div>
 
       <div class="srow">
-        <span class="slabel">宽度</span>
-        <select id="width">
-          <option value="600">600</option>
-          <option value="720">720</option>
-          <option value="900" selected>900</option>
-          <option value="1080">1080</option>
-        </select>
         <span class="slabel">字号</span>
         <select id="size">
-          <option value="12">12</option>
-          <option value="14">14</option>
-          <option value="16" selected>16</option>
-          <option value="18">18</option>
-          <option value="20">20</option>
+          <option value="32" selected>32</option>
+          <option value="36">36</option>
+          <option value="40">40</option>
+          <option value="44">44</option>
+          <option value="48">48</option>
         </select>
         <button id="theme" class="mini theme-btn" title="切换浅色/深色">🌙</button>
       </div>
@@ -67,6 +60,7 @@ const title = 'PR2 本地化编辑器';
       <div class="srow">
         <span class="slabel">跳转</span>
         <button id="randomUnrev" title="随机跳到一条未审核的">随机未审</button>
+        <button id="prevUnrev" title="跳到上一条未审核的">上一条未审</button>
         <button id="nextUnrev" title="跳到下一条未审核的">下一条未审</button>
         <span class="jump-box">
           <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false"

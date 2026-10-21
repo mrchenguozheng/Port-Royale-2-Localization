@@ -45,8 +45,6 @@ const LS_LANG = 'pr2.lang';
 const LS_REFA = 'pr2.refA';
 const LS_REFB = 'pr2.refB';
 const LS_FILTER = 'pr2.filter';
-const WIDTHS = [600, 720, 900, 1080];
-const LS_WIDTH = 'pr2.width';
 const LS_PAGE = 'pr2.page.';
 
 function saved(key: string): string | null {
@@ -77,7 +75,7 @@ const S = {
   //: id -> 加载时的原文。改回原样就把这条从"未保存"里去掉。
   orig: new Map<string, string>(),
   dirtyIds: [] as string[],
-  size: 16,
+  size: 32,
   problems: {} as Record<string, Problem[]>,
   /** 术语一致性： id -> ["Frigate：应为「巡防舰」", …] */
   terms: {} as Record<string, string[]>,
@@ -130,17 +128,8 @@ function applyTheme(theme: string) {
   try { localStorage.setItem(LS_THEME, theme); } catch { /* ignore */ }
 }
 
-function applyWidth(px: number) {
-  document.documentElement.style.setProperty('--page-w', px + 'px');
-  const sel = $('width') as HTMLSelectElement;
-  if (sel) sel.value = String(px);
-  try { localStorage.setItem(LS_WIDTH, String(px)); } catch { /* ignore */ }
-}
-
 async function boot() {
   applyTheme(saved(LS_THEME) === 'light' ? 'light' : 'dark');
-  const savedW = Number(saved(LS_WIDTH));
-  applyWidth(WIDTHS.indexOf(savedW) >= 0 ? savedW : 900);
   const d = await api<{ editable: string[]; all: string[]; base: string }>('/api/langs');
   S.langs = d.editable;
   S.refLangs = d.all;
@@ -281,7 +270,7 @@ function fill(sel: HTMLSelectElement, items: string[], cur: string) {
 }
 
 function applySize() {
-  document.body.style.fontSize = S.size + 'px';
+  document.documentElement.style.setProperty('--text-size', S.size + 'px');
 }
 
 // ── 筛选 ────────────────────────────────────────────────
@@ -323,8 +312,7 @@ async function filter() {
 /* 一行 = id + 上下堆叠的「参照…参照 / 译文」。
  * 译文在中间：它是唯一要改的那块，放中间视线落点正好。 */
 function refLine(which: 'A' | 'B', e: Entry): HTMLElement {
-  const d = el('div', 'line');
-  const tag = el('div', 'tag ref-tag');
+  const d = el('div', 'ref-block');
 
   const sel = el('select', 'ref-pick') as HTMLSelectElement;
   for (const code of S.refLangs) {
@@ -342,8 +330,9 @@ function refLine(which: 'A' | 'B', e: Entry): HTMLElement {
     drawRows();
     void loadContexts(S.rows);
   });
-  tag.appendChild(sel);
-  d.appendChild(tag);
+  const head = el('div', 'ref-head');
+  head.appendChild(sel);
+  d.appendChild(head);
 
   const chosen = which === 'A' ? S.refA : S.refB;
   let cell: HTMLElement;
@@ -408,7 +397,10 @@ function rowOf(e: Entry): HTMLElement {
   const stack = el('div', 'stack');
   stack.appendChild(refLine('A', e));
   stack.appendChild(refLine('B', e));
-  stack.appendChild(line(S.lang, zhCell(e)));
+  const zhBlock = el('div', 'zh-block');
+  zhBlock.appendChild(el('div', 'zh-head', langName(S.lang)));
+  zhBlock.appendChild(zhCell(e));
+  stack.appendChild(zhBlock);
   main.appendChild(stack);
 
   const flags = el('div', 'flags');
@@ -531,10 +523,15 @@ async function loadContexts(rows: Entry[]) {
       const ph = (c.placeholders || [])
         .map((p) => `${p.token} → ${p.meaning}`).join('，');
       if (ph) box.appendChild(el('div', 'ctx-ph', `占位符：${ph}`));
-      const nb = (c.neighbors || []).slice(0, 3);
+      const nb = (c.neighbors || []).slice(0, 4);
       if (nb.length) {
-        box.appendChild(el('div', 'ctx-nb',
-          '相邻：' + nb.map((n) => `${n.id} ${(n.en || '').slice(0, 36)}`).join(' ｜ ')));
+        box.appendChild(el('div', 'ctx-nb-head', '相邻条目'));
+        for (const n of nb) {
+          const item = el('div', 'ctx-nb-item');
+          item.appendChild(el('span', 'ctx-nb-id', n.id));
+          item.appendChild(el('span', 'ctx-nb-text', n.en || '（空）'));
+          box.appendChild(item);
+        }
       }
     }
   } catch { /* 语境只是辅助，取不到不影响编辑 */ }
@@ -573,6 +570,13 @@ async function saveOne(id: string) {
     setDirty(S.dirtyIds.length > 0);
     void check(id);
   } catch { /* 失败就留着改动，等手动保存 */ }
+}
+
+function langName(code: string): string {
+  const names: Record<string, string> = {
+    zh: '中文', ja: '日本語', ko: '한국어', de: 'Deutsch', fr: 'Français', es: 'Español',
+  };
+  return names[code] ? `${names[code]}（${code}）` : code;
 }
 
 function isPlaceholder(t: string): boolean {
@@ -897,6 +901,18 @@ async function randomUnreviewed() {
   }
 }
 
+async function prevUnreviewed() {
+  try {
+    const ids = await unreviewedIds();
+    if (!ids.length) { $('stat').textContent = '没有未审核的条目了'; return; }
+    const cur = S.rows.length ? S.rows[0].id : '';
+    const i = cur ? ids.indexOf(cur) : 0;
+    await jumpToId(ids[(i - 1 + ids.length) % ids.length]);
+  } catch (err) {
+    $('stat').textContent = '跳转失败：' + (err as Error).message;
+  }
+}
+
 async function nextUnreviewed() {
   try {
     const ids = await unreviewedIds();
@@ -920,16 +936,12 @@ async function jumpToHash(raw: string) {
   if (!ok) $('stat').textContent = '找不到 ' + '0x' + id;
 }
 
-$('width').addEventListener('change', (ev) => {
-  const px = Number((ev.target as HTMLSelectElement).value);
-  if (WIDTHS.indexOf(px) >= 0) applyWidth(px);
-});
-
 $('theme').addEventListener('click', () => {
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
 });
 
 $('randomUnrev').addEventListener('click', () => void randomUnreviewed());
+$('prevUnrev').addEventListener('click', () => void prevUnreviewed());
 $('nextUnrev').addEventListener('click', () => void nextUnreviewed());
 $('jumpGo').addEventListener('click', () => void jumpToHash($('jumpHash').value));
 let jumpTimer = 0;
