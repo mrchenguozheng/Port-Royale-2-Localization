@@ -15,7 +15,9 @@
 #   0xfc512ea5 版权声明里的 “RAD Game Tools, Inc.”
 #   0x35f48f70/72/73 “Holy August” 其实是人名圣奥古斯丁，不是八月
 ignore = ["0xfc512ea5", "0x35f48f70", "0x35f48f72", "0x35f48f73",
-          "0xd4cd0f44"]
+          "0xd4cd0f44",
+          # 职员表分区标题 "Tools"：保留英文，不是货物「工具」，会污染术语基准
+          "0x37329032"]
 
 [[group]]
 name = "货物"

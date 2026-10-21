@@ -221,7 +221,6 @@ function drawRows() {
   const frag = document.createDocumentFragment();
   for (const e of S.rows) frag.appendChild(rowOf(e));
   $('rows').appendChild(frag);
-  for (const ta of $('rows').querySelectorAll('textarea')) grow(ta);
   S.activeId = null;
   if (S.rows.length) markActiveInList(S.rows[0].id);
   void loadContexts(S.rows);
@@ -498,26 +497,73 @@ function line(tag: string, body: HTMLElement): HTMLElement {
   return d;
 }
 
-/* 译文格 = 高亮层（垫在下面）+ textarea（透明在上面）。 */
+/* 译文格：contenteditable，空格直接渲染成带底色的 span。
+ * 不再用「透明 textarea + 覆盖层」，从根上避免两层排版不一致。 */
+function editorText(root: HTMLElement): string {
+  let out = '';
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      out += node.nodeValue || '';
+      return;
+    }
+    if (node.nodeName === 'BR') {
+      out += '\n';
+      return;
+    }
+    const elem = node as HTMLElement;
+    if (elem.classList && elem.classList.contains('hl-sp')) {
+      out += elem.textContent || '';
+      return;
+    }
+    const block = elem.nodeName === 'DIV';
+    elem.childNodes.forEach(walk);
+    if (block) out += '\n';
+  };
+  root.childNodes.forEach(walk);
+  return out;
+}
+
+function caretOffset(root: HTMLElement): number {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return 0;
+  const range = sel.getRangeAt(0).cloneRange();
+  const pre = range.cloneRange();
+  pre.selectNodeContents(root);
+  pre.setEnd(range.endContainer, range.endOffset);
+  return pre.toString().length;
+}
+
+function setCaretOffset(root: HTMLElement, offset: number) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let left = offset;
+  let node = walker.nextNode();
+  while (node) {
+    const len = (node.nodeValue || '').length;
+    if (left <= len) {
+      const r = document.createRange();
+      r.setStart(node, left);
+      r.collapse(true);
+      const sel = window.getSelection();
+      if (sel) { sel.removeAllRanges(); sel.addRange(r); }
+      return;
+    }
+    left -= len;
+    node = walker.nextNode();
+  }
+}
+
 function zhCell(e: Entry): HTMLElement {
   const box = el('div', 'cell-zh');
-  const text = textOf(e);
+  const ed = el('div', 'edit') as HTMLDivElement;
+  ed.contentEditable = 'true';
+  ed.spellcheck = false;
+  ed.appendChild(highlightSpaces(textOf(e)));
+  box.appendChild(ed);
 
-  const layer = el('div', 'sp-layer');
-  layer.appendChild(highlightSpaces(text));
-  box.appendChild(layer);
-
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.spellcheck = false;
-  box.appendChild(ta);
-
-  ta.addEventListener('input', () => {
-    const v = ta.value;
-    layer.replaceChildren(highlightSpaces(v));
-    grow(ta);
+  // 中文输入法组合期间不能重绘 DOM，否则会把组合中的字打断
+  let composing = false;
+  const record = (v: string) => {
     if (v === (S.orig.get(e.id) ?? '')) {
-      // 改回原样：不用再提交这一条
       S.edits.delete(e.id);
       S.dirtyIds = S.dirtyIds.filter((x) => x !== e.id);
     } else {
@@ -525,21 +571,39 @@ function zhCell(e: Entry): HTMLElement {
       if (!S.dirtyIds.includes(e.id)) S.dirtyIds.push(e.id);
     }
     setDirty(S.dirtyIds.length > 0);
+  };
+  const repaint = () => {
+    const v = editorText(ed);
+    const off = caretOffset(ed);
+    ed.replaceChildren(highlightSpaces(v));
+    setCaretOffset(ed, off);
+    record(v);
+  };
+
+  ed.addEventListener('focus', () => { void activateRow(e.id, ed); });
+  ed.addEventListener('blur', () => void check(e.id));
+  ed.addEventListener('compositionstart', () => { composing = true; });
+  ed.addEventListener('compositionend', () => {
+    composing = false;
+    repaint();
   });
-  ta.addEventListener('focus', () => { void activateRow(e.id, ta); });
-  ta.addEventListener('blur', () => void check(e.id));
-  ta.addEventListener('keydown', (ev) => {
-    // Ctrl+Enter：去下一条 —— 翻译时最常用的动作（页内最后一条就停）
+  ed.addEventListener('input', () => {
+    if (composing) {
+      record(editorText(ed));
+      return;
+    }
+    repaint();
+  });
+  ed.addEventListener('keydown', (ev) => {
     const e2 = ev as KeyboardEvent;
     if (e2.key === 'Enter' && (e2.ctrlKey || e2.metaKey)) {
       e2.preventDefault();
-      const row = ta.closest('.row') as HTMLElement | null;
+      const row = ed.closest('.row') as HTMLElement | null;
       const next = row && row.nextElementSibling;
-      const nx = next && next.querySelector('textarea');
+      const nx = next && next.querySelector('.edit') as HTMLElement | null;
       void saveOne(e.id).then(() => { if (nx) nx.focus(); });
     }
   });
-
   return box;
 }
 
@@ -604,18 +668,18 @@ async function loadContexts(rows: Entry[]) {
 }
 
 /** 同一时间只编辑一条：切换时把上一条自动存盘，其余行只读。 */
-async function activateRow(id: string, ta: HTMLTextAreaElement) {
+async function activateRow(id: string, ed: HTMLElement) {
   if (S.activeId === id) return;
   if (S.activeId) await saveOne(S.activeId);
   S.activeId = id;
-  for (const t of $('rows').querySelectorAll('textarea') as NodeListOf<HTMLTextAreaElement>) {
+  for (const t of $('rows').querySelectorAll('.edit') as NodeListOf<HTMLElement>) {
     const row = t.closest('.row') as HTMLElement | null;
     const rid = (row && row.dataset.id) || '';
-    t.readOnly = rid !== id;
+    t.contentEditable = rid === id ? 'true' : 'false';
     t.classList.toggle('ro', rid !== id);
   }
-  ta.readOnly = false;
-  ta.classList.remove('ro');
+  ed.contentEditable = 'true';
+  ed.classList.remove('ro');
 }
 
 /** 单条存盘：只提交这一条，不碰其它行。 */
@@ -647,12 +711,6 @@ function langName(code: string): string {
 
 function isPlaceholder(t: string): boolean {
   return /^0x[0-9a-f]{8} \| /.test(t);
-}
-
-function grow(ta: HTMLTextAreaElement) {
-  ta.style.height = 'auto';
-  void ta.offsetWidth;          // 强制回流，让 scrollHeight 变成真值
-  ta.style.height = (ta.scrollHeight + 2) + 'px';
 }
 
 function setDirty(v: boolean) {
@@ -687,8 +745,6 @@ function redraw(id: string) {
   if (!old || !src) return;
   const fresh = rowOf(src);
   old.replaceWith(fresh);
-  const ta = fresh.querySelector('textarea');
-  if (ta) grow(ta);
 }
 
 function cssEsc(s: string): string {
@@ -890,7 +946,6 @@ $('lang').addEventListener('change', (ev) => {
 $('size').addEventListener('change', (ev) => {
   S.size = Number((ev.target as HTMLSelectElement).value);
   applySize();
-  for (const ta of $('rows').querySelectorAll('textarea')) grow(ta);
 });
 $('save').addEventListener('click', () => void save());
 
