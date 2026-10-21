@@ -733,6 +733,34 @@ window.addEventListener('beforeunload', (ev) => {
   ev.returnValue = '';
 });
 
+/** 供横幅等外部按钮调用：跳到某条所在页并高亮。 */
+async function jumpToId(id: string): Promise<boolean> {
+  const f = await api<{ index: number; count: number }>(
+    '/api/find?id=' + encodeURIComponent(id));
+  if (!f || f.index < 0) return false;
+
+  // 目标条目可能被当前筛选挡住：先回到「全部」。
+  if (S.filter !== 'all') {
+    S.filter = 'all';
+    remember(LS_FILTER, 'all');
+    const sel = $('filter') as HTMLSelectElement;
+    if (sel) sel.value = 'all';
+  }
+  await reload(true);
+  const page = Math.floor(f.index / S.pageSize) + 1;
+  if (page > 1) await renderPage(page);
+
+  const row = document.querySelector(`.row[data-id="${cssEsc(id)}"]`);
+  if (row) {
+    row.classList.add('flash');
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    window.setTimeout(() => row.classList.remove('flash'), 2500);
+  }
+  return true;
+}
+
+(window as any).pr2JumpTo = jumpToId;
+
 boot().catch((err) => {
   $('stat').textContent = '载入失败：' + err.message;
 });

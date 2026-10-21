@@ -582,8 +582,15 @@ class Handler(BaseHTTPRequestHandler):
       if (st.status === 'ok') return;
       box.textContent = st.count == null
         ? '中文文本源已变更：还没有接受过审核稿，需要人工审核'
-        : '中文文本源已变更：' + st.count + ' 条待人工审核（点此查看 hash）';
-      box.onclick = () => alert((st.changed || []).join('\\n') || '（无清单）');
+        : '中文文本源已变更：' + st.count + ' 条待人工审核（点此跳到该条）';
+      box.onclick = async () => {
+        const id = (st.changed || [])[0];
+        if (id && window.pr2JumpTo) {
+          const ok = await window.pr2JumpTo(id);
+          if (ok) { box.style.display = 'none'; return; }
+        }
+        alert((st.changed || []).join('\\n') || '（无清单）');
+      };
       document.body.appendChild(box);
       box.style.display = 'block';
     } catch (e) {}
@@ -628,6 +635,16 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/lang-exists":
             # 输入框一边打字一边问：这个名字能不能用、是不是已经有一份了。
             return self.send_json(lang_status((query.get("code") or [""])[0]))
+
+        if path == "/api/find":
+            hid = (query.get("id") or [""])[0]
+            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
+            ids = filter_ids("all", lang)
+            try:
+                idx = ids.index(hid)
+            except ValueError:
+                idx = -1
+            return self.send_json({"id": hid, "index": idx, "count": len(ids)})
 
         if path == "/api/count":
             # 只报条数与 id 顺序，不带正文：首屏拿到它就能把滚动条画对。
