@@ -318,16 +318,7 @@ function rowOf(e: Entry): HTMLElement {
   const row = el('div', 'row');
   row.dataset.id = e.id;
 
-  const idCell = el('div', 'cell-id', e.id);
-  const ctxBtn = el('button', 'ctx-btn', '语境') as HTMLButtonElement;
-  ctxBtn.type = 'button';
-  ctxBtn.title = '推断这条的语境与用途';
-  ctxBtn.addEventListener('click', (ev) => {
-    ev.preventDefault();
-    void openCtx(e.id);
-  });
-  idCell.appendChild(ctxBtn);
-  row.appendChild(idCell);
+  row.appendChild(el('div', 'cell-id', e.id));
 
   // 人工审核：勾上 = 这条已过目。文字常显，不靠 hover 提示。
   const wrap = el('label', 'chk-wrap');
@@ -357,6 +348,18 @@ function rowOf(e: Entry): HTMLElement {
   if (box.checked) row.classList.add('reviewed');
 
   const stack = el('div', 'stack');
+
+  // 语境推断入口：内容区右上角，不挤 id 列
+  const tools = el('div', 'row-tools');
+  const ctxBtn = el('button', 'ctx-btn', '语境') as HTMLButtonElement;
+  ctxBtn.type = 'button';
+  ctxBtn.title = '推断这条的语境与用途';
+  ctxBtn.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    void openCtx(e.id);
+  });
+  tools.appendChild(ctxBtn);
+  stack.appendChild(tools);
 
   const refs = refList();
   if (!refs.length) {
