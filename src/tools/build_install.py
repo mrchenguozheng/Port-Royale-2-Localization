@@ -190,12 +190,24 @@ def copy_if_different(src, dst):
     """
     if os.path.isfile(dst) and same_content(src, dst):
         return "same"
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
     try:
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy2(src, dst)
         return "copied"
     except OSError:
-        return "failed"
+        # 目标被占用（典型：游戏/杀毒还开着）时直接覆盖会失败，
+        # 改成「把旧文件改名让位，再写新文件」；旧文件删不掉就留着 .old。
+        alt = dst + ".old"
+        try:
+            os.replace(dst, alt)
+            shutil.copy2(src, dst)
+        except OSError:
+            return "failed"
+        try:
+            os.remove(alt)
+        except OSError:
+            pass
+        return "copied"
 
 
 def prune_stale_pack(target, langs):
