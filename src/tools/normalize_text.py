@@ -251,7 +251,9 @@ def fix_vars(text, punct, cjk):
             out.append(" ")
         out.append(m.group(0))
         nxt = text[m.end()] if m.end() < len(text) else ""
-        if nxt and nxt != " " and need(nxt):
+        # 占位符后面紧跟标点时不再补空格（「%1 。」→「%1。」），
+        # 只有紧跟正文字符才补；否则标点前会多出空格。
+        if nxt and nxt != " " and rx.match(nxt):
             out.append(" ")
         pos = m.end()
     out.append(text[pos:])
