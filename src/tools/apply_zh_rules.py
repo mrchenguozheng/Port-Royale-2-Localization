@@ -129,6 +129,26 @@ def pad_names(text, spans):
     return "".join(out)
 
 
+CJK = r"\u4e00-\u9fff"
+FW = "，。！？、：；…「」『』（）［］【】〈〉〔〕“”‘’"
+PLACE = r"(?:@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z])"
+
+
+def strip_padding(text):
+    """把「为引擎补的空格」去掉，回到干净译文（写回文本源时用）。"""
+    if not re.search("[%s]" % CJK, text):
+        return text
+    cjk = "[%s]" % CJK
+    fw = "[%s]" % re.escape(FW)
+    text = re.sub(r"(%s)\s+(?=%s)" % (cjk, cjk), r"\1", text)
+    text = re.sub(r"(%s)\s+(?=%s)" % (cjk, fw), r"\1", text)
+    text = re.sub(r"(%s)\s+(?=%s)" % (fw, cjk), r"\1", text)
+    text = re.sub(r"(%s)\s+(?=%s)" % (cjk, PLACE), r"\1", text)
+    text = re.sub(r"(%s)\s+(?=%s)" % (PLACE, cjk), r"\1", text)
+    text = re.sub(r"(%s)\s+(?=%s)" % (PLACE, fw), r"\1", text)
+    return text.strip()
+
+
 def esc(t):
     return t.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
@@ -173,9 +193,10 @@ def main():
     if args.dry_run:
         return
 
-    header = ("# 自动生成，请勿手改：本文件由 src/tools/apply_zh_rules.py\n"
+    header = ("# 自动生成：本文件由 src/tools/apply_zh_rules.py\n"
               "# 从 src/references/zh.gog_1.1.2.3.toml 按 标点/连词/人名 规则生成。\n"
-              "# 改译文请改 references 里的文本源；改规则请改 apply_zh_rules.py。\n")
+              "# 改译文请改 references 里的文本源；改规则请改 apply_zh_rules.py。\n"
+              "# 人工只调空格时，用 src/tools/zh_review.py --accept 记为「已审核」。\n")
     io.open(DST, "w", encoding="utf-8", newline="\n").write(
         header + "\n".join('"%s" = "%s"' % (k, esc(out[k])) for k in order) + "\n")
     print("已写入", DST)

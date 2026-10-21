@@ -127,7 +127,10 @@ def main():
         # 中文：先由 references/zh.gog_1.1.2.3.toml 生成 zh.toml（文本只改 references）
         if lang == "zh":
             ref = os.path.join(HERE, "..", "references", "zh.gog_1.1.2.3.toml")
-            if os.path.isfile(ref):
+            import zh_review
+            if os.path.isfile(ref) and zh_review.marker_ok():
+                print("   使用已审核的 zh.toml（文本源未变，跳过生成）")
+            elif os.path.isfile(ref):
                 run("生成 zh.toml（references/zh.gog_1.1.2.3.toml → 规则）",
                     [sys.executable, os.path.join(HERE, "apply_zh_rules.py")])
         if not args.no_normalize:
