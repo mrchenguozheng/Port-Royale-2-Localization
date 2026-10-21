@@ -45,7 +45,7 @@ if defined PY exit /b 0
 REM -- Install dirs. %%~d strips the quotes; %%d keeps them, and a
 REM quoted path would reach python.exe as part of its own name.
 for %%d in ("%ProgramFiles%" "%ProgramFiles(x86)%" "%LocalAppData%\Programs") do (
-  for %%v in (314 313 312 311) do (
+  for %%v in (315 314 313 312 311) do (
     if not defined PY call :try "%%~d\Python\Python%%v\python.exe"
   )
 )
