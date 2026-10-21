@@ -746,3 +746,40 @@ body > #rows {
 /* 顶部两条栏背景只铺自己的宽度，两侧露出底色即可 */
 body > .bar { border-top: none; }
 body > #rows { flex: 1 1 auto; overflow: auto; }
+
+/* ── 窄宽度下不散架 ───────────────────────────────────── */
+
+/* 设置组靠右，窄了就整组换行，而不是把输入框挤扁 */
+.bar .settings {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+/* 操作栏：允许换行，搜索框可收缩，按钮保持完整 */
+.topbar {
+  flex-wrap: wrap;
+  row-gap: 0.45rem;
+}
+.topbar #q {
+  flex: 1 1 14rem;
+  min-width: 8rem;
+}
+.topbar .pager { flex: 0 0 auto; }
+.topbar .jump { flex: 0 0 auto; }
+.topbar #save { margin-left: auto; }
+
+/* 卡片内部：任何一层都不许把宽度撑破 */
+#rows, #rows .row, #rows .stack, #rows .line, #rows .body { min-width: 0; }
+#rows .line { grid-template-columns: max-content minmax(0, 1fr); }
+#rows .body { overflow-wrap: anywhere; }
+
+/* 候选列表不能比页面还宽 */
+.jump-list { width: min(26rem, calc(var(--page-w) - 2rem)); min-width: 0; }
+
+/* 窄页面：参照标签列收窄 */
+@media (max-width: 760px) {
+  #rows .line { grid-template-columns: 4.2rem minmax(0, 1fr); }
+}
