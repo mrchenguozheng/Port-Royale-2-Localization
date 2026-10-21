@@ -26,10 +26,9 @@ const title = 'PR2 本地化编辑器';
       <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…"
              spellcheck="false" />
       <button id="save" disabled>保存</button>
-      <button id="settingsBtn" class="mini icon-btn" title="设置"><span class="ic ic-gear" aria-hidden="true"></span></button>
-    </header>
-
-    <div id="settings" class="settings-panel" hidden>
+      <span class="menu-wrap">
+        <button id="settingsBtn" class="mini icon-btn" title="设置"><span class="ic ic-gear" aria-hidden="true"></span></button>
+        <div id="settings" class="settings-panel" hidden>
       <div class="srow">
         <span class="slabel">字号</span>
         <select id="size">
@@ -61,6 +60,8 @@ const title = 'PR2 本地化编辑器';
         <span class="hint">Ctrl+Enter 下一条 · Ctrl+S 保存</span>
       </div>
     </div>
+      </span>
+    </header>
 
     <footer class="statusbar">
       <button id="first" class="mini" hidden>首条</button>
