@@ -2,3 +2,4 @@
 * text=auto
 # 生成物：GitHub 上按生成文件处理，默认折叠 diff
 src/translations/zh.toml linguist-generated=true
+*.ttf binary

@@ -1061,7 +1061,7 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   border: 1px solid transparent;
 }
 .icon-btn:hover { border-color: var(--line); color: var(--accent); }
-.icon-btn svg { width: 16px; height: 16px; }
+
 
 /* 序号 */
 .cell-no {
@@ -1074,3 +1074,22 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 }
 .li-head { display: flex; align-items: baseline; gap: 0.35rem; }
 .li-no { font-family: var(--font-mono); font-size: 0.72em; color: var(--fg-id); }
+
+/* 图标字体（由 src/tools/make_icon_font.py 生成） */
+@font-face {
+  font-family: "PR2 Editor Icons";
+  src: url("/fonts/icons.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+.ic {
+  font-family: "PR2 Editor Icons", sans-serif;
+  font-style: normal;
+  font-weight: normal;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-block;
+}
+.ic-plus::before { content: "\e000"; }
+.ic-gear::before { content: "\e001"; }
