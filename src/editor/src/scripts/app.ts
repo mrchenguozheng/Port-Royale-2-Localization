@@ -182,7 +182,6 @@ async function boot() {
   fill($('lang'), S.langs, S.lang);
   fill($('refA'), S.refLangs, S.refA);
   fill($('refB'), [FOLLOW, ...S.refLangs], S.refB);
-  ($('filter') as HTMLSelectElement).value = S.filter;
 
   applySize();
   await reload(true);
@@ -266,10 +265,7 @@ function updatePager() {
 
 function updateStat() {
   const n = Object.keys(S.terms).length;
-  let reviewed: number;
-  if (S.filter === 'reviewed') reviewed = S.total;
-  else if (S.filter === 'unreviewed') reviewed = 0;
-  else reviewed = Math.min(S.reviewedCount, S.total);
+  const reviewed = Math.min(S.reviewedCount, S.total);
   const pending = Math.max(0, S.total - reviewed);
   $('stat').textContent =
     `已审 ${reviewed} 条 · 待审 ${pending} 条 · 当前筛选共 ${S.total} 条`
@@ -720,12 +716,6 @@ async function createLang() {
 
 // ── 事件 ────────────────────────────────────────────────
 
-$('filter').addEventListener('change', (ev) => {
-  S.filter = (ev.target as HTMLSelectElement).value;
-  remember(LS_FILTER, S.filter);
-  void reload(true);
-});
-
 let qTimer = 0;
 $('q').addEventListener('input', () => {
   // 搜索要等服务端，别每个键都发一次
@@ -847,13 +837,6 @@ async function jumpToId(id: string): Promise<boolean> {
     '/api/find?id=' + encodeURIComponent(id));
   if (!f || f.index < 0) return false;
 
-  // 目标条目可能被当前筛选挡住：先回到「全部」。
-  if (S.filter !== 'all') {
-    S.filter = 'all';
-    remember(LS_FILTER, 'all');
-    const sel = $('filter') as HTMLSelectElement;
-    if (sel) sel.value = 'all';
-  }
   await reload(true);
   const page = Math.floor(f.index / S.pageSize) + 1;
   if (page > 1) await renderPage(page);
@@ -867,15 +850,31 @@ async function jumpToId(id: string): Promise<boolean> {
   return true;
 }
 
-async function randomJump() {
+async function unreviewedIds(): Promise<string[]> {
+  const c = await api<{ ids: string[] }>(
+    `/api/count?filter=unreviewed&lang=${encodeURIComponent(S.lang)}`);
+  return c.ids || [];
+}
+
+async function randomUnreviewed() {
   try {
-    const c = await api<{ count: number; ids: string[] }>(
-      `/api/count?filter=${S.filter}&lang=${encodeURIComponent(S.lang)}`);
-    if (!c.count) { $('stat').textContent = '当前筛选下没有条目'; return; }
-    const id = c.ids[Math.floor(Math.random() * c.ids.length)];
-    await jumpToId(id);
+    const ids = await unreviewedIds();
+    if (!ids.length) { $('stat').textContent = '没有未审核的条目了'; return; }
+    await jumpToId(ids[Math.floor(Math.random() * ids.length)]);
   } catch (err) {
     $('stat').textContent = '随机跳转失败：' + (err as Error).message;
+  }
+}
+
+async function nextUnreviewed() {
+  try {
+    const ids = await unreviewedIds();
+    if (!ids.length) { $('stat').textContent = '没有未审核的条目了'; return; }
+    const cur = S.rows.length ? S.rows[0].id : '';
+    const i = cur ? ids.indexOf(cur) : -1;
+    await jumpToId(ids[(i + 1) % ids.length]);
+  } catch (err) {
+    $('stat').textContent = '跳转失败：' + (err as Error).message;
   }
 }
 
@@ -899,7 +898,8 @@ $('theme').addEventListener('click', () => {
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
 });
 
-$('random').addEventListener('click', () => void randomJump());
+$('randomUnrev').addEventListener('click', () => void randomUnreviewed());
+$('nextUnrev').addEventListener('click', () => void nextUnreviewed());
 $('jumpGo').addEventListener('click', () => void jumpToHash($('jumpHash').value));
 let jumpTimer = 0;
 let jumpItems: { id: string; en: string; zh: string }[] = [];

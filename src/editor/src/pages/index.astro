@@ -22,13 +22,6 @@ const title = 'PR2 本地化编辑器';
         <span class="slabel">编辑</span>
         <select id="lang"></select>
         <button id="addLang" class="mini" title="添加一种语言">＋</button>
-        <span class="slabel">筛选</span>
-        <select id="filter">
-          <option value="all">全部</option>
-          <option value="unreviewed">未审核</option>
-          <option value="reviewed">已审核</option>
-          <option value="attention">有问题</option>
-        </select>
       </div>
 
       <div class="srow">
@@ -83,7 +76,8 @@ const title = 'PR2 本地化编辑器';
 
       <div class="srow">
         <span class="slabel">跳转</span>
-        <button id="random" title="随机跳到一条">随机</button>
+        <button id="randomUnrev" title="随机跳到一条未审核的">随机未审</button>
+        <button id="nextUnrev" title="跳到下一条未审核的">下一条未审</button>
         <span class="jump-box">
           <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false"
                  autocomplete="off" />
