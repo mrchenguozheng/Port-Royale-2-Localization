@@ -594,3 +594,22 @@ body { background: var(--bg); color: var(--fg); }
 .pager .pg:not(:disabled):hover { background: var(--accent-soft); }
 button:hover { filter: brightness(1.08); }
 .theme-btn { font-size: 1em; padding: 0.1rem 0.45rem; cursor: pointer; }
+
+/* 主题切换时柔和过渡：只过渡颜色类属性，不影响布局与输入 */
+body, .bar, .head, .row, .stack, .cell-zh, .cell-zh textarea, .sp-layer,
+.tag, .flags, .ctx-inline, .pager, .jump-list, .modal-box, .foot,
+.chk-wrap .chk-label, .cell-id {
+  transition: background-color 0.28s ease,
+              color 0.28s ease,
+              border-color 0.28s ease,
+              box-shadow 0.28s ease;
+}
+
+/* 系统开了「减少动态效果」就不做过渡 */
+@media (prefers-reduced-motion: reduce) {
+  body, .bar, .head, .row, .stack, .cell-zh, .cell-zh textarea, .sp-layer,
+  .tag, .flags, .ctx-inline, .pager, .jump-list, .modal-box, .foot,
+  .chk-wrap .chk-label, .cell-id {
+    transition: none;
+  }
+}
