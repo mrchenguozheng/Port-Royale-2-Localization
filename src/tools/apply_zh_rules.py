@@ -174,8 +174,11 @@ def main():
     if args.dry_run:
         return
 
+    header = ("# 自动生成，请勿手改：本文件由 src/tools/apply_zh_rules.py\n"
+              "# 从 src/references/zh.gog_1.1.2.3.toml 按 标点/连词/人名 规则生成。\n"
+              "# 改译文请改 references 里的文本源；改规则请改 apply_zh_rules.py。\n")
     io.open(DST, "w", encoding="utf-8", newline="\n").write(
-        "\n".join('"%s" = "%s"' % (k, esc(out[k])) for k in order) + "\n")
+        header + "\n".join('"%s" = "%s"' % (k, esc(out[k])) for k in order) + "\n")
     print("已写入", DST)
 
 

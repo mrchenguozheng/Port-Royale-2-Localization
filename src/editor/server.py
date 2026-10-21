@@ -199,6 +199,20 @@ def rows_of(body):
     return out
 
 
+def _keep_header(path, lines):
+    """保留目标文件开头的注释块（生成物头部说明）。"""
+    head = []
+    try:
+        for ln in open(path, encoding="utf-8"):
+            if ln.startswith("#"):
+                head.append(ln.rstrip("\n"))
+            else:
+                break
+    except OSError:
+        pass
+    return head + lines
+
+
 def save_all(lang, rows):
     r"""把译文写回 translations\<lang>.toml（整表写，要求顺序完整）。
 
@@ -220,6 +234,7 @@ def save_all(lang, rows):
             raise ValueError("第 %d 条 id 不符：收到 %s，应为 %s" % (i, a, b))
 
     lines = ['"%s" = "%s"' % (r["id"], toml_escape(r["text"])) for r in rows]
+    lines = _keep_header(path, lines)
 
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:
@@ -278,6 +293,7 @@ def patch_all(lang, rows):
         if text is None:
             text = cur.get(rid, "")      # 没传的保持原样
         lines.append('"%s" = "%s"' % (rid, toml_escape(text)))
+    lines = _keep_header(path, lines)
 
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:

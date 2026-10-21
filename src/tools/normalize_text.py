@@ -328,8 +328,17 @@ def main():
                 o.append(ch)
         return "".join(o)
 
+    head = []
+    try:
+        for ln in io.open(path, encoding="utf-8"):
+            if ln.startswith("#"):
+                head.append(ln.rstrip("\n"))
+            else:
+                break
+    except OSError:
+        pass
     io.open(path, "w", encoding="utf-8", newline="\n").write(
-        "\n".join('"%s" = "%s"' % (k, esc(doc[k])) for k in ids) + "\n")
+        "\n".join(head + ['"%s" = "%s"' % (k, esc(doc[k])) for k in ids]) + "\n")
     print("已写回 %s" % path)
     return 0
 
