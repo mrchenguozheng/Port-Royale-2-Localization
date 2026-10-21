@@ -236,13 +236,6 @@ def fix_ascii_punct(text, lang):
     return "".join(out)
 
 
-def tighten_brackets(text):
-    """全角括号两侧不留空格：「蒂奇（即黑胡子）搅得」。"""
-    text = re.sub(r"[ \u3000]*（[ \u3000]*", "（", text)
-    text = re.sub(r"[ \u3000]*）[ \u3000]*", "）", text)
-    return text
-
-
 def fix_vars(text, punct, cjk):
     # 【坑】不能把整个片假名区当「文字」：・(U+30FB) 和 ー(U+30FC) 也在里面，
     # 一律加空格会把 迭戈・莫扎雷拉 / 小麦・果物 拆开。已把它们排除。
@@ -306,10 +299,9 @@ def main():
         if k in DATE_FORMAT_IDS:
             # 日期格式串（%3年%2%1日）不能让 fix_vars 在占位符两侧补空格，
             # 否则会渲染成「1600 年 4月 1 日」。
-            new = clean_n(tighten_brackets(fmt(fix_ascii_punct(new, a.lang))))
+            new = clean_n(fmt(fix_ascii_punct(new, a.lang)))
         else:
-            new = clean_n(tighten_brackets(
-                fix_vars(fmt(fix_ascii_punct(new, a.lang)), punct, sets["cjk"])))
+            new = clean_n(fix_vars(fmt(fix_ascii_punct(new, a.lang)), punct, sets["cjk"]))
         if new != doc[k]:
             changed += 1
             doc[k] = new
