@@ -45,6 +45,8 @@ const LS_LANG = 'pr2.lang';
 const LS_REFA = 'pr2.refA';
 const LS_REFB = 'pr2.refB';
 const LS_FILTER = 'pr2.filter';
+const WIDTHS = [600, 720, 900, 1080];
+const LS_WIDTH = 'pr2.width';
 const LS_PAGE = 'pr2.page.';
 
 function saved(key: string): string | null {
@@ -128,8 +130,17 @@ function applyTheme(theme: string) {
   try { localStorage.setItem(LS_THEME, theme); } catch { /* ignore */ }
 }
 
+function applyWidth(px: number) {
+  document.documentElement.style.setProperty('--page-w', px + 'px');
+  const sel = $('width') as HTMLSelectElement;
+  if (sel) sel.value = String(px);
+  try { localStorage.setItem(LS_WIDTH, String(px)); } catch { /* ignore */ }
+}
+
 async function boot() {
   applyTheme(saved(LS_THEME) === 'light' ? 'light' : 'dark');
+  const savedW = Number(saved(LS_WIDTH));
+  applyWidth(WIDTHS.indexOf(savedW) >= 0 ? savedW : 900);
   const d = await api<{ editable: string[]; all: string[]; base: string }>('/api/langs');
   S.langs = d.editable;
   S.refLangs = d.all;
@@ -874,6 +885,11 @@ async function jumpToHash(raw: string) {
   const ok = await jumpToId('0x' + id);
   if (!ok) $('stat').textContent = '找不到 ' + '0x' + id;
 }
+
+$('width').addEventListener('change', (ev) => {
+  const px = Number((ev.target as HTMLSelectElement).value);
+  if (WIDTHS.indexOf(px) >= 0) applyWidth(px);
+});
 
 $('theme').addEventListener('click', () => {
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
