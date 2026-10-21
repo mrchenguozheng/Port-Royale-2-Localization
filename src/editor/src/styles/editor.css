@@ -728,3 +728,25 @@ html[data-theme="light"] {
 .topbar #random, .topbar #jumpGo { border: 1px solid var(--line); background: var(--bg-soft); }
 .topbar #jumpGo:hover, .topbar #random:hover { border-color: var(--accent); color: var(--accent); }
 .topbar #pageCount { color: var(--fg-dim); }
+
+/* ── 固定页面宽度：不再铺满整个屏幕 ───────────────────── */
+:root { --page-w: 1040px; }
+
+body {
+  align-items: center;
+  background: var(--bg);
+}
+body > .bar,
+body > .topbar,
+body > #rows {
+  width: min(100%, var(--page-w));
+  margin-left: auto;
+  margin-right: auto;
+}
+/* 顶部两条栏背景只铺自己的宽度，两侧露出底色即可 */
+body > .bar { border-top: none; }
+body > #rows { flex: 1 1 auto; overflow: auto; }
+
+@media (max-width: 1040px) {
+  body > .bar, body > .topbar, body > #rows { width: 100%; }
+}
