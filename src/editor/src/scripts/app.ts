@@ -119,7 +119,17 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
 
 // ── 载入 ────────────────────────────────────────────────
 
+const LS_THEME = 'pr2.theme';
+
+function applyTheme(theme: string) {
+  document.documentElement.dataset.theme = theme;
+  const btn = $('theme');
+  if (btn) btn.textContent = theme === 'light' ? '☀' : '🌙';
+  try { localStorage.setItem(LS_THEME, theme); } catch { /* ignore */ }
+}
+
 async function boot() {
+  applyTheme(saved(LS_THEME) === 'light' ? 'light' : 'dark');
   const d = await api<{ editable: string[]; all: string[]; base: string }>('/api/langs');
   S.langs = d.editable;
   S.refLangs = d.all;
@@ -856,6 +866,10 @@ async function jumpToHash(raw: string) {
   const ok = await jumpToId('0x' + id);
   if (!ok) $('stat').textContent = '找不到 ' + '0x' + id;
 }
+
+$('theme').addEventListener('click', () => {
+  applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+});
 
 $('random').addEventListener('click', () => void randomJump());
 $('jumpGo').addEventListener('click', () => void jumpToHash($('jumpHash').value));
