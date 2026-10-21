@@ -474,7 +474,9 @@ async function loadContexts(rows: Entry[]) {
   const ids = rows.map((r) => r.id);
   try {
     const data = await api<Record<string, {
-      category: string; placeholders: { token: string; meaning: string }[];
+      category: string;
+      placeholders: { token: string; meaning: string }[];
+      neighbors: { id: string; en: string }[];
     }>>(`/api/context-batch?ids=${ids.join(',')}&lang=${encodeURIComponent(S.lang)}`);
     for (const r of rows) {
       const box = document.querySelector(
@@ -482,10 +484,16 @@ async function loadContexts(rows: Entry[]) {
       if (!box) continue;
       const c = data[r.id];
       if (!c) { box.textContent = ''; continue; }
+      box.innerHTML = '';
+      box.appendChild(el('div', 'ctx-cat', `语境：${c.category}`));
       const ph = (c.placeholders || [])
-        .map((p) => `${p.token}=${p.meaning}`).join('，');
-      box.textContent = `语境：${c.category}` + (ph ? ` ｜ ${ph}` : '');
-      box.title = '来自字符串表相邻条目与占位符用法的推断';
+        .map((p) => `${p.token} → ${p.meaning}`).join('，');
+      if (ph) box.appendChild(el('div', 'ctx-ph', `占位符：${ph}`));
+      const nb = (c.neighbors || []).slice(0, 3);
+      if (nb.length) {
+        box.appendChild(el('div', 'ctx-nb',
+          '相邻：' + nb.map((n) => `${n.id} ${(n.en || '').slice(0, 36)}`).join(' ｜ ')));
+      }
     }
   } catch { /* 语境只是辅助，取不到不影响编辑 */ }
 }

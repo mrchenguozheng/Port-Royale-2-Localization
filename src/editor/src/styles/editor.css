@@ -613,3 +613,53 @@ body, .bar, .head, .row, .stack, .cell-zh, .cell-zh textarea, .sp-layer,
     transition: none;
   }
 }
+
+/* ── 单条卡片布局（每页一条） ─────────────────────────── */
+
+#rows {
+  padding: 1rem 1.2rem 2rem;
+  overflow: auto;
+}
+#rows .row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 1rem;
+  padding: 1rem 1.2rem 1.2rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+#rows .row:nth-child(even) { background: var(--bg-soft); }
+#rows .row > .cell-id {
+  order: 0;
+  padding: 0;
+  border-right: 0;
+  font-size: 1.1em;
+  color: var(--accent);
+}
+#rows .row > .chk-wrap { order: 1; padding: 0; }
+#rows .row > .stack { order: 2; flex: 1 0 100%; }
+#rows .row > .flags { order: 3; flex: 1 0 100%; padding: 0; }
+
+#rows .line { grid-template-columns: 5.5rem minmax(0, 1fr); }
+#rows .line + .line { margin-top: 0.55rem; }
+
+/* 译文区撑开，写长句时有地方 */
+.cell-zh { min-height: 30vh; }
+.cell-zh textarea, .sp-layer { min-height: 30vh; }
+
+/* 语境块 */
+.ctx-inline {
+  flex: 1 0 100%;
+  margin: 0.8rem 0 0;
+  padding: 0.6rem 0.8rem;
+  border-top: 1px solid var(--line-soft);
+  background: var(--bg-row-alt);
+  border-radius: 6px;
+  font-size: 0.86em;
+  line-height: 1.8;
+}
+.ctx-cat { color: var(--accent); }
+.ctx-ph { color: var(--fg-dim); }
+.ctx-nb { color: var(--fg-id); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
