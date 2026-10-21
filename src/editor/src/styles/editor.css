@@ -783,3 +783,52 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 @media (max-width: 760px) {
   #rows .line { grid-template-columns: 4.2rem minmax(0, 1fr); }
 }
+
+/* ── 竖排设置面板 ─────────────────────────────────────── */
+.panel {
+  width: min(100%, var(--page-w));
+  margin: 0 auto;
+  padding: 0.5rem 0.9rem;
+  background: var(--head-bg);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: none;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.srow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.slabel {
+  flex: 0 0 4.5rem;
+  text-align: right;
+  color: var(--fg-dim);
+  font-size: 0.9em;
+}
+.srow select { min-width: 8rem; }
+.srow #q { flex: 1 1 100%; }
+.srow .jump-box { position: relative; }
+.srow #save {
+  background: var(--accent);
+  color: #08111d;
+  border: none;
+  font-weight: 600;
+  padding: 0.35rem 1.2rem;
+  min-width: 6rem;
+}
+.srow #save:disabled { opacity: 0.45; }
+.srow .pg {
+  border: 1px solid var(--line);
+  background: var(--bg-soft);
+  padding: 0.25rem 0.7rem;
+  min-width: 0;
+}
+.srow .pg:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
+.pager { flex-wrap: wrap; }

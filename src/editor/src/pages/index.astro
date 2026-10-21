@@ -17,52 +17,39 @@ const title = 'PR2 本地化编辑器';
     <title>{title}</title>
   </head>
   <body>
-    <header class="bar">
-      <span class="brand">PR2 本地化编辑器</span>
-
-      <label class="field">
-        编辑
+    <div class="panel">
+      <div class="srow">
+        <span class="slabel">编辑</span>
         <select id="lang"></select>
-      </label>
-      <button id="addLang" class="mini" title="添加一种语言">＋</button>
-
-      <span class="sep"></span>
-
-      <label class="field">
-        参照
-        <select id="refA" class="ref-sel"></select>
-      </label>
-      <label class="field">
-        <select id="refB" class="ref-sel"></select>
-      </label>
-
-      <label class="field">
-        筛选
+        <button id="addLang" class="mini" title="添加一种语言">＋</button>
+        <span class="slabel">筛选</span>
         <select id="filter">
           <option value="all">全部</option>
           <option value="unreviewed">未审核</option>
           <option value="reviewed">已审核</option>
           <option value="attention">有问题</option>
         </select>
-      </label>
+      </div>
 
-      <span class="sep"></span>
+      <div class="srow">
+        <span class="slabel">参照 A</span>
+        <select id="refA" class="ref-sel"></select>
+      </div>
 
-      <span class="settings">
-      <button id="theme" class="mini theme-btn" title="切换浅色/深色">🌙</button>
+      <div class="srow">
+        <span class="slabel">参照 B</span>
+        <select id="refB" class="ref-sel"></select>
+      </div>
 
-      <label class="field">
-        宽度
+      <div class="srow">
+        <span class="slabel">宽度</span>
         <select id="width">
           <option value="600">600</option>
           <option value="720">720</option>
           <option value="900" selected>900</option>
           <option value="1080">1080</option>
         </select>
-      </label>
-
-      <label class="field">
-        字号
+        <span class="slabel">字号</span>
         <select id="size">
           <option value="12">12</option>
           <option value="14">14</option>
@@ -70,26 +57,32 @@ const title = 'PR2 本地化编辑器';
           <option value="18">18</option>
           <option value="20">20</option>
         </select>
-      </label>
-      </span>
-    </header>
+        <button id="theme" class="mini theme-btn" title="切换浅色/深色">🌙</button>
+      </div>
 
-    <div class="foot topbar">
-      <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…" spellcheck="false" />
-      <span id="stat">载入中…</span>
-      <span id="dirty" class="dirty"></span>
+      <div class="srow">
+        <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…" spellcheck="false" />
+      </div>
 
-      <span class="pager">
-        <button id="first" class="pg" title="第一页 (Home)">«</button>
-        <button id="prev" class="pg" title="上一页 (←)">‹</button>
+      <div class="srow">
+        <span class="slabel">分页</span>
+        <button id="first" class="pg" title="第一页 (Home)">首页</button>
+        <button id="prev" class="pg" title="上一页 (←)">上一页</button>
         <input id="pageInput" class="page-num" type="number" min="1" step="1"
                aria-label="页码" />
         <span id="pageCount">/ 1</span>
-        <button id="next" class="pg" title="下一页 (→)">›</button>
-        <button id="last" class="pg" title="最后一页 (End)">»</button>
-      </span>
+        <button id="next" class="pg" title="下一页 (→)">下一页</button>
+        <button id="last" class="pg" title="最后一页 (End)">末页</button>
+      </div>
 
-      <span class="jump">
+      <div class="srow">
+        <span class="slabel">审核</span>
+        <span id="stat">载入中…</span>
+        <span id="dirty" class="dirty"></span>
+      </div>
+
+      <div class="srow">
+        <span class="slabel">跳转</span>
         <button id="random" title="随机跳到一条">随机</button>
         <span class="jump-box">
           <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false"
@@ -97,12 +90,13 @@ const title = 'PR2 本地化编辑器';
           <div id="jumpList" class="jump-list" hidden></div>
         </span>
         <button id="jumpGo" title="跳到指定 hash">跳转</button>
-      </span>
+        <span class="hint">Ctrl+Enter 下一条</span>
+      </div>
 
-      <span class="hint">Ctrl+Enter 下一条</span>
-      <button id="save" disabled>保存</button>
+      <div class="srow">
+        <button id="save" disabled>保存</button>
+      </div>
     </div>
-
 
     <main id="rows"></main>
 

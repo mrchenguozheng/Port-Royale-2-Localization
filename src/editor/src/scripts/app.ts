@@ -265,11 +265,15 @@ function updatePager() {
 }
 
 function updateStat() {
-  const pages = pageCount();
   const n = Object.keys(S.terms).length;
-  $('stat').textContent = `第 ${S.page} / ${pages} 页 · 共 ${S.total} 条`
-    + (n ? ` · 术语待统一 ${n} 条` : '')
-    + (S.reviewedCount ? ` · 已审 ${S.reviewedCount} 条` : '');
+  let reviewed: number;
+  if (S.filter === 'reviewed') reviewed = S.total;
+  else if (S.filter === 'unreviewed') reviewed = 0;
+  else reviewed = Math.min(S.reviewedCount, S.total);
+  const pending = Math.max(0, S.total - reviewed);
+  $('stat').textContent =
+    `已审 ${reviewed} 条 · 待审 ${pending} 条 · 当前筛选共 ${S.total} 条`
+    + (n ? ` · 术语待统一 ${n} 条` : '');
 }
 
 function fill(sel: HTMLSelectElement, items: string[], cur: string) {
