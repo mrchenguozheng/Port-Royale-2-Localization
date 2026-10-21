@@ -75,7 +75,7 @@ const S = {
   //: id -> 加载时的原文。改回原样就把这条从"未保存"里去掉。
   orig: new Map<string, string>(),
   dirtyIds: [] as string[],
-  size: 14,
+  size: 16,
   problems: {} as Record<string, Problem[]>,
   /** 术语一致性： id -> ["Frigate：应为「巡防舰」", …] */
   terms: {} as Record<string, string[]>,

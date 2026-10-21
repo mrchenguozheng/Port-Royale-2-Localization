@@ -54,17 +54,15 @@ const title = 'PR2 本地化编辑器';
         字号
         <select id="size">
           <option value="12">12</option>
-          <option value="14" selected>14</option>
-          <option value="16">16</option>
+          <option value="14">14</option>
+          <option value="16" selected>16</option>
           <option value="18">18</option>
           <option value="20">20</option>
         </select>
       </label>
     </header>
 
-    <main id="rows"></main>
-
-    <footer class="foot">
+    <div class="foot topbar">
       <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…" spellcheck="false" />
       <span id="stat">载入中…</span>
       <span id="dirty" class="dirty"></span>
@@ -91,7 +89,11 @@ const title = 'PR2 本地化编辑器';
 
       <span class="hint">Ctrl+Enter 下一条</span>
       <button id="save" disabled>保存</button>
-    </footer>
+    </div>
+
+
+    <main id="rows"></main>
+
 
     <!-- 语境推断 -->
     <div id="ctxModal" class="modal" hidden>
