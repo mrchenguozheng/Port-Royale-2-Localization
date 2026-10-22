@@ -74,6 +74,8 @@ const S = {
   edits: new Map<string, string>(),
   //: id -> 加载时的原文。改回原样就把这条从"未保存"里去掉。
   orig: new Map<string, string>(),
+  //: id -> 英文原文里每种占位符需要的个数
+  req: {} as Record<string, Record<string, number>>,
   dirtyIds: [] as string[],
   size: 24,
   problems: {} as Record<string, Problem[]>,
@@ -474,6 +476,8 @@ async function loadEntryInfo(id: string) {
     const ph = r.placeholders || [];
     const meaning = new Map(ph.map((p) => [p.token, p.meaning]));
     const counts = r.counts || [];
+    S.req[id] = {};
+    for (const c of counts) S.req[id][c.token] = c.en;
     if (!counts.length) {
       box.appendChild(el('span', 'info-ph', '占位符：无'));
     }
@@ -487,20 +491,6 @@ async function loadEntryInfo(id: string) {
       if (c.en > 1) chip.appendChild(el('span', 'ph-x', '×' + c.en));
       chip.appendChild(el('span', 'ph-tok', c.token));
       chip.appendChild(el('span', 'ph-mean', meaning.get(c.token) || '原文没有'));
-      const ins = el('button', 'mini ph-btn', '插入');
-      ins.addEventListener('click', () => {
-        insertAtCaret(c.token);
-        void loadEntryInfo(id);
-      });
-      chip.appendChild(ins);
-      if (c.zh > 0) {
-        const rm = el('button', 'mini ph-btn', '移除');
-        rm.addEventListener('click', () => {
-          removeToken(c.token);
-          void loadEntryInfo(id);
-        });
-        chip.appendChild(rm);
-      }
       box.appendChild(chip);
     }
     if (badCount) {
@@ -701,7 +691,7 @@ function zhCell(e: Entry): HTMLElement {
   const ed = el('div', 'edit') as HTMLDivElement;
   ed.contentEditable = 'true';
   ed.spellcheck = false;
-  ed.appendChild(highlightSpaces(textOf(e)));
+  ed.appendChild(renderRich(textOf(e)));
   box.appendChild(ed);
 
   // 中文输入法组合期间不能重绘 DOM，否则会把组合中的字打断
@@ -717,12 +707,37 @@ function zhCell(e: Entry): HTMLElement {
     setDirty(S.dirtyIds.length > 0);
   };
   const repaint = () => {
-    const v = editorText(ed);
+    const fixed = enforceTokens(e.id, editorText(ed));
     const off = caretOffset(ed);
-    ed.replaceChildren(highlightSpaces(v));
+    ed.replaceChildren(renderRich(fixed));
     setCaretOffset(ed, off);
-    record(v);
+    record(fixed);
   };
+
+  ed.addEventListener('dragover', (ev) => ev.preventDefault());
+  ed.addEventListener('drop', (ev) => {
+    const dt = (ev as DragEvent).dataTransfer;
+    const tok = dt ? dt.getData('text/plain') : '';
+    if (!tok) return;
+    ev.preventDefault();
+    const span = tokenSpan(tok);
+    const doc = document as Document & {
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    };
+    const range = doc.caretRangeFromPoint
+      ? doc.caretRangeFromPoint((ev as DragEvent).clientX, (ev as DragEvent).clientY)
+      : null;
+    if (range && ed.contains(range.startContainer)) {
+      range.deleteContents();
+      range.insertNode(span);
+      range.collapse(false);
+    } else {
+      ed.appendChild(span);
+    }
+    const dragging = document.querySelector('.ph-token.dragging') as HTMLElement | null;
+    if (dragging && dragging !== span) dragging.remove();
+    ed.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 
   ed.addEventListener('focus', () => { void activateRow(e.id, ed); });
   ed.addEventListener('blur', () => void check(e.id));
@@ -775,6 +790,60 @@ function highlightSpaces(text: string): DocumentFragment {
   }
   flush();
   return f;
+}
+
+const TOKEN_RX = /@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]/g;
+
+function tokenSpan(tok: string): HTMLElement {
+  const span = el('span', 'ph-token', tok);
+  span.contentEditable = 'false';
+  span.draggable = true;
+  span.dataset.token = tok;
+  span.title = '拖动可换位置；占位符不能删除';
+  span.addEventListener('dragstart', (ev) => {
+    const dt = (ev as DragEvent).dataTransfer;
+    if (dt) {
+      dt.setData('text/plain', tok);
+      dt.effectAllowed = 'move';
+    }
+    span.classList.add('dragging');
+  });
+  span.addEventListener('dragend', () => span.classList.remove('dragging'));
+  return span;
+}
+
+function renderRich(text: string): DocumentFragment {
+  const f = document.createDocumentFragment();
+  if (!text) return f;
+  let pos = 0;
+  TOKEN_RX.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = TOKEN_RX.exec(text))) {
+    if (m.index > pos) f.appendChild(highlightSpaces(text.slice(pos, m.index)));
+    f.appendChild(tokenSpan(m[0]));
+    pos = m.index + m[0].length;
+  }
+  if (pos < text.length) f.appendChild(highlightSpaces(text.slice(pos)));
+  return f;
+}
+
+function countTokens(text: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  TOKEN_RX.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = TOKEN_RX.exec(text))) out[m[0]] = (out[m[0]] || 0) + 1;
+  return out;
+}
+
+/** 占位符只许换位置，不许少；少了就在末尾补回来。 */
+function enforceTokens(id: string, text: string): string {
+  const req = S.req[id] || {};
+  const have = countTokens(text);
+  let out = text;
+  for (const tok of Object.keys(req)) {
+    for (let i = have[tok] || 0; i < req[tok]; i += 1) out += tok;
+  }
+  return out;
 }
 
 async function loadContexts(rows: Entry[]) {

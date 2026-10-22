@@ -1300,3 +1300,12 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .ph-chip.ph-bad { border-color: var(--danger, #d9534f); background: rgba(217, 83, 79, 0.12); }
 .ph-chip .ph-x { color: var(--danger, #d9534f); font-family: var(--font-mono); }
 .info-warn { color: var(--danger, #d9534f); }
+
+.ph-token {
+  display: inline-block; margin: 0 1px; padding: 0 0.3rem;
+  border: 1px solid var(--accent); border-radius: 4px;
+  background: rgba(255, 170, 0, 0.12);
+  color: var(--accent); font-family: var(--font-mono); font-size: 0.95em;
+  cursor: grab; user-select: none;
+}
+.ph-token.dragging { opacity: 0.4; }
