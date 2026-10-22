@@ -1332,3 +1332,6 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   padding: 0.3rem 0.5rem; margin-top: 0.2rem;
 }
 .seed-inline.diff .seed-body { border-left: 3px solid var(--accent); }
+
+.seed-inline .ref-head { display: flex; align-items: center; gap: 0.5rem; }
+.seed-inline .seed-edit { margin-left: auto; }

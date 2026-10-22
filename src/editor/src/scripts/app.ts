@@ -639,10 +639,6 @@ async function loadEntryInfo(id: string) {
     }
 
     const actions = el('span', 'info-actions');
-    const seedBtn = el('button', 'mini', '初版');
-    seedBtn.title = '查看/解锁编辑初版文本';
-    seedBtn.addEventListener('click', () => void openSeed(id));
-    actions.appendChild(seedBtn);
     const undoBtn = el('button', 'mini', '撤销');
     undoBtn.title = '撤销上一次编辑';
     undoBtn.addEventListener('click', () => undoEdit(id));
@@ -739,6 +735,10 @@ function rowOf(e: Entry): HTMLElement {
   const seedBox = el('div', 'seed-inline ref-block');
   const seedHead = el('div', 'ref-head');
   seedHead.appendChild(el('span', 'ref-label', '初版'));
+  const seedEdit = el('button', 'mini seed-edit', '解锁编辑');
+  seedEdit.title = '逐条解锁，仅本次修改有效';
+  seedEdit.addEventListener('click', () => void openSeed(e.id));
+  seedHead.appendChild(seedEdit);
   seedBox.appendChild(seedHead);
   const seedBody = el('div', 'seed-body', '（读取中…）');
   seedBox.appendChild(seedBody);
