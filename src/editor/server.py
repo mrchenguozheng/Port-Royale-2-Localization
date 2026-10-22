@@ -413,33 +413,44 @@ def load_meaning_overrides():
     return _MEAN_CACHE["data"]
 
 
-def save_meaning(hid, token, meaning):
+def meaning_for(lang, hid):
+    return (load_meaning_overrides().get(lang) or {}).get(hid.lower(), {})
+
+
+def save_meaning(lang, hid, token, meaning):
     data = {}
     if os.path.isfile(MEANINGS):
         try:
             data = tomllib.load(open(MEANINGS, "rb"))
         except Exception:
             data = {}
+    by_lang = dict(data.get(lang) or {})
     key = hid.lower()
-    cur = dict(data.get(key) or {})
+    cur = dict(by_lang.get(key) or {})
     if meaning:
         cur[token] = meaning
     else:
         cur.pop(token, None)
     if cur:
-        data[key] = cur
+        by_lang[key] = cur
     else:
-        data.pop(key, None)
-    lines = ["# 按 hash 的占位符含义覆盖（编辑器里手动修改）。", ""]
-    for h in sorted(data):
-        lines.append('["%s"]' % h)
-        for tok in sorted(data[h]):
-            val = data[h][tok].replace("\\", "\\\\").replace('"', '\\"')
-            lines.append('"%s" = "%s"' % (tok.replace('"', '\\"'), val))
-        lines.append("")
+        by_lang.pop(key, None)
+    if by_lang:
+        data[lang] = by_lang
+    else:
+        data.pop(lang, None)
+
+    lines = ["# 按语言 + hash 的占位符含义覆盖（编辑器里手动修改）。", ""]
+    for lg in sorted(data):
+        for h in sorted(data[lg]):
+            lines.append('["%s"."%s"]' % (lg, h))
+            for tok in sorted(data[lg][h]):
+                val = data[lg][h][tok].replace("\\", "\\\\").replace('"', '\\"')
+                lines.append('"%s" = "%s"' % (tok.replace('"', '\\"'), val))
+            lines.append("")
     with open(MEANINGS, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(lines))
-    return data.get(key, {})
+    return meaning_for(lang, hid)
 
 
 HASH_RULES = os.path.join(os.path.dirname(SRC), "glossary", "hash_rules.toml")
@@ -603,7 +614,7 @@ def context_of(hid, lang):
                    r"Lieutenant)\s+%1 %2", en):
         role_hint = {"%1": "名", "%2": "姓"}
 
-    overrides = load_meaning_overrides().get(hid.lower(), {})
+    overrides = meaning_for(lang, hid)
     ph = []
     for tok in placeholders_of(en):
         mean = (overrides.get(tok)
@@ -1285,8 +1296,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/placeholder-meanings":
             hid = (query.get("id") or [""])[0]
-            return self.send_json({"id": hid,
-                                   "meanings": load_meaning_overrides().get(hid.lower(), {})})
+            lang = (query.get("lang") or ["zh"])[0]
+            return self.send_json({"id": hid, "lang": lang,
+                                   "meanings": meaning_for(lang, hid)})
 
         if path == "/api/rule-hits":
             hid = (query.get("id") or [""])[0]
@@ -1306,14 +1318,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"id": hid, "stages": stages})
 
         if path == "/api/placeholder-meaning":
+            lang = (body.get("lang") or "zh").strip() or "zh"
             hid = (body.get("id") or "").strip().lower()
             token = (body.get("token") or "").strip()
             meaning = (body.get("meaning") or "").strip()
             if not hid or not token:
                 return self.send_json({"ok": False, "error": "缺少 id 或占位符"})
-            save_meaning(hid, token, meaning)
+            save_meaning(lang, hid, token, meaning)
             return self.send_json({"ok": True,
-                                   "meanings": load_meaning_overrides().get(hid, {})})
+                                   "meanings": meaning_for(lang, hid)})
 
         if path == "/api/seed":
             hid = (query.get("id") or [""])[0]
@@ -1661,14 +1674,15 @@ class Handler(BaseHTTPRequestHandler):
 
 
         if path == "/api/placeholder-meaning":
+            lang = (body.get("lang") or "zh").strip() or "zh"
             hid = (body.get("id") or "").strip().lower()
             token = (body.get("token") or "").strip()
             meaning = (body.get("meaning") or "").strip()
             if not hid or not token:
                 return self.send_json({"ok": False, "error": "缺少 id 或占位符"})
-            save_meaning(hid, token, meaning)
+            save_meaning(lang, hid, token, meaning)
             return self.send_json({"ok": True,
-                                   "meanings": load_meaning_overrides().get(hid, {})})
+                                   "meanings": meaning_for(lang, hid)})
 
         if path == "/api/seed":
             lang = body.get("lang", "zh")
@@ -1700,14 +1714,15 @@ class Handler(BaseHTTPRequestHandler):
 
 
         if path == "/api/placeholder-meanings":
+            lang = (body.get("lang") or "zh").strip() or "zh"
             hid = (body.get("id") or "").strip().lower()
             meanings = body.get("meanings") or {}
             if not hid or not isinstance(meanings, dict):
                 return self.send_json({"ok": False, "error": "参数不对"})
             for tok, mean in meanings.items():
-                save_meaning(hid, str(tok), str(mean))
+                save_meaning(lang, hid, str(tok), str(mean))
             return self.send_json({"ok": True,
-                                   "meanings": load_meaning_overrides().get(hid, {})})
+                                   "meanings": meaning_for(lang, hid)})
 
         if path == "/api/patch":
             lang = body.get("lang", "")

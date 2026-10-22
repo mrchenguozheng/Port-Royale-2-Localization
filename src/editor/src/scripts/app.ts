@@ -523,7 +523,7 @@ async function editMeaning(id: string, token: string, cur: string) {
   const val = window.prompt('占位符 ' + token + ' 的含义（留空恢复自动判断）', cur);
   if (val === null) return;
   try {
-    await api('/api/placeholder-meaning', { id, token, meaning: val.trim() });
+    await api('/api/placeholder-meaning', { lang: S.lang, id, token, meaning: val.trim() });
     void loadEntryInfo(id);
   } catch (err) {
     const box = document.getElementById('infoBar');
@@ -669,7 +669,7 @@ async function loadEntryInfo(id: string) {
       S.meaningSaved[id] = true;
       const map: Record<string, string> = {};
       for (const p of ph) map[p.token] = p.meaning;
-      void api('/api/placeholder-meanings', { id, meanings: map }).catch(() => {
+      void api('/api/placeholder-meanings', { lang: S.lang, id, meanings: map }).catch(() => {
         S.meaningSaved[id] = false;
       });
     }
