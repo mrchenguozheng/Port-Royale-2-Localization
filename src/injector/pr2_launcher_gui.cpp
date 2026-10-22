@@ -17,6 +17,9 @@
 static char g_root[MAX_PATH];
 static char g_codes[64][64];
 static int  g_codeCount = 0;
+static char g_aliasCodes[64][64];
+static char g_aliasNames[64][256];
+static int  g_aliasCount = 0;
 static HWND g_combo = NULL;
 static HWND g_status = NULL;
 
@@ -156,6 +159,58 @@ static void ReadLauncherLang(char* out, int cap) {
     fclose(f);
 }
 
+static void AddAlias(const char* code, const char* name) {
+    if (!code || !*code || !name || !*name) return;
+    for (int i = 0; i < g_aliasCount; i++) {
+        if (_stricmp(g_aliasCodes[i], code) == 0) {
+            strncpy(g_aliasNames[i], name, 255);
+            g_aliasNames[i][255] = 0;
+            return;
+        }
+    }
+    if (g_aliasCount >= 64) return;
+    strncpy(g_aliasCodes[g_aliasCount], code, 63);
+    g_aliasCodes[g_aliasCount][63] = 0;
+    strncpy(g_aliasNames[g_aliasCount], name, 255);
+    g_aliasNames[g_aliasCount][255] = 0;
+    g_aliasCount++;
+}
+
+static void LoadAliasFile(const char* path, const char* prefix) {
+    FILE* f = fopen(path, "rb");
+    if (!f) return;
+    char line[1024];
+    while (fgets(line, sizeof(line), f)) {
+        char* p = line;
+        Trim(p);
+        if (!*p || *p == '#' || *p == ';' || *p == '[') continue;
+        char* eq = strchr(p, '=');
+        if (!eq) continue;
+        *eq = 0;
+        char* key = p; Trim(key);
+        char* val = eq + 1; Trim(val);
+        int plen = (int)strlen(prefix);
+        if (plen && strncmp(key, prefix, plen) == 0) key += plen;
+        AddAlias(key, val);
+    }
+    fclose(f);
+}
+
+static void LoadAliases(void) {
+    char path[MAX_PATH];
+    snprintf(path, sizeof(path), "%s\\lang\\aliases.ini", g_root);
+    LoadAliasFile(path, "");
+    snprintf(path, sizeof(path), "%s\\launcher.ini", g_root);
+    LoadAliasFile(path, "alias.");
+}
+
+static const char* AliasOf(const char* code) {
+    for (int i = 0; i < g_aliasCount; i++) {
+        if (_stricmp(g_aliasCodes[i], code) == 0) return g_aliasNames[i];
+    }
+    return code;
+}
+
 static void LoadGuiStrings(void) {
     char ui[16];
     ReadLauncherLang(ui, sizeof(ui));
@@ -237,7 +292,8 @@ static void LoadLanguages(void) {
             if (n <= 0 || n >= 64) continue;
             strncpy(g_codes[g_codeCount], fd.cFileName, n);
             g_codes[g_codeCount][n] = '\0';
-            SendMessageW(g_combo, CB_ADDSTRING, 0, (LPARAM)W(g_codes[g_codeCount]));
+            SendMessageW(g_combo, CB_ADDSTRING, 0,
+                         (LPARAM)W(AliasOf(g_codes[g_codeCount])));
             g_codeCount++;
         } while (FindNextFileA(h, &fd));
         FindClose(h);
@@ -349,6 +405,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
     GetModuleFileNameA(NULL, g_root, MAX_PATH);
     DirOf(g_root, g_root);
     LoadGuiStrings();
+    LoadAliases();
 
     WNDCLASSW wc = {0};
     wc.lpfnWndProc = WndProc;
