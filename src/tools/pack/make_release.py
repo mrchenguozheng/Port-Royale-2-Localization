@@ -105,6 +105,15 @@ def write_readme(lang, stage, mode):
   字体在 fonts\\<语言>\\；启动器通过路径重定向读取，不覆盖根目录原版。
   同一目录可以放多个语言（fonts\\zh、fonts\\ja），启动器按 locale.ini 或 --lang 选择。
 
+如果启动器提示“字体缺失”：
+  1. 确认 fonts\\<语言>\\ 下四个文件都在：
+     ARIAL.TTF、ELGRECO_.TTF、Tiepolo_black.ttf、Tiepolo_bold.ttf
+  2. 从压缩包重新解压 fonts 目录；只复制 PR2Packs 里的语言包不够。
+  3. 不要把字体放到 fonts\\ 根目录；根目录保留原版。
+  4. 检查杀毒软件是否隔离了字体文件。
+  5. 确认 PR2Packs\\<语言>.txt、fonts\\<语言>\\、locale.ini 的语言代码一致。
+  仍要启动会回退原版拉丁字体，中文可能缺字。
+
 卸载：
   删除 PR2Launcher.exe、PR2LauncherGUI.exe、PR2TextSource.dll、PR2Packs\\%s.txt；
   如果覆盖过 fonts\\ 里的字体，请先用备份恢复。
