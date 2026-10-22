@@ -60,6 +60,10 @@ class TestZhRules(unittest.TestCase):
         self.assertEqual([("自伊丽莎白女王时代")[a:b] for a, b in spans], ["伊丽莎白女王"])
         spans = ZH.find_names("亨利八世国王和教宗", given, surn, extras)
         self.assertEqual([("亨利八世国王和教宗")[a:b] for a, b in spans], ["亨利八世国王"])
+        txt = "亨利·摩根爵士 出任"
+        spans = ZH.find_names(txt, given, surn, extras)
+        self.assertEqual([txt[a:b] for a, b in spans], ["亨利·摩根爵士"])
+        self.assertEqual(ZH.pad_names(txt, spans), "亨利·摩根爵士 出任")
         # 引号里的船名不按人名处理
         spans = ZH.find_names("「安妮女王复仇号」", given, surn, extras)
         self.assertEqual(spans, [])

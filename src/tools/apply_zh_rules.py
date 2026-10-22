@@ -101,8 +101,9 @@ def find_names(text, given, surn, extras):
             start = k + len(name)
 
     titled = re.compile(
-        "(%s)((?:[\\u4e00-\\u9fff]{1,3}世|\\d+世)?(?:%s))"
+        "(%s)\\s*((?:[\\u4e00-\\u9fff]{1,3}世|\\d+世)(?:\\s*(?:%s))?|(?:%s))"
         % ("|".join(map(re.escape, sorted(all_names, key=len, reverse=True))),
+           "|".join(map(re.escape, sorted(TITLES, key=len, reverse=True))),
            "|".join(map(re.escape, sorted(TITLES, key=len, reverse=True)))))
     spans.extend(m.span() for m in titled.finditer(text))
 
@@ -150,7 +151,7 @@ def pad_names(text, spans, towns=()):
         out.append(text[last:start])
         if need_before:
             out.append(" ")
-        out.append(text[start:end])
+        out.append(re.sub(r"\s+", "", text[start:end]))
         if need_after:
             out.append(" ")
         last = end
