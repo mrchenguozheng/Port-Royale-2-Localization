@@ -1159,3 +1159,19 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .statusbar .jump-box input { width: 10rem; font-family: var(--font-mono); }
 .statusbar .nav-group + .nav-group { padding-left: 0.6rem; border-left: 1px solid var(--line); }
 .statusbar #stat { margin-left: auto; }
+
+/* 顶部页签：编辑器 / 安装与启动 */
+.tabs { display: inline-flex; gap: 0.2rem; margin: 0 0.4rem; }
+.tab {
+  padding: 0.25rem 0.7rem;
+  border-radius: 6px;
+  color: var(--fg-dim);
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+.tab:hover { color: var(--fg); border-color: var(--line); }
+.tab.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
