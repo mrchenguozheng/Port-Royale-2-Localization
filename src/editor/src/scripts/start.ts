@@ -100,6 +100,17 @@ const S = { status: null, timer: 0 };
       }
     }
 
+    $('browseDir').addEventListener('click', async () => {
+      $('dirMsg').textContent = '等待选择目录…';
+      try {
+        const r = await api('/api/start/pick', {});
+        $('dir').value = r.path;
+        await saveDir();
+      } catch (err) {
+        $('dirMsg').textContent = (err as Error).message;
+      }
+    });
+
     $('pickDir').addEventListener('click', () => void saveDir());
     $('dir').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') void saveDir(); });
     $('build').addEventListener('click', () => void runJob('build', { langs: chosenLangs() }));

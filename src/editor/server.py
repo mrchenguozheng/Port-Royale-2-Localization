@@ -30,6 +30,7 @@ import re
 import sys
 import threading
 import time
+import subprocess
 import traceback
 import urllib.parse
 import urllib.request
@@ -898,6 +899,26 @@ class Handler(BaseHTTPRequestHandler):
             ok = P.editor_shutdown(port)
             return self.send_json({"ok": ok, "port": port})
 
+        if path == "/api/start/pick":
+            try:
+                out = subprocess.run(
+                    ["powershell", "-NoProfile", "-STA", "-Command",
+                     "Add-Type -AssemblyName System.Windows.Forms; "
+                     "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
+                     "$d.Description = '选择 Port Royale 2 游戏目录'; "
+                     "$d.ShowNewFolderButton = $false; "
+                     "if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) "
+                     "{ Write-Output $d.SelectedPath }"],
+                    capture_output=True, text=True, timeout=180,
+                    creationflags=0x08000000)
+                chosen = (out.stdout or "").strip().splitlines()
+                chosen = chosen[-1].strip() if chosen else ""
+            except Exception as exc:
+                return self.send_json({"ok": False, "error": "打开目录选择框失败：%s" % exc})
+            if not chosen:
+                return self.send_json({"ok": False, "error": "已取消"})
+            return self.send_json({"ok": True, "path": chosen})
+
         if path == "/api/start/dir":
             d = (body.get("path") or "").strip()
             if not P.is_game_dir(d):
@@ -1117,6 +1138,26 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"ok": False, "error": "不能停当前服务"})
             ok = P.editor_shutdown(port)
             return self.send_json({"ok": ok, "port": port})
+
+        if path == "/api/start/pick":
+            try:
+                out = subprocess.run(
+                    ["powershell", "-NoProfile", "-STA", "-Command",
+                     "Add-Type -AssemblyName System.Windows.Forms; "
+                     "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
+                     "$d.Description = '选择 Port Royale 2 游戏目录'; "
+                     "$d.ShowNewFolderButton = $false; "
+                     "if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) "
+                     "{ Write-Output $d.SelectedPath }"],
+                    capture_output=True, text=True, timeout=180,
+                    creationflags=0x08000000)
+                chosen = (out.stdout or "").strip().splitlines()
+                chosen = chosen[-1].strip() if chosen else ""
+            except Exception as exc:
+                return self.send_json({"ok": False, "error": "打开目录选择框失败：%s" % exc})
+            if not chosen:
+                return self.send_json({"ok": False, "error": "已取消"})
+            return self.send_json({"ok": True, "path": chosen})
 
         if path == "/api/start/dir":
             d = (body.get("path") or "").strip()
