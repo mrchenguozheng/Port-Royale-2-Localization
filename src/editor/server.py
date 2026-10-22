@@ -174,20 +174,24 @@ def health_info():
 
 
 def server_instances():
-    """扫一遍编辑器常用端口，列出还在跑的实例（含自己）。"""
-    out = []
-    for port in range(8777, 8777 + 24):
+    """并发扫一遍编辑器常用端口，列出还在跑的实例（含自己）。"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def probe(port):
         try:
             with urllib.request.urlopen(
-                    "http://127.0.0.1:%d/api/health" % port, timeout=0.3) as resp:
+                    "http://127.0.0.1:%d/api/health" % port, timeout=0.15) as resp:
                 info = json.loads(resp.read().decode("utf-8"))
         except Exception:
-            continue
+            return None
         if not isinstance(info, dict) or info.get("app") != "pr2-editor":
-            continue
+            return None
         info["current"] = port == CURRENT_PORT
-        out.append(info)
-    return {"current": CURRENT_PORT, "instances": out}
+        return info
+
+    with ThreadPoolExecutor(max_workers=24) as ex:
+        found = list(ex.map(probe, range(8777, 8777 + 24)))
+    return {"current": CURRENT_PORT, "instances": [x for x in found if x]}
 
 
 def rule_trace(hid, lang):
