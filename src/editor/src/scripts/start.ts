@@ -17,7 +17,8 @@ const S = { status: null, timer: 0 };
 
     function fillStatus(st) {
       S.status = st;
-      $('ver').textContent = st.valid ? (st.version || '') : '未选择目录';
+      const ver = $('ver');
+      if (ver) ver.textContent = st.valid ? (st.version || '') : '未选择目录';
       $('statusLine').textContent = st.valid
         ? `语言包：${(st.packs || []).join('、') || '（无）'} · locale.ini：${st.locale || '（空）'}`
         : '';
