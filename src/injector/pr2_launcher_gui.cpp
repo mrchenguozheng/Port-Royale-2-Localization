@@ -140,35 +140,6 @@ static const wchar_t* TF(const char* key, ...) {
     return W(buf);
 }
 
-static void ReadLauncherValue(const char* key, char* out, int cap) {
-    char path[MAX_PATH], line[512];
-    int klen = (int)strlen(key);
-    out[0] = 0;
-    snprintf(path, sizeof(path), "%s\\launcher.ini", g_root);
-    FILE* f = fopen(path, "rb");
-    if (!f) return;
-    while (fgets(line, sizeof(line), f)) {
-        char* p = line;
-        Trim(p);
-        if (strncmp(p, key, klen) != 0) continue;
-        p += klen;
-        while (*p == ' ' || *p == '\t') p++;
-        if (*p != '=') continue;
-        p++;
-        while (*p == ' ' || *p == '\t') p++;
-        char* e = p;
-        while (*e && *e != '\r' && *e != '\n' && *e != ' ' && *e != '\t') e++;
-        *e = 0;
-        strncpy(out, p, cap - 1); out[cap - 1] = 0;
-        break;
-    }
-    fclose(f);
-}
-
-static void ReadLauncherLang(char* out, int cap) {
-    ReadLauncherValue("ui_language", out, cap);
-}
-
 static void SaveIniValue(const char* path, const char* key, const char* value) {
     char tmp[MAX_PATH], line[1024];
     snprintf(tmp, sizeof(tmp), "%s.tmp", path);
@@ -220,14 +191,11 @@ static void LoadGuiStringsFor(const char* ui) {
 
 static void LoadGuiStrings(void) {
     char ui[16];
-    ReadLauncherLang(ui, sizeof(ui));
-    if (!ui[0]) {
-        LANGID id = GetUserDefaultUILanguage();
-        switch (PRIMARYLANGID(id)) {
-        case LANG_CHINESE: strcpy(ui, "zh"); break;
-        case LANG_JAPANESE: strcpy(ui, "ja"); break;
-        default: strcpy(ui, "en"); break;
-        }
+    LANGID id = GetUserDefaultUILanguage();
+    switch (PRIMARYLANGID(id)) {
+    case LANG_CHINESE: strcpy(ui, "zh"); break;
+    case LANG_JAPANESE: strcpy(ui, "ja"); break;
+    default: strcpy(ui, "en"); break;
     }
     strncpy(g_defaultUi, ui, sizeof(g_defaultUi) - 1);
     g_defaultUi[sizeof(g_defaultUi) - 1] = 0;
