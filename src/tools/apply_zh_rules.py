@@ -15,7 +15,9 @@
 """
 
 import argparse
+import hashlib
 import io
+import json
 import os
 import re
 import sys
@@ -319,8 +321,36 @@ def collapse_spaces(text):
     return re.sub(r" {2,}", " ", text)
 
 
-def generate():
+CACHE = os.path.join(ROOT, "build", "cache", "zh.generated.json")
+KEY_FILES = [SRC, __file__,
+             os.path.join(HERE, "lang_rules", "zh.py"),
+             os.path.join(HERE, "lang_rules", "base.py"),
+             os.path.join(HERE, "zh_names.txt"),
+             os.path.join(HERE, "zh_towns.txt")]
+
+
+def _cache_key():
+    rows = []
+    for p in KEY_FILES:
+        try:
+            st = os.stat(p)
+            rows.append([os.path.basename(p), st.st_mtime_ns, st.st_size])
+        except OSError:
+            rows.append([os.path.basename(p), 0, 0])
+    return hashlib.sha1(json.dumps(rows).encode()).hexdigest()
+
+
+def generate(use_cache=True):
     """按规则生成 {id: 文本}，不写文件。"""
+    if use_cache and not os.environ.get("PR2_NO_CACHE"):
+        try:
+            with open(CACHE, encoding="utf-8") as fh:
+                cached = json.load(fh)
+            if cached.get("key") == _cache_key():
+                return cached["order"], cached["out"], cached["stats"]
+        except (OSError, ValueError, KeyError):
+            pass
+
     doc = tomllib.load(open(SRC, "rb"))
     order = [m.group(1) for m in
              (re.match(r'^"([^"]+)"\s*=', ln) for ln in io.open(SRC, encoding="utf-8"))
@@ -351,6 +381,17 @@ def generate():
         stats["conj"] += b != a
         stats["name"] += c != b
         out[h] = c
+
+    if use_cache and not os.environ.get("PR2_NO_CACHE"):
+        try:
+            os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+            tmp = CACHE + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump({"key": _cache_key(), "order": order,
+                           "out": out, "stats": stats}, fh, ensure_ascii=False)
+            os.replace(tmp, CACHE)
+        except OSError:
+            pass
     return order, out, stats
 
 
