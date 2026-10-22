@@ -84,8 +84,15 @@ def find_font(stem, weight=None):
 
 
 def _static(path, weight, out_path):
-    from fontTools.ttLib import TTFont
-    from fontTools.varLib.instancer import instantiateVariableFont
+    try:
+        from fontTools.ttLib import TTFont
+        from fontTools.varLib.instancer import instantiateVariableFont
+    except ImportError:
+        raise ValueError(
+            "这个 Noto 字体是可变字体（VF），需要 fontTools 实例化："
+            "python -m pip install fonttools\n"
+            "或者安装静态字重文件，例如 NotoSerifSC-Black.ttf / -Bold.ttf，"
+            "这样只复制改名，不需要 fontTools")
     font = TTFont(path)
     if "fvar" in font:
         font = instantiateVariableFont(font, {"wght": weight}, inplace=False)
@@ -100,8 +107,6 @@ def ensure_noto_fonts(lang, out_dir, log=None):
     cfg = LANGS.get(lang)
     if not cfg:
         raise ValueError("没有为语言 %s 配置 Noto 字体映射" % lang)
-    if not _fonttools():
-        raise ValueError("缺 fontTools：python -m pip install fonttools")
 
     sans_path, sans_var = find_font(cfg["sans"][0], cfg["sans"][1])
     serif_path, serif_var = find_font(cfg["serif"][0], cfg["serif"][1][1])
@@ -112,6 +117,12 @@ def ensure_noto_fonts(lang, out_dir, log=None):
 
     os.makedirs(out_dir, exist_ok=True)
     serif_bold, serif_bold_var = find_font(cfg["serif"][0], cfg["serif"][1][0])
+    if (sans_var or serif_var or serif_bold_var) and not _fonttools():
+        raise ValueError(
+            "源字体是 VF 可变字体，需要 fontTools 实例化："
+            "python -m pip install fonttools；"
+            "或安装静态字重文件（NotoSerifSC-Bold.ttf / -Black.ttf），"
+            "这样只复制改名，不需要 fontTools")
     mapping = {
         "ARIAL.TTF": (sans_path, sans_var, cfg["sans"][1]),
         "ELGRECO_.TTF": (serif_path, serif_var, cfg["serif"][1][1]),
