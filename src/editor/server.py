@@ -23,6 +23,7 @@ translate.py / compile_pack.py 里，那是唯一的一份。抄到 JS 里就多
 """
 
 import argparse
+import difflib
 import io
 import json
 import mimetypes
@@ -228,6 +229,27 @@ def rule_trace(hid, lang):
     live = {r["id"]: r.get(lang, "") for r in load_all()}.get(hid, "")
     stages.append({"key": "live", "label": "当前译文", "text": live})
     return stages
+
+
+def rule_hits(hid, lang):
+    """规则命中的位置：只标注规则生成出来的那段文本。"""
+    stages = rule_trace(hid, lang)
+    if not stages:
+        return None
+    gen = [x for x in stages if x["key"] != "live"]
+    text = gen[-1]["text"]
+    live = stages[-1]["text"]
+    hits = []
+    prev = gen[0]["text"]
+    for st in gen[1:]:
+        a, b = prev, st["text"]
+        sm = difflib.SequenceMatcher(None, a, b)
+        for tag, i1, i2, j1, j2 in sm.get_opcodes():
+            if tag in ("insert", "replace") and j2 > j1:
+                hits.append({"start": j1, "end": j2, "type": st["key"],
+                             "label": st["label"]})
+        prev = b
+    return {"text": text, "live": live, "same": text == live, "hits": hits}
 
 
 def known_dirs():
@@ -1196,6 +1218,14 @@ class Handler(BaseHTTPRequestHandler):
                     out[hid] = c
             return self.send_json(out)
 
+        if path == "/api/rule-hits":
+            hid = (query.get("id") or [""])[0]
+            lang = (query.get("lang") or ["zh"])[0]
+            data = rule_hits(hid, lang)
+            if data is None:
+                return self.send_json({"detail": "没有初版或条目"}, 404)
+            return self.send_json(data)
+
         if path == "/api/rule-trace":
             hid = (query.get("id") or [""])[0]
             lang = (query.get("lang") or ["zh"])[0]
@@ -1530,6 +1560,14 @@ class Handler(BaseHTTPRequestHandler):
             lang = body.get("lang", "")
             return self.send_json({"ok": True,
                                    "written": save_all(lang, rows_of(body))})
+
+        if path == "/api/rule-hits":
+            hid = (query.get("id") or [""])[0]
+            lang = (query.get("lang") or ["zh"])[0]
+            data = rule_hits(hid, lang)
+            if data is None:
+                return self.send_json({"detail": "没有初版或条目"}, 404)
+            return self.send_json(data)
 
         if path == "/api/rule-trace":
             hid = (query.get("id") or [""])[0]

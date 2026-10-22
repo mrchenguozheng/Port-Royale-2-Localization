@@ -551,6 +551,30 @@ async function openRules(id: string) {
       box.appendChild(row);
       prev = st.text;
     }
+    try {
+      const hr = await api<{ text: string; same: boolean;
+        hits: { start: number; end: number; type: string; label: string }[] }>(
+        `/api/rule-hits?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
+      const row = el('div', 'rule-stage');
+      row.appendChild(el('div', 'rule-label',
+        hr.same ? '命中标注' : '命中标注（当前译文与规则生成不同，这里标的是生成结果）'));
+      const body = el('div', 'rule-text');
+      let pos = 0;
+      for (const hit of (hr.hits || []).slice().sort((a, b) => a.start - b.start)) {
+        if (hit.start < pos) continue;
+        body.appendChild(document.createTextNode(hr.text.slice(pos, hit.start)));
+        const mark = document.createElement('span');
+        mark.className = 'hit hit-' + hit.type;
+        mark.textContent = hr.text.slice(hit.start, hit.end);
+        mark.title = hit.label;
+        body.appendChild(mark);
+        pos = hit.end;
+      }
+      body.appendChild(document.createTextNode(hr.text.slice(pos)));
+      row.appendChild(body);
+      box.appendChild(row);
+    } catch { /* 标注失败不影响阶段展示 */ }
+
     $('ruleModal').hidden = false;
   } catch (err) {
     $('stat').textContent = '规则轨迹读取失败：' + (err as Error).message;

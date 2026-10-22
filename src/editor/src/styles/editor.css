@@ -1343,3 +1343,9 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   background: var(--bg-row-alt); border-radius: 4px; padding: 0.3rem 0.5rem;
 }
 .rule-stage mark { background: rgba(255, 170, 0, 0.28); color: var(--fg); }
+
+.rule-stage .hit { border-radius: 2px; }
+.rule-stage .hit-punct { background: rgba(255, 170, 0, 0.28); }
+.rule-stage .hit-conj { background: rgba(80, 160, 255, 0.28); }
+.rule-stage .hit-names { background: rgba(80, 200, 120, 0.28); }
+.rule-stage .hit:hover { outline: 1px solid var(--accent); }
