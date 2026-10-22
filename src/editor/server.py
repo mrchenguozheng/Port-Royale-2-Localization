@@ -30,6 +30,7 @@ import re
 import sys
 import threading
 import time
+import traceback
 import urllib.parse
 import urllib.request
 import webbrowser
@@ -804,9 +805,11 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.unquote(parsed.path)
         try:
             if path.startswith("/api/"):
+                _say("GET  %s" % path)
                 return self.get_api(path, urllib.parse.parse_qs(parsed.query))
             return self.get_static(path)
         except Exception as exc:            # 兜底：别让一个异常把连接挂死
+            _say("ERROR GET %s: %s\n%s" % (path, exc, traceback.format_exc()))
             return self.send_error_json(500, exc)
 
     def do_POST(self):
@@ -819,6 +822,7 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as exc:
             return self.send_error_json(400, exc)
         except Exception as exc:
+            _say("ERROR %s %s: %s\n%s" % (self.command, path, exc, traceback.format_exc()))
             return self.send_error_json(500, exc)
 
     # ---- GET

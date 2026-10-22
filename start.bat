@@ -2,7 +2,10 @@
 REM ============================================================
 REM  PR2 Localization - install / launch window
 REM
-REM  Default: start the local web app and open the installer page.
+REM  Default: start the local web app in THIS console window and
+REM  open the installer page. Keep the window open to watch the
+REM  backend log; close it (or Ctrl+C) to stop the server.
+REM
 REM  --status: list running editor backends (ports, pids) and exit.
 REM
 REM  Keep this file ASCII + CRLF. cmd misreads UTF-8 in .bat files.
@@ -16,10 +19,13 @@ if /I "%~1"=="--status" goto status
 
 call "%SRC%find_python.bat"
 if not defined PY goto :nopython
-set "PYW=%PY%"
-if "%PY:~-10%"=="python.exe" set "PYW=%PY:~0,-10%pythonw.exe"
-if not exist "%PYW%" set "PYW=%PY%"
-start "" %PYW% "%SRC%editor\server.py" --restart --open-page /start
+title PR2 Localization
+echo Starting local server... close this window to stop it.
+echo.
+"%PY%" "%SRC%editor\server.py" --restart --open-page /start
+echo.
+echo Server stopped.
+pause
 endlocal
 exit /b 0
 
