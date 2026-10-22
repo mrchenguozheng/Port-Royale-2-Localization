@@ -1359,3 +1359,15 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   overflow: auto;
   overscroll-behavior: contain;
 }
+
+/* 轻提示：不占布局，不挤动状态栏 */
+.toast {
+  position: fixed; left: 50%; bottom: 4.5rem; transform: translateX(-50%);
+  z-index: 300; padding: 0.45rem 0.9rem;
+  background: var(--head-bg); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  font-size: 0.9rem; pointer-events: none;
+  opacity: 0; visibility: hidden;
+}
+.toast.show { opacity: 1; visibility: visible; }

@@ -410,6 +410,22 @@ function fill(sel: HTMLSelectElement, items: string[], cur: string) {
   sel.value = cur;
 }
 
+let toastTimer = 0;
+
+function toast(msg: string) {
+  let box = document.getElementById('toast');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'toast';
+    box.className = 'toast';
+    document.body.appendChild(box);
+  }
+  box.textContent = msg;
+  box.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => box!.classList.remove('show'), 1800);
+}
+
 function fillSizeSelect() {
   const sel = $('size') as HTMLSelectElement;
   const all = Array.from(new Set([...PRESET_SIZES, ...S.customSizes]))
@@ -1527,7 +1543,7 @@ $('sizeAdd').addEventListener('click', () => {
   if (val === null) return;
   const n = Math.round(Number(val));
   if (!Number.isFinite(n) || n < 8 || n > 96) {
-    $('stat').textContent = '字号需在 8–96 之间';
+    toast('字号需在 8–96 之间');
     return;
   }
   if (!PRESET_SIZES.includes(n) && !S.customSizes.includes(n)) S.customSizes.push(n);
@@ -1539,7 +1555,7 @@ $('sizeAdd').addEventListener('click', () => {
 
 $('sizeDel').addEventListener('click', () => {
   if (PRESET_SIZES.includes(S.size)) {
-    $('stat').textContent = '预设字号不能删除';
+    toast('预设字号不能删除');
     return;
   }
   S.customSizes = S.customSizes.filter((n) => n !== S.size);
