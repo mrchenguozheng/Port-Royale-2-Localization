@@ -215,6 +215,27 @@ def space_dash(text):
     return re.sub(r" *—— *", repl, text)
 
 
+def soft_wrap(text, limit=24, step=12):
+    """超长且没有空格的汉字串，按约 12 字简单断开。"""
+    particles = set("的了是在和与而或也就都但并且时后中上下里外为以于对把被将从到着过们吗呢吧啊呀哦嗯")
+
+    def split_run(run):
+        out, s0 = [], run
+        while len(s0) > step:
+            cut = step
+            for k in range(step, max(5, step // 2), -1):
+                if s0[k - 1] in particles:
+                    cut = k
+                    break
+            out.append(s0[:cut])
+            s0 = s0[cut:]
+        out.append(s0)
+        return " ".join(out)
+
+    return re.sub(r"[\u4e00-\u9fff]{24,}",
+                  lambda m: split_run(m.group(0)), text)
+
+
 def join_words(text):
     """不该断开的常用词：因此。"""
     return re.sub(r"因\s+此", "因此", text)
@@ -263,7 +284,7 @@ def generate():
                 continue
             spans = find_names(part, given, surn, extras + towns)
             res.append(pad_names(part, spans, towns) if spans else part)
-        c = space_before_double_break(space_ellipsis(space_dash(space_years(join_words("".join(res))))))
+        c = soft_wrap(space_before_double_break(space_ellipsis(space_dash(space_years(join_words("".join(res)))))))
         stats["punct"] += a != text
         stats["conj"] += b != a
         stats["name"] += c != b

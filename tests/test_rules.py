@@ -26,6 +26,13 @@ class TestZhRules(unittest.TestCase):
         out = zh.normalize("支付 @g$TotalPrice$ 元")
         self.assertIn("@g$TotalPrice$", out)
 
+    def test_soft_wrap(self):
+        t = "这是一个非常长的没有空格的中文句子用来测试自动断行"
+        out = ZH.soft_wrap(t)
+        self.assertIn(" ", out)
+        self.assertNotIn("  ", out)
+        self.assertEqual(ZH.soft_wrap("短句"), "短句")
+
     def test_join_words(self):
         self.assertEqual(ZH.join_words("。 因 此， 只有"), "。 因此， 只有")
         self.assertEqual(ZH.join_words("因此"), "因此")
