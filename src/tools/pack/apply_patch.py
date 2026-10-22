@@ -32,6 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(TOOLS))
 sys.path.insert(0, HERE)
 
 from install import pr2ctl as B  # noqa: E402
+from build_artifacts import compile_pack  # noqa: E402
 
 PACK_OUT = os.path.join(ROOT, "build", "PR2Packs")
 
@@ -130,10 +131,10 @@ def main():
         if not args.no_check:
             run("校验换行 %s" % lang,
                 [sys.executable, os.path.join(HERE, "check_breaks.py"), "--lang", lang, "--strict"])
-        cmd = [sys.executable, os.path.join(HERE, "compile_pack.py"), "--lang", lang]
-        if args.no_fonts:
-            cmd.append("--no-fonts")
-        run("编译 %s" % lang, cmd)
+        print("\n── 编译 %s ──" % lang)
+        if compile_pack(lang, PACK_OUT, no_fonts=args.no_fonts,
+                        on_line=print) != 0:
+            sys.exit("[失败] 编译 %s" % lang)
 
     # 2) 注入器产物必须已在 build\ 里
     missing = [n for n in B.FLAT_FILES if not os.path.isfile(os.path.join(ROOT, "build", n))]

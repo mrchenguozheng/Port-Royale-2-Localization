@@ -22,7 +22,6 @@
 import argparse
 import os
 import shutil
-import subprocess
 import sys
 import zipfile
 
@@ -41,12 +40,9 @@ FLAT = ("PR2Launcher.exe", "PR2LauncherGUI.exe", "PR2TextSource.dll")
 def build_pack(lang, stage, log):
     out = os.path.join(stage, "PR2Packs")
     os.makedirs(out, exist_ok=True)
-    script = os.path.join(TOOLS, "pack", "compile_pack.py")
     log("编译语言包 %s …" % lang)
-    proc = subprocess.run([sys.executable, script, "--lang", lang,
-                           "--out", out, "--no-fonts"],
-                          cwd=ROOT, text=True, encoding="utf-8", errors="replace")
-    if proc.returncode:
+    from build_artifacts import compile_pack
+    if compile_pack(lang, out, no_fonts=True, on_line=log) != 0:
         raise RuntimeError("语言包编译失败：%s" % lang)
     with open(os.path.join(out, "locale.ini"), "w",
               encoding="utf-8", newline="\n") as fh:

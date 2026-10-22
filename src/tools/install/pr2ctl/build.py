@@ -4,6 +4,9 @@
 from .base import *  # noqa: F401,F403
 from .detect import missing_outputs, read_ini_language
 
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+
 def child_env():
     r"""子进程环境：UTF-8 + 无缓冲。
 
@@ -53,17 +56,14 @@ def build_pack(lang, out_dir, events):
     这里仍查一次条目数兜底：空包装进游戏等于没生效，而 GUI 是
     会把它复制过去的最后一道关口。
     """
-    script = os.path.join(HERE, "pack", "compile_pack.py")
-    # --no-fonts：字体由 run_build 在所有语言编完后统一做一次，
-    # 免得选三种语言就重裁三遍字体。
-    cmd = [sys.executable, script, "--lang", lang, "--out", out_dir, "--no-fonts"]
+    # 构建入口统一在 pack.build_artifacts；字体由 run_build 最后统一做一次。
+    from pack import build_artifacts
     events.put(("line", "[%s] 编译中…" % lang))
-    proc = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        cwd=ROOT, env=child_env(),
+    code = build_artifacts.compile_pack(
+        lang, out_dir, no_fonts=True,
+        on_line=lambda line: events.put(("line", line)),
+        env=child_env(),
     )
-    read_lines(proc, events)
-    code = proc.wait()
 
     pack = os.path.join(out_dir, "%s.txt" % lang)
     if code == 0:
