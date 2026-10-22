@@ -49,9 +49,11 @@ src/tools/
 
 | 路径 | 作用 |
 |---|---|
-| `font/subset_fonts.py` | 字体缝合入口（每个语言 `presets/<语言>.toml`，各出一套） |
+| `font/subset_fonts.py` | 字体缝合入口（进阶/自用，每个语言 `presets/<语言>.toml`） |
+| `font/make_noto_fonts.py` | 发行版 Noto 替换字体（完整字体，不裁剪） |
 | `font/extract_fonts.py` | 从游戏 `pr2_loca.cpr` 导出原版拉丁字体 |
 | `font/fontstitch/` | 缝合引擎、`presets/` 目录、校验工具 |
+| `pack/make_release.py` | 按语言生成发行 zip（语言包 + 启动器 + Noto 字体） |
 
 字体前置检查：
 
