@@ -271,7 +271,10 @@ function drawRows() {
   for (const e of S.rows) frag.appendChild(rowOf(e));
   $('rows').appendChild(frag);
   S.activeId = null;
-  if (S.rows.length) markActiveInList(S.rows[0].id);
+  if (S.rows.length) {
+    markActiveInList(S.rows[0].id);
+    void loadEntryInfo(S.rows[0].id);
+  }
   void loadContexts(S.rows);
 }
 
@@ -459,6 +462,30 @@ function refLine(which: 'A' | 'B', e: Entry): HTMLElement {
 
 /* 一条 = 左「语境」+ 右「id/审核 + 参照 A/B + 译文」。
  * 参照语言的选择器就贴在参照文本前面，换语言不用回头顶。 */
+async function loadEntryInfo(id: string) {
+  const box = document.getElementById('infoBar');
+  if (!box) return;
+  box.textContent = '';
+  try {
+    const r = await api<{ placeholders: { token: string; meaning: string }[];
+      tags: string[]; spaces: number[]; length: number; en_len: number }>(
+      `/api/entry-info?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
+    if (box !== document.getElementById('infoBar')) return;
+    const ph = r.placeholders || [];
+    const phText = ph.length ? ph.map((p) => `${p.token} = ${p.meaning}`).join(' · ')
+                             : '无';
+    box.appendChild(el('span', 'info-ph', '占位符：' + phText));
+    const spaces = r.spaces || [];
+    box.appendChild(el('span', 'info-sp',
+      `空格：${spaces.length} 处` + (spaces.length ? `（位置 ${spaces.slice(0, 24).join(', ')}）` : '')));
+    if (r.tags && r.tags.length) {
+      box.appendChild(el('span', 'info-tag', '标记：' + r.tags.join('、')));
+    }
+  } catch {
+    box.textContent = '';
+  }
+}
+
 function rowOf(e: Entry): HTMLElement {
   const row = el('div', 'row');
   row.dataset.id = e.id;
@@ -502,6 +529,9 @@ function rowOf(e: Entry): HTMLElement {
   wrap.appendChild(lab);
   top.appendChild(wrap);
   main.appendChild(top);
+  const info = el('div', 'info-bar');
+  info.id = 'infoBar';
+  main.appendChild(info);
   if (box.checked) row.classList.add('reviewed');
 
   const compare = el('div', 'compare');

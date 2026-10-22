@@ -379,9 +379,22 @@ def context_of(hid, lang):
     zh = row.get(lang, "") or ""
     reasons = []
 
+    # %N 没有固定名字，按英文上下文给个保守说明。
+    es = en.strip()
+    role_hint = {}
+    if es.startswith("%1 %2 %3"):
+        role_hint = {"%1": "等级/头衔", "%2": "名", "%3": "姓"}
+    elif es.startswith("%1 %2 "):
+        role_hint = {"%1": "等级/头衔", "%2": "姓名"}
+    elif re.search(r"\b(Governor|Captain|Viceroy|King|Queen|Prince|Princess|"
+                   r"Lord|Sir|Mr|Mrs|Ms|Dr|Admiral|General|Colonel|Major|"
+                   r"Lieutenant)\s+%1 %2", en):
+        role_hint = {"%1": "名", "%2": "姓"}
+
     ph = []
     for tok in placeholders_of(en):
-        mean = next((v for k, v in PH_MEAN.items() if tok.startswith(k)), "变量/参数")
+        mean = role_hint.get(tok) or next(
+            (v for k, v in PH_MEAN.items() if tok.startswith(k)), "变量/参数")
         ph.append({"token": tok, "meaning": mean})
 
     tags = []
@@ -1056,6 +1069,22 @@ class Handler(BaseHTTPRequestHandler):
                 if c:
                     out[hid] = c
             return self.send_json(out)
+
+        if path == "/api/entry-info":
+            hid = (query.get("id") or [""])[0]
+            lang = (query.get("lang") or ["zh"])[0]
+            c = context_of(hid, lang)
+            if c is None:
+                return self.send_json({"detail": "no such entry"}, 404)
+            zh = c.get("zh") or ""
+            spaces = [i for i, ch in enumerate(zh) if ch == " "]
+            return self.send_json({
+                "placeholders": c.get("placeholders") or [],
+                "tags": c.get("tags") or [],
+                "spaces": spaces,
+                "length": len(zh),
+                "en_len": len(c.get("en") or ""),
+            })
 
         if path == "/api/context":
             hid = (query.get("id") or [""])[0]

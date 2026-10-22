@@ -1276,3 +1276,12 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 }
 .dir-list .dir-actions { margin-left: auto; display: inline-flex; gap: 0.4rem; flex: 0 0 auto; }
 .dir-list .dir-bad { color: var(--danger, #d9534f); }
+
+.info-bar {
+  display: flex; flex-wrap: wrap; gap: 0.4rem 1rem;
+  padding: 0.3rem 0; font-size: 0.86rem; color: var(--fg-dim);
+  border-bottom: 1px dashed var(--line-soft, var(--line));
+}
+.info-bar .info-ph { color: var(--accent); }
+.info-bar .info-sp { font-family: var(--font-mono); }
+.info-bar .info-tag { color: var(--fg-dim); }
