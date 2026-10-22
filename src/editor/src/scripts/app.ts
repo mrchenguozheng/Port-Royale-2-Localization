@@ -408,8 +408,17 @@ function updateStat() {
     box.appendChild(term);
   }
 }
+function clearChildren(el: HTMLElement) {
+  for (const c of Array.from(el.children)) {
+    if (c.parentNode === el) {
+      try { el.removeChild(c); } catch { /* shoelace 可能已经接管 */ }
+    }
+  }
+}
+
 function fill(sel: HTMLElement, items: string[], cur: string) {
-  sel.innerHTML = '';
+  if (sel.tagName === 'SL-SELECT') clearChildren(sel);
+  else sel.innerHTML = '';
   const tag = sel.tagName === 'SL-SELECT' ? 'sl-option' : 'option';
   for (const v of items) {
     const o = document.createElement(tag) as HTMLElement & { value: string };
@@ -439,7 +448,7 @@ function fillSizeSelect() {
   const all = Array.from(new Set([...PRESET_SIZES, ...S.customSizes]))
     .sort((a, b) => a - b);
   if (!all.includes(S.size)) all.push(S.size);
-  sel.innerHTML = '';
+  clearChildren(sel);
   for (const n of all.sort((a, b) => a - b)) {
     const o = document.createElement('sl-option') as HTMLElement & { value: string };
     o.value = String(n);
