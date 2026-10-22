@@ -9,7 +9,7 @@ fontstitch/
 ├── fontstitch.py    augment（补汉字）/ extract（拆 TTC）/ validate（结构校验）
 ├── fontsubset.py    可选：裁剪任意字体（封装 pyftsubset）
 ├── fontverify.py    可选：字体信息 / 逐字形校验 / UPM 缩放（需要 fontTools）
-├── presets.toml     四组配对偏好的记录
+├── presets.example.toml  四组配对偏好的示例（复制成 presets.toml 后改）
 └── README.md
 ```
 
@@ -84,8 +84,10 @@ Arial 补满整个 GB2312（6,763 字）实测 **2.13 MB / 8,084 字形**。
 | Tiepolo-Bold | 标题 | 华文中宋 | 覆盖 24k 字符，最稳 |
 | Arial | 正文/UI | 微软雅黑 | 同为 2048 UPM，免缩放；12px 黑体最清晰 |
 
-四组配对按语言记录在 [`presets.toml`](presets.toml)：`[[zh.pair]]` 是中文
-主 donor，`[[zh.supplement]]` 是缺字补充，`[fallback]` 是最后兜底。
+四组配对按语言记录在 [`presets.example.toml`](presets.example.toml)：
+复制成 `presets.toml` 后修改（后者进 `.gitignore`，可写本机路径）。
+`[[zh.pair]]` 是中文主 donor，`[[zh.supplement]]` 是缺字补充，
+`[fallback]` 是最后兜底。
 
 PR2 的 `subset_fonts.py` 直接读取这份配置：**只有配置了 `[<语言>]` 段的语言
 才会被缝进字体**，没配置的语言（目前是 `ja`）直接跳过。`augment` 本身仍按

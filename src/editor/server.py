@@ -985,7 +985,9 @@ def font_status():
         problems.append("缺 %d 个 donor 字体" % len(missing_donors))
     if not sf._fonttools():
         problems.append("缺 fontTools")
-    if not langs:
+    if not os.path.isfile(sf.PRESETS):
+        problems.append("缺少 presets.toml（复制 presets.example.toml 后修改）")
+    elif not langs:
         problems.append("presets 里没有配置任何语言")
     return {
         "ok": not problems,

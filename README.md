@@ -106,7 +106,7 @@ pr2-localization/
 
 1. 跑 `start.bat`，在「译文编辑」页点语言下拉旁的「＋」，用现成语言当模板；
 2. 逐条翻译并保存（写进 `src/live/<代码>.toml`）；
-3. 在 `src/tools/font/fontstitch/presets.toml` 加 `[<代码>]` 段，准备该语言的 donor；
+3. 把 `src/tools/font/fontstitch/presets.example.toml` 复制成 `presets.toml`，加 `[<代码>]` 段并准备 donor；
 4. 构建字体、语言包并部署。
 
 完整步骤（含每步验收点）见

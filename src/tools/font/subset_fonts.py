@@ -50,6 +50,7 @@ FONTS = ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf")
 
 STITCH_DIR = os.path.join(TOOLS, "font", "fontstitch")
 PRESETS = os.path.join(STITCH_DIR, "presets.toml")
+PRESETS_EXAMPLE = os.path.join(STITCH_DIR, "presets.example.toml")
 
 #: 除了译文用字，还要保留的字符：ASCII、中文标点、数字全角等。
 EXTRA = ("，。、；：！？…—～·「」『』“”《》【】（）〔〕〈〉［］％０１２３４５６７８９"
@@ -259,6 +260,10 @@ def ensure_fonts(out_dir=None, src=None, log=None, force=False):
     log = log or (lambda msg: None)
     src = src or os.environ.get("PR2_ORIG_FONTS") or DEFAULT_SRC
 
+    if not os.path.isfile(PRESETS):
+        return False, ("缺少 %s；复制 presets.example.toml 为 presets.toml，"
+                       "再按自己机器上的 donor 修改" % PRESETS)
+
     langs, lang_donors, fallback = _presets()
     if not langs:
         return True, "presets 里没有配置任何语言的 donor，跳过字体缝合"
@@ -320,8 +325,12 @@ def check_prereqs(src=None):
     src = src or os.environ.get("PR2_ORIG_FONTS") or DEFAULT_SRC
     langs, donors, fallback = _presets()
     info, bad = [], []
-    info.append("已配置语言：%s" % ("、".join(langs) if langs else "（无）"))
-    if not langs:
+    if not os.path.isfile(PRESETS):
+        info.append("已配置语言：（无）")
+        bad.append("缺少 presets.toml；复制 presets.example.toml 为 presets.toml 后修改")
+    else:
+        info.append("已配置语言：%s" % ("、".join(langs) if langs else "（无）"))
+    if not langs and os.path.isfile(PRESETS):
         bad.append("presets.toml 里没有任何 [语言] 段，不会缝合任何字体")
     for name in FONTS:
         base = os.path.join(src, name)

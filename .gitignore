@@ -223,3 +223,6 @@ build/fonts/
 # 分词实验用的额外 venv
 .venv-spacy/
 .venv-hanlp/
+
+# 字体 donor 的个人配置（路径可能含本机信息），只提交 example
+src/tools/font/fontstitch/presets.toml
