@@ -171,7 +171,7 @@ function setView(view: string) {
   for (const t of document.querySelectorAll('.tab')) {
     t.classList.toggle('active', (t as HTMLElement).dataset.view === view);
   }
-  history.replaceState(null, '', start ? '/install' : '/translate');
+  history.replaceState(null, '', start ? '/install' : (S.rows[0] ? `/translate/${S.page}/${S.rows[0].id}` : '/translate'));
 }
 
 async function boot() {
@@ -218,6 +218,13 @@ async function boot() {
   setLoading(false);
   const sp = Number(saved(pageKey()));
   if (sp > 1) await renderPage(sp);
+}
+
+function updatePath() {
+  if (document.body.classList.contains('view-start')) return;
+  const row = S.rows[0];
+  const path = row ? `/translate/${S.page}/${row.id}` : '/translate';
+  if (location.pathname !== path) history.replaceState(null, '', path);
 }
 
 function pageKey(): string {
@@ -291,6 +298,7 @@ function drawRows() {
   const frag = document.createDocumentFragment();
   for (const e of S.rows) frag.appendChild(rowOf(e));
   $('rows').appendChild(frag);
+  updatePath();
   S.activeId = null;
   if (S.rows.length) {
     markActiveInList(S.rows[0].id);
@@ -1435,6 +1443,9 @@ $('lang').addEventListener('change', (ev) => {
     await reload(true);
     const sp = Number(saved(pageKey()));
     if (sp > 1) await renderPage(sp);
+    const m = location.pathname.match(/^\/translate\/(\d+)\/(0x[0-9a-f]{8})$/i);
+    if (m) await jumpToId('0x' + m[2].slice(2).toLowerCase());
+    updatePath();
   })();
 });
 $('size').addEventListener('change', (ev) => {
