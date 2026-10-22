@@ -1170,6 +1170,8 @@ def main():
     ap.add_argument("--host", default="127.0.0.1",
                     help="只监听本机。有接口能写文件，不要改成 0.0.0.0。")
     ap.add_argument("--no-open", action="store_true", help="不自动开浏览器")
+    ap.add_argument("--open-page", default="/",
+                    help="自动打开的页面，默认 /（安装页用 /start）")
     ap.add_argument("--restart", action="store_true",
                     help="若已有编辑器在跑，先停掉它再用新代码启动")
     a = ap.parse_args()
@@ -1203,7 +1205,7 @@ def main():
             else:
                 _say("编辑器已在运行：http://%s:%d/" % (a.host, port))
                 if not a.no_open:
-                    webbrowser.open("http://%s:%d/" % (a.host, port))
+                    webbrowser.open("http://%s:%d%s" % (a.host, port, a.open_page))
                 return 0
 
         if not restarted:
@@ -1242,7 +1244,7 @@ def main():
     _say("（只监听本机。按 Ctrl+C 停止。）")
     if not a.no_open:
         threading.Timer(0.8, lambda: webbrowser.open(
-            "http://%s:%d/" % (a.host, port))).start()
+            "http://%s:%d%s" % (a.host, port, a.open_page))).start()
 
     try:
         httpd.serve_forever()
