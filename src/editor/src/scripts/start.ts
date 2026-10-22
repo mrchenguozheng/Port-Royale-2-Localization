@@ -65,6 +65,8 @@ const S = { status: null, timer: 0 };
         ul.innerHTML = '';
         for (const it of r.dirs || []) {
           const li = document.createElement('li');
+          const actions = document.createElement('span');
+          actions.className = 'dir-actions';
           const label = document.createElement('span');
           label.className = 'dir-label';
           label.textContent = (it.label || '未知版本') + (it.current ? ' · 当前' : '');
@@ -90,7 +92,7 @@ const S = { status: null, timer: 0 };
                 await loadDirs();
               } catch (err) { $('dirMsg').textContent = (err as Error).message; }
             });
-            li.appendChild(use);
+            actions.appendChild(use);
           }
           const forget = document.createElement('button');
           forget.textContent = '移除';
@@ -101,7 +103,8 @@ const S = { status: null, timer: 0 };
               await loadDirs();
             } catch (err) { $('dirMsg').textContent = (err as Error).message; }
           });
-          li.appendChild(forget);
+          actions.appendChild(forget);
+          li.appendChild(actions);
           ul.appendChild(li);
         }
       } catch (err) {

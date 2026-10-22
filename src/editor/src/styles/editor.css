@@ -1263,7 +1263,16 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .srv-list li { display: flex; align-items: center; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.88rem; }
 
 .dir-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
-.dir-list li { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.9rem; }
-.dir-list .dir-label { color: var(--accent); white-space: nowrap; }
-.dir-list .dir-path { font-family: var(--font-mono); color: var(--fg-dim); overflow: hidden; text-overflow: ellipsis; }
+.dir-list li { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+.dir-list .dir-label {
+  flex: 0 0 13.5rem; min-width: 0;
+  color: var(--accent); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.dir-list .dir-path {
+  flex: 1 1 auto; min-width: 0;
+  font-family: var(--font-mono); color: var(--fg-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dir-list .dir-actions { margin-left: auto; display: inline-flex; gap: 0.4rem; flex: 0 0 auto; }
 .dir-list .dir-bad { color: var(--danger, #d9534f); }
