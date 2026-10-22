@@ -55,26 +55,31 @@ def make_fmt(sets):
     return fmt, punct
 
 
+_ASCII_CACHE = {}
+
+
 def fix_ascii_punct(text, table, cjk_rx):
     """把 CJK 文本里的半角标点换成全角；不动纯 ASCII 的格式串。"""
     if not cjk_rx.search(text):
         return text
-    out = []
-    for i, ch in enumerate(text):
-        rep = table.get(ch)
-        if rep:
-            prev = text[i - 1] if i else ""
-            nxt = text[i + 1] if i + 1 < len(text) else ""
-            if ch == ":" and prev.isdigit() and nxt.isdigit():
-                out.append(ch)
-                continue
-            if prev.isascii() and prev.isalnum() and nxt.isascii() and nxt.isalnum():
-                out.append(ch)
-                continue
-            out.append(rep)
-            continue
-        out.append(ch)
-    return "".join(out)
+    key = tuple(sorted(table))
+    rx = _ASCII_CACHE.get(key)
+    if rx is None:
+        rx = re.compile("|".join(map(re.escape, key)))
+        _ASCII_CACHE[key] = rx
+
+    def repl(m):
+        ch = m.group(0)
+        i = m.start()
+        prev = text[i - 1] if i else ""
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+        if ch == ":" and prev.isdigit() and nxt.isdigit():
+            return ch
+        if prev.isascii() and prev.isalnum() and nxt.isascii() and nxt.isalnum():
+            return ch
+        return table[ch]
+
+    return rx.sub(repl, text)
 
 
 def fix_vars(text, punct, cjk_rx, var=VAR):
