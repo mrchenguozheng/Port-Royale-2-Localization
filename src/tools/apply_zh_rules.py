@@ -161,6 +161,28 @@ def esc(t):
     return t.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
+def _is_han(ch):
+    return ch and "\u4e00" <= ch <= "\u9fff"
+
+
+def space_years(text):
+    """4 位年份与相邻汉字之间补空格（标签/占位符内部不动）。"""
+    parts = TAG.split(text)
+    for i in range(0, len(parts), 2):
+        seg = parts[i]
+
+        def repl(m):
+            s0 = m.group(0)
+            left = seg[m.start() - 1] if m.start() > 0 else ""
+            right = seg[m.end()] if m.end() < len(seg) else ""
+            pre = " " if _is_han(left) else ""
+            post = " " if _is_han(right) else ""
+            return pre + s0 + post
+
+        parts[i] = re.sub(r"(?<!\d)\d{4}(?!\d)", repl, seg)
+    return "".join(parts)
+
+
 def space_before_double_break(text):
     """<n><n> 前必须有一个空格（段首除外）。"""
     if text.startswith("<n><n>"):
@@ -194,7 +216,7 @@ def generate():
                 continue
             spans = find_names(part, given, surn, extras + towns)
             res.append(pad_names(part, spans, towns) if spans else part)
-        c = space_before_double_break("".join(res))
+        c = space_before_double_break(space_years("".join(res)))
         stats["punct"] += a != text
         stats["conj"] += b != a
         stats["name"] += c != b

@@ -26,6 +26,12 @@ class TestZhRules(unittest.TestCase):
         out = zh.normalize("支付 @g$TotalPrice$ 元")
         self.assertIn("@g$TotalPrice$", out)
 
+    def test_space_years(self):
+        self.assertEqual(ZH.space_years("约1554 — 1618年"), "约 1554 — 1618 年")
+        self.assertEqual(ZH.space_years("在1502 年"), "在 1502 年")
+        self.assertEqual(ZH.space_years("超过1000，"), "超过 1000，")
+        self.assertEqual(ZH.space_years("<o:0xFF131512>年"), "<o:0xFF131512>年")
+
     def test_space_before_double_break(self):
         self.assertEqual(ZH.space_before_double_break("你好。<n><n>下一段"),
                          "你好。 <n><n>下一段")
