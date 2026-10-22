@@ -17,40 +17,16 @@ def make_fmt(sets):
     """按该语言的标点表生成 fmt(text)：单标点后补空格、成对标点外侧补。"""
     open_, close, single, runs = (sets["open"], sets["close"],
                                   sets["single"], sets["runs"])
-    punct = open_ + close + single
+    punct = open_ + close + single + runs
+    esc = lambda s: re.escape(s)
+    rx_open = re.compile(r"(?<!\s)([%s])" % esc(open_))
+    rx_after = re.compile(r"([%s])(?=[^%s\s])" % (esc(close + single + runs), esc(punct)))
+    rx_space = re.compile(r" {2,}")
 
     def fmt(s):
-        out, i, n = [], 0, len(s)
-        while i < n:
-            c = s[i]
-            if c in runs:
-                j = i
-                while j + 1 < n and s[j + 1] == c:
-                    j += 1
-                out.append(s[i:j + 1])
-                nxt = s[j + 1] if j + 1 < n else ""
-                if nxt and nxt not in punct:
-                    out.append(" ")
-                i = j + 1
-                continue
-            if c in open_:
-                out.append(" ")
-                out.append(c)
-            elif c in close:
-                out.append(c)
-                nxt = s[i + 1] if i + 1 < n else ""
-                if nxt and nxt not in punct:
-                    out.append(" ")
-            elif c in single:
-                out.append(c)
-                nxt = s[i + 1] if i + 1 < n else ""
-                if nxt and nxt not in punct:
-                    out.append(" ")
-            else:
-                out.append(c)
-            i += 1
-        s = "".join(out)
-        return re.sub(r" {2,}", " ", s).strip(" ")
+        s = rx_open.sub(r" \1", s)
+        s = rx_after.sub(r"\1 ", s)
+        return rx_space.sub(" ", s).strip(" ")
 
     return fmt, punct
 

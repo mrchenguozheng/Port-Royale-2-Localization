@@ -102,8 +102,9 @@ def _name_regexes(all_names):
     titled_re = re.compile(
         "(%s)\\s*((?:[\\u4e00-\\u9fff]{1,3}世|\\d+世)(?:\\s*(?:%s))?|(?:%s))"
         % (names_alt, titles_alt, titles_alt))
-    _NAME_CACHE[key] = (bare_re, titled_re)
-    return bare_re, titled_re
+    first_chars = frozenset(n[0] for n in all_names if n)
+    _NAME_CACHE[key] = (bare_re, titled_re, first_chars)
+    return bare_re, titled_re, first_chars
 
 
 def find_names(text, given, surn, extras, all_names=None):
@@ -113,14 +114,16 @@ def find_names(text, given, surn, extras, all_names=None):
             "(%s)\u00b7([\\u4e00-\\u9fff]{1,6}?)(?=[%s]|%s|$)"
             % ("|".join(map(re.escape, sorted(given, key=len, reverse=True))),
                re.escape(NAME_STOP), "|".join(map(re.escape, TITLES))))
-    spans = [(m.start(), m.end()) for m in name_re.finditer(text)]
+    spans = ([(m.start(), m.end()) for m in name_re.finditer(text)]
+             if "·" in text else [])
 
     if all_names is None:
         all_names = set(given) | set(surn) | set(extras)
-    bare_re, titled_re = _name_regexes(all_names)
-    if bare_re:
-        spans.extend(m.span() for m in bare_re.finditer(text))
-    spans.extend(m.span() for m in titled_re.finditer(text))
+    bare_re, titled_re, first_chars = _name_regexes(all_names)
+    if not first_chars.isdisjoint(text):
+        if bare_re:
+            spans.extend(m.span() for m in bare_re.finditer(text))
+        spans.extend(m.span() for m in titled_re.finditer(text))
 
     # 引号里的通常是船名/书名，不按人名加空格。
     quotes = ([(m.start(), m.end()) for m in QUOTE_RX.finditer(text)]
