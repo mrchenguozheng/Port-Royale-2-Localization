@@ -161,11 +161,8 @@ def esc(t):
     return t.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--dry-run", action="store_true")
-    args = ap.parse_args()
-
+def generate():
+    """按规则生成 {id: 文本}，不写文件。"""
     doc = tomllib.load(open(SRC, "rb"))
     order = [m.group(1) for m in
              (re.match(r'^"([^"]+)"\s*=', ln) for ln in io.open(SRC, encoding="utf-8"))
@@ -195,22 +192,54 @@ def main():
         stats["conj"] += b != a
         stats["name"] += c != b
         out[h] = c
+    return order, out, stats
 
-    print("生成 %d 条｜标点改动 %d｜连词 %d｜人名 %d" % (
-        len(order), stats["punct"], stats["conj"], stats["name"]))
-    if args.dry_run:
-        return
 
+def write(order, out):
     header = ("# 自动生成：本文件由 src/tools/apply_zh_rules.py\n"
               "# 从 src/references/zh.gog_1.1.2.3.toml 按 标点/连词/人名 规则生成。\n"
-              "# 改译文请改 references 里的文本源；改规则请改 apply_zh_rules.py。\n"
-              "# 人工只调空格时，用 src/tools/zh_review.py --accept 记为「已审核」。\n")
+              "# 改译文请改 references 里的文本源；改规则请改 apply_zh_rules.py。\n")
     io.open(DST, "w", encoding="utf-8", newline="\n").write(
         header + "\n".join('"%s" = "%s"' % (k, esc(out[k])) for k in order) + "\n")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--check", action="store_true",
+                    help="只校验生成物是否与文本源+规则一致，不写文件")
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+
+    order, out, stats = generate()
+    print("生成 %d 条｜标点改动 %d｜连词 %d｜人名 %d" % (
+        len(order), stats["punct"], stats["conj"], stats["name"]))
+
+    if args.check:
+        old = {}
+        if os.path.isfile(DST):
+            try:
+                old = tomllib.load(open(DST, "rb"))
+            except Exception:
+                old = {}
+        diff = [h for h in order if old.get(h) != out[h]]
+        extra = [h for h in old if h not in out]
+        if diff or extra:
+            print("生成物不一致：%d 条不同" % len(diff))
+            for h in diff[:5]:
+                print("  %s\n    文件：%s\n    应为：%s" % (h, old.get(h), out[h]))
+            if extra:
+                print("  文件里多出 %d 条" % len(extra))
+            return 1
+        print("生成物一致。")
+        return 0
+
+    if args.dry_run:
+        return 0
+
+    write(order, out)
     print("已写入", DST)
-    print("提示：文本源改过的话，用 python src/tools/zh_review.py --diff 人工审核，"
-          "审完 --accept 或 --sync。")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

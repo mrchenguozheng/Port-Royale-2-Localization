@@ -1,7 +1,6 @@
 # 自动生成：本文件由 src/tools/apply_zh_rules.py
 # 从 src/references/zh.gog_1.1.2.3.toml 按 标点/连词/人名 规则生成。
 # 改译文请改 references 里的文本源；改规则请改 apply_zh_rules.py。
-# 人工只调空格时，用 src/tools/zh_review.py --accept 记为「已审核」。
 "0xc46f793a" = "谢谢你付的 @g$TotalPrice$。 到市场来找我， 我把货物给你。"
 "0xc48835d4" = "我刚听说， 一艘满载移民的英格兰船沉了。"
 "0xc48835d5" = "我刚听说， 一艘满载移民的法国船沉了。"

@@ -191,10 +191,7 @@ async function boot() {
   const savedB = saved(LS_REFB);
   if (savedB !== null && (savedB === FOLLOW || S.refLangs.includes(savedB))) S.refB = savedB;
 
-  const savedFilter = saved(LS_FILTER);
-  if (savedFilter && ['all', 'unreviewed', 'reviewed', 'attention'].includes(savedFilter)) {
-    S.filter = savedFilter;
-  }
+  S.filter = 'all';
   // 参照默认取基准语言（en.gog_1.1.2.3 这类带来源与版本的名字）。
   S.refA = d.all.includes(d.base) ? d.base : (d.all[0] || '');
   S.refB = S.refLangs.includes('fr.gog_1.1.2.42') ? 'fr.gog_1.1.2.42' : FOLLOW;
@@ -334,17 +331,11 @@ function nextTermIssue() {
 
 function updateStat() {
   const n = Object.keys(S.terms).length;
-  const reviewed = Math.min(S.reviewedCount, S.total);
-  const pending = Math.max(0, S.total - reviewed);
   const box = $('stat');
   box.innerHTML = '';
 
   const plain = (text: string) => box.appendChild(el('span', 'stat-item', text));
 
-  plain(`已审 ${reviewed} 条`);
-  const todo = el('a', 'stat-item link', `待审 ${pending} 条`);
-  todo.addEventListener('click', () => void nextUnreviewed());
-  box.appendChild(todo);
   plain(`共 ${S.total} 条`);
   if (n) {
     const term = el('a', 'stat-item link', `术语待统一 ${n} 条`);
@@ -668,36 +659,10 @@ function rowOf(e: Entry): HTMLElement {
   top.appendChild(el('span', 'cell-no', '#' + S.page));
   top.appendChild(el('div', 'cell-id', e.id));
 
-  const wrap = el('label', 'chk-wrap');
-  const box = el('input', 'chk') as HTMLInputElement;
-  box.type = 'checkbox';
-  box.checked = S.reviewed.has(e.id);
-  box.setAttribute('aria-label', '标记这条已审核');
-  const lab = el('span', 'chk-label', box.checked ? '已审' : '待审');
-  box.addEventListener('change', async () => {
-    try {
-      const r = await api<{ count: number }>('/api/review-flags',
-        { lang: S.lang, id: e.id, on: box.checked });
-      S.reviewedCount = r.count;
-    } catch {
-      box.checked = !box.checked;
-      return;
-    }
-    if (box.checked) S.reviewed.add(e.id); else S.reviewed.delete(e.id);
-    lab.textContent = box.checked ? '已审' : '待审';
-    row.classList.toggle('reviewed', box.checked);
-    const li = $('list').querySelector(`.list-item[data-id="${cssEsc(e.id)}"]`);
-    if (li) li.classList.toggle('done', box.checked);
-    updateStat();
-  });
-  wrap.appendChild(box);
-  wrap.appendChild(lab);
-  top.appendChild(wrap);
   main.appendChild(top);
   const info = el('div', 'info-bar');
   info.id = 'infoBar';
   main.appendChild(info);
-  if (box.checked) row.classList.add('reviewed');
 
   const compare = el('div', 'compare');
   const src = el('div', 'col-src');
@@ -1407,9 +1372,6 @@ document.addEventListener('keydown', (ev) => {
   }
 });
 
-$('randomUnrev').addEventListener('click', () => void randomUnreviewed());
-$('prevUnrev').addEventListener('click', () => void prevUnreviewed());
-$('nextUnrev').addEventListener('click', () => void nextUnreviewed());
 $('jumpGo').addEventListener('click', () => void jumpToHash($('jumpHash').value));
 let jumpTimer = 0;
 let jumpItems: { id: string; en: string; zh: string }[] = [];
