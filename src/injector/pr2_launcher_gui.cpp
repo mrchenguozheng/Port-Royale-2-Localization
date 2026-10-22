@@ -300,24 +300,24 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_CREATE: {
         CreateWindowW(L"STATIC", T("label.language"), WS_CHILD | WS_VISIBLE,
-                      16, 18, 320, 20, hwnd, NULL, NULL, NULL);
+                      16, 18, 420, 20, hwnd, NULL, NULL, NULL);
         g_combo = CreateWindowW(L"COMBOBOX", NULL,
                                 WS_CHILD | WS_VISIBLE | WS_TABSTOP |
                                 CBS_DROPDOWNLIST | WS_VSCROLL,
-                                16, 42, 320, 200, hwnd, (HMENU)ID_LANG,
+                                16, 42, 420, 200, hwnd, (HMENU)ID_LANG,
                                 NULL, NULL);
         CreateWindowW(L"BUTTON", T("button.launch"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                      16, 84, 130, 32, hwnd, (HMENU)ID_LAUNCH, NULL, NULL);
+                      16, 84, 170, 32, hwnd, (HMENU)ID_LAUNCH, NULL, NULL);
         CreateWindowW(L"BUTTON", T("button.vanilla"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                      156, 84, 100, 32, hwnd, (HMENU)ID_VANILLA, NULL, NULL);
+                      196, 84, 150, 32, hwnd, (HMENU)ID_VANILLA, NULL, NULL);
         CreateWindowW(L"BUTTON", T("button.refresh"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                      266, 84, 70, 32, hwnd, (HMENU)ID_REFRESH, NULL, NULL);
+                      356, 84, 80, 32, hwnd, (HMENU)ID_REFRESH, NULL, NULL);
         g_status = CreateWindowW(L"STATIC", L"",
                                  WS_CHILD | WS_VISIBLE | SS_LEFT,
-                                 16, 126, 320, 40, hwnd, (HMENU)ID_STATUS,
+                                 16, 126, 420, 40, hwnd, (HMENU)ID_STATUS,
                                  NULL, NULL);
         LoadLanguages();
         return 0;
@@ -361,7 +361,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
     HWND hwnd = CreateWindowW(L"PR2LauncherGUI", T("title"),
                               WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU |
                               WS_MINIMIZEBOX,
-                              CW_USEDEFAULT, CW_USEDEFAULT, 370, 210,
+                              CW_USEDEFAULT, CW_USEDEFAULT, 470, 210,
                               NULL, NULL, inst, NULL);
     ShowWindow(hwnd, show);
     UpdateWindow(hwnd);
