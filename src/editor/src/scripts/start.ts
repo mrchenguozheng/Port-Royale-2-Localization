@@ -199,3 +199,14 @@ const S = { status: null, timer: 0 };
     $('openEditor').addEventListener('click', () => { document.querySelector('.tab[data-view="editor"]')?.dispatchEvent(new MouseEvent('click', {bubbles: true})); });
 
     void refresh();
+    void loadDirs();
+
+    // 每次切回「安装与启动」都刷新一次，目录列表与状态不会停留在旧数据。
+    for (const tab of document.querySelectorAll('.tab')) {
+      tab.addEventListener('click', () => {
+        if ((tab as HTMLElement).dataset.view === 'start') {
+          void refresh();
+          void loadDirs();
+        }
+      });
+    }
