@@ -854,11 +854,21 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(start_run(
                 "deploy", lambda ev: P.run_deploy(d, langs or None, ev)))
 
+        if path == "/api/start/lang":
+            d = start_dir()
+            if not d or not P.is_game_dir(d):
+                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
+            code = (body.get("lang") or "").strip()
+            if code not in P.available_langs():
+                return self.send_json({"ok": False, "error": "没有这个语言包：%s" % code})
+            ok, code = P.set_game_language(d, code)
+            return self.send_json({"ok": ok, "lang": code, **start_status()})
+
         if path == "/api/start/launch":
             d = start_dir()
             if not d or not P.is_game_dir(d):
                 return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
-            lang = body.get("lang") or None
+            lang = body.get("lang") or P.game_language(d) or None
             if body.get("vanilla"):
                 ok, msg = P.launch_vanilla(d)
             else:
@@ -1052,11 +1062,21 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(start_run(
                 "deploy", lambda ev: P.run_deploy(d, langs or None, ev)))
 
+        if path == "/api/start/lang":
+            d = start_dir()
+            if not d or not P.is_game_dir(d):
+                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
+            code = (body.get("lang") or "").strip()
+            if code not in P.available_langs():
+                return self.send_json({"ok": False, "error": "没有这个语言包：%s" % code})
+            ok, code = P.set_game_language(d, code)
+            return self.send_json({"ok": ok, "lang": code, **start_status()})
+
         if path == "/api/start/launch":
             d = start_dir()
             if not d or not P.is_game_dir(d):
                 return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
-            lang = body.get("lang") or None
+            lang = body.get("lang") or P.game_language(d) or None
             if body.get("vanilla"):
                 ok, msg = P.launch_vanilla(d)
             else:

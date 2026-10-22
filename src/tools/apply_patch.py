@@ -99,6 +99,8 @@ def main():
     ap.add_argument("--no-check", action="store_true", help="跳过 check_breaks")
     ap.add_argument("--no-fonts", action="store_true", help="编译时不重裁字体")
     ap.add_argument("--launch", action="store_true", help="部署完成后启动游戏")
+    ap.add_argument("--locale", default="",
+                    help="部署后把游戏语言设为该代码（默认保持现有 locale.ini）")
     ap.add_argument("--dep", action="store_true",
                     help="中文：用依存句法给 ≥60 字的段落补空格（需要 .venv-spacy）")
     ap.add_argument("--dry-run", action="store_true", help="只打印计划，不写文件")
@@ -183,10 +185,14 @@ def main():
         sys.exit("[失败] " + msg)
     print("   " + msg.replace("\n", "\n   "))
 
-    # 4) locale.ini 指向本次的主语言
-    primary = langs[0]
+    # 4) locale.ini：默认不动，只有显式 --locale 才改
     ini = os.path.join(target, B.PACK_DIR, "locale.ini")
-    B.write_ini_language(ini, primary)
+    if args.locale:
+        B.set_game_language(target, args.locale)
+        primary = args.locale
+    else:
+        primary = B.read_ini_language(ini) or B.get_language() or langs[0]
+        print("   保持游戏语言：%s（要改加 --locale <代码>）" % (primary or "（空）"))
 
     # 5) 比对：构建产物 vs 游戏目录里实际文件
     print("\n── 核对 ──")

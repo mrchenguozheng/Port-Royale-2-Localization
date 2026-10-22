@@ -43,6 +43,7 @@ const title = 'PR2 本地化 · 安装与启动';
       <h2>3 启动</h2>
       <div class="row">
         <label>语言 <select id="launchLang"></select></label>
+        <button id="setLang">设为游戏语言</button>
         <button id="play">启动游戏（已注入）</button>
         <button id="vanilla">启动原版对比</button>
         <button id="openEditor">打开编辑器</button>
@@ -161,6 +162,14 @@ const title = 'PR2 本地化 · 安装与启动';
     $('dir').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') void saveDir(); });
     $('build').addEventListener('click', () => void runJob('build', { langs: chosenLangs() }));
     $('deploy').addEventListener('click', () => void runJob('deploy', { langs: chosenLangs() }));
+
+    $('setLang').addEventListener('click', async () => {
+      try {
+        const st = await api('/api/start/lang', { lang: $('launchLang').value });
+        fillStatus(st);
+        $('log').textContent = '游戏语言已设为 ' + st.lang;
+      } catch (err) { $('log').textContent = err.message; }
+    });
 
     $('play').addEventListener('click', async () => {
       try {
