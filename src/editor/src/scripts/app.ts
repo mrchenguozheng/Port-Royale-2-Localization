@@ -430,7 +430,6 @@ function fill(sel: HTMLElement, items: string[], cur: string) {
 
 let toastTimer = 0;
 
-let toastTimer = 0;
 
 function toast(msg: string) {
   const a = document.getElementById('toast') as HTMLElement & { open?: boolean };
