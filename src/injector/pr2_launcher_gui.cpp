@@ -172,9 +172,8 @@ static void ReadLauncherLang(char* out, int cap) {
     ReadLauncherValue("ui_language", out, cap);
 }
 
-static void SaveLauncherValue(const char* key, const char* value) {
-    char path[MAX_PATH], tmp[MAX_PATH], line[1024];
-    snprintf(path, sizeof(path), "%s\\launcher.ini", g_root);
+static void SaveIniValue(const char* path, const char* key, const char* value) {
+    char tmp[MAX_PATH], line[1024];
     snprintf(tmp, sizeof(tmp), "%s.tmp", path);
     int klen = (int)strlen(key);
     int replaced = 0;
@@ -203,6 +202,12 @@ static void SaveLauncherValue(const char* key, const char* value) {
     if (!replaced) fprintf(out, "%s=%s\n", key, value);
     fclose(out);
     if (!MoveFileExA(tmp, path, MOVEFILE_REPLACE_EXISTING)) remove(tmp);
+}
+
+static void SaveLocaleLanguage(const char* lang) {
+    char path[MAX_PATH];
+    snprintf(path, sizeof(path), "%s\\PR2Packs\\locale.ini", g_root);
+    SaveIniValue(path, "language", lang);
 }
 
 static void AddAlias(const char* code, const char* name) {
@@ -418,19 +423,7 @@ static void LoadLanguages(void) {
     }
 
     int sel = 0;
-    int foundLast = 0;
-    char last[64];
-    ReadLauncherValue("last_language", last, sizeof(last));
-    if (last[0]) {
-        for (int i = 0; i < g_codeCount; i++) {
-            if (_stricmp(g_codes[i], last) == 0) {
-                sel = i;
-                foundLast = 1;
-                break;
-            }
-        }
-    }
-    if (!foundLast && ReadLocale(current, sizeof(current))) {
+    if (ReadLocale(current, sizeof(current))) {
         for (int i = 0; i < g_codeCount; i++) {
             if (_stricmp(g_codes[i], current) == 0) { sel = i; break; }
         }
@@ -477,7 +470,7 @@ static void Launch(const char* lang, int vanilla) {
     if (code != 0) {
         MessageBoxW(NULL, TF("error.exit_code", code), T("title"), MB_ICONERROR);
     } else {
-        if (!vanilla && lang && *lang) SaveLauncherValue("last_language", lang);
+        if (!vanilla && lang && *lang) SaveLocaleLanguage(lang);
         SetWindowTextW(g_status, vanilla ? T("status.vanilla") : T("status.launched"));
     }
 }
