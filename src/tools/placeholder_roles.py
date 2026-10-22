@@ -36,7 +36,7 @@ RULES_DIR = os.path.join(ROOT, "src", "translations", "placeholder_roles")
 def lang_source(lang):
     """中文文本源在 references/，其他语言在 translations/。"""
     if lang == "zh":
-        return os.path.join(ROOT, "src", "references", "zh.gog_1.1.2.3.toml")
+        return os.path.join(ROOT, "src", "clean", "zh.toml")
     return os.path.join(ROOT, "src", "translations", "%s.toml" % lang)
 
 

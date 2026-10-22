@@ -673,9 +673,8 @@ def save_all(lang, rows):
         raise ValueError("%s 是只读参考原文，不能写入" % lang)
 
     if lang == "zh":
-        # 中文：把去掉排版空格的干净文本写回 references，再按规则重新生成。
-        ref = os.path.join(os.path.dirname(SRC), "src", "references",
-                           "zh.gog_1.1.2.3.toml")
+        # 中文：干净文本写回 src/clean/zh.toml，再按规则重新生成。
+        ref = os.path.join(os.path.dirname(SRC), "src", "clean", "zh.toml")
         cur = tomllib.load(open(ref, "rb"))
         order = list(cur)
         upd = {r["id"]: ZH_GEN.strip_padding(r["text"]) for r in rows}
@@ -759,9 +758,8 @@ def patch_all(lang, rows):
         raise ValueError("%s 是只读参考原文，不能写入" % lang)
 
     if lang == "zh":
-        # 中文：把去掉排版空格的干净文本写回 references，再按规则重新生成。
-        ref = os.path.join(os.path.dirname(SRC), "src", "references",
-                           "zh.gog_1.1.2.3.toml")
+        # 中文：干净文本写回 src/clean/zh.toml，再按规则重新生成。
+        ref = os.path.join(os.path.dirname(SRC), "src", "clean", "zh.toml")
         cur = tomllib.load(open(ref, "rb"))
         order = list(cur)
         upd = {r["id"]: ZH_GEN.strip_padding(r["text"]) for r in rows}
@@ -1236,9 +1234,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/clean":
             hid = (query.get("id") or [""])[0]
             lang = (query.get("lang") or ["zh"])[0]
-            ref_name = ("zh.gog_1.1.2.3.toml" if lang == "zh"
+            ref_name = ("zh.toml" if lang == "zh"
                         else "%s.toml" % lang)
-            ref_path = os.path.join(os.path.dirname(SRC), "src", "references", ref_name)
+            ref_path = os.path.join(os.path.dirname(SRC), "src", "clean", ref_name)
             if not os.path.isfile(ref_path):
                 return self.send_json({"detail": "没有干净文本源"}, 404)
             try:
@@ -1268,9 +1266,9 @@ class Handler(BaseHTTPRequestHandler):
             extra = [t for t in zh_ph if t not in en_ph]
             # 「干净文本」的空格数：优先读 references 里的干净文本源。
             clean_spaces = None
-            ref_name = ("zh.gog_1.1.2.3.toml" if lang == "zh"
+            ref_name = ("zh.toml" if lang == "zh"
                         else "%s.toml" % lang)
-            ref_path = os.path.join(os.path.dirname(SRC), "src", "references", ref_name)
+            ref_path = os.path.join(os.path.dirname(SRC), "src", "clean", ref_name)
             if os.path.isfile(ref_path):
                 try:
                     with open(ref_path, "rb") as fh:

@@ -35,7 +35,7 @@ sys.path.insert(0, HERE)
 import lang_rules  # noqa: E402
 import apply_zh_rules as GEN  # noqa: E402
 
-REF = os.path.join(ROOT, "src", "references", "zh.gog_1.1.2.3.toml")
+REF = os.path.join(ROOT, "src", "clean", "zh.toml")
 ZH = os.path.join(ROOT, "src", "translations", "zh.toml")
 MARK = os.path.join(ROOT, "build", "zh.reviewed.json")
 ACCEPTED = os.path.join(ROOT, "build", "zh.accepted.toml")

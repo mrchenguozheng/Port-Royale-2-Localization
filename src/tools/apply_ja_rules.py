@@ -2,7 +2,7 @@
 # coding: utf-8
 r"""apply_ja_rules.py —— 从干净日语源生成带排版空格的 ja.toml
 
-来源：src/references/ja.toml（无排版空格）
+来源：src/clean/ja.toml（无排版空格）
 产物：src/translations/ja.toml（引擎用，带助词/标点后的空格）
 
 规则来自 lang_rules/ja.py：
@@ -23,15 +23,15 @@ import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-CLEAN = os.path.join(ROOT, "src", "references", "ja.toml")
+CLEAN = os.path.join(ROOT, "src", "clean", "ja.toml")
 OUT = os.path.join(ROOT, "src", "translations", "ja.toml")
 
 sys.path.insert(0, HERE)
 import lang_rules.ja as JA  # noqa: E402
 
 HEADER = [
-    "# 日语生成物：由 src/references/ja.toml 经 apply_ja_rules.py 生成，请勿手改。",
-    "# 改动请改 references/ja.toml（干净文本），再跑一次 apply_ja_rules.py。",
+    "# 日语生成物：由 src/clean/ja.toml 经 apply_ja_rules.py 生成，请勿手改。",
+    "# 改动请改 clean/ja.toml（干净文本），再跑一次 apply_ja_rules.py。",
 ]
 
 

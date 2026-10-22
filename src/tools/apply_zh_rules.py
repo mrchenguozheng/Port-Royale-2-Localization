@@ -27,7 +27,7 @@ sys.path.insert(0, HERE)
 
 import lang_rules  # noqa: E402
 
-SRC = os.path.join(ROOT, "src", "references", "zh.gog_1.1.2.3.toml")
+SRC = os.path.join(ROOT, "src", "clean", "zh.toml")
 DST = os.path.join(ROOT, "src", "translations", "zh.toml")
 
 TAG = re.compile(r"(<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z])")
@@ -197,7 +197,7 @@ def generate():
 
 def write(order, out):
     header = ("# 自动生成：本文件由 src/tools/apply_zh_rules.py\n"
-              "# 从 src/references/zh.gog_1.1.2.3.toml 按 标点/连词/人名 规则生成。\n"
+              "# 从 src/clean/zh.toml 按 标点/连词/人名 规则生成。\n"
               "# 改译文请改 references 里的文本源；改规则请改 apply_zh_rules.py。\n")
     io.open(DST, "w", encoding="utf-8", newline="\n").write(
         header + "\n".join('"%s" = "%s"' % (k, esc(out[k])) for k in order) + "\n")
