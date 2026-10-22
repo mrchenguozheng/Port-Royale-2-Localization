@@ -4,7 +4,7 @@
 
 为什么需要
 ----------
-`src\\translations\\references\\` 里的英文/法文原文不是抄来的，是从各自版本
+`src\\references\\` 里的英文/法文原文不是抄来的，是从各自版本
 的 exe 里解出来的。换游戏版本（或想对照别的语言版本）时用这个脚本重提一次，
 拿到的是**原样**的表：`<n>` 换行、占位符、行尾空格都保持游戏里的样子。
 
@@ -21,7 +21,7 @@
 用法
 ----
     python src\\tools\\extract_strings.py --exe "<游戏目录>\\PR2.exe" \\
-        --out src\\translations\\references\\en.gog_1.1.2.3.toml
+        --out src\\references\\en.gog_1.1.2.3.toml
 """
 import argparse
 import io

@@ -24,8 +24,8 @@ import tomllib
 from collections import Counter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-TRANS = os.path.join(ROOT, "src", "translations")
-REF = os.path.join(TRANS, "references")
+TRANS = os.path.join(ROOT, "src", "live")
+REF = os.path.join(ROOT, "src", "orig")
 DOCS = os.path.join(ROOT, "docs")
 
 # ---------------------------------------------------------------- 规则

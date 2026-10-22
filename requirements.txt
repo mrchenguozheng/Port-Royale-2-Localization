@@ -2,7 +2,7 @@
 #
 # 核心流程只用 Python 标准库：
 #   - 编辑器后端是 http.server + json，不需要 fastapi / uvicorn，也不需要 venv；
-#   - translate / compile_pack / build_install / normalize_text / check_breaks /
+#   - translate / compile_pack / pr2ctl / normalize_text / check_breaks /
 #     extract_strings / extract_fonts 全部只有标准库。
 #
 # 下面都是「可选增强」，缺了会自动降级，不会让构建失败。
@@ -17,3 +17,6 @@ unidic-lite>=1.0.8
 # 字体裁剪（subset_fonts.py）。本机目前装在 WorkBuddy 的 Python 环境里，
 # 脚本会自动找到；想统一就装进主环境。
 fonttools>=4.0
+
+# 可选：space_words.py 给中文按词补空格
+# jieba

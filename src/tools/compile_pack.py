@@ -3,12 +3,12 @@
 r"""src/tools/compile_pack.py — 把 translations\<语言>.toml 编译成引擎能读的语言包
 
     python src/tools/compile_pack.py                        # 编 zh（默认）
-    python src/tools/compile_pack.py --lang de --out <游戏目录>
+    python src/tools/compile_pack.py --lang de --out <输出目录>
 
 只做一件事：**占位符校验**。译文里的 %1 / @D$EndDate$ 必须与原文
 一一对应，种类、数量、写法全都要对；顺序可以按中文语序调。
 
-references\ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
+src\references\ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
 合并层（translate.load_toml）本身就是从这两个文件读出 en / fr 的，
 拿它们校验自己永远相等，报不出任何东西。
 
@@ -128,7 +128,7 @@ def load_keep_original():
     """读 keep_original.toml，返回 {id: 分组名}。"""
     import tomllib
     path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "translations", "keep_original.toml")
+                        "live", "keep_original.toml")
     if not os.path.isfile(path):
         return {"0xfc512ea5": "版权声明"}
     data = tomllib.load(open(path, "rb"))
@@ -187,7 +187,7 @@ def _default_lang():
 def build(lang, out_dir, strict):
     # 参考原文**不参与编译**：生成 en.txt / fr.txt 交给引擎等于用「原始英文」
     # 覆盖游戏，等于没汉化。所以直接拒绝，而不是打个警告继续跑。
-    # 名单问 translate —— 那里是唯一一份（references\en.gog_1.1.2.3 之类）。
+    # 名单问 translate —— 那里是唯一一份（src\references\en.gog_1.1.2.3 之类）。
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import translate as T
     if lang in T.REFERENCE_LANGS:
@@ -226,7 +226,7 @@ def build(lang, out_dir, strict):
         # 【坑】hash 必须写成**大写**（0x30A45770），与既有语言包一致。
         # patch.js 的合并逻辑按大写规范化 hash，产物若写成小写，
         # 用户手改过的条目就识别不出来，合并会静默失效（测试 test_patch.js
-        # 会抓到）。小写 id 只存在于 src/translations\*.toml 里作为内部键。
+        # 会抓到）。小写 id 只存在于 src/live\*.toml 里作为内部键。
         lines.append("%s = %s\n" % (h.upper().replace("0X", "0x"),
                                     to_engine(txt)))
         n += 1
@@ -240,7 +240,7 @@ def build(lang, out_dir, strict):
     if n == 0:
         print("错误：没有编出任何条目，未生成 %s" % path)
         print("      找不到 %s\\%s.toml，或它里面没有条目。"
-              % (os.path.join(SRC, "translations"), lang))
+              % (os.path.join(SRC, "live"), lang))
         print("      加一种语言：python src\\tools\\new_lang.py"
               " --new-lang %s" % lang)
         return 1
@@ -268,7 +268,7 @@ def build(lang, out_dir, strict):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="把 src/translations\\<语言>.toml 编译成引擎语言包")
+    ap = argparse.ArgumentParser(description="把 src/live\\<语言>.toml 编译成引擎语言包")
     ap.add_argument("--lang", default="", help="语言代码，默认 translations\\ 下第一个可编辑语言")
     ap.add_argument("--out", default=DEFAULT_OUT, help="输出目录")
     ap.add_argument("--strict", action="store_true", help="有错误时返回非零")

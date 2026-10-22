@@ -24,7 +24,7 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 
 
 def load_keep():
-    path = os.path.join(ROOT, "src", "translations", "keep_original.toml")
+    path = os.path.join(ROOT, "src", "live", "keep_original.toml")
     if not os.path.isfile(path):
         return set()
     data = tomllib.load(open(path, "rb"))

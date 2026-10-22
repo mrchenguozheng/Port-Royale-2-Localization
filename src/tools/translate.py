@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-r"""src/tools/translate.py — src/translations\<语言>.toml 的翻译流水线
+r"""src/tools/translate.py — src/live\<语言>.toml 的翻译流水线
 
     python src/tools/translate.py export --out work.jsonl   # 导出待译条目
     python src/tools/translate.py check  work.jsonl         # 校验译文（占位符/标签）
@@ -35,7 +35,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.dirname(HERE)                     # 仓库的 src\
 ROOT = os.path.dirname(SRC)                     # 仓库根
-STRINGS_DIR = os.path.join(SRC, "translations")
+STRINGS_DIR = os.path.join(SRC, "live")
+REFERENCES_DIR = os.path.join(SRC, "orig")
 
 #: 译文主源：translations\<语言>.toml，**每条一行**：
 #:     "0xd2d0a572" = "萧条"
@@ -60,9 +61,8 @@ FR_LANG = "fr.gog_1.1.2.42"
 
 def lang_path(code):
     """语言代码 -> 文件路径。只读参考在 references\\ 子目录下。"""
-    return os.path.join(STRINGS_DIR,
-                        "references" if code in REFERENCE_LANGS else "",
-                        code + ".toml")
+    base = REFERENCES_DIR if code in REFERENCE_LANGS else STRINGS_DIR
+    return os.path.join(base, code + ".toml")
 
 
 def target_langs():

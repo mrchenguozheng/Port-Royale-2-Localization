@@ -34,7 +34,7 @@ Steam 版 `PR2.exe` 带 Valve CEG 完整性校验，**改 exe 哪怕一个字节
 
 ## 快速开始
 
-需要 Visual Studio（C++ 桌面开发组件）+ Python 3.11 且带 tkinter。
+需要 Visual Studio（C++ 桌面开发组件）+ Python 3.11 以上（当前用 3.15）。
 
 ```
 start.bat
@@ -43,6 +43,11 @@ start.bat
 它只打开本地化工具窗口，**不自动编译**。窗口分三段，段号就是步骤：
 
 1. **构建** —— 首次要点「构建注入器」拿到 DLL 与启动器；勾选语言点「构建所选语言」
+   开发时改完译文，可以直接双击 `apply_patch.bat`：归一化→校验→编译→部署→核对一次跑完
+
+   选过游戏目录后，窗口会按 `PR2.exe` 的 SHA-256 认出是哪个版本（GOG 英/法、Steam），
+   并把「版本 → 目录」记住；下次打开自动恢复，下拉可切换；
+   点「检查补丁…」能看到注入组件、语言包、`locale.ini` 与字体是否已装好。
 2. **部署** —— 选游戏目录，点「复制到游戏目录」
 3. **启动** —— 「启动游戏（已注入）」；只想改配置不想进游戏就用「保存语言设置」
 
@@ -63,10 +68,10 @@ start.bat
 Port Royale 2 Localization/
 ├─ start.bat                  日常入口：只开窗口
 ├─ src/
-│  ├─ translations/         译文人工维护源（唯一）
+│  ├─ live/         译文人工维护源（唯一）
 │  │  ├─ zh.toml
 │  │  ├─ ja.toml           日语（3548 条已完成）
-│  │  └─ references/        en.gog_1.1.2.3.toml / fr.gog_1.1.2.42.toml，只读参考原文
+│  └─ orig/           en.gog_1.1.2.3.toml / fr.gog_1.1.2.42.toml / zh.toml（文本源）
 │  ├─ injector/             注入组件源码（纯 C++）
 │  ├─ tools/                语言包与译文处理脚本（Python）
 │  └─ locale.ini            语言选择模板
@@ -141,11 +146,11 @@ Port Royale 2 Localization/
 |---|---|---|
 | 中文 `zh` | 3548 | ✅ 全部完成（含排版与占位符校验） |
 | 日语 `ja` | 3548 | ✅ 全部完成（3370 条译文 + 178 条「原样保留」） |
-| 英文/法文 | 3548 | 参照原文（`translations/references/`），不生成语言包 |
+| 英文/法文 | 3548 | 参照原文（`src/orig/`），不生成语言包 |
 
 日语里的「原样保留」指本来就不该翻译的 178 条：纯符号/数字、引擎编号
 （`IDM_CONTEST_…`）、按键名（`ESC`/`CTRL`/`F10`）、版权声明与制作方名称。
-清单在 `src/translations/keep_original.toml`，编译时会强制写回英文原文。
+清单在 `src/live/keep_original.toml`，编译时会强制写回英文原文。
 
 ## 路径约定
 

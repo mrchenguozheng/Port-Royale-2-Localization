@@ -7,7 +7,7 @@
 // 不如先出骨架再取数据。
 import '../styles/editor.css';
 
-const title = 'PR2 本地化编辑器';
+const title = 'PR2 本地化 · 译文编辑';
 ---
 <!doctype html>
 <html lang="zh-CN">
@@ -17,63 +17,146 @@ const title = 'PR2 本地化编辑器';
     <title>{title}</title>
   </head>
   <body>
-    <header class="bar">
-      <span class="brand">PR2 本地化编辑器</span>
+  <header class="toolbar">
+    <span class="brand">PR2 本地化工作台</span>
+    <nav class="tabs">
+      <button class="tab active" data-view="editor" type="button">译文编辑</button>
+      <button class="tab" data-view="start" type="button">安装与启动</button>
+    </nav>
+  </header>
 
-      <label class="field">
-        编辑
-        <select id="lang"></select>
-      </label>
-      <button id="addLang" class="mini" title="添加一种语言">＋</button>
-
-      <span class="sep"></span>
-
-      <label class="field">
-        参照
-        <select id="refA" class="ref-sel"></select>
-      </label>
-      <label class="field">
-        <select id="refB" class="ref-sel"></select>
-      </label>
-
-      <span class="sep"></span>
-
-      <label class="field">
-        字号
-        <select id="size">
-          <option value="12">12</option>
-          <option value="14" selected>14</option>
-          <option value="16">16</option>
-          <option value="18">18</option>
-          <option value="20">20</option>
-        </select>
-      </label>
-    </header>
-
-    <div class="head">
-      <div>id</div>
-      <div id="headLabels">翻译对照</div>
-    </div>
-
-    <main id="rows"></main>
-
-    <footer class="foot">
-      <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…" spellcheck="false" />
-      <span id="stat">载入中…</span>
-      <span id="dirty" class="dirty"></span>
-
-      <span class="pager">
-        <button id="prev" title="上一页">‹</button>
-        <input id="pageInput" class="page-num" type="number" min="1" step="1"
-               aria-label="页码" />
-        <span id="pageCount">/ 1</span>
-        <button id="next" title="下一页">›</button>
-        <select id="pageSize" title="每页条数"></select>
+  <section id="view-editor" class="view">
+    <div class="editor-bar">
+      <span class="editor-tools">
+        <label class="tb">编辑
+          <sl-select id="lang" size="small" hoist style="min-width:7.5rem"></sl-select>
+        </label>
+        <button id="addLang" class="mini icon-btn" title="添加一种语言"><span class="ic ic-plus" aria-hidden="true"></span></button>
+        <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…" spellcheck="false" />
+        <label class="tb">字号
+          <sl-select id="size" size="small" hoist style="min-width:5rem"></sl-select>
+          <button id="sizeAdd" class="mini" title="输入数值，加入字号列表">添加</button>
+          <button id="sizeDel" class="mini" title="从列表删除当前自定义字号（预设不可删）">删除</button>
+        </label>
+        <button id="save" disabled>保存</button>
       </span>
 
-      <span class="hint">Ctrl+Enter 下一条</span>
-      <button id="save" disabled>保存</button>
-    </footer>
+      <span class="nav-group">
+        <button id="first" class="mini" hidden>首条</button>
+        <button id="prev" class="mini">&lsaquo; 上一条</button>
+        <input id="pageInput" class="page-num" type="number" min="1" step="1" aria-label="第几条" />
+        <span id="pageCount">共 0 条</span>
+        <button id="next" class="mini">下一条 &rsaquo;</button>
+        <button id="last" class="mini" hidden>末条</button>
+      </span>
+
+      <span class="jump-box">
+        <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false" autocomplete="off" />
+        <div id="jumpList" class="jump-list" hidden></div>
+      </span>
+      <button id="jumpGo">跳转</button>
+
+      <span id="stat"></span>
+      <span id="dirty" class="dirty"></span>
+    </div>
+
+    <div class="workspace">
+      <aside id="list" class="side-list" aria-label="条目列表"></aside>
+      <main id="rows"></main>
+    </div>
+  </section>
+
+  <section id="view-start" class="view" hidden>
+    <div class="start-col">
+
+
+
+    <section class="card">
+      <h2>1 游戏目录</h2>
+      <div class="row">
+        <input id="dir" type="text" spellcheck="false"
+               placeholder="游戏安装目录" />
+        <button id="browseDir">浏览…</button>
+        <button id="pickDir">检测并记住</button>
+      </div>
+      <p id="dirMsg" class="msg"></p>
+      <p id="statusLine" class="msg"></p>
+      <ul id="dirList" class="dir-list"></ul>
+    </section>
+
+    <section class="card">
+      <h2>2 构建与部署</h2>
+      <div id="langs" class="langs"></div>
+      <div class="row">
+        <button id="buildInjector">编译注入器（DLL + 启动器）</button>
+        <button id="buildPacks">编译语言包</button>
+        <button id="deploy">部署到游戏目录</button>
+      </div>
+      <p class="msg">编译注入器会调用 MSVC；编译语言包只处理勾选的译文；部署只复制文件，不改 PR2.exe。</p>
+    </section>
+
+    <section class="card">
+      <h2>3 启动</h2>
+      <div class="row">
+        <label>语言 <select id="launchLang"></select></label>
+        <button id="setLang">设为游戏语言</button>
+        <button id="play">启动游戏（已注入）</button>
+        <button id="vanilla">启动原版对比</button>
+        <button id="openEditor">打开译文编辑</button>
+      </div>
+      <p id="gameState" class="msg">游戏状态：未检测</p>
+      <div class="row">
+        <button id="checkGame">检测游戏是否运行</button>
+        <button id="killGame">结束游戏进程</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>服务状态</h2>
+      <p id="srvInfo" class="msg"></p>
+      <div class="row"><button id="srvRefresh">刷新</button></div>
+      <ul id="srvList" class="srv-list"></ul>
+    </section>
+    </div>
+    <aside class="card log-card">
+      <h2>日志</h2>
+      <pre id="log" class="log"></pre>
+    </aside>
+    
+  </section>
+
+    <sl-alert id="toast" variant="warning" duration="1800" closable class="pr2-toast"></sl-alert>
+
+    <div id="loading" class="loading" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <span>载入中…</span>
+    </div>
+
+    <!-- 语境推断 -->
+    <div id="ctxModal" class="modal" hidden>
+      <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="ctxTitle">
+        <h2 id="ctxTitle">语境推断</h2>
+        <div id="ctxBody" class="ctx-body"></div>
+        <div class="modal-actions">
+          <button id="ctxClose">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 规则轨迹：这条译文逐阶段经过了哪些格式化规则 -->
+    <sl-dialog id="ruleModal" label="规则轨迹">
+      <div id="ruleStages" class="rule-stages"></div>
+      <sl-button slot="footer" id="ruleClose" size="small">关闭</sl-button>
+    </sl-dialog>
+
+    <!-- 初版：默认锁定，逐条解锁，仅本次修改有效 -->
+    <sl-dialog id="seedModal" label="初版文本">
+      <p id="seedLockInfo" class="modal-note">初版默认锁定。解锁后只能改这一条，保存或关闭后重新锁定。</p>
+      <sl-textarea id="seedText" resize="auto" readonly></sl-textarea>
+      <sl-button slot="footer" id="seedUnlock" size="small">解锁编辑</sl-button>
+      <sl-button slot="footer" id="seedSave" size="small" disabled>保存初版</sl-button>
+      <sl-button slot="footer" id="seedClose" size="small">关闭</sl-button>
+    </sl-dialog>
 
     <!-- 添加语言：选一个已存在的语言当模板，复制成新语言的基础 -->
     <div id="modal" class="modal" hidden>
@@ -103,5 +186,6 @@ const title = 'PR2 本地化编辑器';
     </div>
 
     <script src="../scripts/app.ts"></script>
+  <script>import '../scripts/start';</script>
   </body>
 </html>

@@ -1,48 +1,49 @@
 @echo off
 REM ============================================================
-REM  PR2 Localization - open the localization window
+REM  PR2 Localization - install / launch window
 REM
-REM  This script only starts the window. Everything is done
-REM  inside it, one button at a time:
+REM  Default: start the local web app in THIS console window and
+REM  open the installer page. Keep the window open to watch the
+REM  backend log; close it (or Ctrl+C) to stop the server.
 REM
-REM    - Build injector     PR2TextSource.dll / PR2Launcher.exe
-REM    - Build languages    compile the ticked packs
-REM    - Deploy             copy them into the game folder
-REM    - Run / Vanilla
-REM
-REM  Nothing is compiled automatically, so you can rebuild only
-REM  what you actually changed.
+REM  --status: list running editor backends (ports, pids) and exit.
 REM
 REM  Keep this file ASCII + CRLF. cmd misreads UTF-8 in .bat files.
 REM ============================================================
-setlocal
+setlocal EnableExtensions
 
-REM %~dp0 is the repo root, where the tools live one level down.
 set "SRC=%~dp0src\"
 set "TOOLS=%SRC%tools\"
 
-call "%SRC%find_python.bat" --tk
-if not defined PY goto :nopython
+if /I "%~1"=="--status" goto status
 
-REM  pythonw.exe beside python.exe opens the window without a
-REM  console behind it. Anything else (the py launcher) is used
-REM  as is.
-set "PYW=%PY%"
-if "%PY:~-10%"=="python.exe" set "PYW=%PY:~0,-10%pythonw.exe"
-if not exist "%PYW%" set "PYW=%PY%"
-start "" %PYW% "%TOOLS%build_install.py"
+call "%SRC%find_python.bat"
+if not defined PY goto :nopython
+title PR2 Localization
+echo Starting local server... close this window to stop it.
+echo.
+"%PY%" "%SRC%editor\server.py" --restart --open-page /install
+echo.
+echo Server stopped.
+pause
+endlocal
+exit /b 0
+
+:status
+call "%SRC%find_python.bat"
+if not defined PY goto :nopython
+"%PY%" "%TOOLS%server_status.py"
+echo.
+pause
 endlocal
 exit /b 0
 
 :nopython
 echo.
-echo [all] The localization window cannot open:
-echo [all] no Python 3.11+ with tkinter was found.
-echo [all]
-echo [all] Install Python from
-echo [all]   https://www.python.org/downloads/
-echo [all] and tick "Add python.exe to PATH", then try again.
-echo [all]
+echo [start] Cannot start: no Python 3.11+ found.
+echo [start] Install Python from https://www.python.org/downloads/
+echo [start] and tick "Add python.exe to PATH".
+echo.
 pause
 endlocal
 exit /b 0
