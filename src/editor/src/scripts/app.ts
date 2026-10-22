@@ -238,18 +238,30 @@ async function boot() {
   } catch { /* 忽略坏值 */ }
   fillSizeSelect();
   applySize();
-  await reload(true);
-  setLoading(false);
-  const sp = Number(saved(pageKey()));
-  if (sp > 1) await renderPage(sp);
 
-  const mFullHash = initialPath.match(/^\/translate\/[A-Za-z][A-Za-z-]*\/(?:0x)?([0-9a-f]{8})$/i);
-  const mFullNum = initialPath.match(/^\/translate\/[A-Za-z][A-Za-z-]*\/(\d+)$/);
-  if (mFullHash) {
-    await jumpToId('0x' + mFullHash[1].toLowerCase());
-  } else if (mFullNum) {
-    await renderPage(Number(mFullNum[1]));
+  // 先算目标页，再一次性加载：避免「先到第 1 条、再跳目标」的中间态。
+  let targetPage = 0;
+  const mHash = initialPath.match(/^\/translate\/[A-Za-z][A-Za-z-]*\/(?:0x)?([0-9a-f]{8})$/i);
+  const mNum = initialPath.match(/^\/translate\/[A-Za-z][A-Za-z-]*\/(\d+)$/);
+  if (mHash) {
+    try {
+      const f = await api<{ index: number }>(
+        '/api/find?id=' + encodeURIComponent('0x' + mHash[1].toLowerCase()));
+      if (f && f.index >= 0) targetPage = Math.floor(f.index / S.pageSize) + 1;
+    } catch { /* 找不到就按第 1 页 */ }
+  } else if (mNum) {
+    targetPage = Number(mNum[1]);
   }
+
+  if (targetPage > 0) {
+    S.page = targetPage;
+    await reload(false);           // 保持目标页，不重置
+  } else {
+    await reload(true);
+    const sp = Number(saved(pageKey()));
+    if (sp > 1) await renderPage(sp);
+  }
+  setLoading(false);
   updatePath();
 }
 
