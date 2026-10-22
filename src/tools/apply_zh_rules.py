@@ -215,7 +215,7 @@ def space_dash(text):
     return re.sub(r" *—— *", repl, text)
 
 
-def soft_wrap(text, limit=24, step=12):
+def soft_wrap(text, limit=16, step=12):
     """超长且没有空格的汉字串，按约 12 字简单断开。"""
     particles = set("的了是在和与而或也就都但并且时后中上下里外为以于对把被将从到着过们吗呢吧啊呀哦嗯")
 
@@ -232,7 +232,7 @@ def soft_wrap(text, limit=24, step=12):
         out.append(s0)
         return " ".join(out)
 
-    return re.sub(r"[\u4e00-\u9fff]{24,}",
+    return re.sub(r"[\u4e00-\u9fff]{%d,}" % limit,
                   lambda m: split_run(m.group(0)), text)
 
 
