@@ -34,7 +34,9 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import sys
+import threading
 import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -137,6 +139,58 @@ def _presets():
     if f.get("donor_file"):
         fb = (f["donor_file"], int(f.get("donor_index", 0)))
     return sorted(langs), donors, fb
+
+
+_PRESETS_LOCK = threading.Lock()
+
+
+def add_language_presets(code, template=None):
+    """给新语言追加 [code] 段；donor 以模板语言（默认 zh）为起点。
+
+    返回 {"added": bool, "source": str|None, "path": str}。
+    只追加文本，不改动已有段；presets.toml 不存在时先从 example 复制。
+    """
+    code = (code or "").strip()
+    if not code:
+        raise ValueError("语言代码为空")
+    with _PRESETS_LOCK:
+        if not os.path.isfile(PRESETS):
+            if not os.path.isfile(PRESETS_EXAMPLE):
+                raise ValueError("缺少 presets.example.toml，无法自动生成字体配置")
+            shutil.copyfile(PRESETS_EXAMPLE, PRESETS)
+        doc = tomllib.load(open(PRESETS, "rb"))
+        if code in doc:
+            return {"added": False, "source": None, "path": PRESETS}
+
+        source = None
+        for cand in (template, "zh"):
+            cfg = doc.get(cand)
+            if isinstance(cfg, dict) and (cfg.get("pair") or cfg.get("supplement")):
+                source = cand
+                break
+
+        lines = ["", "# 自动添加：新语言 %s%s" % (
+            code, "（donor 以 %s 为模板）" % source if source else "（未找到可复制的模板）")]
+        lines.append("[%s]" % code)
+        if source:
+            cfg = doc[source]
+            for kind in ("pair", "supplement"):
+                for p in cfg.get(kind, []):
+                    lines.append("")
+                    lines.append("[[%s.%s]]" % (code, kind))
+                    for key in ("game", "game_file", "donor", "donor_file",
+                                "donor_index", "note"):
+                        if key not in p:
+                            continue
+                        val = p[key]
+                        if isinstance(val, int):
+                            lines.append("%s = %d" % (key, val))
+                        else:
+                            lines.append("%s = %s" % (
+                                key, json.dumps(str(val), ensure_ascii=False)))
+        with open(PRESETS, "a", encoding="utf-8", newline="\n") as fh:
+            fh.write("\n".join(lines) + "\n")
+        return {"added": True, "source": source, "path": PRESETS}
 
 
 def _upm(path, index=0):

@@ -948,8 +948,13 @@ def new_lang(code, src):
             pass
         raise
 
-    return {"code": code, "from": src, "aligned": aligned,
-            "dropped": dropped, "filled": filled}
+    result = {"code": code, "from": src, "aligned": aligned,
+              "dropped": dropped, "filled": filled}
+    try:
+        result["presets"] = _font_module().add_language_presets(code, src)
+    except Exception as exc:
+        result["presets_error"] = str(exc)
+    return result
 
 
 # ---------------------------------------------------------------- 字体前置状态
