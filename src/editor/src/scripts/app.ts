@@ -472,41 +472,40 @@ async function loadEntryInfo(id: string) {
       `/api/entry-info?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
     if (box !== document.getElementById('infoBar')) return;
     const ph = r.placeholders || [];
-    const missing = new Set(r.missing || []);
-    const used = new Set(r.used || []);
-    const extras = r.extra || [];
-    if (!ph.length && !extras.length) {
+    const meaning = new Map(ph.map((p) => [p.token, p.meaning]));
+    const counts = r.counts || [];
+    if (!counts.length) {
       box.appendChild(el('span', 'info-ph', '占位符：无'));
     }
-    for (const p of ph) {
+    let badCount = 0;
+    for (const c of counts) {
       const chip = el('span', 'ph-chip');
-      chip.appendChild(el('span', 'ph-tok', p.token));
-      chip.appendChild(el('span', 'ph-mean', p.meaning));
+      if (c.en !== c.zh) {
+        chip.classList.add('ph-bad');
+        badCount += 1;
+      }
+      if (c.en > 1) chip.appendChild(el('span', 'ph-x', '×' + c.en));
+      chip.appendChild(el('span', 'ph-tok', c.token));
+      chip.appendChild(el('span', 'ph-mean', meaning.get(c.token) || '原文没有'));
       const ins = el('button', 'mini ph-btn', '插入');
       ins.addEventListener('click', () => {
-        insertAtCaret(p.token);
+        insertAtCaret(c.token);
         void loadEntryInfo(id);
       });
       chip.appendChild(ins);
-      if (missing.has(p.token)) chip.classList.add('ph-missing');
-      if (used.has(p.token)) {
+      if (c.zh > 0) {
         const rm = el('button', 'mini ph-btn', '移除');
         rm.addEventListener('click', () => {
-          removeToken(p.token);
+          removeToken(c.token);
           void loadEntryInfo(id);
         });
         chip.appendChild(rm);
       }
       box.appendChild(chip);
     }
-    for (const t of extras) {
-      const chip = el('span', 'ph-chip ph-extra');
-      chip.appendChild(el('span', 'ph-tok', t));
-      chip.appendChild(el('span', 'ph-mean', '原文没有'));
-      const b = el('button', 'mini ph-btn', '移除');
-      b.addEventListener('click', () => removeToken(t));
-      chip.appendChild(b);
-      box.appendChild(chip);
+    if (badCount) {
+      box.appendChild(el('span', 'info-warn',
+        `占位符数量不符：${badCount} 个（原文与译文必须逐个数一致）`));
     }
     const extraSp = r.extra_spaces || 0;
     box.appendChild(el('span', 'info-sp',

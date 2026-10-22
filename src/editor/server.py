@@ -360,6 +360,29 @@ def table_order():
     return _ORDER
 
 
+ARG_RX = re.compile(r"@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]")
+
+
+def placeholder_counts(text):
+    from collections import Counter
+    return Counter(ARG_RX.findall(text or ""))
+
+
+def placeholder_problems(hid, lang, text):
+    """返回 [(token, 原文数, 译文数)]，只列数量不一致的。"""
+    c = context_of(hid, lang)
+    if c is None:
+        return []
+    en = placeholder_counts(c.get("en") or "")
+    zh = placeholder_counts(text)
+    out = []
+    for tok in set(en) | set(zh):
+        if en[tok] != zh[tok]:
+            out.append((tok, en[tok], zh[tok]))
+    out.sort()
+    return out
+
+
 def placeholders_of(text):
     out = []
     for m in re.finditer(r"@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]", text):
@@ -1106,8 +1129,14 @@ class Handler(BaseHTTPRequestHandler):
                     r = zh[i + 1] if i + 1 < len(zh) else ""
                     if (l.isascii() and l.isalnum()) or (r.isascii() and r.isalnum()):
                         clean_spaces += 1
+            en_c = placeholder_counts(en)
+            zh_c = placeholder_counts(zh)
+            counts = [{"token": t, "en": en_c[t], "zh": zh_c[t]}
+                      for t in sorted(set(en_c) | set(zh_c))]
             return self.send_json({
                 "placeholders": c.get("placeholders") or [],
+                "counts": counts,
+                "mismatch": [x["token"] for x in counts if x["en"] != x["zh"]],
                 "tags": c.get("tags") or [],
                 "missing": missing,
                 "extra": extra,
@@ -1373,7 +1402,17 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/patch":
             lang = body.get("lang", "")
-            written, changed = patch_all(lang, rows_of(body))
+            rows = rows_of(body)
+            bad = []
+            for row in rows:
+                for tok, want, got in placeholder_problems(
+                        row.get("id", ""), lang, row.get("text", "")):
+                    bad.append("%s 的 %s（原文 %d 个，译文 %d 个）"
+                               % (row.get("id", ""), tok, want, got))
+            if bad:
+                return self.send_error_json(
+                    400, "占位符数量不符，未保存：\n" + "\n".join(bad[:10]))
+            written, changed = patch_all(lang, rows)
             return self.send_json({"ok": True, "written": written,
                                    "changed": changed})
 
