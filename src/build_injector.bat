@@ -116,6 +116,7 @@ REM Move it to the repo-root build\ folder, next to PR2Packs\.
 move /Y "%SRC%PR2TextSource.dll" "%ROOT%PR2TextSource.dll" >nul
 move /Y "%SRC%PR2Launcher.exe" "%ROOT%PR2Launcher.exe" >nul
 move /Y "%SRC%PR2LauncherGUI.exe" "%ROOT%PR2LauncherGUI.exe" >nul
+if exist "%SRC%lang" xcopy /E /I /Y "%SRC%lang" "%ROOT%lang" >nul
 del /Q "%SRC%*.obj" >nul 2>&1
 
 echo.

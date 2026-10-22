@@ -189,6 +189,18 @@ static void BackupOriginalFonts(const char* self) {
     else printf("[PR2Launch] 原版字体备份不完整（%d/4）\n", n);
 }
 
+static int LanguageFontsComplete(const char* root, const char* lang) {
+    static const char* names[4] = {
+        "ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf"
+    };
+    for (int i = 0; i < 4; i++) {
+        char p[MAX_PATH];
+        snprintf(p, sizeof(p), "%s\\fonts\\%s\\%s", root, lang, names[i]);
+        if (GetFileAttributesA(p) == INVALID_FILE_ATTRIBUTES) return 0;
+    }
+    return 1;
+}
+
 static int RestoreOriginalFonts(const char* self) {
     char root[MAX_PATH], bak[MAX_PATH];
     DirOf(self, root);
@@ -315,11 +327,17 @@ int main(int argc, char** argv) {
         } else {
             langDir[0] = 0;
         }
-        if (langDir[0] && GetFileAttributesA(langDir) != INVALID_FILE_ATTRIBUTES) {
+        if (langDir[0] &&
+            GetFileAttributesA(langDir) != INVALID_FILE_ATTRIBUTES &&
+            LanguageFontsComplete(gameDir, fontLang)) {
             SetEnvironmentVariableA("PR2_FONT_DIR", fontLang);
             printf("[PR2Launch] 字体使用 fonts\\%s\\（不覆盖原版）\n", fontLang);
         } else {
             SetEnvironmentVariableA("PR2_FONT_DIR", NULL);
+            if (langDir[0] && GetFileAttributesA(langDir) != INVALID_FILE_ATTRIBUTES) {
+                printf("[PR2Launch] fonts\\%s\\ 字体不完整，回退到原版根目录字体\n",
+                       fontLang);
+            }
         }
     }
 

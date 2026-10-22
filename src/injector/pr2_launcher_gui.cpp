@@ -1,17 +1,18 @@
 /* pr2_launcher_gui.cpp -- 带界面的语言选择启动器。
  *
+ * 界面字符串来自 lang/gui.<ui>.ini（UTF-8）；找不到时回退 en，再回退内置英文。
  * 不重新实现注入：只调用同目录的 PR2Launcher.exe --lang=<代码>。
- * 语言列表来自 PR2Packs\*.txt，默认选中 locale.ini 的 language=。
  */
 #include <windows.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
-#define ID_LANG   1001
-#define ID_LAUNCH 1002
+#define ID_LANG    1001
+#define ID_LAUNCH  1002
 #define ID_VANILLA 1003
 #define ID_REFRESH 1004
-#define ID_STATUS 1005
+#define ID_STATUS  1005
 
 static char g_root[MAX_PATH];
 static char g_codes[64][64];
@@ -19,14 +20,160 @@ static int  g_codeCount = 0;
 static HWND g_combo = NULL;
 static HWND g_status = NULL;
 
-/* UTF-8 源字符串 -> 宽字符；只用于立即传给 Win32。 */
+/* ---- UTF-8 -> wide（只用于立即传给 Win32） ---- */
 static const wchar_t* W(const char* s) {
-    static wchar_t bufs[8][512];
+    static wchar_t bufs[8][1024];
     static int idx = 0;
     wchar_t* b = bufs[idx++ % 8];
-    MultiByteToWideChar(CP_UTF8, 0, s, -1, b, 511);
-    b[511] = 0;
+    MultiByteToWideChar(CP_UTF8, 0, s, -1, b, 1023);
+    b[1023] = 0;
     return b;
+}
+
+/* ---- 极简 key=value 语言文件 ---- */
+#define MAX_STR 96
+static char g_keys[MAX_STR][64];
+static char g_vals[MAX_STR][1024];
+static int  g_strCount = 0;
+
+static const char* BUILTIN[][2] = {
+    {"title", "Port Royale 2 Launcher"},
+    {"label.language", "Language pack:"},
+    {"button.launch", "Launch localized"},
+    {"button.vanilla", "Launch original"},
+    {"button.refresh", "Refresh"},
+    {"status.count", "%d language pack(s)"},
+    {"status.none", "No .txt in PR2Packs"},
+    {"status.launched", "Localized game launched."},
+    {"status.vanilla", "Original game launched."},
+    {"error.no_launcher", "PR2Launcher.exe not found in this folder."},
+    {"error.no_language", "No language pack selected."},
+    {"error.launch_failed", "Failed to start PR2Launcher.exe."},
+    {"error.exit_code", "Launcher exit code %lu; the game did not start."},
+    {"error.font_missing", "fonts\\%s\\ has no TTF fonts."},
+    {NULL, NULL}
+};
+
+static void Trim(char* s) {
+    char* p = s;
+    while (*p == ' ' || *p == '\t') p++;
+    if (p != s) memmove(s, p, strlen(p) + 1);
+    size_t n = strlen(s);
+    while (n && (s[n-1] == '\r' || s[n-1] == '\n' || s[n-1] == ' ' || s[n-1] == '\t')) {
+        s[--n] = 0;
+    }
+}
+
+static void Unescape(char* s) {
+    char* w = s;
+    for (char* p = s; *p; p++) {
+        if (p[0] == '\\' && p[1] == 'n') { *w++ = '\n'; p++; }
+        else *w++ = *p;
+    }
+    *w = 0;
+}
+
+static int LoadIni(const char* path) {
+    FILE* f = fopen(path, "rb");
+    if (!f) return 0;
+    char line[1200];
+    int loaded = 0;
+    if (fgets(line, sizeof(line), f)) {
+        unsigned char* u = (unsigned char*)line;
+        if (u[0] == 0xEF && u[1] == 0xBB && u[2] == 0xBF) {
+            memmove(line, line + 3, strlen(line + 3) + 1);
+        } else {
+            rewind(f);
+        }
+    } else {
+        fclose(f);
+        return 0;
+    }
+    while (fgets(line, sizeof(line), f)) {
+        char* p = line;
+        Trim(p);
+        if (!*p || *p == '#' || *p == ';' || *p == '[') continue;
+        char* eq = strchr(p, '=');
+        if (!eq) continue;
+        *eq = 0;
+        char* key = p; Trim(key);
+        char* val = eq + 1; Trim(val);
+        if (!*key || g_strCount >= MAX_STR) continue;
+        strncpy(g_keys[g_strCount], key, 63);
+        g_keys[g_strCount][63] = 0;
+        strncpy(g_vals[g_strCount], val, 1023);
+        g_vals[g_strCount][1023] = 0;
+        Unescape(g_vals[g_strCount]);
+        g_strCount++;
+        loaded++;
+    }
+    fclose(f);
+    return loaded;
+}
+
+static const char* T8(const char* key) {
+    for (int i = 0; i < g_strCount; i++) {
+        if (strcmp(g_keys[i], key) == 0) return g_vals[i];
+    }
+    for (int i = 0; BUILTIN[i][0]; i++) {
+        if (strcmp(BUILTIN[i][0], key) == 0) return BUILTIN[i][1];
+    }
+    return key;
+}
+
+static const wchar_t* T(const char* key) { return W(T8(key)); }
+
+static const wchar_t* TF(const char* key, ...) {
+    char buf[1600];
+    va_list ap;
+    va_start(ap, key);
+    vsnprintf(buf, sizeof(buf), T8(key), ap);
+    va_end(ap);
+    return W(buf);
+}
+
+static void ReadLauncherLang(char* out, int cap) {
+    char path[MAX_PATH], line[512];
+    out[0] = 0;
+    snprintf(path, sizeof(path), "%s\\launcher.ini", g_root);
+    FILE* f = fopen(path, "rb");
+    if (!f) return;
+    while (fgets(line, sizeof(line), f)) {
+        char* p = line;
+        Trim(p);
+        if (strncmp(p, "ui_language", 11) != 0) continue;
+        p += 11;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p != '=') continue;
+        p++;
+        while (*p == ' ' || *p == '\t') p++;
+        char* e = p;
+        while (*e && *e != '\r' && *e != '\n' && *e != ' ' && *e != '\t') e++;
+        *e = 0;
+        strncpy(out, p, cap - 1); out[cap - 1] = 0;
+        break;
+    }
+    fclose(f);
+}
+
+static void LoadGuiStrings(void) {
+    char ui[16];
+    ReadLauncherLang(ui, sizeof(ui));
+    if (!ui[0]) {
+        LANGID id = GetUserDefaultUILanguage();
+        switch (PRIMARYLANGID(id)) {
+        case LANG_CHINESE: strcpy(ui, "zh"); break;
+        case LANG_JAPANESE: strcpy(ui, "ja"); break;
+        default: strcpy(ui, "en"); break;
+        }
+    }
+    char path[MAX_PATH];
+    snprintf(path, sizeof(path), "%s\\lang\\gui.%s.ini", g_root, ui);
+    LoadIni(path);
+    if (!g_strCount && strcmp(ui, "en") != 0) {
+        snprintf(path, sizeof(path), "%s\\lang\\gui.en.ini", g_root);
+        LoadIni(path);
+    }
 }
 
 static void DirOf(const char* path, char* out) {
@@ -61,6 +208,18 @@ static int ReadLocale(char* out, int cap) {
     return found;
 }
 
+static int HasLanguageFonts(const char* lang) {
+    static const char* names[4] = {
+        "ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf"
+    };
+    for (int i = 0; i < 4; i++) {
+        char p[MAX_PATH];
+        snprintf(p, sizeof(p), "%s\\fonts\\%s\\%s", g_root, lang, names[i]);
+        if (GetFileAttributesA(p) == INVALID_FILE_ATTRIBUTES) return 0;
+    }
+    return 1;
+}
+
 static void LoadLanguages(void) {
     char pattern[MAX_PATH], current[64];
     g_codeCount = 0;
@@ -78,9 +237,7 @@ static void LoadLanguages(void) {
             if (n <= 0 || n >= 64) continue;
             strncpy(g_codes[g_codeCount], fd.cFileName, n);
             g_codes[g_codeCount][n] = '\0';
-            char label[128];
-            snprintf(label, sizeof(label), "%s", g_codes[g_codeCount]);
-            SendMessageW(g_combo, CB_ADDSTRING, 0, (LPARAM)W(label));
+            SendMessageW(g_combo, CB_ADDSTRING, 0, (LPARAM)W(g_codes[g_codeCount]));
             g_codeCount++;
         } while (FindNextFileA(h, &fd));
         FindClose(h);
@@ -93,33 +250,37 @@ static void LoadLanguages(void) {
         }
     }
     if (g_codeCount) SendMessageW(g_combo, CB_SETCURSEL, sel, 0);
-    char msg[256];
-    snprintf(msg, sizeof(msg), "%d 个语言包", g_codeCount);
-    if (!g_codeCount) strncat(msg, "（PR2Packs 里没有 .txt）", sizeof(msg) - strlen(msg) - 1);
-    SetWindowTextW(g_status, W(msg));
+    SetWindowTextW(g_status, g_codeCount ? TF("status.count", g_codeCount)
+                                         : T("status.none"));
 }
 
 static void Launch(const char* lang, int vanilla) {
     char launcher[MAX_PATH], cmd[1024];
     snprintf(launcher, sizeof(launcher), "%s\\PR2Launcher.exe", g_root);
     if (GetFileAttributesA(launcher) == INVALID_FILE_ATTRIBUTES) {
-        MessageBoxW(NULL, W("同目录下找不到 PR2Launcher.exe。"), W("PR2 启动器"), MB_ICONERROR);
+        MessageBoxW(NULL, T("error.no_launcher"), T("title"), MB_ICONERROR);
         return;
     }
-    if (vanilla) {
-        snprintf(cmd, sizeof(cmd), "\"%s\" --vanilla", launcher);
-    } else {
+    if (!vanilla) {
         if (!lang || !*lang) {
-            MessageBoxW(NULL, W("还没有选择语言包。"), W("PR2 启动器"), MB_ICONWARNING);
+            MessageBoxW(NULL, T("error.no_language"), T("title"), MB_ICONWARNING);
             return;
         }
+        if (!HasLanguageFonts(lang)) {
+            if (MessageBoxW(NULL, TF("error.font_missing", lang), T("title"),
+                            MB_YESNO | MB_ICONWARNING) != IDYES) {
+                return;
+            }
+        }
         snprintf(cmd, sizeof(cmd), "\"%s\" --lang=%s", launcher, lang);
+    } else {
+        snprintf(cmd, sizeof(cmd), "\"%s\" --vanilla", launcher);
     }
     STARTUPINFOA si = {0}; si.cb = sizeof(si);
     PROCESS_INFORMATION pi = {0};
     if (!CreateProcessA(NULL, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW,
                         NULL, g_root, &si, &pi)) {
-        MessageBoxW(NULL, W("启动 PR2Launcher.exe 失败。"), W("PR2 启动器"), MB_ICONERROR);
+        MessageBoxW(NULL, T("error.launch_failed"), T("title"), MB_ICONERROR);
         return;
     }
     DWORD code = 0;
@@ -129,33 +290,29 @@ static void Launch(const char* lang, int vanilla) {
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
     if (code != 0) {
-        char msg[256];
-        snprintf(msg, sizeof(msg),
-                 "启动器退出码 %lu，游戏没有启动。\n"
-                 "检查 PR2Launcher.exe / PR2TextSource.dll 是否在同目录。", code);
-        MessageBoxW(NULL, W(msg), W("PR2 启动器"), MB_ICONERROR);
+        MessageBoxW(NULL, TF("error.exit_code", code), T("title"), MB_ICONERROR);
     } else {
-        SetWindowTextW(g_status, W(vanilla ? "已启动原版游戏。" : "已启动本地化游戏。"));
+        SetWindowTextW(g_status, vanilla ? T("status.vanilla") : T("status.launched"));
     }
 }
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_CREATE: {
-        CreateWindowW(L"STATIC", W("语言包："), WS_CHILD | WS_VISIBLE,
+        CreateWindowW(L"STATIC", T("label.language"), WS_CHILD | WS_VISIBLE,
                       16, 18, 320, 20, hwnd, NULL, NULL, NULL);
         g_combo = CreateWindowW(L"COMBOBOX", NULL,
                                 WS_CHILD | WS_VISIBLE | WS_TABSTOP |
                                 CBS_DROPDOWNLIST | WS_VSCROLL,
                                 16, 42, 320, 200, hwnd, (HMENU)ID_LANG,
                                 NULL, NULL);
-        CreateWindowW(L"BUTTON", W("启动本地化"),
+        CreateWindowW(L"BUTTON", T("button.launch"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                       16, 84, 130, 32, hwnd, (HMENU)ID_LAUNCH, NULL, NULL);
-        CreateWindowW(L"BUTTON", W("启动原版"),
+        CreateWindowW(L"BUTTON", T("button.vanilla"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                       156, 84, 100, 32, hwnd, (HMENU)ID_VANILLA, NULL, NULL);
-        CreateWindowW(L"BUTTON", W("刷新"),
+        CreateWindowW(L"BUTTON", T("button.refresh"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                       266, 84, 70, 32, hwnd, (HMENU)ID_REFRESH, NULL, NULL);
         g_status = CreateWindowW(L"STATIC", L"",
@@ -191,6 +348,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
     (void)prev; (void)cmd;
     GetModuleFileNameA(NULL, g_root, MAX_PATH);
     DirOf(g_root, g_root);
+    LoadGuiStrings();
 
     WNDCLASSW wc = {0};
     wc.lpfnWndProc = WndProc;
@@ -200,7 +358,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
     wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
     RegisterClassW(&wc);
 
-    HWND hwnd = CreateWindowW(L"PR2LauncherGUI", W("Port Royale 2 启动器"),
+    HWND hwnd = CreateWindowW(L"PR2LauncherGUI", T("title"),
                               WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU |
                               WS_MINIMIZEBOX,
                               CW_USEDEFAULT, CW_USEDEFAULT, 370, 210,

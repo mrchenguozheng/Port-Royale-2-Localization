@@ -155,6 +155,10 @@ def make_release(lang, version, out_dir, mode, log=None):
     os.makedirs(stage)
     build_pack(lang, stage, log)
     copy_runtime(stage, log)
+    lang_dir = os.path.join(ROOT, "src", "injector", "lang")
+    if os.path.isdir(lang_dir):
+        shutil.copytree(lang_dir, os.path.join(stage, "lang"),
+                        dirs_exist_ok=True)
     copy_fonts(lang, stage, mode, log)
     write_readme(lang, stage, mode)
     copy_license(stage, log)

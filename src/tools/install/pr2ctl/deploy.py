@@ -47,6 +47,14 @@ def deploy_steps(target, langs):
                               os.path.join(font_dir, name),
                               os.path.join(target, "fonts", fl, name)))
 
+    lang_src = os.path.join(BUILD, "lang")
+    if os.path.isdir(lang_src):
+        for name in sorted(os.listdir(lang_src)):
+            src = os.path.join(lang_src, name)
+            if os.path.isfile(src):
+                steps.append(("lang\\%s" % name, src,
+                              os.path.join(target, "lang", name)))
+
     steps.append(("%s\\" % PACK_DIR, None, os.path.join(target, PACK_DIR)))
     wanted = ["locale.ini"]
     if langs:
