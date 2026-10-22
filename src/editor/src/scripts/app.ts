@@ -733,15 +733,8 @@ function rowOf(e: Entry): HTMLElement {
 
   const compare = el('div', 'compare');
 
-  // 2×2：左上原文 A、右上译文编辑、左下原文 B、右下初版
-  compare.appendChild(refLine('A', e));
-
-  const zhBlock = el('div', 'zh-block');
-  zhBlock.appendChild(el('div', 'zh-head', langName(S.lang)));
-  zhBlock.appendChild(zhCell(e));
-  compare.appendChild(zhBlock);
-
-  compare.appendChild(refLine('B', e));
+  // 左栏：初版、原文 A、原文 B；右栏：译文编辑
+  const left = el('div', 'col-src');
 
   const seedBox = el('div', 'seed-inline ref-block');
   const seedHead = el('div', 'ref-head');
@@ -749,7 +742,18 @@ function rowOf(e: Entry): HTMLElement {
   seedBox.appendChild(seedHead);
   const seedBody = el('div', 'seed-body', '（读取中…）');
   seedBox.appendChild(seedBody);
-  compare.appendChild(seedBox);
+  left.appendChild(seedBox);
+
+  left.appendChild(refLine('A', e));
+  left.appendChild(refLine('B', e));
+  compare.appendChild(left);
+
+  const right = el('div', 'col-dst');
+  const zhBlock = el('div', 'zh-block');
+  zhBlock.appendChild(el('div', 'zh-head', langName(S.lang)));
+  zhBlock.appendChild(zhCell(e));
+  right.appendChild(zhBlock);
+  compare.appendChild(right);
 
   main.appendChild(compare);
 

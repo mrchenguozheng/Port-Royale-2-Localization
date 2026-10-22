@@ -1034,6 +1034,7 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .ctx-side { grid-column: 2; min-width: 0; }
 .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .col-src, .col-dst { min-width: 0; }
+.col-src { display: flex; flex-direction: column; gap: 0.7rem; }
 
 .statusbar {
   display: flex;
