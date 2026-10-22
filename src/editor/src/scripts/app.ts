@@ -1,10 +1,20 @@
 import '@shoelace-style/shoelace/dist/themes/light.css';
-import '@shoelace-style/shoelace/dist/components/dialog/dialog.js';
+
+let dialogsReady: Promise<unknown> | null = null;
+
+function ensureDialogs(): Promise<unknown> {
+  if (!dialogsReady) {
+    dialogsReady = Promise.all([
+      import('@shoelace-style/shoelace/dist/components/dialog/dialog.js'),
+      import('@shoelace-style/shoelace/dist/components/button/button.js'),
+      import('@shoelace-style/shoelace/dist/components/textarea/textarea.js'),
+    ]);
+  }
+  return dialogsReady;
+}
 import '@shoelace-style/shoelace/dist/components/select/select.js';
 import '@shoelace-style/shoelace/dist/components/option/option.js';
-import '@shoelace-style/shoelace/dist/components/button/button.js';
 import '@shoelace-style/shoelace/dist/components/alert/alert.js';
-import '@shoelace-style/shoelace/dist/components/textarea/textarea.js';
 
 // 编辑器的前端逻辑。
 //
@@ -662,6 +672,7 @@ function diffNodes(a: string, b: string): DocumentFragment {
 
 async function openRules(id: string) {
   try {
+    await ensureDialogs();
     const r = await api<{ stages: { label: string; text: string }[] }>(
       `/api/rule-trace?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
     $('ruleModal').setAttribute('label', '规则轨迹 · ' + id);
@@ -685,6 +696,7 @@ async function openRules(id: string) {
 
 async function openSeed(id: string) {
   try {
+    await ensureDialogs();
     const r = await api<{ text: string }>(
       `/api/seed?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
     seedId = id;
