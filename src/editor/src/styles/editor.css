@@ -1371,3 +1371,13 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   opacity: 0; visibility: hidden;
 }
 .toast.show { opacity: 1; visibility: visible; }
+
+/* Shoelace 组件适配 */
+.pr2-toast {
+  position: fixed; left: 50%; bottom: 4.5rem; transform: translateX(-50%);
+  z-index: 300; max-width: 90vw; width: auto;
+}
+sl-dialog::part(panel) { max-height: 85vh; max-width: min(1100px, 92vw); }
+sl-dialog::part(body) { overflow: auto; }
+#seedText { width: 100%; min-height: 40vh; }
+#seedText::part(textarea) { font-family: var(--font-mono); font-size: 0.95rem; min-height: 38vh; }

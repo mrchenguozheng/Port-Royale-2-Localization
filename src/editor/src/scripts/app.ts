@@ -1,3 +1,11 @@
+import '@shoelace-style/shoelace/dist/themes/dark.css';
+import '@shoelace-style/shoelace/dist/components/dialog/dialog.js';
+import '@shoelace-style/shoelace/dist/components/select/select.js';
+import '@shoelace-style/shoelace/dist/components/option/option.js';
+import '@shoelace-style/shoelace/dist/components/button/button.js';
+import '@shoelace-style/shoelace/dist/components/alert/alert.js';
+import '@shoelace-style/shoelace/dist/components/textarea/textarea.js';
+
 // 编辑器的前端逻辑。
 //
 // 这一层只管三件事：**渲染、筛选、编辑**。
@@ -400,30 +408,30 @@ function updateStat() {
     box.appendChild(term);
   }
 }
-function fill(sel: HTMLSelectElement, items: string[], cur: string) {
+function fill(sel: HTMLElement, items: string[], cur: string) {
   sel.innerHTML = '';
+  const tag = sel.tagName === 'SL-SELECT' ? 'sl-option' : 'option';
   for (const v of items) {
-    const o = el('option', undefined, v === FOLLOW ? '（无）' : v);
-    (o as HTMLOptionElement).value = v;
+    const o = document.createElement(tag) as HTMLElement & { value: string };
+    o.value = v;
+    o.textContent = v === FOLLOW ? '（无）' : v;
     sel.appendChild(o);
   }
-  sel.value = cur;
+  (sel as HTMLElement & { value: string }).value = cur;
 }
 
 let toastTimer = 0;
 
 function toast(msg: string) {
-  let box = document.getElementById('toast');
-  if (!box) {
-    box = document.createElement('div');
-    box.id = 'toast';
-    box.className = 'toast';
-    document.body.appendChild(box);
+  const a = document.getElementById('toast') as HTMLElement & { toast?: () => void };
+  if (!a) return;
+  a.textContent = msg;
+  if (typeof a.toast === 'function') {
+    a.toast();
+    return;
   }
-  box.textContent = msg;
-  box.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => box!.classList.remove('show'), 1800);
+  a.classList.add('show');
+  window.setTimeout(() => a.classList.remove('show'), 1800);
 }
 
 function fillSizeSelect() {
@@ -433,11 +441,12 @@ function fillSizeSelect() {
   if (!all.includes(S.size)) all.push(S.size);
   sel.innerHTML = '';
   for (const n of all.sort((a, b) => a - b)) {
-    const o = el('option', undefined, String(n)) as HTMLOptionElement;
+    const o = document.createElement('sl-option') as HTMLElement & { value: string };
     o.value = String(n);
+    o.textContent = String(n);
     sel.appendChild(o);
   }
-  sel.value = String(S.size);
+  (sel as HTMLElement & { value: string }).value = String(S.size);
 }
 
 function saveSizePrefs() {
@@ -637,7 +646,7 @@ async function openRules(id: string) {
   try {
     const r = await api<{ stages: { label: string; text: string }[] }>(
       `/api/rule-trace?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
-    $('ruleTitle').textContent = '规则轨迹 · ' + id;
+    $('ruleModal').setAttribute('label', '规则轨迹 · ' + id);
     const box = $('ruleStages');
     box.innerHTML = '';
     let prev: string | null = null;
@@ -673,7 +682,7 @@ async function openRules(id: string) {
       row.appendChild(body);
       box.appendChild(row);
     } catch { /* 标注失败不影响阶段展示 */ }
-    $('ruleModal').hidden = false;
+    ($('ruleModal') as any).show?.();
   } catch (err) {
     $('stat').textContent = '规则轨迹读取失败：' + (err as Error).message;
   }
@@ -686,11 +695,11 @@ async function openSeed(id: string) {
     seedId = id;
     const ta = $('seedText') as HTMLTextAreaElement;
     ta.value = r.text;
-    ta.readOnly = true;
+    ta.setAttribute('readonly', '');
     ($('seedSave') as HTMLButtonElement).disabled = true;
     $('seedLockInfo').textContent =
       '初版默认锁定。解锁后只能改这一条，保存或关闭后重新锁定。';
-    $('seedModal').hidden = false;
+    ($('seedModal') as any).show?.();
     ta.focus();
   } catch (err) {
     $('stat').textContent = '读取初版失败：' + (err as Error).message;
@@ -700,7 +709,7 @@ async function openSeed(id: string) {
 async function unlockSeed() {
   if (!window.confirm('只解锁这一条的初版，且仅本次修改有效。继续？')) return;
   const ta = $('seedText') as HTMLTextAreaElement;
-  ta.readOnly = false;
+  ta.removeAttribute('readonly');
   ($('seedSave') as HTMLButtonElement).disabled = false;
   $('seedLockInfo').textContent = '已解锁（仅本次修改）。保存或关闭后重新锁定。';
   ta.focus();
@@ -710,7 +719,7 @@ async function saveSeed() {
   try {
     const ta = $('seedText') as HTMLTextAreaElement;
     await api('/api/seed', { lang: S.lang, id: seedId, text: ta.value });
-    ta.readOnly = true;
+    ta.setAttribute('readonly', '');
     ($('seedSave') as HTMLButtonElement).disabled = true;
     $('seedLockInfo').textContent = '初版已保存，已重新锁定。工作文本未变。';
   } catch (err) {
@@ -719,7 +728,7 @@ async function saveSeed() {
 }
 
 function closeSeed() {
-  $('seedModal').hidden = true;
+  ($('seedModal') as any).hide?.();
   ($('seedText') as HTMLTextAreaElement).readOnly = true;
   ($('seedSave') as HTMLButtonElement).disabled = true;
 }
@@ -1514,7 +1523,7 @@ $('pageInput').addEventListener('change', () => {
   if (Number.isFinite(v)) void renderPage(Math.floor(v));
 });
 
-$('lang').addEventListener('change', (ev) => {
+$('lang').addEventListener('sl-change', (ev) => {
   const sel = ev.target as HTMLSelectElement;
   const next = sel.value;
   void (async () => {
@@ -1525,14 +1534,14 @@ $('lang').addEventListener('change', (ev) => {
     const keepId = S.rows[0] ? S.rows[0].id : '';
     S.lang = next;
     remember(LS_LANG, S.lang);
-    // 换编辑语言：列表重取，但仍停在当前这条。
+    // 换编辑语言：重取列表与当前页，不先跳回第 1 条。
     await loadSideList();
-    await reload(true);
-    if (keepId) await jumpToId(keepId);
+    await reload(false);
+    if (keepId && S.rows[0]?.id !== keepId) await jumpToId(keepId);
     updatePath();
   })();
 });
-$('size').addEventListener('change', (ev) => {
+$('size').addEventListener('sl-change', (ev) => {
   S.size = Number((ev.target as HTMLSelectElement).value);
   applySize();
   saveSizePrefs();
@@ -1752,16 +1761,10 @@ async function openCtx(id: string) {
   }
 }
 
-$('ruleClose').addEventListener('click', () => { $('ruleModal').hidden = true; });
-$('ruleModal').addEventListener('click', (ev) => {
-  if (ev.target === $('ruleModal')) $('ruleModal').hidden = true;
-});
+$('ruleClose').addEventListener('click', () => { ($('ruleModal') as any).hide?.(); });
 $('seedUnlock').addEventListener('click', () => void unlockSeed());
 $('seedSave').addEventListener('click', () => void saveSeed());
 $('seedClose').addEventListener('click', closeSeed);
-$('seedModal').addEventListener('click', (ev) => {
-  if (ev.target === $('seedModal')) closeSeed();
-});
 $('ctxClose').addEventListener('click', () => { $('ctxModal').hidden = true; });
 $('ctxModal').addEventListener('click', (ev) => {
   if (ev.target === $('ctxModal')) $('ctxModal').hidden = true;
