@@ -8,7 +8,7 @@
 用法：
     python src/tools/analysis/width_check.py --lang ja --font build/fonts/ARIAL.TTF --size 14
 输出：
-    docs/宽度粗查-<lang>.csv
+    docs/csv/宽度粗查-<lang>.csv
 """
 
 import argparse
@@ -113,7 +113,7 @@ def main():
                      "ratio": round(wt / we, 2), "max_token": round(tok, 1),
                      "en": e.strip(), "tr": t.strip()})
     rows.sort(key=lambda r: -r["ratio"])
-    out = os.path.join(ROOT, "docs", "宽度粗查-%s.csv" % args.lang)
+    out = os.path.join(ROOT, "docs", "csv", "宽度粗查-%s.csv" % args.lang)
     with io.open(out, "w", encoding="utf-8-sig", newline="") as fh:
         wr = csv.DictWriter(fh, fieldnames=["hash", "w_en", "w_tr", "ratio",
                                             "max_token", "en", "tr"])
