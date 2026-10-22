@@ -1424,8 +1424,9 @@ async function createLang() {
 
   err.textContent = '';
   toast('正在创建 ' + code + ' …');
+  let made: { code: string; from: string; aligned: boolean; dropped: number; filled: number };
   try {
-    await api<{ ok: boolean; code: string; from: string }>(
+    made = await api<typeof made>(
       '/api/newlang', { code, from });
   } catch (e) {
     // 竞态兜底：比如另一个窗口刚好抢先建了同名文件
@@ -1450,7 +1451,9 @@ async function createLang() {
   fill($('lang'), S.langs, code);
   await reload();
   $('stat').textContent = `已新建 ${code}（复制自 ${from}），共 ${S.total} 条待改`;
-  toast(`已创建 ${code}`);
+  toast(made.aligned
+    ? `已创建 ${code}`
+    : `已创建 ${code}：模板多 ${made.dropped} 条已忽略，缺 ${made.filled} 条用 ${made.from.split('.')[0]} 基准补齐`);
 }
 
 // ── 事件 ────────────────────────────────────────────────

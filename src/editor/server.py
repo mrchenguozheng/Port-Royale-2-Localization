@@ -890,9 +890,24 @@ def new_lang(code, src):
     with open(T.lang_path(T.BASE_LANG), "rb") as f:
         base = tomllib.load(f)
     order = [k for k in base if k != "ctx"]
-    if rows != order:
-        raise ValueError("模板 %s 的条目与 %s 对不齐（%d vs %d），不能当模板"
-                         % (src, T.BASE_LANG, len(rows), len(order)))
+
+    # 模板与基准表对不齐时（版本不同、多几条少几条），按基准表的 id 重新排：
+    # 多出来的 id 丢掉，缺的 id 用基准语言补齐，保证新语言仍是一张完整的表。
+    aligned = rows == order
+    dropped = filled = 0
+    if not aligned:
+        src_map = {k: v for k, v in doc.items() if k != "ctx"}
+        dropped = len(set(src_map) - set(order))
+        filled = len(set(order) - set(src_map))
+        lines = ["# 由模板 %s 自动对齐到 %s 生成。" % (src, T.BASE_LANG), ""]
+        for hid in order:
+            val = src_map.get(hid)
+            if val is None:
+                val = base.get(hid, "")
+                filled += 0
+            val = str(val).replace("\\", "\\\\").replace('"', '\\"')
+            lines.append('"%s" = "%s"' % (hid, val))
+        data = ("\n".join(lines) + "\n").encode("utf-8")
 
     # 【关键】独占创建，不用「先 exists() 再 replace」：那两步之间有窗口，
     # 期间别人（另一个编辑器窗口、或用户自己刚放进去的文件）建了同名文件，
@@ -913,7 +928,8 @@ def new_lang(code, src):
             pass
         raise
 
-    return {"code": code, "from": src}
+    return {"code": code, "from": src, "aligned": aligned,
+            "dropped": dropped, "filled": filled}
 
 
 # ---------------------------------------------------------------- HTTP
