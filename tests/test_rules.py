@@ -52,8 +52,8 @@ class TestZhRules(unittest.TestCase):
     def test_space_tokens(self):
         self.assertEqual(
             ZH.space_tokens("在1502 年元旦—— 就这样<n><n>下一段"),
-            "在 1502 年元旦 —— 就这样 <n><n>下一段")
-        self.assertEqual(ZH.space_tokens("<n><n>开头"), "<n><n>开头")
+            "在 1502 年元旦 —— 就这样 <n><n> 下一段")
+        self.assertEqual(ZH.space_tokens("<n><n> 开头"), "<n><n> 开头")
         self.assertEqual(ZH.space_tokens("<o:0xFF131512>年"), "<o:0xFF131512>年")
 
     def test_space_years(self):
@@ -64,11 +64,11 @@ class TestZhRules(unittest.TestCase):
 
     def test_space_before_double_break(self):
         self.assertEqual(ZH.space_before_double_break("你好。<n><n>下一段"),
-                         "你好。 <n><n>下一段")
-        self.assertEqual(ZH.space_before_double_break("你好。 <n><n>下一段"),
-                         "你好。 <n><n>下一段")
-        self.assertEqual(ZH.space_before_double_break("<n><n>开头"),
-                         "<n><n>开头")
+                         "你好。 <n><n> 下一段")
+        self.assertEqual(ZH.space_before_double_break("你好。 <n><n> 下一段"),
+                         "你好。 <n><n> 下一段")
+        self.assertEqual(ZH.space_before_double_break("<n><n> 开头"),
+                         "<n><n> 开头")
 
     def test_names_with_titles_and_quotes(self):
         import tomllib

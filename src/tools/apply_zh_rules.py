@@ -234,7 +234,10 @@ def space_tokens(text):
             return pre + mark + post
 
         out.append(re.sub(r" *—— *| *…… *", mark_repl, seg))
-    return "".join(out)
+    result = "".join(out)
+    # <n><n> 两端都留空格（出现在段中也一样）。
+    result = re.sub(r" *<n><n> *", " <n><n> ", result)
+    return result.strip()
 
 
 def space_years(text):
@@ -304,7 +307,7 @@ def space_ellipsis(text):
 
 
 def space_before_double_break(text):
-    return space_marks(text)
+    return space_tokens(text)
 
 
 def collapse_spaces(text):
