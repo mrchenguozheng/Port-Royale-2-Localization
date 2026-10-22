@@ -171,10 +171,11 @@ function setView(view: string) {
   for (const t of document.querySelectorAll('.tab')) {
     t.classList.toggle('active', (t as HTMLElement).dataset.view === view);
   }
-  history.replaceState(null, '', start ? '/install' : (S.rows[0] ? `/translate/${S.page}/${S.rows[0].id}` : '/translate'));
+  history.replaceState(null, '', start ? '/install' : (S.rows[0] ? `/translate/${S.page}` : '/translate'));
 }
 
 async function boot() {
+  const initialPath = location.pathname;
   if (location.protocol === 'file:') {
     showBootError('这是用文件方式打开的。请双击 start.bat，通过本地服务打开页面。');
     return;
@@ -218,12 +219,18 @@ async function boot() {
   setLoading(false);
   const sp = Number(saved(pageKey()));
   if (sp > 1) await renderPage(sp);
+
+  const mNum = initialPath.match(/^\/translate\/(\d+)$/);
+  const mHash = initialPath.match(/^\/translate\/(0x[0-9a-f]{8})$/i);
+  if (mHash) await jumpToId(mHash[1].toLowerCase());
+  else if (mNum) await renderPage(Number(mNum[1]));
+  updatePath();
 }
 
 function updatePath() {
   if (document.body.classList.contains('view-start')) return;
   const row = S.rows[0];
-  const path = row ? `/translate/${S.page}/${row.id}` : '/translate';
+  const path = row ? `/translate/${S.page}` : '/translate';
   if (location.pathname !== path) history.replaceState(null, '', path);
 }
 
@@ -1443,8 +1450,10 @@ $('lang').addEventListener('change', (ev) => {
     await reload(true);
     const sp = Number(saved(pageKey()));
     if (sp > 1) await renderPage(sp);
-    const m = location.pathname.match(/^\/translate\/(\d+)\/(0x[0-9a-f]{8})$/i);
-    if (m) await jumpToId('0x' + m[2].slice(2).toLowerCase());
+    const mNum = initialPath.match(/^\/translate\/(\d+)$/);
+    const mHash = initialPath.match(/^\/translate\/(0x[0-9a-f]{8})$/i);
+    if (mHash) await jumpToId(mHash[1].toLowerCase());
+    else if (mNum) await renderPage(Number(mNum[1]));
     updatePath();
   })();
 });
