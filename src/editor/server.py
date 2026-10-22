@@ -571,13 +571,8 @@ def context_of(hid, lang):
     overrides = meaning_for(lang, hid)
     ph = []
     for tok in placeholders_of(en):
-        if tok in overrides:
-            mean = overrides[tok]      # 空字符串也算显式含义
-        else:
-            mean = (role_hint.get(tok)
-                    or next((v for k, v in PH_MEAN.items()
-                             if tok.startswith(k)), "Variable"))
-        ph.append({"token": tok, "meaning": mean})
+        # 默认不给标签：占位符本身就是英文变量名，需要时在编辑器里手动补含义。
+        ph.append({"token": tok, "meaning": overrides.get(tok, "")})
 
     tags = []
     for tok, mean in TAG_MEAN:

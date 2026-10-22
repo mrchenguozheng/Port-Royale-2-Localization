@@ -95,7 +95,6 @@ const S = {
   seed: {} as Record<string, string>,
   curMeaning: new Map<string, string>(),
   curId: '',
-  meaningSaved: {} as Record<string, boolean>,
   dirtyIds: [] as string[],
   size: 14,
   customSizes: [] as number[],
@@ -747,15 +746,6 @@ async function loadEntryInfo(id: string) {
     const ph = r.placeholders || [];
     const meaning = new Map(ph.map((p) => [p.token, p.meaning]));
     S.curMeaning = meaning;
-    const mk = S.lang + ':' + id;
-    if (!S.meaningSaved[mk] && ph.length) {
-      S.meaningSaved[mk] = true;
-      const map: Record<string, string> = {};
-      for (const p of ph) map[p.token] = p.meaning;
-      void api('/api/placeholder-meanings', { lang: S.lang, id, meanings: map }).catch(() => {
-        S.meaningSaved[mk] = false;
-      });
-    }
     document.querySelectorAll('.ph-token').forEach((node) => {
       const elx = node as HTMLElement;
       const m = meaning.get(elx.dataset.token || '');
@@ -779,7 +769,7 @@ async function loadEntryInfo(id: string) {
       if (c.en > 1) chip.appendChild(el('span', 'ph-x', '×' + c.en));
       chip.appendChild(el('span', 'ph-tok', c.token));
       chip.appendChild(el('span', 'ph-mean',
-        meaning.has(c.token) ? (meaning.get(c.token) || '（空）') : '原文没有'));
+        meaning.has(c.token) ? (meaning.get(c.token) || '') : ''));
       const editMean = el('button', 'mini ph-btn', '改');
       editMean.title = '修改这个占位符在本条里的含义';
       editMean.addEventListener('click', () =>
