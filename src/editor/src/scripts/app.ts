@@ -550,7 +550,7 @@ async function toggleSpaceColor(id: string) {
     }
   }
   const ed = zhEditor();
-  if (S.colorSpaces && ed && S.hits[id] && S.hits[id].text !== (ed.textContent || '')) {
+  if (S.colorSpaces && ed && S.hits[id] && S.hits[id].text !== editorText(ed)) {
     $('stat').textContent = '空格着色：当前译文与规则生成不同，暂不显示';
   }
   redraw(id);

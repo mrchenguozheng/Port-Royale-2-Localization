@@ -1330,9 +1330,15 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .rule-stage .hit-names { background: rgba(80, 200, 120, 0.28); }
 .rule-stage .hit:hover { outline: 1px solid var(--accent); }
 
-.cell-zh .edit .hl-sp.hit-punct { background: rgba(255, 170, 0, 0.35); }
-.cell-zh .edit .hl-sp.hit-conj { background: rgba(80, 160, 255, 0.35); }
-.cell-zh .edit .hl-sp.hit-names { background: rgba(80, 200, 120, 0.35); }
+.cell-zh .edit .hl-sp.hit-punct {
+  background: rgba(255, 170, 0, 0.5); box-shadow: inset 0 -2px 0 #ffaa00;
+}
+.cell-zh .edit .hl-sp.hit-conj {
+  background: rgba(80, 160, 255, 0.5); box-shadow: inset 0 -2px 0 #50a0ff;
+}
+.cell-zh .edit .hl-sp.hit-names {
+  background: rgba(80, 200, 120, 0.5); box-shadow: inset 0 -2px 0 #50c878;
+}
 
 .ph-token .ph-mean-inline {
   margin-left: 0.3rem;
