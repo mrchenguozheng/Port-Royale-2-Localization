@@ -1334,9 +1334,10 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .cell-zh .edit .hl-sp.hit-conj { background: rgba(80, 160, 255, 0.35); }
 .cell-zh .edit .hl-sp.hit-names { background: rgba(80, 200, 120, 0.35); }
 
-.ph-token::after {
-  content: attr(data-meaning);
+.ph-token .ph-mean-inline {
   margin-left: 0.3rem; padding-right: 0.1rem;
   color: var(--fg-dim); font-size: 0.82em;
   font-family: system-ui, sans-serif;
+  cursor: pointer; user-select: none;
 }
+.ph-token .ph-mean-inline:hover { color: var(--accent); text-decoration: underline; }

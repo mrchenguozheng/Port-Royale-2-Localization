@@ -81,6 +81,7 @@ const S = {
   suppressUndo: false,
   seed: {} as Record<string, string>,
   curMeaning: new Map<string, string>(),
+  curId: '',
   colorSpaces: false,
   hits: {} as Record<string, { text: string; hits: { start: number; end: number; type: string }[] }>,
   dirtyIds: [] as string[],
@@ -690,7 +691,9 @@ async function loadEntryInfo(id: string) {
     document.querySelectorAll('.ph-token').forEach((node) => {
       const elx = node as HTMLElement;
       const m = meaning.get(elx.dataset.token || '');
-      if (m) elx.dataset.meaning = m;
+      if (!m) return;
+      elx.dataset.meaning = m;
+      setTokenMeaning(elx, elx.dataset.token || '', m);
     });
     const counts = r.counts || [];
     S.req[id] = {};
@@ -708,11 +711,6 @@ async function loadEntryInfo(id: string) {
       if (c.en > 1) chip.appendChild(el('span', 'ph-x', '×' + c.en));
       chip.appendChild(el('span', 'ph-tok', c.token));
       chip.appendChild(el('span', 'ph-mean', meaning.get(c.token) || '原文没有'));
-      const editMean = el('button', 'mini ph-btn', '改');
-      editMean.title = '修改这个占位符在本条里的含义';
-      editMean.addEventListener('click', () =>
-        void editMeaning(id, c.token, meaning.get(c.token) || ''));
-      chip.appendChild(editMean);
       box.appendChild(chip);
     }
     if (badCount) {
@@ -916,6 +914,9 @@ function editorText(root: HTMLElement): string {
       return;
     }
     const elem = node as HTMLElement;
+    if (elem.classList && elem.classList.contains('ph-mean-inline')) {
+      return;                       // 显示用的含义，不属于正文
+    }
     if (elem.classList && elem.classList.contains('hl-sp')) {
       out += elem.textContent || '';
       return;
@@ -1100,7 +1101,7 @@ function tokenSpan(tok: string): HTMLElement {
   span.draggable = true;
   span.dataset.token = tok;
   const meaning = S.curMeaning.get(tok);
-  if (meaning) span.dataset.meaning = meaning;
+  if (meaning) setTokenMeaning(span, tok, meaning);
   span.title = '拖动可换位置；占位符不能删除';
   span.addEventListener('dragstart', (ev) => {
     const dt = (ev as DragEvent).dataTransfer;
@@ -1112,6 +1113,22 @@ function tokenSpan(tok: string): HTMLElement {
   });
   span.addEventListener('dragend', () => span.classList.remove('dragging'));
   return span;
+}
+
+function setTokenMeaning(span: HTMLElement, tok: string, meaning: string) {
+  let mi = span.querySelector('.ph-mean-inline') as HTMLElement | null;
+  if (!mi) {
+    mi = el('span', 'ph-mean-inline');
+    mi.contentEditable = 'false';
+    mi.title = '点击修改含义';
+    mi.addEventListener('mousedown', (ev) => ev.preventDefault());
+    mi.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      void editMeaning(S.curId, tok, S.curMeaning.get(tok) || '');
+    });
+    span.appendChild(mi);
+  }
+  mi.textContent = meaning;
 }
 
 function renderRich(text: string, hits?: Hit[]): DocumentFragment {
