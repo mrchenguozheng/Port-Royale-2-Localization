@@ -24,10 +24,12 @@ import sys
 import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
 sys.path.insert(0, HERE)
 import translate as T  # noqa: E402
-import lang_rules  # noqa: E402
-from lang_rules import base  # noqa: E402
+from text import lang_rules  # noqa: E402
+from text.lang_rules import base  # noqa: E402
 
 
 def esc(t):

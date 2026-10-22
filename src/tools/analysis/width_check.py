@@ -6,7 +6,7 @@
 做代理指标，先把最可疑的挑出来。
 
 用法：
-    python src/tools/width_check.py --lang ja --font build/fonts/ARIAL.TTF --size 14
+    python src/tools/analysis/width_check.py --lang ja --font build/fonts/ARIAL.TTF --size 14
 输出：
     docs/宽度粗查-<lang>.csv
 """
@@ -19,7 +19,9 @@ import re
 import struct
 import tomllib
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+ROOT = os.path.dirname(os.path.dirname(TOOLS))
 TAG = re.compile(r"<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]")
 
 

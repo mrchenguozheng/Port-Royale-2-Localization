@@ -74,7 +74,13 @@ pr2-localization/
 │  ├─ orig/                  原版英文/法文（只读参照）
 │  ├─ editor/                译文编辑器（Astro 前端 + server.py）
 │  ├─ injector/              注入组件源码（C++）
-│  └─ tools/                 语言包、字体、术语等脚本（见 tools/README.md）
+│  └─ tools/
+│     ├─ pack/               编译、部署、新建语言
+│     ├─ text/               归一化、中文/日文规则、分词
+│     ├─ font/               字体缝合与导出（含 fontstitch/）
+│     ├─ analysis/           说话人、语气、宽度等分析
+│     ├─ install/            pr2ctl 构建/部署/启动实现
+│     └─ data/               人名、地名、分词词典
 ├─ assets/fonts/original/    游戏原版拉丁字体（gitignore，需自己导出）
 ├─ build/                    产物：PR2Packs/、fonts/、注入器
 ├─ docs/                     说明文档
@@ -100,7 +106,7 @@ pr2-localization/
 
 1. 跑 `start.bat`，在「译文编辑」页点语言下拉旁的「＋」，用现成语言当模板；
 2. 逐条翻译并保存（写进 `src/live/<代码>.toml`）；
-3. 在 `src/tools/fontstitch/presets.toml` 加 `[<代码>]` 段，准备该语言的 donor；
+3. 在 `src/tools/font/fontstitch/presets.toml` 加 `[<代码>]` 段，准备该语言的 donor；
 4. 构建字体、语言包并部署。
 
 完整步骤（含每步验收点）见

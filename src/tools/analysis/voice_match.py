@@ -19,7 +19,9 @@ import re
 import sys
 import tomllib
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+ROOT = os.path.dirname(os.path.dirname(TOOLS))
 TRANS = os.path.join(ROOT, "src", "live")
 REF = os.path.join(ROOT, "src", "orig")
 

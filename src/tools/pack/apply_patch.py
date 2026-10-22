@@ -10,10 +10,10 @@
 
 用法
 ----
-    python src/tools/apply_patch.py                 # 构建 ja/zh 并部署到上次的游戏目录
-    python src/tools/apply_patch.py --langs ja      # 只弄日语
-    python src/tools/apply_patch.py --game-dir "<游戏目录>" --launch
-    python src/tools/apply_patch.py --dry-run       # 只打印计划
+    python src/tools/pack/apply_patch.py                 # 构建 ja/zh 并部署到上次的游戏目录
+    python src/tools/pack/apply_patch.py --langs ja      # 只弄日语
+    python src/tools/pack/apply_patch.py --game-dir "<游戏目录>" --launch
+    python src/tools/pack/apply_patch.py --dry-run       # 只打印计划
 
 游戏目录的确定顺序：--game-dir > 设置里的 last_dir > 「记住的版本」里第一个。
 """
@@ -26,10 +26,12 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+ROOT = os.path.dirname(os.path.dirname(TOOLS))
 sys.path.insert(0, HERE)
 
-import pr2ctl as B  # noqa: E402
+from install import pr2ctl as B  # noqa: E402
 
 PACK_OUT = os.path.join(ROOT, "build", "PR2Packs")
 

@@ -61,11 +61,11 @@ if TOOLS not in sys.path:
     sys.path.insert(0, TOOLS)
 
 import translate as T          # noqa: E402
-import compile_pack as C       # noqa: E402
+from pack import compile_pack as C       # noqa: E402
 import terms_check             # noqa: E402
-import apply_zh_rules as ZH_GEN  # noqa: E402
-import lang_rules  # noqa: E402
-import pr2ctl as P            # noqa: E402
+from text import apply_zh_rules as ZH_GEN  # noqa: E402
+from text import lang_rules  # noqa: E402
+from install import pr2ctl as P  # noqa: E402
 
 
 #: 真实端口，由 main() 在启动前填上。工具窗口靠 /api/health 判断

@@ -31,8 +31,8 @@ token 比控件宽时，要么整行被丢弃（空白），要么被裁掉（�
 
 用法
 ----
-    python src/tools/space_words.py --lang zh --dry-run
-    python src/tools/space_words.py --lang zh --apply
+    python src/tools/text/space_words.py --lang zh --dry-run
+    python src/tools/text/space_words.py --lang zh --apply
 """
 
 import argparse
@@ -45,7 +45,9 @@ import subprocess
 import sys
 import tomllib
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+ROOT = os.path.dirname(os.path.dirname(TOOLS))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, ".tmp", "deps"))
 
@@ -207,7 +209,7 @@ def main():
     else:
         try:
             import jieba
-            dict_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "zh_userdict.txt")
+            dict_path = os.path.join(TOOLS, "data", "zh_userdict.txt")
             if os.path.isfile(dict_path):
                 jieba.load_userdict(dict_path)
         except ImportError:

@@ -23,7 +23,9 @@ import re
 import tomllib
 from collections import Counter
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+ROOT = os.path.dirname(os.path.dirname(TOOLS))
 TRANS = os.path.join(ROOT, "src", "live")
 REF = os.path.join(ROOT, "src", "orig")
 DOCS = os.path.join(ROOT, "docs")
@@ -209,7 +211,7 @@ def write_md(rows):
     A = [r for r in rows if r["tier"] == "A"]
 
     L = ["# 说话人分级（只依据英/法原文）", "",
-         "> 自动生成：`python src/tools/speaker_audit.py`。逐条明细：[speaker-audit.csv](speaker-audit.csv)。",
+         "> 自动生成：`python src/tools/analysis/speaker_audit.py`。逐条明细：[speaker-audit.csv](speaker-audit.csv)。",
          "> 判定只使用**英语**和**法语**原文。日语是我们自己译的，用它反推说话人是循环论证，所以不参与。", "",
          "## 分级定义", "",
          "| 级别 | 含义 | 条数 |", "|---|---|---|",

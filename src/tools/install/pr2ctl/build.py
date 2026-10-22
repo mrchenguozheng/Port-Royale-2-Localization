@@ -53,7 +53,7 @@ def build_pack(lang, out_dir, events):
     这里仍查一次条目数兜底：空包装进游戏等于没生效，而 GUI 是
     会把它复制过去的最后一道关口。
     """
-    script = os.path.join(HERE, "compile_pack.py")
+    script = os.path.join(HERE, "pack", "compile_pack.py")
     # --no-fonts：字体由 run_build 在所有语言编完后统一做一次，
     # 免得选三种语言就重裁三遍字体。
     cmd = [sys.executable, script, "--lang", lang, "--out", out_dir, "--no-fonts"]
@@ -167,7 +167,7 @@ def run_build(langs, events):
         # 字体：语言包编完后统一检查一次。译文里出现新字而字体没跟上，
         # 游戏里就画成空白 —— 所以并进同一个构建动作，别让人单记一步。
         try:
-            sys.path.insert(0, HERE)
+            sys.path.insert(0, os.path.join(HERE, "font"))
             import subset_fonts
             events.put(("line", "检查字体…"))
             ok, msg = subset_fonts.ensure_fonts(

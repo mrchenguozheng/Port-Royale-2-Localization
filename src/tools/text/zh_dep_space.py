@@ -11,8 +11,8 @@
 apply_patch.py --dep 时会用 PR2_SPACY_PYTHON（或 .venv-spacy）来调它。
 
 用法：
-    python src/tools/zh_dep_space.py --dry-run      # 出 CSV + 抽样
-    python src/tools/zh_dep_space.py --apply        # 写回 zh.toml
+    python src/tools/text/zh_dep_space.py --dry-run      # 出 CSV + 抽样
+    python src/tools/text/zh_dep_space.py --apply        # 写回 zh.toml
 """
 
 import argparse
@@ -24,7 +24,9 @@ import sys
 import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+ROOT = os.path.dirname(os.path.dirname(TOOLS))
 sys.path.insert(0, HERE)
 
 TAG = re.compile(r"(<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z])")

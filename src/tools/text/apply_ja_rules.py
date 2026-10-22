@@ -10,8 +10,8 @@ r"""apply_ja_rules.py —— 从干净日语源生成带排版空格的 ja.toml
 - 占位符两侧的空格；
 - 助词后补空格（优先形态素分析，装了 janome/fugashi 更准；没装则用正则）。
 
-    python src/tools/apply_ja_rules.py             # 只对比，不写文件
-    python src/tools/apply_ja_rules.py --write     # 写入 live/ja.toml
+    python src/tools/text/apply_ja_rules.py             # 只对比，不写文件
+    python src/tools/text/apply_ja_rules.py --write     # 写入 live/ja.toml
 """
 
 import argparse
@@ -22,12 +22,14 @@ import sys
 import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+ROOT = os.path.dirname(os.path.dirname(TOOLS))
 CLEAN = os.path.join(ROOT, "src", "seed", "ja.toml")
 OUT = os.path.join(ROOT, "src", "live", "ja.toml")
 
 sys.path.insert(0, HERE)
-import lang_rules.ja as JA  # noqa: E402
+from text.lang_rules import ja as JA  # noqa: E402
 
 HEADER = [
     "# 日语生成物：由 src/seed/ja.toml 经 apply_ja_rules.py 生成，请勿手改。",

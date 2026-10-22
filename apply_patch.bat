@@ -17,7 +17,7 @@ setlocal
 
 call "%~dp0src\find_python.bat" || goto :nopython
 
-%PY% "%~dp0src\tools\apply_patch.py" %*
+%PY% "%~dp0src\tools\pack\apply_patch.py" %*
 set "RC=%ERRORLEVEL%"
 endlocal & exit /b %RC%
 

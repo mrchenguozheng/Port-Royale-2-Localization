@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
-r"""src/tools/compile_pack.py — 把 translations\<语言>.toml 编译成引擎能读的语言包
+r"""src/tools/pack/compile_pack.py — 把 translations\<语言>.toml 编译成引擎能读的语言包
 
-    python src/tools/compile_pack.py                        # 编 zh（默认）
-    python src/tools/compile_pack.py --lang de --out <输出目录>
+    python src/tools/pack/compile_pack.py                        # 编 zh（默认）
+    python src/tools/pack/compile_pack.py --lang de --out <输出目录>
 
 只做一件事：**占位符校验**。译文里的 %1 / @D$EndDate$ 必须与原文
 一一对应，种类、数量、写法全都要对；顺序可以按中文语序调。
@@ -26,7 +26,9 @@ import sys
 import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC = os.path.dirname(HERE)                              # 仓库的 src\
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+SRC = os.path.dirname(TOOLS)                              # 仓库的 src\
 ROOT = os.path.dirname(SRC)                              # 仓库根
 DEFAULT_OUT = os.path.join(ROOT, "build", "PR2Packs")
 

@@ -18,7 +18,9 @@ import re
 import tomllib
 from collections import Counter, defaultdict
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+ROOT = os.path.dirname(os.path.dirname(TOOLS))
 DOCS = os.path.join(ROOT, "docs")
 
 POLITE = re.compile(r"(です|ます|ました|ません|ましょう|でしょう|ください|ござい|いたし|お[ら願待越持受取])")
@@ -150,7 +152,7 @@ def main():
     cat_stats = {c: (len(v), sum(1 for r in v if r["person"] == "第1人称")) for c, v in by_cat.items()}
 
     L = ["# 语体拟改清单（待确认，尚未改动）", "",
-         "> 生成：`python src/tools/tone_proposal.py`；逐条：[tone-proposal.csv](tone-proposal.csv)。",
+         "> 生成：`python src/tools/analysis/tone_proposal.py`；逐条：[tone-proposal.csv](tone-proposal.csv)。",
          "> 依据：[说话人分级](说话人分级.md) + 语音表（[语音映射](语音映射.md)）。", "",
          "## 一句话结论", "",
          "| 批次 | 范围 | 可自动判定 | 结论 |", "|---|---|---|---|",

@@ -10,8 +10,8 @@
   · 再跑 apply_patch / compile_pack 构建。
 
 用法：
-    python src/tools/apply_zh_rules.py            # 生成并写回
-    python src/tools/apply_zh_rules.py --dry-run  # 只统计
+    python src/tools/text/apply_zh_rules.py            # 生成并写回
+    python src/tools/text/apply_zh_rules.py --dry-run  # 只统计
 """
 
 import argparse
@@ -24,10 +24,12 @@ import sys
 import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+ROOT = os.path.dirname(os.path.dirname(TOOLS))
 sys.path.insert(0, HERE)
 
-import lang_rules  # noqa: E402
+from text import lang_rules  # noqa: E402
 
 SRC = os.path.join(ROOT, "src", "seed", "zh.toml")
 DST = os.path.join(ROOT, "src", "live", "zh.toml")
@@ -62,7 +64,7 @@ def fix_conj(text):
 
 
 def load_list(name):
-    path = os.path.join(HERE, name)
+    path = os.path.join(TOOLS, "data", name)
     out = []
     if os.path.isfile(path):
         for line in io.open(path, encoding="utf-8"):
@@ -328,8 +330,8 @@ CACHE = os.path.join(ROOT, "build", "cache", "zh.generated.json")
 KEY_FILES = [SRC, __file__,
              os.path.join(HERE, "lang_rules", "zh.py"),
              os.path.join(HERE, "lang_rules", "base.py"),
-             os.path.join(HERE, "zh_names.txt"),
-             os.path.join(HERE, "zh_towns.txt")]
+             os.path.join(TOOLS, "data", "zh_names.txt"),
+             os.path.join(TOOLS, "data", "zh_towns.txt")]
 
 
 def _cache_key():
@@ -399,7 +401,7 @@ def generate(use_cache=True):
 
 
 def write(order, out):
-    header = ("# 自动生成：本文件由 src/tools/apply_zh_rules.py\n"
+    header = ("# 自动生成：本文件由 src/tools/text/apply_zh_rules.py\n"
               "# 从 src/seed/zh.toml 按 标点/连词/人名 规则生成。\n"
               "# 改译文请改 references 里的文本源；改规则请改 apply_zh_rules.py。\n")
     io.open(DST, "w", encoding="utf-8", newline="\n").write(

@@ -2,8 +2,8 @@
 # coding: utf-8
 r"""server_status.py —— 看看编辑器后端现在有几个实例、都是谁。
 
-    python src/tools/server_status.py          # 列出 8777–8800 上的编辑器
-    python src/tools/server_status.py --stop 8779   # 停掉某个端口上的实例
+    python src/tools/install/server_status.py          # 列出 8777–8800 上的编辑器
+    python src/tools/install/server_status.py --stop 8779   # 停掉某个端口上的实例
 
 不依赖启动器：直接问每个端口的 /api/health，所以旧版本的服务也认得出。
 """
@@ -74,7 +74,7 @@ def main():
     if not found:
         print("8777–%d 上没有发现编辑器实例。" % (args.base + TRIES - 1))
         return 1
-    print("\n共 %d 个实例。停掉某个：python src/tools/server_status.py --stop <端口>" % found)
+    print("\n共 %d 个实例。停掉某个：python src/tools/install/server_status.py --stop <端口>" % found)
     return 0
 
 

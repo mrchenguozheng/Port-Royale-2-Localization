@@ -20,6 +20,8 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
 sys.path.insert(0, HERE)
 import translate as T
 

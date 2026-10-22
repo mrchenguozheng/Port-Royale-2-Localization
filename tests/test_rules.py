@@ -7,8 +7,9 @@ import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src", "tools"))
+sys.path.insert(0, os.path.join(ROOT, "src", "tools", "text"))
 
-import apply_zh_rules as ZH  # noqa: E402
+from text import apply_zh_rules as ZH  # noqa: E402
 import lang_rules  # noqa: E402
 
 

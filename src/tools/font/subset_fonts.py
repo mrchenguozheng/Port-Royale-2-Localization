@@ -14,16 +14,16 @@
 
 用法
 ----
-    python src\\tools\\subset_fonts.py            # 用全部译文用字重新缝合
-    python src\\tools\\subset_fonts.py --force    # 忽略缓存，强制重缝
-    python src\\tools\\subset_fonts.py --out D:\\fonts
+    python src\\tools\\font\\subset_fonts.py            # 用全部译文用字重新缝合
+    python src\\tools\\font\\subset_fonts.py --force    # 忽略缓存，强制重缝
+    python src\\tools\\font\\subset_fonts.py --out D:\\fonts
 
 依赖
 ----
 需要 fontTools。默认解释器没装时会尝试 ``PR2_FONTTOOLS_SITE``，再试
 ``~/.workbuddy/binaries/python/envs/*/Lib/site-packages``。
 
-donor 按语言配置在 ``src/tools/fontstitch/presets.toml``：只有写了
+donor 按语言配置在 ``src/tools/font/fontstitch/presets.toml``：只有写了
 ``[<语言>]`` 段的语言才会被缝进字体，没配置的语言直接跳过。目前只有
 ``zh`` 配了 donor，``ja`` 等没有配置，所以不会给它们缝字形。
 
@@ -38,7 +38,9 @@ import sys
 import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC_DIR = os.path.dirname(HERE)                       # 仓库的 src\
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+SRC_DIR = os.path.dirname(TOOLS)                       # 仓库的 src\
 ROOT = os.path.dirname(SRC_DIR)                       # 仓库根
 STRINGS = os.path.join(SRC_DIR, "live")
 
@@ -46,7 +48,7 @@ DEFAULT_SRC = os.path.join(ROOT, "assets", "fonts", "original")
 DEFAULT_OUT = os.path.join(ROOT, "build", "fonts")
 FONTS = ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf")
 
-STITCH_DIR = os.path.join(HERE, "fontstitch")
+STITCH_DIR = os.path.join(TOOLS, "font", "fontstitch")
 PRESETS = os.path.join(STITCH_DIR, "presets.toml")
 
 #: 除了译文用字，还要保留的字符：ASCII、中文标点、数字全角等。
@@ -241,7 +243,7 @@ def _write_notice(out_dir):
         "（微软雅黑、华文中宋、思源宋体、钟齐志莽、Noto Sans JP 等）。\n\n"
         "只允许在本机自用；禁止再分发、上传、打包进发布物或提交到仓库。\n"
         "需要给别人的机器补字体时，让对方用自己的 donor 重新运行：\n"
-        "  python src\\tools\\subset_fonts.py\n"
+        "  python src\\tools\\font\\subset_fonts.py\n"
     )
     try:
         with open(os.path.join(out_dir, "不要分发.txt"), "w",

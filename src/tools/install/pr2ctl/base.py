@@ -28,7 +28,8 @@ import webbrowser
 
 
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # src/tools
+HERE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # src/tools
+TOOLS = HERE
 SRC = os.path.dirname(HERE)                              # 仓库的 src\
 ROOT = os.path.dirname(SRC)                              # 仓库根
 BUILD = os.path.join(ROOT, "build")

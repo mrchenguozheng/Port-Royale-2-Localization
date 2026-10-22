@@ -14,7 +14,7 @@ def deploy_steps(target, langs):
              for n in FLAT_FILES]
 
     # 字体：游戏自带的是纯拉丁字体，不换掉中文就画不出来。
-    # 由 src\tools\subset_fonts.py 生成到 build\fonts\；没有就跳过
+    # 由 src\tools\font\subset_fonts.py 生成到 build\fonts\；没有就跳过
     # （旧版本的构建目录里可能还没有字体）。
     font_dir = os.path.join(BUILD, "fonts")
     if os.path.isdir(font_dir):

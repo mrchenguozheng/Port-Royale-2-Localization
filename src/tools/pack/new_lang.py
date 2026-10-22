@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
-"""src/tools/new_lang.py — 新建一种语言的译文文件
+"""src/tools/pack/new_lang.py — 新建一种语言的译文文件
 
-    python src/tools/new_lang.py --new-lang <代码> [--from <语言代码>]
+    python src/tools/pack/new_lang.py --new-lang <代码> [--from <语言代码>]
 
 **加一种语言就是复制 en.gog_1.1.2.3.toml 再逐条改译文**，所以本脚本只做这一件事：
 
@@ -20,7 +20,7 @@
 
 重建全部原文（极少用）
 ----------------------
-    python src/tools/new_lang.py
+    python src/tools/pack/new_lang.py
 
 不带参数时走这条路，从 `editor/data/editor-data.json` 重新生成
 en / fr / zh 三份文件。只在初次建立或**换游戏版本**（英法原文变了）时用。
@@ -35,7 +35,9 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC = os.path.dirname(HERE)                     # 仓库的 src\
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
+SRC = os.path.dirname(TOOLS)                     # 仓库的 src\
 ROOT = os.path.dirname(SRC)                     # 仓库根
 sys.path.insert(0, HERE)
 

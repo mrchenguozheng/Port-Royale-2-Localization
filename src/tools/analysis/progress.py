@@ -17,10 +17,12 @@ import sys
 import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, TOOLS)
 sys.path.insert(0, HERE)
 import translate as T
 
-ROOT = os.path.dirname(os.path.dirname(HERE))
+ROOT = os.path.dirname(os.path.dirname(TOOLS))
 
 
 def load_keep():
