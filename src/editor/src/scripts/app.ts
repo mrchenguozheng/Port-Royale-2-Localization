@@ -42,6 +42,9 @@ const FOLLOW = '';                 // 参照下拉里的「（无）」
 const PAGE_SIZE = 1;
 //: 每页条数存在浏览器里，下次打开沿用上次的选择。
 const LS_LANG = 'pr2.lang';
+const LS_SIZE = 'pr2.size';
+const LS_SIZES = 'pr2.sizes';
+const PRESET_SIZES = [14, 16, 18, 20, 24, 28, 32, 40, 48];
 const LS_REFA = 'pr2.refA';
 const LS_REFB = 'pr2.refB';
 const LS_FILTER = 'pr2.filter';
@@ -86,7 +89,8 @@ const S = {
   curId: '',
   meaningSaved: {} as Record<string, boolean>,
   dirtyIds: [] as string[],
-  size: 24,
+  size: 14,
+  customSizes: [] as number[],
   problems: {} as Record<string, Problem[]>,
   /** 术语一致性： id -> ["Frigate：应为「巡防舰」", …] */
   terms: {} as Record<string, string[]>,
@@ -217,6 +221,15 @@ async function boot() {
   fill($('lang'), S.langs, S.lang);
   await loadSideList();
 
+  const savedSize = Number(saved(LS_SIZE));
+  if (Number.isFinite(savedSize) && savedSize >= 8 && savedSize <= 96) S.size = savedSize;
+  try {
+    const arr = JSON.parse(saved(LS_SIZES) || '[]');
+    if (Array.isArray(arr)) {
+      S.customSizes = arr.map(Number).filter((n) => Number.isFinite(n) && n >= 8 && n <= 96);
+    }
+  } catch { /* 忽略坏值 */ }
+  fillSizeSelect();
   applySize();
   await reload(true);
   setLoading(false);
@@ -395,6 +408,25 @@ function fill(sel: HTMLSelectElement, items: string[], cur: string) {
     sel.appendChild(o);
   }
   sel.value = cur;
+}
+
+function fillSizeSelect() {
+  const sel = $('size') as HTMLSelectElement;
+  const all = Array.from(new Set([...PRESET_SIZES, ...S.customSizes]))
+    .sort((a, b) => a - b);
+  if (!all.includes(S.size)) all.push(S.size);
+  sel.innerHTML = '';
+  for (const n of all.sort((a, b) => a - b)) {
+    const o = el('option', undefined, String(n)) as HTMLOptionElement;
+    o.value = String(n);
+    sel.appendChild(o);
+  }
+  sel.value = String(S.size);
+}
+
+function saveSizePrefs() {
+  remember(LS_SIZE, String(S.size));
+  remember(LS_SIZES, JSON.stringify(S.customSizes));
 }
 
 function applySize() {
@@ -1487,6 +1519,34 @@ $('lang').addEventListener('change', (ev) => {
 $('size').addEventListener('change', (ev) => {
   S.size = Number((ev.target as HTMLSelectElement).value);
   applySize();
+  saveSizePrefs();
+});
+
+$('sizeAdd').addEventListener('click', () => {
+  const val = window.prompt('输入字号（8–96，整数）', String(S.size));
+  if (val === null) return;
+  const n = Math.round(Number(val));
+  if (!Number.isFinite(n) || n < 8 || n > 96) {
+    $('stat').textContent = '字号需在 8–96 之间';
+    return;
+  }
+  if (!PRESET_SIZES.includes(n) && !S.customSizes.includes(n)) S.customSizes.push(n);
+  S.size = n;
+  fillSizeSelect();
+  applySize();
+  saveSizePrefs();
+});
+
+$('sizeDel').addEventListener('click', () => {
+  if (PRESET_SIZES.includes(S.size)) {
+    $('stat').textContent = '预设字号不能删除';
+    return;
+  }
+  S.customSizes = S.customSizes.filter((n) => n !== S.size);
+  S.size = 14;
+  fillSizeSelect();
+  applySize();
+  saveSizePrefs();
 });
 $('save').addEventListener('click', () => void save());
 

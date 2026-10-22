@@ -35,16 +35,18 @@ const title = 'PR2 本地化 · 译文编辑';
         <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…" spellcheck="false" />
         <label class="tb">字号
           <select id="size">
-            <option value="14">14</option>
+            <option value="14" selected>14</option>
             <option value="16">16</option>
             <option value="18">18</option>
             <option value="20">20</option>
-            <option value="24" selected>24</option>
+            <option value="24">24</option>
             <option value="28">28</option>
             <option value="32">32</option>
             <option value="40">40</option>
             <option value="48">48</option>
           </select>
+          <button id="sizeAdd" class="mini" title="添加自定义字号">+</button>
+          <button id="sizeDel" class="mini" title="删除当前自定义字号">-</button>
         </label>
         <button id="save" disabled>保存</button>
       </span>
