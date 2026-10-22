@@ -1083,16 +1083,29 @@ class Handler(BaseHTTPRequestHandler):
             zh_ph = placeholders_of(zh)
             missing = [t for t in en_ph if t not in zh_ph]
             extra = [t for t in zh_ph if t not in en_ph]
-            # 「干净文本」的空格：只算夹在拉丁字母/数字之间的那些
-            # （如 Port Royale 2）；标点后补的排版空格不算。
-            clean_spaces = 0
-            for i, ch in enumerate(zh):
-                if ch != " ":
-                    continue
-                l = zh[i - 1] if i else ""
-                r = zh[i + 1] if i + 1 < len(zh) else ""
-                if (l.isascii() and l.isalnum()) or (r.isascii() and r.isalnum()):
-                    clean_spaces += 1
+            # 「干净文本」的空格数：优先读 references 里的干净文本源。
+            clean_spaces = None
+            ref_name = ("zh.gog_1.1.2.3.toml" if lang == "zh"
+                        else "%s.toml" % lang)
+            ref_path = os.path.join(os.path.dirname(SRC), "src", "references", ref_name)
+            if os.path.isfile(ref_path):
+                try:
+                    with open(ref_path, "rb") as fh:
+                        clean = tomllib.load(fh).get(hid)
+                    if isinstance(clean, str):
+                        clean_spaces = clean.count(" ")
+                except Exception:
+                    clean_spaces = None
+            if clean_spaces is None:
+                # 没有干净文本源时退回启发式：只算拉丁字符之间的空格。
+                clean_spaces = 0
+                for i, ch in enumerate(zh):
+                    if ch != " ":
+                        continue
+                    l = zh[i - 1] if i else ""
+                    r = zh[i + 1] if i + 1 < len(zh) else ""
+                    if (l.isascii() and l.isalnum()) or (r.isascii() and r.isalnum()):
+                        clean_spaces += 1
             return self.send_json({
                 "placeholders": c.get("placeholders") or [],
                 "tags": c.get("tags") or [],
