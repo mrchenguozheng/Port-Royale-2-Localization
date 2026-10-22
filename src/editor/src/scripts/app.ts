@@ -501,88 +501,21 @@ function undoEdit(id: string) {
   void loadEntryInfo(id);
 }
 
-async function revertClean(id: string) {
-  try {
-    const r = await api<{ text: string }>(
-      `/api/seed?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
-    const ed = zhEditor();
-    const cur = ed ? (ed.textContent || '') : '';
-    if (cur) {
-      const st = S.undo[id] || (S.undo[id] = []);
-      st.push(cur);
-      if (st.length > 20) st.shift();
-    }
-    setEditorText(r.text);
-    void loadEntryInfo(id);
-  } catch (err) {
-    const box = document.getElementById('infoBar');
-    if (box) box.textContent = '读取初版失败：' + (err as Error).message;
+async function copySeed(id: string) {
+  const seed = S.seed[id];
+  if (seed === undefined) return;
+  const ed = zhEditor();
+  const cur = ed ? editorText(ed) : '';
+  if (cur) {
+    const st = S.undo[id] || (S.undo[id] = []);
+    st.push(cur);
+    if (st.length > 20) st.shift();
   }
+  setEditorText(seed);
+  void loadEntryInfo(id);
 }
 
 let seedId = '';
-
-function diffNodes(a: string, b: string): DocumentFragment {
-  const f = document.createDocumentFragment();
-  let i = 0;
-  while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
-  let j = 0;
-  while (j < a.length - i && j < b.length - i &&
-         a[a.length - 1 - j] === b[b.length - 1 - j]) j += 1;
-  f.appendChild(document.createTextNode(b.slice(0, i)));
-  const mark = document.createElement('mark');
-  mark.textContent = b.slice(i, b.length - j);
-  f.appendChild(mark);
-  f.appendChild(document.createTextNode(b.slice(b.length - j)));
-  return f;
-}
-
-async function openRules(id: string) {
-  try {
-    const r = await api<{ stages: { label: string; text: string }[] }>(
-      `/api/rule-trace?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
-    $('ruleTitle').textContent = '规则轨迹 · ' + id;
-    const box = $('ruleStages');
-    box.innerHTML = '';
-    let prev: string | null = null;
-    for (const st of r.stages) {
-      const row = el('div', 'rule-stage');
-      row.appendChild(el('div', 'rule-label', st.label));
-      const body = el('div', 'rule-text');
-      body.appendChild(prev === null ? document.createTextNode(st.text) : diffNodes(prev, st.text));
-      row.appendChild(body);
-      box.appendChild(row);
-      prev = st.text;
-    }
-    try {
-      const hr = await api<{ text: string; same: boolean;
-        hits: { start: number; end: number; type: string; label: string }[] }>(
-        `/api/rule-hits?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
-      const row = el('div', 'rule-stage');
-      row.appendChild(el('div', 'rule-label',
-        hr.same ? '命中标注' : '命中标注（当前译文与初版文字不同，无法标注）'));
-      const body = el('div', 'rule-text');
-      let pos = 0;
-      for (const hit of (hr.hits || []).slice().sort((a, b) => a.start - b.start)) {
-        if (hit.start < pos) continue;
-        body.appendChild(document.createTextNode(hr.text.slice(pos, hit.start)));
-        const mark = document.createElement('span');
-        mark.className = 'hit hit-' + hit.type;
-        mark.textContent = hr.text.slice(hit.start, hit.end);
-        mark.title = hit.label;
-        body.appendChild(mark);
-        pos = hit.end;
-      }
-      body.appendChild(document.createTextNode(hr.text.slice(pos)));
-      row.appendChild(body);
-      box.appendChild(row);
-    } catch { /* 标注失败不影响阶段展示 */ }
-
-    $('ruleModal').hidden = false;
-  } catch (err) {
-    $('stat').textContent = '规则轨迹读取失败：' + (err as Error).message;
-  }
-}
 
 async function openSeed(id: string) {
   try {
@@ -627,18 +560,6 @@ function closeSeed() {
   $('seedModal').hidden = true;
   ($('seedText') as HTMLTextAreaElement).readOnly = true;
   ($('seedSave') as HTMLButtonElement).disabled = true;
-}
-
-async function editMeaning(id: string, token: string, cur: string) {
-  const val = window.prompt('占位符 ' + token + ' 的含义（留空恢复自动判断）', cur);
-  if (val === null) return;
-  try {
-    await api('/api/placeholder-meaning', { id, token, meaning: val.trim() });
-    void loadEntryInfo(id);
-  } catch (err) {
-    const box = document.getElementById('infoBar');
-    if (box) box.textContent = '含义保存失败：' + (err as Error).message;
-  }
 }
 
 async function setTermRule(id: string, term: string, skip: boolean) {
@@ -745,10 +666,6 @@ async function loadEntryInfo(id: string) {
     undoBtn.title = '撤销上一次编辑';
     undoBtn.addEventListener('click', () => undoEdit(id));
     actions.appendChild(undoBtn);
-    const cleanBtn = el('button', 'mini', '还原干净原文');
-    cleanBtn.title = '用 references 里的干净文本替换当前译文';
-    cleanBtn.addEventListener('click', () => void revertClean(id));
-    actions.appendChild(cleanBtn);
     box.appendChild(actions);
     try {
       const sd = await api<{ text: string }>(
@@ -837,6 +754,10 @@ function rowOf(e: Entry): HTMLElement {
   const seedBox = el('div', 'seed-inline ref-block');
   const seedHead = el('div', 'ref-head');
   seedHead.appendChild(el('span', 'ref-label', '初版'));
+  const seedCopy = el('button', 'mini seed-edit', '复制到译文');
+  seedCopy.title = '用初版覆盖编辑框（可撤销）';
+  seedCopy.addEventListener('click', () => void copySeed(e.id));
+  seedHead.appendChild(seedCopy);
   const seedEdit = el('button', 'mini seed-edit', '解锁编辑');
   seedEdit.title = '逐条解锁，仅本次修改有效';
   seedEdit.addEventListener('click', () => void openSeed(e.id));
