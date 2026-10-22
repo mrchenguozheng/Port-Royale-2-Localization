@@ -233,6 +233,30 @@ async function boot() {
   updatePath();
 }
 
+function syncScrollers() {
+  const panes = Array.from(
+    document.querySelectorAll('.col-src .body, .col-src .seed-body'),
+  ) as HTMLElement[];
+  if (panes.length < 2) return;
+  let lock = false;
+  for (const p of panes) {
+    if ((p as HTMLElement & { _sync?: boolean })._sync) continue;
+    (p as HTMLElement & { _sync?: boolean })._sync = true;
+    p.addEventListener('scroll', () => {
+      if (lock) return;
+      lock = true;
+      const max = p.scrollHeight - p.clientHeight;
+      const ratio = max > 0 ? p.scrollTop / max : 0;
+      for (const q of panes) {
+        if (q === p) continue;
+        const m2 = q.scrollHeight - q.clientHeight;
+        if (m2 > 0) q.scrollTop = ratio * m2;
+      }
+      window.requestAnimationFrame(() => { lock = false; });
+    });
+  }
+}
+
 function updatePath() {
   if (document.body.classList.contains('view-start')) return;
   const row = S.rows[0];
@@ -311,6 +335,7 @@ function drawRows() {
   const frag = document.createDocumentFragment();
   for (const e of S.rows) frag.appendChild(rowOf(e));
   $('rows').appendChild(frag);
+  syncScrollers();
   updatePath();
   S.activeId = null;
   if (S.rows.length) {
