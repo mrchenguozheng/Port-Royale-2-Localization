@@ -186,6 +186,18 @@ def _default_lang():
     return langs[0]
 
 
+def load_pack_meta(lang):
+    """读取 src/packs/<语言>.toml 的 alias/gui；这是写进语言包的元数据。"""
+    p = os.path.join(SRC, "packs", lang + ".toml")
+    if not os.path.isfile(p):
+        return {}
+    try:
+        doc = tomllib.load(open(p, "rb"))
+    except Exception:
+        return {}
+    return {k: str(doc[k]) for k in ("alias", "gui") if doc.get(k)}
+
+
 def build(lang, out_dir, strict):
     # 参考原文**不参与编译**：生成 en.txt / fr.txt 交给引擎等于用「原始英文」
     # 覆盖游戏，等于没汉化。所以直接拒绝，而不是打个警告继续跑。
@@ -208,6 +220,11 @@ def build(lang, out_dir, strict):
     KEEP_ORIGINAL.update(load_keep_original())
     path = os.path.join(out_dir, "%s.txt" % lang)
     lines = []
+    meta = load_pack_meta(lang)
+    for k in ("alias", "gui"):
+        if meta.get(k):
+            val = meta[k].replace("\n", " ").replace("\r", " ")
+            lines.append("# pack-meta %s=%s\n" % (k, val))
     n = n_ph = 0
 
     for s in doc.get("s", []):

@@ -20,8 +20,16 @@ static int  g_codeCount = 0;
 static char g_aliasCodes[64][64];
 static char g_aliasNames[64][256];
 static int  g_aliasCount = 0;
+static char g_packAlias[64][256];
+static char g_packGui[64][16];
+static char g_defaultUi[16] = "en";
 static HWND g_combo = NULL;
 static HWND g_status = NULL;
+static HWND g_label = NULL;
+static HWND g_btnLaunch = NULL;
+static HWND g_btnVanilla = NULL;
+static HWND g_btnRefresh = NULL;
+static HWND g_hwnd = NULL;
 
 /* ---- UTF-8 -> wide（只用于立即传给 Win32） ---- */
 static const wchar_t* W(const char* s) {
@@ -211,6 +219,17 @@ static const char* AliasOf(const char* code) {
     return code;
 }
 
+static void LoadGuiStringsFor(const char* ui) {
+    g_strCount = 0;
+    char path[MAX_PATH];
+    snprintf(path, sizeof(path), "%s\\lang\\gui.%s.ini", g_root, ui);
+    LoadIni(path);
+    if (!g_strCount && _stricmp(ui, "en") != 0) {
+        snprintf(path, sizeof(path), "%s\\lang\\gui.en.ini", g_root);
+        LoadIni(path);
+    }
+}
+
 static void LoadGuiStrings(void) {
     char ui[16];
     ReadLauncherLang(ui, sizeof(ui));
@@ -222,13 +241,61 @@ static void LoadGuiStrings(void) {
         default: strcpy(ui, "en"); break;
         }
     }
-    char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s\\lang\\gui.%s.ini", g_root, ui);
-    LoadIni(path);
-    if (!g_strCount && strcmp(ui, "en") != 0) {
-        snprintf(path, sizeof(path), "%s\\lang\\gui.en.ini", g_root);
-        LoadIni(path);
+    strncpy(g_defaultUi, ui, sizeof(g_defaultUi) - 1);
+    g_defaultUi[sizeof(g_defaultUi) - 1] = 0;
+    LoadGuiStringsFor(g_defaultUi);
+}
+
+static void ReadPackMeta(const char* path, char* alias, int acap,
+                         char* gui, int gcap) {
+    alias[0] = 0;
+    gui[0] = 0;
+    FILE* f = fopen(path, "rb");
+    if (!f) return;
+    char line[1024];
+    while (fgets(line, sizeof(line), f)) {
+        char* p = line;
+        Trim(p);
+        if (strncmp(p, "# pack-meta ", 12) != 0) continue;
+        p += 12;
+        char* eq = strchr(p, '=');
+        if (!eq) continue;
+        *eq = 0;
+        char* key = p; Trim(key);
+        char* val = eq + 1; Trim(val);
+        if (strcmp(key, "alias") == 0) {
+            strncpy(alias, val, acap - 1);
+            alias[acap - 1] = 0;
+        } else if (strcmp(key, "gui") == 0) {
+            strncpy(gui, val, gcap - 1);
+            gui[gcap - 1] = 0;
+        }
     }
+    fclose(f);
+}
+
+static void UpdateStatus(void) {
+    if (!g_status) return;
+    SetWindowTextW(g_status, g_codeCount ? TF("status.count", g_codeCount)
+                                         : T("status.none"));
+}
+
+static void UpdateTexts(void) {
+    if (!g_hwnd) return;
+    SetWindowTextW(g_hwnd, T("title"));
+    if (g_label) SetWindowTextW(g_label, T("label.language"));
+    if (g_btnLaunch) SetWindowTextW(g_btnLaunch, T("button.launch"));
+    if (g_btnVanilla) SetWindowTextW(g_btnVanilla, T("button.vanilla"));
+    if (g_btnRefresh) SetWindowTextW(g_btnRefresh, T("button.refresh"));
+    UpdateStatus();
+}
+
+static void ApplyPackLanguage(void) {
+    int sel = (int)SendMessageW(g_combo, CB_GETCURSEL, 0, 0);
+    const char* ui = g_defaultUi;
+    if (sel >= 0 && sel < g_codeCount && g_packGui[sel][0]) ui = g_packGui[sel];
+    LoadGuiStringsFor(ui);
+    UpdateTexts();
 }
 
 static void DirOf(const char* path, char* out) {
@@ -278,6 +345,8 @@ static int HasLanguageFonts(const char* lang) {
 static void LoadLanguages(void) {
     char pattern[MAX_PATH], current[64];
     g_codeCount = 0;
+    memset(g_packAlias, 0, sizeof(g_packAlias));
+    memset(g_packGui, 0, sizeof(g_packGui));
     SendMessageW(g_combo, CB_RESETCONTENT, 0, 0);
     snprintf(pattern, sizeof(pattern), "%s\\PR2Packs\\*.txt", g_root);
     WIN32_FIND_DATAA fd;
@@ -292,8 +361,15 @@ static void LoadLanguages(void) {
             if (n <= 0 || n >= 64) continue;
             strncpy(g_codes[g_codeCount], fd.cFileName, n);
             g_codes[g_codeCount][n] = '\0';
-            SendMessageW(g_combo, CB_ADDSTRING, 0,
-                         (LPARAM)W(AliasOf(g_codes[g_codeCount])));
+            char full[MAX_PATH];
+            snprintf(full, sizeof(full), "%s\\PR2Packs\\%s",
+                     g_root, fd.cFileName);
+            ReadPackMeta(full, g_packAlias[g_codeCount], 256,
+                         g_packGui[g_codeCount], 16);
+            const char* label = g_packAlias[g_codeCount][0]
+                              ? g_packAlias[g_codeCount]
+                              : AliasOf(g_codes[g_codeCount]);
+            SendMessageW(g_combo, CB_ADDSTRING, 0, (LPARAM)W(label));
             g_codeCount++;
         } while (FindNextFileA(h, &fd));
         FindClose(h);
@@ -306,8 +382,7 @@ static void LoadLanguages(void) {
         }
     }
     if (g_codeCount) SendMessageW(g_combo, CB_SETCURSEL, sel, 0);
-    SetWindowTextW(g_status, g_codeCount ? TF("status.count", g_codeCount)
-                                         : T("status.none"));
+    ApplyPackLanguage();
 }
 
 static void Launch(const char* lang, int vanilla) {
@@ -355,20 +430,21 @@ static void Launch(const char* lang, int vanilla) {
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_CREATE: {
-        CreateWindowW(L"STATIC", T("label.language"), WS_CHILD | WS_VISIBLE,
+        g_hwnd = hwnd;
+        g_label = CreateWindowW(L"STATIC", T("label.language"), WS_CHILD | WS_VISIBLE,
                       16, 18, 420, 20, hwnd, NULL, NULL, NULL);
         g_combo = CreateWindowW(L"COMBOBOX", NULL,
                                 WS_CHILD | WS_VISIBLE | WS_TABSTOP |
                                 CBS_DROPDOWNLIST | WS_VSCROLL,
                                 16, 42, 420, 200, hwnd, (HMENU)ID_LANG,
                                 NULL, NULL);
-        CreateWindowW(L"BUTTON", T("button.launch"),
+        g_btnLaunch = CreateWindowW(L"BUTTON", T("button.launch"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                       16, 84, 190, 32, hwnd, (HMENU)ID_LAUNCH, NULL, NULL);
-        CreateWindowW(L"BUTTON", T("button.vanilla"),
+        g_btnVanilla = CreateWindowW(L"BUTTON", T("button.vanilla"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                       216, 84, 150, 32, hwnd, (HMENU)ID_VANILLA, NULL, NULL);
-        CreateWindowW(L"BUTTON", T("button.refresh"),
+        g_btnRefresh = CreateWindowW(L"BUTTON", T("button.refresh"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
                       376, 84, 80, 32, hwnd, (HMENU)ID_REFRESH, NULL, NULL);
         g_status = CreateWindowW(L"STATIC", L"",
@@ -380,6 +456,9 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
     case WM_COMMAND:
         switch (LOWORD(wp)) {
+        case ID_LANG:
+            if (HIWORD(wp) == CBN_SELCHANGE) ApplyPackLanguage();
+            break;
         case ID_LAUNCH: {
             int sel = (int)SendMessageW(g_combo, CB_GETCURSEL, 0, 0);
             if (sel >= 0 && sel < g_codeCount) Launch(g_codes[sel], 0);
