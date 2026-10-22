@@ -1395,3 +1395,26 @@ sl-dialog::part(body) { overflow: auto; }
 .editor-tools #lang { width: 7.5rem; }
 .editor-tools #size { width: 5.5rem; }
 .editor-tools sl-select::part(combobox) { min-height: 1.9rem; }
+
+/* Shoelace 控件底色：默认是透明的，这里统一成页面配色 */
+:root {
+  --sl-input-background-color: #191d24;
+  --sl-input-background-color-hover: #1f242c;
+  --sl-input-background-color-focus: #1f242c;
+  --sl-input-border-color: var(--line);
+  --sl-input-border-color-hover: var(--line);
+  --sl-input-border-color-focus: var(--accent);
+  --sl-input-color: var(--fg);
+  --sl-panel-background-color: var(--head-bg);
+  --sl-overlay-background-color: rgba(0, 0, 0, 0.55);
+}
+.editor-tools sl-select::part(combobox) {
+  background: #191d24;
+}
+sl-select::part(listbox) {
+  background: var(--head-bg);
+  border: 1px solid var(--line);
+}
+sl-option::part(base) { background: transparent; color: var(--fg); }
+sl-option:hover::part(base) { background: var(--bg-row); }
+sl-dialog::part(panel) { background: var(--head-bg); }
