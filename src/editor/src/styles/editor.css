@@ -1381,3 +1381,17 @@ sl-dialog::part(panel) { max-height: 85vh; max-width: min(1100px, 92vw); }
 sl-dialog::part(body) { overflow: auto; }
 #seedText { width: 100%; min-height: 40vh; }
 #seedText::part(textarea) { font-family: var(--font-mono); font-size: 0.95rem; min-height: 38vh; }
+
+/* 顶部工具栏里的 Shoelace 下拉：压成行内小控件 */
+.editor-tools label.tb {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  white-space: nowrap; font-size: 0.85rem; color: var(--fg-dim);
+}
+.editor-tools sl-select {
+  width: 7rem; min-width: 0;
+  --sl-input-font-size-small: 0.85rem;
+  --sl-input-height-small: 1.9rem;
+}
+.editor-tools #lang { width: 7.5rem; }
+.editor-tools #size { width: 5.5rem; }
+.editor-tools sl-select::part(combobox) { min-height: 1.9rem; }
