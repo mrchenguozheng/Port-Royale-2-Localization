@@ -227,6 +227,23 @@ def _stitch_one(base, out, donors, codes, log):
     return missing, passes
 
 
+def _write_notice(out_dir):
+    """在输出目录放一份“不要分发”的说明（部署只复制 .ttf，不会带进游戏）。"""
+    text = (
+        "这些字体是衍生作品：游戏原版拉丁字体 + 商业/系统 donor 字体\n"
+        "（微软雅黑、华文中宋、思源宋体、钟齐志莽、Noto Sans JP 等）。\n\n"
+        "只允许在本机自用；禁止再分发、上传、打包进发布物或提交到仓库。\n"
+        "需要给别人的机器补字体时，让对方用自己的 donor 重新运行：\n"
+        "  python src\\tools\\subset_fonts.py\n"
+    )
+    try:
+        with open(os.path.join(out_dir, "不要分发.txt"), "w",
+                  encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
+    except OSError:
+        pass
+
+
 def ensure_fonts(out_dir=None, src=None, log=None, force=False):
     """确保 build/fonts 覆盖当前全部用字；返回 (ok, 说明)。"""
     out_dir = out_dir or DEFAULT_OUT
@@ -253,6 +270,7 @@ def ensure_fonts(out_dir=None, src=None, log=None, force=False):
     cache = _load_cache(out_dir)
     if not force and cache.get("key") == key and all(
             os.path.isfile(os.path.join(out_dir, f)) for f in FONTS):
+        _write_notice(out_dir)
         return True, "字体已是最新（%d 个用字），无需重缝" % len(chars)
 
     if not _fonttools():
@@ -281,6 +299,8 @@ def ensure_fonts(out_dir=None, src=None, log=None, force=False):
         return False, "字体缝合失败：%s" % exc
 
     _save_cache(out_dir, {"key": key, "chars": len(chars)})
+    _write_notice(out_dir)
+    log("注意：缝合字体只限本机自用，不要分发/上传/打包。")
     return True, "字体已重新缝合（%d 个用字）" % len(chars)
 
 
@@ -295,6 +315,7 @@ def main():
     print(msg)
     if ok:
         print("把这里的 4 个 TTF 复制到 <游戏目录>\\fonts\\ 覆盖，重启游戏生效。")
+        print("警告：缝合字体仅限本机自用，不要分发或打包进发布物。")
     return 0 if ok else 1
 
 
