@@ -26,6 +26,14 @@ class TestZhRules(unittest.TestCase):
         out = zh.normalize("支付 @g$TotalPrice$ 元")
         self.assertIn("@g$TotalPrice$", out)
 
+    def test_space_before_double_break(self):
+        self.assertEqual(ZH.space_before_double_break("你好。<n><n>下一段"),
+                         "你好。 <n><n>下一段")
+        self.assertEqual(ZH.space_before_double_break("你好。 <n><n>下一段"),
+                         "你好。 <n><n>下一段")
+        self.assertEqual(ZH.space_before_double_break("<n><n>开头"),
+                         "<n><n>开头")
+
     def test_generate_keys_match_live(self):
         # live 可手改，不再要求和规则输出逐字一致，但键集合必须一致。
         order, out, _ = ZH.generate()

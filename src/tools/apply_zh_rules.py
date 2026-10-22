@@ -161,6 +161,13 @@ def esc(t):
     return t.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
+def space_before_double_break(text):
+    """<n><n> 前必须有一个空格（段首除外）。"""
+    if text.startswith("<n><n>"):
+        return text
+    return re.sub(r"(?<! )<n><n>", " <n><n>", text)
+
+
 def generate():
     """按规则生成 {id: 文本}，不写文件。"""
     doc = tomllib.load(open(SRC, "rb"))
@@ -187,7 +194,7 @@ def generate():
                 continue
             spans = find_names(part, given, surn, extras + towns)
             res.append(pad_names(part, spans, towns) if spans else part)
-        c = "".join(res)
+        c = space_before_double_break("".join(res))
         stats["punct"] += a != text
         stats["conj"] += b != a
         stats["name"] += c != b
