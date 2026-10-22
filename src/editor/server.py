@@ -38,6 +38,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.dirname(HERE)                                  # 仓库的 src\
 TOOLS = os.path.join(SRC, "tools")
+
+# pythonw 拉起时 stdout/stderr 是 None；warnings/print 往它们写会抛
+# AttributeError: 'NoneType' object has no attribute 'write'。
+# 换成 devnull，保证没有控制台窗口时服务也正常。
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8", errors="replace")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8", errors="replace")
+
 DIST = os.path.join(HERE, "dist")                            # astro build 的产物
 #: 人工审核勾选：build\zh.review-flags.json，按语言存 id 列表。
 FLAGS = os.path.join(os.path.dirname(SRC), "build", "zh.review-flags.json")
