@@ -81,11 +81,13 @@ def build_names(doc):
 name_re = None
 
 
+QUOTE_RX = re.compile(r"「[^」]*」|『[^』]*』|《[^》]*》")
+WRAP_PARTICLES = set("的了是在和与而或也就都但并且时后中上下里外为以于对把被将从到着过们吗呢吧啊呀哦嗯")
 _NAME_CACHE = {}
 
 
 def _name_regexes(all_names):
-    key = frozenset(all_names)
+    key = all_names if isinstance(all_names, frozenset) else frozenset(all_names)
     hit = _NAME_CACHE.get(key)
     if hit is not None:
         return hit
@@ -102,7 +104,7 @@ def _name_regexes(all_names):
     return bare_re, titled_re
 
 
-def find_names(text, given, surn, extras):
+def find_names(text, given, surn, extras, all_names=None):
     global name_re
     if name_re is None:
         name_re = re.compile(
@@ -111,15 +113,16 @@ def find_names(text, given, surn, extras):
                re.escape(NAME_STOP), "|".join(map(re.escape, TITLES))))
     spans = [(m.start(), m.end()) for m in name_re.finditer(text)]
 
-    all_names = set(given) | set(surn) | set(extras)
+    if all_names is None:
+        all_names = set(given) | set(surn) | set(extras)
     bare_re, titled_re = _name_regexes(all_names)
     if bare_re:
         spans.extend(m.span() for m in bare_re.finditer(text))
     spans.extend(m.span() for m in titled_re.finditer(text))
 
     # 引号里的通常是船名/书名，不按人名加空格。
-    quotes = [(m.start(), m.end()) for m in
-              re.finditer(r"「[^」]*」|『[^』]*』|《[^》]*》", text)]
+    quotes = ([(m.start(), m.end()) for m in QUOTE_RX.finditer(text)]
+              if ("「" in text or "『" in text or "《" in text) else [])
 
     def in_quote(s0, e0):
         return any(q0 <= s0 and e0 <= q1 for q0, q1 in quotes)
@@ -278,7 +281,7 @@ def space_dash(text):
 
 def soft_wrap(text, limit=16, step=12):
     """超长且没有空格的汉字串，按约 12 字简单断开。"""
-    particles = set("的了是在和与而或也就都但并且时后中上下里外为以于对把被将从到着过们吗呢吧啊呀哦嗯")
+    particles = WRAP_PARTICLES
 
     def split_run(run):
         out, s0 = [], run
@@ -311,6 +314,8 @@ def space_before_double_break(text):
 
 
 def collapse_spaces(text):
+    if "  " not in text:
+        return text
     return re.sub(r" {2,}", " ", text)
 
 
@@ -323,6 +328,7 @@ def generate():
 
     zh_rules = lang_rules.get("zh")
     given, surn, extras, towns = build_names(doc)
+    all_names = frozenset(set(given) | set(surn) | set(extras) | set(towns))
 
     out, stats = {}, {"punct": 0, "conj": 0, "name": 0}
     for h in order:
@@ -338,7 +344,7 @@ def generate():
             if i % 2 == 1 or not part:
                 res.append(part)
                 continue
-            spans = find_names(part, given, surn, extras + towns)
+            spans = find_names(part, given, surn, extras + towns, all_names)
             res.append(pad_names(part, spans, towns) if spans else part)
         c = collapse_spaces(soft_wrap(space_tokens(fix_conj("".join(res)))))
         stats["punct"] += a != text
