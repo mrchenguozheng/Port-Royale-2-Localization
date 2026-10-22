@@ -1249,6 +1249,26 @@ $('ctxModal').addEventListener('click', (ev) => {
   if (ev.target === $('ctxModal')) $('ctxModal').hidden = true;
 });
 
-boot().catch((err) => {
-  $('stat').textContent = '载入失败：' + err.message;
+function showBootError(msg: string) {
+  const box = document.getElementById('loading');
+  if (!box) return;
+  box.hidden = false;
+  box.innerHTML = '';
+  const text = document.createElement('div');
+  text.className = 'boot-error';
+  text.textContent = '载入失败：' + msg;
+  const retry = document.createElement('button');
+  retry.textContent = '重试';
+  retry.addEventListener('click', () => location.reload());
+  box.appendChild(text);
+  box.appendChild(retry);
+  $('stat').textContent = '载入失败：' + msg;
+}
+
+window.addEventListener('error', (ev) => showBootError(ev.message || '脚本错误'));
+window.addEventListener('unhandledrejection', (ev) => {
+  const r = ev.reason as Error | undefined;
+  showBootError(r && r.message ? r.message : String(ev.reason));
 });
+
+boot().catch((err) => showBootError(err && err.message ? err.message : String(err)));
