@@ -143,6 +143,20 @@ const title = 'PR2 本地化 · 译文编辑';
       </div>
     </div>
 
+    <!-- 初版：默认锁定，逐条解锁，仅本次修改有效 -->
+    <div id="seedModal" class="modal" hidden>
+      <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="seedTitle">
+        <h2 id="seedTitle">初版文本</h2>
+        <p id="seedLockInfo" class="modal-note">初版默认锁定。解锁后只能改这一条，保存或关闭后重新锁定。</p>
+        <textarea id="seedText" class="seed-text" readonly></textarea>
+        <div class="modal-actions">
+          <button id="seedUnlock">解锁编辑</button>
+          <button id="seedSave" disabled>保存初版</button>
+          <button id="seedClose">关闭</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 添加语言：选一个已存在的语言当模板，复制成新语言的基础 -->
     <div id="modal" class="modal" hidden>
       <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="newTitle">

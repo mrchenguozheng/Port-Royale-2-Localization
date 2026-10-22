@@ -1314,3 +1314,11 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 
 .term-chip { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--warn, #e0a000); }
 .term-chip.term-off { color: var(--fg-dim); }
+
+.seed-text {
+  width: 100%; min-height: 9rem; resize: vertical;
+  font-family: var(--font-mono); font-size: 0.95rem;
+  background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem;
+}
+.seed-text[readonly] { opacity: 0.75; }

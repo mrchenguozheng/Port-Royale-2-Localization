@@ -516,20 +516,51 @@ async function revertClean(id: string) {
   }
 }
 
-async function editSeed(id: string) {
+let seedId = '';
+
+async function openSeed(id: string) {
   try {
     const r = await api<{ text: string }>(
       `/api/seed?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
-    if (!window.confirm('初版默认锁定。确认解锁并编辑这一条的初版？')) return;
-    const text = window.prompt('初版文本（可修改；保存只改初版）', r.text);
-    if (text === null) return;
-    await api('/api/seed', { lang: S.lang, id, text });
-    const box = document.getElementById('infoBar');
-    if (box) box.textContent = '初版已保存（工作文本未变）';
+    seedId = id;
+    const ta = $('seedText') as HTMLTextAreaElement;
+    ta.value = r.text;
+    ta.readOnly = true;
+    ($('seedSave') as HTMLButtonElement).disabled = true;
+    $('seedLockInfo').textContent =
+      '初版默认锁定。解锁后只能改这一条，保存或关闭后重新锁定。';
+    $('seedModal').hidden = false;
+    ta.focus();
   } catch (err) {
-    const box = document.getElementById('infoBar');
-    if (box) box.textContent = '初版操作失败：' + (err as Error).message;
+    $('stat').textContent = '读取初版失败：' + (err as Error).message;
   }
+}
+
+async function unlockSeed() {
+  if (!window.confirm('只解锁这一条的初版，且仅本次修改有效。继续？')) return;
+  const ta = $('seedText') as HTMLTextAreaElement;
+  ta.readOnly = false;
+  ($('seedSave') as HTMLButtonElement).disabled = false;
+  $('seedLockInfo').textContent = '已解锁（仅本次修改）。保存或关闭后重新锁定。';
+  ta.focus();
+}
+
+async function saveSeed() {
+  try {
+    const ta = $('seedText') as HTMLTextAreaElement;
+    await api('/api/seed', { lang: S.lang, id: seedId, text: ta.value });
+    ta.readOnly = true;
+    ($('seedSave') as HTMLButtonElement).disabled = true;
+    $('seedLockInfo').textContent = '初版已保存，已重新锁定。工作文本未变。';
+  } catch (err) {
+    $('seedLockInfo').textContent = '保存失败：' + (err as Error).message;
+  }
+}
+
+function closeSeed() {
+  $('seedModal').hidden = true;
+  ($('seedText') as HTMLTextAreaElement).readOnly = true;
+  ($('seedSave') as HTMLButtonElement).disabled = true;
 }
 
 async function setTermRule(id: string, term: string, skip: boolean) {
@@ -609,7 +640,7 @@ async function loadEntryInfo(id: string) {
     const actions = el('span', 'info-actions');
     const seedBtn = el('button', 'mini', '初版');
     seedBtn.title = '查看/解锁编辑初版文本';
-    seedBtn.addEventListener('click', () => void editSeed(id));
+    seedBtn.addEventListener('click', () => void openSeed(id));
     actions.appendChild(seedBtn);
     const undoBtn = el('button', 'mini', '撤销');
     undoBtn.title = '撤销上一次编辑';
@@ -1515,6 +1546,12 @@ async function openCtx(id: string) {
   }
 }
 
+$('seedUnlock').addEventListener('click', () => void unlockSeed());
+$('seedSave').addEventListener('click', () => void saveSeed());
+$('seedClose').addEventListener('click', closeSeed);
+$('seedModal').addEventListener('click', (ev) => {
+  if (ev.target === $('seedModal')) closeSeed();
+});
 $('ctxClose').addEventListener('click', () => { $('ctxModal').hidden = true; });
 $('ctxModal').addEventListener('click', (ev) => {
   if (ev.target === $('ctxModal')) $('ctxModal').hidden = true;
