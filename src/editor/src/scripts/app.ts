@@ -500,7 +500,7 @@ function undoEdit(id: string) {
 async function revertClean(id: string) {
   try {
     const r = await api<{ text: string }>(
-      `/api/clean?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
+      `/api/seed?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
     const ed = zhEditor();
     const cur = ed ? (ed.textContent || '') : '';
     if (cur) {
@@ -512,7 +512,23 @@ async function revertClean(id: string) {
     void loadEntryInfo(id);
   } catch (err) {
     const box = document.getElementById('infoBar');
-    if (box) box.textContent = '还原失败：' + (err as Error).message;
+    if (box) box.textContent = '读取初版失败：' + (err as Error).message;
+  }
+}
+
+async function editSeed(id: string) {
+  try {
+    const r = await api<{ text: string }>(
+      `/api/seed?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
+    if (!window.confirm('初版默认锁定。确认解锁并编辑这一条的初版？')) return;
+    const text = window.prompt('初版文本（可修改；保存只改初版）', r.text);
+    if (text === null) return;
+    await api('/api/seed', { lang: S.lang, id, text });
+    const box = document.getElementById('infoBar');
+    if (box) box.textContent = '初版已保存（工作文本未变）';
+  } catch (err) {
+    const box = document.getElementById('infoBar');
+    if (box) box.textContent = '初版操作失败：' + (err as Error).message;
   }
 }
 
@@ -591,6 +607,10 @@ async function loadEntryInfo(id: string) {
     }
 
     const actions = el('span', 'info-actions');
+    const seedBtn = el('button', 'mini', '初版');
+    seedBtn.title = '查看/解锁编辑初版文本';
+    seedBtn.addEventListener('click', () => void editSeed(id));
+    actions.appendChild(seedBtn);
     const undoBtn = el('button', 'mini', '撤销');
     undoBtn.title = '撤销上一次编辑';
     undoBtn.addEventListener('click', () => undoEdit(id));

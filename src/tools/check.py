@@ -5,7 +5,7 @@
 依次跑：
 1. 跨模块引用检查（lint_imports.py）
 2. 规则单元测试（tests/）
-3. 中文生成物一致性（apply_zh_rules.py --check）
+3. （已移除：live 可手改，不再要求等于规则输出）
 
     python src/tools/check.py
 """
@@ -32,7 +32,6 @@ def main():
     steps = [
         ("跨模块引用", [PY, os.path.join("src", "tools", "lint_imports.py")]),
         ("规则单测", [PY, "-m", "unittest", "discover", "-s", "tests", "-q"]),
-        ("生成物一致性", [PY, os.path.join("src", "tools", "apply_zh_rules.py"), "--check"]),
     ]
     for title, cmd in steps:
         if not run(title, cmd):

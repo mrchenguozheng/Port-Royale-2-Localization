@@ -672,42 +672,6 @@ def save_all(lang, rows):
     if lang in T.REFERENCE_LANGS:
         raise ValueError("%s 是只读参考原文，不能写入" % lang)
 
-    if lang == "zh":
-        # 中文：干净文本写回 src/clean/zh.toml，再按规则重新生成。
-        ref = os.path.join(os.path.dirname(SRC), "src", "clean", "zh.toml")
-        cur = tomllib.load(open(ref, "rb"))
-        order = list(cur)
-        upd = {r["id"]: ZH_GEN.strip_padding(r["text"]) for r in rows}
-        changed = 0
-        for rid, text in upd.items():
-            if rid in cur and cur[rid] != text:
-                changed += 1
-        with io.open(ref, "w", encoding="utf-8", newline="\n") as fh:
-            fh.write("# 中文文本源：只写译文，不要加任何为引擎服务的空格。\n")
-            fh.write("# src/translations/zh.toml 由它经 apply_zh_rules.py 生成，请勿手改生成物。\n")
-            for rid in order:
-                fh.write('"%s" = "%s"\n' % (rid, toml_escape(upd.get(rid, cur[rid]))))
-        gen_order, gen_out, _stats = ZH_GEN.generate()
-        ZH_GEN.write(gen_order, gen_out)
-
-        # 保存即审核：把审核状态置为已接受，并把保存过的条目勾成已审。
-        try:
-            import time as _t
-            st = {"status": "ok", "ref": zh_review.sha(zh_review.REF),
-                  "zh": zh_review.sha(zh_review.ZH),
-                  "accepted": _t.strftime("%Y-%m-%d %H:%M:%S")}
-            os.makedirs(os.path.dirname(zh_review.MARK), exist_ok=True)
-            with open(zh_review.MARK, "w", encoding="utf-8") as fh:
-                json.dump(st, fh, ensure_ascii=False, indent=1)
-            flags = load_flags()
-            cur = set(flags.get("zh", []))
-            cur.update(upd.keys())
-            flags["zh"] = sorted(cur)
-            save_flags(flags)
-        except Exception:
-            pass
-        return len(rows), changed
-
     path = T.lang_path(lang)
     order = [e.get("id", "") for e in T.entries(T.load_toml())]
 
@@ -756,42 +720,6 @@ def patch_all(lang, rows):
     """
     if lang in T.REFERENCE_LANGS:
         raise ValueError("%s 是只读参考原文，不能写入" % lang)
-
-    if lang == "zh":
-        # 中文：干净文本写回 src/clean/zh.toml，再按规则重新生成。
-        ref = os.path.join(os.path.dirname(SRC), "src", "clean", "zh.toml")
-        cur = tomllib.load(open(ref, "rb"))
-        order = list(cur)
-        upd = {r["id"]: ZH_GEN.strip_padding(r["text"]) for r in rows}
-        changed = 0
-        for rid, text in upd.items():
-            if rid in cur and cur[rid] != text:
-                changed += 1
-        with io.open(ref, "w", encoding="utf-8", newline="\n") as fh:
-            fh.write("# 中文文本源：只写译文，不要加任何为引擎服务的空格。\n")
-            fh.write("# src/translations/zh.toml 由它经 apply_zh_rules.py 生成，请勿手改生成物。\n")
-            for rid in order:
-                fh.write('"%s" = "%s"\n' % (rid, toml_escape(upd.get(rid, cur[rid]))))
-        gen_order, gen_out, _stats = ZH_GEN.generate()
-        ZH_GEN.write(gen_order, gen_out)
-
-        # 保存即审核：把审核状态置为已接受，并把保存过的条目勾成已审。
-        try:
-            import time as _t
-            st = {"status": "ok", "ref": zh_review.sha(zh_review.REF),
-                  "zh": zh_review.sha(zh_review.ZH),
-                  "accepted": _t.strftime("%Y-%m-%d %H:%M:%S")}
-            os.makedirs(os.path.dirname(zh_review.MARK), exist_ok=True)
-            with open(zh_review.MARK, "w", encoding="utf-8") as fh:
-                json.dump(st, fh, ensure_ascii=False, indent=1)
-            flags = load_flags()
-            cur = set(flags.get("zh", []))
-            cur.update(upd.keys())
-            flags["zh"] = sorted(cur)
-            save_flags(flags)
-        except Exception:
-            pass
-        return len(rows), changed
 
     path = T.lang_path(lang)
     try:
@@ -1231,12 +1159,12 @@ class Handler(BaseHTTPRequestHandler):
                     out[hid] = c
             return self.send_json(out)
 
-        if path == "/api/clean":
+        if path == "/api/seed":
             hid = (query.get("id") or [""])[0]
             lang = (query.get("lang") or ["zh"])[0]
             ref_name = ("zh.toml" if lang == "zh"
                         else "%s.toml" % lang)
-            ref_path = os.path.join(os.path.dirname(SRC), "src", "clean", ref_name)
+            ref_path = os.path.join(os.path.dirname(SRC), "src", "seed", ref_name)
             if not os.path.isfile(ref_path):
                 return self.send_json({"detail": "没有干净文本源"}, 404)
             try:
@@ -1268,7 +1196,7 @@ class Handler(BaseHTTPRequestHandler):
             clean_spaces = None
             ref_name = ("zh.toml" if lang == "zh"
                         else "%s.toml" % lang)
-            ref_path = os.path.join(os.path.dirname(SRC), "src", "clean", ref_name)
+            ref_path = os.path.join(os.path.dirname(SRC), "src", "seed", ref_name)
             if os.path.isfile(ref_path):
                 try:
                     with open(ref_path, "rb") as fh:
@@ -1557,6 +1485,26 @@ class Handler(BaseHTTPRequestHandler):
             lang = body.get("lang", "")
             return self.send_json({"ok": True,
                                    "written": save_all(lang, rows_of(body))})
+
+        if path == "/api/seed":
+            lang = body.get("lang", "zh")
+            hid = body.get("id", "")
+            text = body.get("text", "")
+            seed = os.path.join(os.path.dirname(SRC), "src", "seed", "%s.toml" % lang)
+            if not os.path.isfile(seed):
+                return self.send_json({"detail": "没有初版文件"}, 404)
+            cur = tomllib.load(open(seed, "rb"))
+            if hid not in cur:
+                return self.send_json({"detail": "初版里没有这一条"}, 404)
+            if lang == "zh":
+                text = ZH_GEN.strip_padding(text)
+            order = list(cur)
+            cur[hid] = text
+            with io.open(seed, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write("# 初版译文：可解锁修改；生成工作文本时从这里起步。\n")
+                for rid in order:
+                    fh.write('"%s" = "%s"\n' % (rid, toml_escape(cur[rid])))
+            return self.send_json({"ok": True, "text": text})
 
         if path == "/api/hash-rule":
             hid = (body.get("id") or "").strip()

@@ -128,7 +128,7 @@ def load_keep_original():
     """读 keep_original.toml，返回 {id: 分组名}。"""
     import tomllib
     path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "translations", "keep_original.toml")
+                        "live", "keep_original.toml")
     if not os.path.isfile(path):
         return {"0xfc512ea5": "版权声明"}
     data = tomllib.load(open(path, "rb"))
@@ -226,7 +226,7 @@ def build(lang, out_dir, strict):
         # 【坑】hash 必须写成**大写**（0x30A45770），与既有语言包一致。
         # patch.js 的合并逻辑按大写规范化 hash，产物若写成小写，
         # 用户手改过的条目就识别不出来，合并会静默失效（测试 test_patch.js
-        # 会抓到）。小写 id 只存在于 src/translations\*.toml 里作为内部键。
+        # 会抓到）。小写 id 只存在于 src/live\*.toml 里作为内部键。
         lines.append("%s = %s\n" % (h.upper().replace("0X", "0x"),
                                     to_engine(txt)))
         n += 1
@@ -240,7 +240,7 @@ def build(lang, out_dir, strict):
     if n == 0:
         print("错误：没有编出任何条目，未生成 %s" % path)
         print("      找不到 %s\\%s.toml，或它里面没有条目。"
-              % (os.path.join(SRC, "translations"), lang))
+              % (os.path.join(SRC, "live"), lang))
         print("      加一种语言：python src\\tools\\new_lang.py"
               " --new-lang %s" % lang)
         return 1
@@ -268,7 +268,7 @@ def build(lang, out_dir, strict):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="把 src/translations\\<语言>.toml 编译成引擎语言包")
+    ap = argparse.ArgumentParser(description="把 src/live\\<语言>.toml 编译成引擎语言包")
     ap.add_argument("--lang", default="", help="语言代码，默认 translations\\ 下第一个可编辑语言")
     ap.add_argument("--out", default=DEFAULT_OUT, help="输出目录")
     ap.add_argument("--strict", action="store_true", help="有错误时返回非零")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-r"""src/tools/translate.py — src/translations\<语言>.toml 的翻译流水线
+r"""src/tools/translate.py — src/live\<语言>.toml 的翻译流水线
 
     python src/tools/translate.py export --out work.jsonl   # 导出待译条目
     python src/tools/translate.py check  work.jsonl         # 校验译文（占位符/标签）
@@ -35,8 +35,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.dirname(HERE)                     # 仓库的 src\
 ROOT = os.path.dirname(SRC)                     # 仓库根
-STRINGS_DIR = os.path.join(SRC, "translations")
-REFERENCES_DIR = os.path.join(SRC, "references")
+STRINGS_DIR = os.path.join(SRC, "live")
+REFERENCES_DIR = os.path.join(SRC, "orig")
 
 #: 译文主源：translations\<语言>.toml，**每条一行**：
 #:     "0xd2d0a572" = "萧条"

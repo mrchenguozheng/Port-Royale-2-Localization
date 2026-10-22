@@ -3,7 +3,7 @@
 
 背景
 ----
-`zh.toml` 是规则从 `references/zh.gog_1.1.2.3.toml` 生成的。人工在编辑器里
+`zh.toml` 是规则从 `orig/zh.gog_1.1.2.3.toml` 生成的。人工在编辑器里
 过一遍时，多半只调空格（换行位置、该不该断开）；偶尔才真改字。这个脚本负责
 分清这两种情况：
 
@@ -35,8 +35,8 @@ sys.path.insert(0, HERE)
 import lang_rules  # noqa: E402
 import apply_zh_rules as GEN  # noqa: E402
 
-REF = os.path.join(ROOT, "src", "clean", "zh.toml")
-ZH = os.path.join(ROOT, "src", "translations", "zh.toml")
+REF = os.path.join(ROOT, "src", "seed", "zh.toml")
+ZH = os.path.join(ROOT, "src", "live", "zh.toml")
 MARK = os.path.join(ROOT, "build", "zh.reviewed.json")
 ACCEPTED = os.path.join(ROOT, "build", "zh.accepted.toml")
 FLAGS = os.path.join(ROOT, "build", "zh.review-flags.json")

@@ -129,32 +129,14 @@ def main():
         for lang in langs:
             print("\n[计划] %s" % lang)
             if not args.no_normalize:
-                print("  normalize_text --lang %s" % lang)
-            if not args.no_check:
+                    if not args.no_check:
                 print("  check_breaks --lang %s --strict" % lang)
             print("  compile_pack --lang %s%s" % (lang, " --no-fonts" if args.no_fonts else ""))
         print("\n[计划] deploy -> %s（复制 %s）" % (target, "、".join(langs)))
         return 0
 
-    # 1) 归一化 + 校验 + 编译
+    # 1) 校验 + 编译（live/ 是编辑器直接维护的文本，构建不再改写它）
     for lang in langs:
-        # 中文：先由 clean/zh.toml 生成 zh.toml（文本只改 references）
-        if lang == "zh":
-            ref = os.path.join(HERE, "..", "clean", "zh.toml")
-            import zh_review
-            if os.path.isfile(ref) and zh_review.marker_ok():
-                print("   使用已审核的 zh.toml（文本源未变，跳过生成）")
-            elif os.path.isfile(ref):
-                run("生成 zh.toml（clean/zh.toml → 规则）",
-                    [sys.executable, os.path.join(HERE, "apply_zh_rules.py")])
-        if not args.no_normalize:
-            cmd = [sys.executable, os.path.join(HERE, "normalize_text.py"), "--lang", lang]
-            if lang == "ja":
-                if has_module("janome") or has_module("fugashi"):
-                    cmd.append("--particles")
-                else:
-                    print("   （未装 janome/fugashi，跳过助词空格判定；pip install -r requirements.txt 可补）")
-            run("归一化 %s" % lang, cmd)
         if not args.no_check:
             run("校验换行 %s" % lang,
                 [sys.executable, os.path.join(HERE, "check_breaks.py"), "--lang", lang, "--strict"])
@@ -162,15 +144,6 @@ def main():
         if args.no_fonts:
             cmd.append("--no-fonts")
         run("编译 %s" % lang, cmd)
-
-    if "zh" in langs:
-        st = zh_review.status()
-        if st.get("status") != "ok":
-            n = st.get("count")
-            print("\n   ⚠ 中文需要人工审核：%s" % (
-                "还没有接受过审核稿" if n is None else "%d 条待看" % n))
-            print("     跑 python src/tools/zh_review.py --diff 查看，"
-                  "审完 --accept；改字用 --sync。")
 
     # 2) 注入器产物必须已在 build\ 里
     missing = [n for n in B.FLAT_FILES if not os.path.isfile(os.path.join(ROOT, "build", n))]

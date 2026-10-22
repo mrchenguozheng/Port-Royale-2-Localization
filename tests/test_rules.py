@@ -26,13 +26,12 @@ class TestZhRules(unittest.TestCase):
         out = zh.normalize("支付 @g$TotalPrice$ 元")
         self.assertIn("@g$TotalPrice$", out)
 
-    def test_generate_matches_file(self):
+    def test_generate_keys_match_live(self):
+        # live 可手改，不再要求和规则输出逐字一致，但键集合必须一致。
         order, out, _ = ZH.generate()
         import tomllib
-        cur = tomllib.load(open(os.path.join(ROOT, "src", "translations", "zh.toml"), "rb"))
-        self.assertEqual(len(cur), len(order))
-        for h in order:
-            self.assertEqual(cur.get(h), out[h], h)
+        cur = tomllib.load(open(os.path.join(ROOT, "src", "live", "zh.toml"), "rb"))
+        self.assertEqual(set(cur), set(order))
 
 
 if __name__ == "__main__":

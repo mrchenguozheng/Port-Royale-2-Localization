@@ -20,8 +20,8 @@ import sys
 import tomllib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-TRANS = os.path.join(ROOT, "src", "translations")
-REF = os.path.join(ROOT, "src", "references")
+TRANS = os.path.join(ROOT, "src", "live")
+REF = os.path.join(ROOT, "src", "orig")
 
 TAG = re.compile(r"<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]")
 WORD = re.compile(r"[a-zà-öø-ÿ0-9']+")

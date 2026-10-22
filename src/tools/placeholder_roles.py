@@ -6,7 +6,7 @@
 
 做法：不猜整条，只针对「相邻的两个 %N 参数」逐条记录规则：
 
-    src/translations/placeholder_roles.toml
+    src/live/placeholder_roles.toml
     ["0x338a357f"]
     pair = ["1", "2"]
     sep  = " "          # 等级 + 全名，用空格
@@ -29,15 +29,15 @@ import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-EN = os.path.join(ROOT, "src", "references", "en.gog_1.1.2.3.toml")
-RULES_DIR = os.path.join(ROOT, "src", "translations", "placeholder_roles")
+EN = os.path.join(ROOT, "src", "orig", "en.gog_1.1.2.3.toml")
+RULES_DIR = os.path.join(ROOT, "src", "live", "placeholder_roles")
 
 
 def lang_source(lang):
-    """中文文本源在 references/，其他语言在 translations/。"""
+    """中文文本源在 orig/，其他语言在 live/。"""
     if lang == "zh":
-        return os.path.join(ROOT, "src", "clean", "zh.toml")
-    return os.path.join(ROOT, "src", "translations", "%s.toml" % lang)
+        return os.path.join(ROOT, "src", "seed", "zh.toml")
+    return os.path.join(ROOT, "src", "live", "%s.toml" % lang)
 
 
 def rules_path(lang):

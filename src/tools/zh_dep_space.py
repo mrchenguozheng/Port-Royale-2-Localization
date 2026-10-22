@@ -119,7 +119,7 @@ def main():
                  "（或设 PR2_SPACY_PYTHON 指向它）。")
     nlp = spacy.load("zh_core_web_sm")
 
-    path = os.path.join(ROOT, "src", "translations", "%s.toml" % args.lang)
+    path = os.path.join(ROOT, "src", "live", "%s.toml" % args.lang)
     doc = tomllib.load(open(path, "rb"))
     ids = [m.group(1) for m in
            (re.match(r'^"([^"]+)"\s*=', l) for l in io.open(path, encoding="utf-8")) if m]

@@ -176,7 +176,7 @@ def main():
     WIDTH = width_check.load_font(args.font)
     TARGET_PX = args.target
 
-    path = os.path.join(ROOT, "src", "translations", "%s.toml" % args.lang)
+    path = os.path.join(ROOT, "src", "live", "%s.toml" % args.lang)
     doc = tomllib.load(open(path, "rb"))
     order = [m.group(1) for m in
              (re.match(r'^"([^"]+)"\s*=', ln) for ln in io.open(path, encoding="utf-8"))
