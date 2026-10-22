@@ -29,10 +29,23 @@ import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-REF = os.path.join(ROOT, "src", "references", "zh.gog_1.1.2.3.toml")
 EN = os.path.join(ROOT, "src", "references", "en.gog_1.1.2.3.toml")
-RULES = os.path.join(ROOT, "src", "translations", "placeholder_roles.toml")
-REPORT = os.path.join(ROOT, "docs", "占位符语义.csv")
+RULES_DIR = os.path.join(ROOT, "src", "translations", "placeholder_roles")
+
+
+def lang_source(lang):
+    """中文文本源在 references/，其他语言在 translations/。"""
+    if lang == "zh":
+        return os.path.join(ROOT, "src", "references", "zh.gog_1.1.2.3.toml")
+    return os.path.join(ROOT, "src", "translations", "%s.toml" % lang)
+
+
+def rules_path(lang):
+    return os.path.join(RULES_DIR, "%s.toml" % lang)
+
+
+def report_path(lang):
+    return os.path.join(ROOT, "docs", "占位符语义.%s.csv" % lang)
 
 PAIR = re.compile(r"%0?(\d+)([ \u3000・]*)(%0?(\d+))")
 TITLES = ("Governor", "Captain", "Viceroy", "King", "Queen", "Prince",
@@ -57,12 +70,13 @@ def suggest(en, a, b):
     return None, "上下文不足"
 
 
-def rules():
+def rules(lang):
     """返回 {(hash, (a, b)): sep}。"""
-    if not os.path.isfile(RULES):
+    path = rules_path(lang)
+    if not os.path.isfile(path):
         return {}
     try:
-        data = tomllib.load(open(RULES, "rb"))
+        data = tomllib.load(open(path, "rb"))
     except (OSError, ValueError):
         return {}
     out = {}
@@ -74,9 +88,9 @@ def rules():
     return out
 
 
-def scan():
+def scan(lang):
     en = tomllib.load(open(EN, "rb"))
-    zh = tomllib.load(open(REF, "rb"))
+    zh = tomllib.load(open(lang_source(lang), "rb"))
     rows = []
     for h, text in zh.items():
         for m in PAIR.finditer(text):
@@ -90,16 +104,18 @@ def scan():
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--lang", default="zh", help="语言代码，默认 zh")
     ap.add_argument("--report", action="store_true")
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--fix", action="store_true")
     args = ap.parse_args()
 
-    rows = scan()
-    rl = rules()
+    lang = args.lang
+    rows = scan(lang)
+    rl = rules(lang)
 
     if args.report:
-        with io.open(REPORT, "w", encoding="utf-8-sig", newline="") as fh:
+        with io.open(report_path(lang), "w", encoding="utf-8-sig", newline="") as fh:
             wr = csv.writer(fh)
             wr.writerow(["hash", "参数", "当前连接符", "建议", "依据", "英文", "中文"])
             for r in rows:
@@ -107,7 +123,7 @@ def main():
                              r["hint"] or "", r["why"],
                              r["en"].replace("\n", " ")[:120],
                              r["zh"].replace("\n", " ")[:120]])
-        print("已写", REPORT, "（%d 对相邻参数）" % len(rows))
+        print("已写", report_path(lang), "（%d 对相邻参数）" % len(rows))
 
     bad = []
     for r in rows:
@@ -122,11 +138,12 @@ def main():
         print("\n与规则不符：%d 处（已记录规则 %d 条）" % (len(bad), len(rl)))
 
     if args.fix:
-        doc = tomllib.load(open(REF, "rb"))
+        ref_path = lang_source(lang)
+        doc = tomllib.load(open(ref_path, "rb"))
         order = [m.group(1) for m in
-                 (re.match(r'^"([^"]+)"\s*=', l) for l in io.open(REF, encoding="utf-8")) if m]
+                 (re.match(r'^"([^"]+)"\s*=', l) for l in io.open(ref_path, encoding="utf-8")) if m]
         head = []
-        for ln in io.open(REF, encoding="utf-8"):
+        for ln in io.open(ref_path, encoding="utf-8"):
             if ln.startswith("#"):
                 head.append(ln.rstrip("\n"))
             else:
@@ -146,7 +163,7 @@ def main():
 
         def esc(t):
             return t.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-        io.open(REF, "w", encoding="utf-8", newline="\n").write(
+        io.open(ref_path, "w", encoding="utf-8", newline="\n").write(
             "\n".join(head + ['"%s" = "%s"' % (k, esc(doc[k])) for k in order]) + "\n")
         print("按规则修正 %d 条；接着跑 apply_zh_rules.py。" % changed)
 
