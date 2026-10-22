@@ -221,8 +221,8 @@ async function boot() {
   if (sp > 1) await renderPage(sp);
 
   const mNum = initialPath.match(/^\/translate\/(\d+)$/);
-  const mHash = initialPath.match(/^\/translate\/(0x[0-9a-f]{8})$/i);
-  if (mHash) await jumpToId(mHash[1].toLowerCase());
+  const mHash = initialPath.match(/^\/translate\/(?:0x)?([0-9a-f]{8})$/i);
+  if (mHash) await jumpToId('0x' + mHash[1].toLowerCase());
   else if (mNum) await renderPage(Number(mNum[1]));
   updatePath();
 }
