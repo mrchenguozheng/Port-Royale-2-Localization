@@ -147,7 +147,7 @@ def copy_license(stage, log):
 def make_zip(stage, out_dir):
     name = os.path.basename(stage.rstrip("\\/"))
     zip_path = os.path.join(out_dir, name + ".zip")
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for root, _dirs, files in os.walk(stage):
             for fn in files:
                 full = os.path.join(root, fn)

@@ -191,8 +191,11 @@ def ensure_noto_fonts(lang, out_dir, log=None, cache=True, cache_dir=None):
     with open(os.path.join(out_dir, "NOTO-SOURCES.txt"), "w",
               encoding="utf-8", newline="\n") as fh:
         fh.write("Noto font sources for %s (%s)\n\n" % (lang, cfg["label"]))
-        fh.write("Sans:  %s\n" % sans_path)
-        fh.write("Serif: %s\n" % serif_path)
+        fh.write("Sans:  %s (weight %s)\n" % (
+            os.path.basename(sans_path), cfg["sans"][1]))
+        fh.write("Serif: %s (weights %s)\n" % (
+            os.path.basename(serif_path),
+            ", ".join(str(w) for w in cfg["serif"][1])))
         fh.write("Weights: Sans %s; Serif %s\n\n" % (
             cfg["sans"][1], ", ".join(str(w) for w in cfg["serif"][1])))
         fh.write("License: SIL Open Font License 1.1\n")
