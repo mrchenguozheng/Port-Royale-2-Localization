@@ -165,6 +165,10 @@ function setView(view: string) {
 }
 
 async function boot() {
+  if (location.protocol === 'file:') {
+    showBootError('这是用文件方式打开的。请双击 start.bat，通过本地服务打开页面。');
+    return;
+  }
   setLoading(true);
   const d = await api<{ editable: string[]; all: string[]; base: string }>('/api/langs');
   S.langs = d.editable;
