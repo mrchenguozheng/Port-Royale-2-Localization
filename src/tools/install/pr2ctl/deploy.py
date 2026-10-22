@@ -34,17 +34,18 @@ def deploy_steps(target, langs):
     steps = [(n, os.path.join(BUILD, n), os.path.join(target, n))
              for n in FLAT_FILES]
 
-    # 字体按语言分别生成在 build\fonts\<语言>\；只复制游戏当前语言那一套。
+    # 字体按语言分别生成在 build\fonts\<语言>\；复制到游戏 fonts\<语言>\，
+    # 不覆盖根目录的原版字体。启动器用 PR2_FONT_DIR 做重定向。
     font_lang = _font_lang(target, langs)
-    font_dir = os.path.join(BUILD, "fonts", font_lang) if font_lang else ""
-    if not font_dir or not os.path.isdir(font_dir):
-        font_dir = os.path.join(BUILD, "fonts")   # 兼容旧的单目录产物
-    if os.path.isdir(font_dir):
+    for fl in (langs or ([font_lang] if font_lang else [])):
+        font_dir = os.path.join(BUILD, "fonts", fl)
+        if not os.path.isdir(font_dir):
+            continue
         for name in sorted(os.listdir(font_dir)):
             if name.lower().endswith(".ttf"):
-                steps.append(("fonts\\%s" % name,
+                steps.append(("fonts\\%s\\%s" % (fl, name),
                               os.path.join(font_dir, name),
-                              os.path.join(target, "fonts", name)))
+                              os.path.join(target, "fonts", fl, name)))
 
     steps.append(("%s\\" % PACK_DIR, None, os.path.join(target, PACK_DIR)))
     wanted = ["locale.ini"]

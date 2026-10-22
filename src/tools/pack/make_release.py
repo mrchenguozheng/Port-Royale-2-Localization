@@ -101,7 +101,7 @@ def write_readme(lang, stage, mode):
   3. 不要直接运行 PR2.exe，那样不会加载语言包。
 
 字体：
-  字体在 fonts\\<语言>\\；启动器会按语言把它复制到 fonts\\ 根目录。
+  字体在 fonts\\<语言>\\；启动器通过路径重定向读取，不覆盖根目录原版。
   同一目录可以放多个语言（fonts\\zh、fonts\\ja），启动器按 locale.ini 或 --lang 选择。
 
 卸载：

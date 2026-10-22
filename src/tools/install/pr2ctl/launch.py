@@ -11,9 +11,8 @@ def launch_game(target, lang=None):
     所以它很快就会退出 —— 不用等它结束。控制台留给它自己开，
     那里会打印注入结果，窗口不该抢。
 
-    工作目录必须设成游戏目录：启动器给 CreateProcess 传的
-    lpCurrentDirectory 是 NULL，PR2.exe 会继承启动器的 cwd，
-    而它按相对路径找资源文件。
+    工作目录必须设成游戏目录：启动器会给 CreateProcess 传游戏根目录，
+    而 PR2.exe 按相对路径找资源文件。
 
     lang 非空时给启动器传 --lang=xx，它写进子进程的 PR2_PACK_LANG，
     DLL 优先用它而不是 locale.ini —— 只影响这一次启动，不写任何文件。

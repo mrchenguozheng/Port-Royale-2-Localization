@@ -238,7 +238,6 @@ int main(int argc, char** argv) {
     int  i;
     const char* lang = NULL;
     int vanilla = 0;
-    int noFontCopy = 0;
 
     UseUtf8Console();
     GetModuleFileNameA(NULL, self, MAX_PATH);
@@ -250,15 +249,13 @@ int main(int argc, char** argv) {
             lang = argv[i] + 7;
         } else if (strcmp(argv[i], "--vanilla") == 0) {
             vanilla = 1;
-        } else if (strcmp(argv[i], "--no-font-copy") == 0) {
-            noFontCopy = 1;
+
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("[PR2Launch] 用法: %s [--lang=<代码>] [--vanilla]\n", "PR2Launcher.exe");
             printf("[PR2Launch]   --lang     这一次启动用哪个语言包，\n");
             printf("[PR2Launch]              覆盖 PR2Packs\\locale.ini 的 language=。\n");
             printf("[PR2Launch]   --vanilla  恢复原版字体后直接启动 PR2.exe，不注入。\n");
-            printf("[PR2Launch]   --no-font-copy  不复制字体（配合 PR2_FONT_DIR 做重定向测试）。\n");
-            return 0;
+                        return 0;
         }
     }
     if (lang && !ValidLangCode(lang)) {
@@ -302,16 +299,27 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    /* 字体按语言放在 fonts\<语言>\；游戏只认 fonts\ 根目录下的固定文件名，
-     * 所以在启动前把目标语言那一套复制到根目录。没有子目录时保持旧行为。 */
-    if (!noFontCopy) {
+    /* 字体不覆盖根目录：原版字体留在 fonts\，本地化字体在 fonts\<语言>\。
+     * 通过 PR2_FONT_DIR 让 DLL 把 fonts\X.TTF 重定向到 fonts\<语言>\X.TTF。 */
+    char gameDir[MAX_PATH];
+    DirOf(self, gameDir);
+    {
         char localeLang[64];
         const char* fontLang = lang;
         if (!fontLang && ReadLocaleLang(self, localeLang, sizeof(localeLang))) {
             fontLang = localeLang;
         }
+        char langDir[MAX_PATH];
         if (fontLang && ValidLangCode(fontLang)) {
-            CopyFontSet(self, fontLang);
+            snprintf(langDir, sizeof(langDir), "%s\\fonts\\%s", gameDir, fontLang);
+        } else {
+            langDir[0] = 0;
+        }
+        if (langDir[0] && GetFileAttributesA(langDir) != INVALID_FILE_ATTRIBUTES) {
+            SetEnvironmentVariableA("PR2_FONT_DIR", fontLang);
+            printf("[PR2Launch] 字体使用 fonts\\%s\\（不覆盖原版）\n", fontLang);
+        } else {
+            SetEnvironmentVariableA("PR2_FONT_DIR", NULL);
         }
     }
 
@@ -325,8 +333,6 @@ int main(int argc, char** argv) {
 
     STARTUPINFOA si = {0}; si.cb = sizeof(si);
     PROCESS_INFORMATION pi = {0};
-    char gameDir[MAX_PATH];
-    DirOf(self, gameDir);
     if (!CreateProcessA(exePath, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED,
                         NULL, gameDir, &si, &pi)) {
         printf("[PR2Launch] 启动 PR2.exe 失败 (错误 %lu)\n", GetLastError());
