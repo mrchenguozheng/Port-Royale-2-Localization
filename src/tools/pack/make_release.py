@@ -35,6 +35,7 @@ PACK_OUT = os.path.join(BUILD, "PR2Packs")
 
 LABELS = {"zh": "简体中文", "ja": "日本語"}
 FLAT = ("PR2Launcher.exe", "PR2LauncherGUI.exe", "PR2TextSource.dll")
+RUNTIME_VERSION = 1  # 与 src/injector/pr2_version.h 的 PR2_RUNTIME_VERSION 保持一致
 
 
 def build_pack(lang, stage, log):
@@ -82,6 +83,13 @@ def copy_fonts(lang, stage, mode, log, cache=True):
     notice = os.path.join(dst, "NOTO-SOURCES.txt")
     if os.path.isfile(notice):
         shutil.move(notice, os.path.join(stage, "NOTO-SOURCES.txt"))
+
+
+def write_runtime_version(stage, log):
+    path = os.path.join(stage, "RUNTIME-VERSION")
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("%d\n" % RUNTIME_VERSION)
+    log("写入 RUNTIME-VERSION (%d)" % RUNTIME_VERSION)
 
 
 def write_readme(lang, stage, mode):
@@ -162,6 +170,7 @@ def make_release(lang, version, out_dir, mode, log=None, cache=True):
     os.makedirs(stage)
     build_pack(lang, stage, log)
     copy_runtime(stage, log)
+    write_runtime_version(stage, log)
     ui_dir = os.path.join(ROOT, "src", "injector", "ui")
     if os.path.isdir(ui_dir):
         shutil.copytree(ui_dir, os.path.join(stage, "ui"),

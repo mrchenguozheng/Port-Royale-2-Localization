@@ -17,6 +17,7 @@
 
 #include "pr2_fonts.h"
 #include "pr2_locale.h"
+#include "pr2_version.h"
 #pragma comment(lib, "advapi32.lib")
 
 /* 源文件是 UTF-8（cl 用 /utf-8 编译），所以 printf 送出去的是 UTF-8 字节。
@@ -278,6 +279,13 @@ int main(int argc, char** argv) {
         const char* fontLang = lang;
         if (!fontLang && pr2_read_locale_language(gameDir, localeLang, sizeof(localeLang))) {
             fontLang = localeLang;
+        }
+        if (fontLang && ValidLangCode(fontLang) &&
+            !pr2_pack_runtime_ok(gameDir, fontLang)) {
+            printf("[PR2Launch] 语言包 %s 需要运行时 v%d，当前 v%d，拒绝启动\n",
+                   fontLang, pr2_pack_min_runtime(gameDir, fontLang),
+                   PR2_RUNTIME_VERSION);
+            return 1;
         }
         char langDir[MAX_PATH];
         if (fontLang && ValidLangCode(fontLang)) {

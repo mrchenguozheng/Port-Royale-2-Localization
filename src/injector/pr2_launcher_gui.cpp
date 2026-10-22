@@ -10,6 +10,7 @@
 
 #include "pr2_fonts.h"
 #include "pr2_locale.h"
+#include "pr2_version.h"
 
 #define ID_LANG    1001
 #define ID_LAUNCH  1002
@@ -22,6 +23,7 @@ static char g_codes[64][64];
 static int  g_codeCount = 0;
 static char g_packAlias[64][256];
 static char g_packGui[64][16];
+static int  g_packMinRuntime[64];
 static char g_defaultUi[16] = "en";
 static HWND g_combo = NULL;
 static HWND g_status = NULL;
@@ -168,9 +170,10 @@ static void LoadGuiStrings(void) {
 }
 
 static void ReadPackMeta(const char* path, char* alias, int acap,
-                         char* gui, int gcap) {
+                         char* gui, int gcap, int* min_runtime) {
     alias[0] = 0;
     gui[0] = 0;
+    if (min_runtime) *min_runtime = 1;
     FILE* f = fopen(path, "rb");
     if (!f) return;
     char line[1024];
@@ -194,6 +197,9 @@ static void ReadPackMeta(const char* path, char* alias, int acap,
         } else if (strcmp(key, "gui") == 0) {
             strncpy(gui, val, gcap - 1);
             gui[gcap - 1] = 0;
+        } else if (strcmp(key, "min_runtime") == 0 && min_runtime) {
+            int v = atoi(val);
+            if (v > *min_runtime) *min_runtime = v;
         }
     }
     fclose(f);
@@ -235,6 +241,7 @@ static void LoadLanguages(void) {
     g_codeCount = 0;
     memset(g_packAlias, 0, sizeof(g_packAlias));
     memset(g_packGui, 0, sizeof(g_packGui));
+    memset(g_packMinRuntime, 0, sizeof(g_packMinRuntime));
     SendMessageW(g_combo, CB_RESETCONTENT, 0, 0);
     snprintf(pattern, sizeof(pattern), "%s\\PR2Packs\\*.txt", g_root);
     WIN32_FIND_DATAA fd;
@@ -253,7 +260,8 @@ static void LoadLanguages(void) {
             snprintf(full, sizeof(full), "%s\\PR2Packs\\%s",
                      g_root, fd.cFileName);
             ReadPackMeta(full, g_packAlias[g_codeCount], 256,
-                         g_packGui[g_codeCount], 16);
+                         g_packGui[g_codeCount], 16,
+                         &g_packMinRuntime[g_codeCount]);
             const char* label = g_packAlias[g_codeCount][0]
                               ? g_packAlias[g_codeCount]
                               : g_codes[g_codeCount];
@@ -283,6 +291,18 @@ static void Launch(const char* lang, int vanilla) {
     if (!vanilla) {
         if (!lang || !*lang) {
             MessageBoxW(NULL, T("error.no_language"), T("title"), MB_ICONWARNING);
+            return;
+        }
+        int minv = 1;
+        for (int i = 0; i < g_codeCount; i++) {
+            if (_stricmp(g_codes[i], lang) == 0) {
+                minv = g_packMinRuntime[i];
+                break;
+            }
+        }
+        if (minv > PR2_RUNTIME_VERSION) {
+            MessageBoxW(NULL, TF("error.pack_too_new", minv, PR2_RUNTIME_VERSION),
+                        T("title"), MB_ICONERROR);
             return;
         }
         if (!pr2_language_fonts_complete(g_root, lang)) {

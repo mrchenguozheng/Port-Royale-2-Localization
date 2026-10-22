@@ -195,7 +195,8 @@ def load_pack_meta(lang):
         doc = tomllib.load(open(p, "rb"))
     except Exception:
         return {}
-    return {k: str(doc[k]) for k in ("alias", "gui") if doc.get(k)}
+    return {k: str(doc[k]) for k in ("alias", "gui", "min_runtime")
+            if doc.get(k)}
 
 
 def build(lang, out_dir, strict):
@@ -221,7 +222,7 @@ def build(lang, out_dir, strict):
     path = os.path.join(out_dir, "%s.txt" % lang)
     lines = []
     meta = load_pack_meta(lang)
-    for k in ("alias", "gui"):
+    for k in ("alias", "gui", "min_runtime"):
         if meta.get(k):
             val = meta[k].replace("\n", " ").replace("\r", " ")
             lines.append("# pack-meta %s=%s\n" % (k, val))
