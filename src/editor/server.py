@@ -969,42 +969,38 @@ def _font_module():
 
 
 def font_status():
-    """安装页「第一次用」卡片的字体状态。"""
+    """安装页「第一次用」卡片的字体状态（按语言）。"""
     sf = _font_module()
-    langs, donors, fallback = sf._presets()
+    langs = sf.list_presets()
     base_missing = [n for n in sf.FONTS
                     if not os.path.isfile(os.path.join(sf.DEFAULT_SRC, n))]
-    built = [n for n in sf.FONTS
-             if os.path.isfile(os.path.join(sf.DEFAULT_OUT, n))]
-    donor_rows = []
-    for name in sf.FONTS:
-        for donor, _idx in donors.get(name, []):
-            p = sf._resolve(donor)
-            donor_rows.append({"game_file": name, "path": p,
-                               "exists": os.path.isfile(p)})
+    rows = []
     problems = []
+    for lang in langs:
+        donors, _fallback = sf.load_preset(lang)
+        donor_rows = [{"path": sf._resolve(d), "exists": os.path.isfile(sf._resolve(d))}
+                      for d, _idx in donors]
+        built = sum(1 for n in sf.FONTS
+                    if os.path.isfile(os.path.join(sf.DEFAULT_OUT, lang, n)))
+        rows.append({"lang": lang, "donors": donor_rows,
+                     "built": built, "total": len(sf.FONTS)})
+        miss = [d for d in donor_rows if not d["exists"]]
+        if miss:
+            problems.append("%s 缺 %d 个 donor" % (lang, len(miss)))
     if base_missing:
         problems.append("缺 %d 个原版字体（需要从游戏导出）" % len(base_missing))
-    missing_donors = [d for d in donor_rows if not d["exists"]]
-    if missing_donors:
-        problems.append("缺 %d 个 donor 字体" % len(missing_donors))
     if not sf._fonttools():
         problems.append("缺 fontTools")
-    if not os.path.isfile(sf.PRESETS):
-        problems.append("缺少 presets.toml（复制 presets.example.toml 后修改）")
-    elif not langs:
-        problems.append("presets 里没有配置任何语言")
+    if not langs:
+        problems.append("没有 presets/<语言>.toml（可从 presets.example.toml 复制）")
     return {
         "ok": not problems,
-        "languages": langs,
         "fonttools": bool(sf._fonttools()),
         "base": {"dir": sf.DEFAULT_SRC, "missing": base_missing,
                  "total": len(sf.FONTS)},
-        "built": {"dir": sf.DEFAULT_OUT, "count": len(built),
-                  "total": len(sf.FONTS)},
-        "donors": donor_rows,
+        "languages": rows,
         "problems": problems,
-        "presets": os.path.join(TOOLS, "font", "fontstitch", "presets.toml"),
+        "presets_dir": sf.PRESETS_DIR,
     }
 
 
@@ -1404,7 +1400,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/font/stitch":
             sf = _font_module()
             lines = []
-            ok, msg = sf.ensure_fonts(force=bool(body.get("force", True)),
+            langs = body.get("langs") or None
+            ok, msg = sf.ensure_fonts(langs=langs,
+                                      force=bool(body.get("force", True)),
                                       log=lines.append)
             return self.send_json({"ok": ok, "message": msg, "log": lines,
                                    "status": font_status()})

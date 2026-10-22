@@ -3,6 +3,27 @@
 
 from .base import *  # noqa: F401,F403
 
+def _font_lang(target, langs):
+    """部署哪一套字体：优先游戏当前 locale，否则选中的第一个语言。"""
+    if not langs:
+        return None
+    ini = os.path.join(target, PACK_DIR, "locale.ini")
+    try:
+        with open(ini, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                if "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                if k.strip().lower() == "language":
+                    cur = v.strip()
+                    if cur in langs:
+                        return cur
+                    break
+    except OSError:
+        pass
+    return langs[0]
+
+
 def deploy_steps(target, langs):
     """列出复制要做的事，供进度条按步推进。
 
@@ -13,10 +34,11 @@ def deploy_steps(target, langs):
     steps = [(n, os.path.join(BUILD, n), os.path.join(target, n))
              for n in FLAT_FILES]
 
-    # 字体：游戏自带的是纯拉丁字体，不换掉中文就画不出来。
-    # 由 src\tools\font\subset_fonts.py 生成到 build\fonts\；没有就跳过
-    # （旧版本的构建目录里可能还没有字体）。
-    font_dir = os.path.join(BUILD, "fonts")
+    # 字体按语言分别生成在 build\fonts\<语言>\；只复制游戏当前语言那一套。
+    font_lang = _font_lang(target, langs)
+    font_dir = os.path.join(BUILD, "fonts", font_lang) if font_lang else ""
+    if not font_dir or not os.path.isdir(font_dir):
+        font_dir = os.path.join(BUILD, "fonts")   # 兼容旧的单目录产物
     if os.path.isdir(font_dir):
         for name in sorted(os.listdir(font_dir)):
             if name.lower().endswith(".ttf"):

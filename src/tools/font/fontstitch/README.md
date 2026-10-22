@@ -1,15 +1,16 @@
 # fontstitch
 
-给游戏原版的**拉丁字体补上中文字形**，用于中文化：拉丁字形、字宽和 name 表保持原样，只把翻译用到的汉字追加进去。
+给游戏原版的**拉丁字体补上中文/日文字形**：拉丁字形、字宽和 name 表保持原样，只把当前译文用到的字追加进去。
 
-面向的场景就是：游戏内嵌字体（如 Port Royale 2 的 El Greco / Tiepolo / Arial）只能显示西文，需要让它在不改动英文、法文排版的前提下显示中文。
+面向的场景就是：游戏内嵌字体（如 Port Royale 2 的 El Greco / Tiepolo / Arial）只能显示西文，需要让它在不改动英文、法文排版的前提下显示中文/日文。
 
 ```
 fontstitch/
-├── fontstitch.py    augment（补汉字）/ extract（拆 TTC）/ validate（结构校验）
-├── fontsubset.py    可选：裁剪任意字体（封装 pyftsubset）
+├── fontstitch.py    augment（补字形）/ extract（拆 TTC）/ validate（结构校验）
+├── fontsubset.py    可选：按用字裁剪任意字体（封装 pyftsubset）
 ├── fontverify.py    可选：字体信息 / 逐字形校验 / UPM 缩放（需要 fontTools）
-├── presets.example.toml  四组配对偏好的示例（复制成 presets.toml 后改）
+├── presets.example.toml  单语言预设示例
+├── presets/         每个语言一份 <语言>.toml（本机配置，不进仓库）
 └── README.md
 ```
 
@@ -84,14 +85,14 @@ Arial 补满整个 GB2312（6,763 字）实测 **2.13 MB / 8,084 字形**。
 | Tiepolo-Bold | 标题 | 华文中宋 | 覆盖 24k 字符，最稳 |
 | Arial | 正文/UI | 微软雅黑 | 同为 2048 UPM，免缩放；12px 黑体最清晰 |
 
-四组配对按语言记录在 [`presets.example.toml`](presets.example.toml)：
-复制成 `presets.toml` 后修改（后者进 `.gitignore`，可写本机路径）。
-`[[zh.pair]]` 是中文主 donor，`[[zh.supplement]]` 是缺字补充，
-`[fallback]` 是最后兜底。
+每个语言一份配置：`presets/<语言>.toml`，结构统一为
+`[[pair]]`（主 donor）、`[[supplement]]`（缺字补充）、`[fallback]`（兜底）。
+模板是 [`presets.example.toml`](presets.example.toml)；`presets/` 进
+`.gitignore`，可写本机路径。
 
-PR2 的 `subset_fonts.py` 直接读取这份配置：**只有配置了 `[<语言>]` 段的语言
-才会被缝进字体**，没配置的语言（目前是 `ja`）直接跳过。`augment` 本身仍按
-显式路径调用，不依赖配置。
+PR2 的 `subset_fonts.py` 按语言读取对应文件，输出到
+`build/fonts/<语言>/`，每种语言互不影响。`augment` 本身仍按显式路径调用，
+不依赖配置。
 
 ## 限制
 

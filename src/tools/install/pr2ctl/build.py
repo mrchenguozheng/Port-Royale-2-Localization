@@ -171,7 +171,7 @@ def run_build(langs, events):
             import subset_fonts
             events.put(("line", "检查字体…"))
             ok, msg = subset_fonts.ensure_fonts(
-                log=lambda m: events.put(("line", m)))
+                langs=langs, log=lambda m: events.put(("line", m)))
             events.put(("line", "字体：" + msg))
         except Exception as exc:                  # 字体失败不该让构建失败
             events.put(("line", "字体检查跳过：%s" % exc))

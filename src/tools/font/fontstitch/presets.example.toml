@@ -1,18 +1,7 @@
-# 字体缝合 donor 配置（按语言）
-#
-# 只有在这里配置了 [语言] 段的语言，才会把它的译文用字缝进字体；
-# 没配置的语言直接跳过（那些语言的字符不会进字体，游戏里会缺字）。
-#
-# 每个语言段可以包含：
-#   [[<lang>.pair]]       主 donor（每种游戏字体一条）
-#   [[<lang>.supplement]] 主 donor 覆盖不到时的补充 donor（可选）
-#
-# donor 路径支持 %WINDIR%、%LOCALAPPDATA%、${VAR}、~。
-# 目前只有中文（zh）配了 donor；日语（ja）等没有配置，因此不做。
+# 字体 donor 示例（复制成 presets/<语言>.toml 后按语种改）
+# 结构与其他语言一致：[[pair]] 主 donor，[[supplement]] 缺口补充，[fallback] 兜底。
 
-[zh]
-
-[[zh.pair]]
+[[pair]]
 id = "arial"
 game = "Arial"
 game_file = "ARIAL.TTF"
@@ -21,7 +10,7 @@ donor_file = "%WINDIR%\\Fonts\\msyh.ttc"
 donor_index = 0
 note = "2048 UPM 与 Arial 一致，正文/UI 最清晰"
 
-[[zh.pair]]
+[[pair]]
 id = "elgreco"
 game = "ElGreco"
 game_file = "ELGRECO_.TTF"
@@ -29,7 +18,7 @@ donor = "钟齐志莽行书"
 donor_file = "%LOCALAPPDATA%\\Microsoft\\Windows\\Fonts\\ZhiMangXing-Regular.ttf"
 note = "连笔花体 + 毛笔行书，配装饰标题"
 
-[[zh.pair]]
+[[pair]]
 id = "tiepolo-black"
 game = "Tiepolo-Black"
 game_file = "Tiepolo_black.ttf"
@@ -37,7 +26,7 @@ donor = "思源宋体 Heavy"
 donor_file = "%WINDIR%\\Fonts\\Source Han Serif SC Heavy (TrueType).ttf"
 note = "字重最匹配；思源 Heavy 是子集，生僻字可能缺"
 
-[[zh.pair]]
+[[pair]]
 id = "tiepolo-bold"
 game = "Tiepolo-Bold"
 game_file = "Tiepolo_bold.ttf"
@@ -45,67 +34,15 @@ donor = "华文中宋"
 donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
 note = "覆盖最全，最稳"
 
-[[zh.supplement]]
+[[supplement]]
 game_file = "ELGRECO_.TTF"
 donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
 note = "行书缺字用宋体补"
 
-[[zh.supplement]]
+[[supplement]]
 game_file = "Tiepolo_black.ttf"
 donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
 note = "思源 Heavy 缺字用宋体补"
 
-# 全局兜底：主 donor + supplement 都缺的字符（主要是个别标点）。
-# 只有配置了语言时才启用。
 [fallback]
 donor_file = "%WINDIR%\\Fonts\\NotoSansJP-VF.ttf"
-
-[ja]
-
-[[ja.pair]]
-id = "arial"
-game = "Arial"
-game_file = "ARIAL.TTF"
-donor = "微软雅黑"
-donor_file = "%WINDIR%\\Fonts\\msyh.ttc"
-donor_index = 0
-note = "日语正文/UI；与 Arial 同为 2048 UPM"
-
-[[ja.pair]]
-id = "elgreco"
-game = "ElGreco"
-game_file = "ELGRECO_.TTF"
-donor = "Noto Serif JP"
-donor_file = "%WINDIR%\\Fonts\\NotoSerifJP-VF.ttf"
-note = "日语衬线，配装饰标题"
-
-[[ja.pair]]
-id = "tiepolo-black"
-game = "Tiepolo-Black"
-game_file = "Tiepolo_black.ttf"
-donor = "Noto Serif JP"
-donor_file = "%WINDIR%\\Fonts\\NotoSerifJP-VF.ttf"
-note = "日语衬线，字重接近"
-
-[[ja.pair]]
-id = "tiepolo-bold"
-game = "Tiepolo-Bold"
-game_file = "Tiepolo_bold.ttf"
-donor = "Noto Serif JP"
-donor_file = "%WINDIR%\\Fonts\\NotoSerifJP-VF.ttf"
-note = "日语衬线"
-
-[[ja.supplement]]
-game_file = "ELGRECO_.TTF"
-donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
-note = "Noto Serif JP 缺字补"
-
-[[ja.supplement]]
-game_file = "Tiepolo_black.ttf"
-donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
-note = "Noto Serif JP 缺字补"
-
-[[ja.supplement]]
-game_file = "Tiepolo_bold.ttf"
-donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
-note = "Noto Serif JP 缺字补"

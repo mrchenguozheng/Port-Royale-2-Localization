@@ -88,21 +88,28 @@ const S = { status: null, timer: 0 };
         base.className = 'step-state ' + (miss ? 'bad' : 'ok');
       }
       if (donor) {
-        const all = st.donors || [];
-        const have = all.filter((d) => d.exists).length;
-        donor.textContent = all.length
-          ? `${have}/${all.length} 个可用 · fontTools ${st.fonttools ? '已装' : '缺'}`
-          : `presets 未配置 donor · fontTools ${st.fonttools ? '已装' : '缺'}`;
-        donor.className = 'step-state ' + (all.length && have === all.length ? 'ok' : 'bad');
+        const rows = st.languages || [];
+        const parts = rows.map((r) => {
+          const all = r.donors || [];
+          const have = all.filter((d) => d.exists).length;
+          return `${r.lang} ${have}/${all.length}`;
+        });
+        donor.textContent = (parts.join(' · ') || '无 presets') +
+          ` · fontTools ${st.fonttools ? '已装' : '缺'}`;
+        const allOk = rows.length > 0 && rows.every(
+          (r) => (r.donors || []).length && (r.donors || []).every((d) => d.exists));
+        donor.className = 'step-state ' + (allOk ? 'ok' : 'bad');
       }
       if (built) {
-        built.textContent = st.built.count === st.built.total
-          ? `已生成（${st.built.count}/${st.built.total}）`
-          : `未生成（${st.built.count}/${st.built.total}）`;
-        built.className = 'step-state ' + (st.built.count === st.built.total ? 'ok' : 'bad');
+        const rows = st.languages || [];
+        built.textContent = rows.length
+          ? rows.map((r) => `${r.lang} ${r.built}/${r.total}`).join(' · ')
+          : '未生成';
+        const allBuilt = rows.length > 0 && rows.every((r) => r.built === r.total);
+        built.className = 'step-state ' + (allBuilt ? 'ok' : 'bad');
       }
       const preset = $('fontPreset');
-      if (preset) preset.textContent = st.presets || '';
+      if (preset) preset.textContent = st.presets_dir || '';
       const msg = $('fontMsg');
       if (msg) {
         msg.textContent = (st.problems && st.problems.length)

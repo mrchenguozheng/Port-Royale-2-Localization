@@ -171,6 +171,18 @@ def new_lang(code, source=None):
         f.write(txt)
     print("已复制 %s -> %s（%d 条）" % (spath, dpath, txt.count("\n")))
     print("接下来把每行右边的原文改成译文；没改的会显示英文。")
+    try:
+        fdir = os.path.join(TOOLS, "font")
+        if fdir not in sys.path:
+            sys.path.insert(0, fdir)
+        import subset_fonts
+        info = subset_fonts.add_language_presets(code, src.split(".")[0])
+        if info.get("added"):
+            print("已生成字体配置：%s（模板 %s）" % (info["path"], info["source"]))
+        else:
+            print("字体配置已存在：%s" % info["path"])
+    except Exception as exc:
+        print("字体配置未生成：%s" % exc)
     return 0
 
 

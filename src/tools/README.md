@@ -49,9 +49,9 @@ src/tools/
 
 | 路径 | 作用 |
 |---|---|
-| `font/subset_fonts.py` | 字体缝合入口（按 presets 的语言配置） |
+| `font/subset_fonts.py` | 字体缝合入口（每个语言 `presets/<语言>.toml`，各出一套） |
 | `font/extract_fonts.py` | 从游戏 `pr2_loca.cpr` 导出原版拉丁字体 |
-| `font/fontstitch/` | 缝合引擎、donor presets、校验工具 |
+| `font/fontstitch/` | 缝合引擎、`presets/` 目录、校验工具 |
 
 字体前置检查：
 

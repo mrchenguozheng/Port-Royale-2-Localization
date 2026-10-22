@@ -1,33 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""subset_fonts.py —— 用 fontstitch 把中文字形缝进游戏原版拉丁字体。
+"""subset_fonts.py —— 按语言把字形缝合进游戏原版拉丁字体。
 
-思路
+术语
 ----
-游戏自带的四个 TTF（``assets/fonts/original/``）是纯拉丁字体，排版、字宽
-和名字表都是原版的。本项目不再用「整个换成某个中文字体」的做法，而是：
+* **原版字体**：游戏自带的四个 TTF（``assets/fonts/original/``）。
+* **donor**：提供字形的来源字体（系统/商业字体，不进仓库）。
+* **按用字裁剪**：从 donor 中只取当前译文用到的字形，是缝合的内部步骤。
+* **缝合**：把裁剪后的 donor 字形追加进原版字体。
+* **重缝**：译文变化后重新执行一次缝合。
 
-    base（原版 TTF） + donor（中文/日文字体） → 只追加译文用到的字形
+按语言分开
+----------
+每个语言一份配置：``fontstitch/presets/<语言>.toml``，互不影响。
+字体也按语言分别生成到 ``build/fonts/<语言>/``，部署时只复制目标语言那一套。
 
-这样英文/法文的字形、字宽、kern 都不变，只是额外多了中文和日文字形。
-缝合引擎就是本仓库自带的 ``fontstitch/``（从独立项目并入）。
-
-用法
-----
-    python src\\tools\\font\\subset_fonts.py            # 用全部译文用字重新缝合
-    python src\\tools\\font\\subset_fonts.py --force    # 忽略缓存，强制重缝
-    python src\\tools\\font\\subset_fonts.py --out D:\\fonts
+    python src\\tools\\font\\subset_fonts.py --check
+    python src\\tools\\font\\subset_fonts.py --lang zh --force
+    python src\\tools\\font\\subset_fonts.py --all --force
 
 依赖
 ----
-需要 fontTools。默认解释器没装时会尝试 ``PR2_FONTTOOLS_SITE``，再试
-``~/.workbuddy/binaries/python/envs/*/Lib/site-packages``。
-
-donor 按语言配置在 ``src/tools/font/fontstitch/presets.toml``：只有写了
-``[<语言>]`` 段的语言才会被缝进字体，没配置的语言直接跳过。目前只有
-``zh`` 配了 donor，``ja`` 等没有配置，所以不会给它们缝字形。
-
-缺 donor 或缺 fontTools 时只返回失败说明，不会把现有 build/fonts 覆盖成坏文件。
+需要 fontTools；缺了只返回说明，不会把已有字体覆盖成坏文件。
 """
 
 import argparse
@@ -51,14 +45,12 @@ DEFAULT_OUT = os.path.join(ROOT, "build", "fonts")
 FONTS = ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf")
 
 STITCH_DIR = os.path.join(TOOLS, "font", "fontstitch")
-PRESETS = os.path.join(STITCH_DIR, "presets.toml")
+PRESETS_DIR = os.path.join(STITCH_DIR, "presets")
 PRESETS_EXAMPLE = os.path.join(STITCH_DIR, "presets.example.toml")
 
-#: 除了译文用字，还要保留的字符：ASCII、中文标点、数字全角等。
 EXTRA = ("，。、；：！？…—～·「」『』“”《》【】（）〔〕〈〉［］％０１２３４５６７８９"
          "　￥· ‐–")
-
-STITCH_VERSION = 3
+STITCH_VERSION = 4
 
 
 def toml_chars(paths):
@@ -74,17 +66,8 @@ def toml_chars(paths):
     return chars
 
 
-def text_files(langs):
-    out = []
-    for lang in langs:
-        p = os.path.join(STRINGS, lang + ".toml")
-        if os.path.isfile(p):
-            out.append(p)
-    return out
-
-
 def needed_chars(langs):
-    return toml_chars(text_files(langs))
+    return toml_chars([os.path.join(STRINGS, lang + ".toml") for lang in langs])
 
 
 def _fonttools():
@@ -116,81 +99,63 @@ def _fontstitch():
     return fontstitch
 
 
-def _presets():
-    """返回 (语言列表, {game_file: [(donor, index)]}, fallback)。"""
-    if not os.path.isfile(PRESETS):
-        return [], {}, None
-    doc = tomllib.load(open(PRESETS, "rb"))
-    langs = []
-    donors = {}
-    for lang, cfg in doc.items():
-        if lang == "fallback" or not isinstance(cfg, dict):
-            continue
-        langs.append(lang)
-        for key in ("pair", "supplement"):
-            for p in cfg.get(key, []):
-                gf = p.get("game_file")
-                if not gf:
-                    continue
-                donors.setdefault(gf, []).append(
-                    (p["donor_file"], int(p.get("donor_index", 0))))
-    fb = None
-    f = doc.get("fallback") or {}
-    if f.get("donor_file"):
-        fb = (f["donor_file"], int(f.get("donor_index", 0)))
-    return sorted(langs), donors, fb
+def preset_path(lang):
+    return os.path.join(PRESETS_DIR, lang + ".toml")
+
+
+def list_presets():
+    if not os.path.isdir(PRESETS_DIR):
+        return []
+    return sorted(n[:-5] for n in os.listdir(PRESETS_DIR)
+                  if n.endswith(".toml"))
+
+
+def load_preset(lang, game_file=None):
+    """返回 (donors, fallback)；可按 game_file 过滤。"""
+    path = preset_path(lang)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(path)
+    doc = tomllib.load(open(path, "rb"))
+    donors = []
+    for key in ("pair", "supplement"):
+        for p in doc.get(key, []):
+            if game_file and p.get("game_file") != game_file:
+                continue
+            if p.get("donor_file"):
+                donors.append((p["donor_file"], int(p.get("donor_index", 0))))
+    fb = doc.get("fallback") or {}
+    fallback = None
+    if fb.get("donor_file"):
+        fallback = (fb["donor_file"], int(fb.get("donor_index", 0)))
+    return donors, fallback
 
 
 _PRESETS_LOCK = threading.Lock()
 
 
 def add_language_presets(code, template=None):
-    """给新语言追加 [code] 段；donor 以模板语言（默认 zh）为起点。
-
-    返回 {"added": bool, "source": str|None, "path": str}。
-    只追加文本，不改动已有段；presets.toml 不存在时先从 example 复制。
-    """
+    """给新语言复制一份 ``presets/<code>.toml``，返回 {"added", "source"}。"""
     code = (code or "").strip()
     if not code:
         raise ValueError("语言代码为空")
     with _PRESETS_LOCK:
-        if not os.path.isfile(PRESETS):
-            if not os.path.isfile(PRESETS_EXAMPLE):
-                raise ValueError("缺少 presets.example.toml，无法自动生成字体配置")
-            shutil.copyfile(PRESETS_EXAMPLE, PRESETS)
-        doc = tomllib.load(open(PRESETS, "rb"))
-        if code in doc:
-            return {"added": False, "source": None, "path": PRESETS}
-
+        dst = preset_path(code)
+        if os.path.isfile(dst):
+            return {"added": False, "source": None, "path": dst}
+        os.makedirs(PRESETS_DIR, exist_ok=True)
         source = None
         for cand in (template, "zh"):
-            cfg = doc.get(cand)
-            if isinstance(cfg, dict) and (cfg.get("pair") or cfg.get("supplement")):
-                source = cand
+            cand_path = preset_path(cand) if cand else ""
+            if cand_path and os.path.isfile(cand_path):
+                source = cand_path
                 break
-
-        lines = ["", "# 自动添加：新语言 %s%s" % (
-            code, "（donor 以 %s 为模板）" % source if source else "（未找到可复制的模板）")]
-        lines.append("[%s]" % code)
-        if source:
-            cfg = doc[source]
-            for kind in ("pair", "supplement"):
-                for p in cfg.get(kind, []):
-                    lines.append("")
-                    lines.append("[[%s.%s]]" % (code, kind))
-                    for key in ("game", "game_file", "donor", "donor_file",
-                                "donor_index", "note"):
-                        if key not in p:
-                            continue
-                        val = p[key]
-                        if isinstance(val, int):
-                            lines.append("%s = %d" % (key, val))
-                        else:
-                            lines.append("%s = %s" % (
-                                key, json.dumps(str(val), ensure_ascii=False)))
-        with open(PRESETS, "a", encoding="utf-8", newline="\n") as fh:
-            fh.write("\n".join(lines) + "\n")
-        return {"added": True, "source": source, "path": PRESETS}
+        if not source and os.path.isfile(PRESETS_EXAMPLE):
+            source = PRESETS_EXAMPLE
+        if not source:
+            raise ValueError("缺少 presets.example.toml，无法生成字体配置")
+        shutil.copyfile(source, dst)
+        return {"added": True,
+                "source": os.path.basename(source)[:-5], "path": dst}
 
 
 def _upm(path, index=0):
@@ -206,52 +171,72 @@ def _resolve(path):
     return _fontstitch().resolve_path(path)
 
 
-def _key(chars, donors, src, langs):
+def _donors_for(lang, game_file):
+    donors, fallback = load_preset(lang, game_file)
+    out = list(donors)
+    if fallback:
+        out.append(fallback)
+    seen, uniq = set(), []
+    for item in out:
+        if item not in seen:
+            seen.add(item)
+            uniq.append(item)
+    return uniq
+
+
+def _key(lang, chars, donors, src):
     h = hashlib.sha1("".join(sorted(chars)).encode("utf-8")).hexdigest()
-    rows = [STITCH_VERSION, sorted(langs), h, len(chars)]
-    for base in FONTS:
-        p = os.path.join(src, base)
+    rows = [STITCH_VERSION, lang, h, len(chars)]
+    for name in FONTS:
+        p = os.path.join(src, name)
         try:
             s = os.stat(p)
-            rows += [base, s.st_mtime_ns, s.st_size]
+            rows += [name, s.st_mtime_ns, s.st_size]
         except OSError:
-            rows += [base, 0, 0]
-        for donor, idx in donors.get(base, []):
-            dp = _resolve(donor)
-            try:
-                s = os.stat(dp)
-                rows += [base, os.path.basename(dp), s.st_mtime_ns, s.st_size, idx]
-            except OSError:
-                rows += [base, os.path.basename(dp), 0, 0, idx]
+            rows += [name, 0, 0]
+    for donor, idx in donors:
+        p = _resolve(donor)
+        try:
+            s = os.stat(p)
+            rows += [os.path.basename(p), s.st_mtime_ns, s.st_size, idx]
+        except OSError:
+            rows += [os.path.basename(p), 0, 0, idx]
     return hashlib.sha1(json.dumps(rows).encode("utf-8")).hexdigest()
 
 
-def _cache_path(out_dir):
-    return os.path.join(out_dir, ".stitch.json")
-
-
-def _load_cache(out_dir):
+def _load_cache(lang_dir):
     try:
-        with open(_cache_path(out_dir), encoding="utf-8") as fh:
+        with open(os.path.join(lang_dir, ".stitch.json"), encoding="utf-8") as fh:
             return json.load(fh)
     except (OSError, ValueError):
         return {}
 
 
-def _save_cache(out_dir, data):
+def _save_cache(lang_dir, data):
     try:
-        cache = _cache_path(out_dir)
-        os.makedirs(os.path.dirname(cache), exist_ok=True)
-        tmp = cache + ".tmp"
+        path = os.path.join(lang_dir, ".stitch.json")
+        tmp = path + ".tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
             json.dump(data, fh, ensure_ascii=False)
-        os.replace(tmp, cache)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _write_notice(out_dir):
+    text = (
+        "这些字体是衍生作品：游戏原版拉丁字体 + 商业/系统 donor 字体。\n"
+        "只允许在本机自用；禁止再分发、上传、打包进发布物或提交到仓库。\n"
+    )
+    try:
+        with open(os.path.join(out_dir, "不要分发.txt"), "w",
+                  encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
     except OSError:
         pass
 
 
 def _stitch_one(base, out, donors, codes, log):
-    """base 上追加 donors 的字形；返回 (missing, passes)。"""
     cur = base
     temps = []
     upm = _upm(base)
@@ -288,59 +273,19 @@ def _stitch_one(base, out, donors, codes, log):
     for t in temps:
         if os.path.exists(t):
             os.remove(t)
-    return missing, passes
+    return missing
 
 
-def _write_notice(out_dir):
-    """在输出目录放一份“不要分发”的说明（部署只复制 .ttf，不会带进游戏）。"""
-    text = (
-        "这些字体是衍生作品：游戏原版拉丁字体 + 商业/系统 donor 字体\n"
-        "（微软雅黑、华文中宋、思源宋体、钟齐志莽、Noto Sans JP 等）。\n\n"
-        "只允许在本机自用；禁止再分发、上传、打包进发布物或提交到仓库。\n"
-        "需要给别人的机器补字体时，让对方用自己的 donor 重新运行：\n"
-        "  python src\\tools\\font\\subset_fonts.py\n"
-    )
-    try:
-        with open(os.path.join(out_dir, "不要分发.txt"), "w",
-                  encoding="utf-8", newline="\n") as fh:
-            fh.write(text)
-    except OSError:
-        pass
-
-
-def ensure_fonts(out_dir=None, src=None, log=None, force=False):
-    """确保 build/fonts 覆盖当前全部用字；返回 (ok, 说明)。"""
+def ensure_fonts(out_dir=None, langs=None, src=None, log=None, force=False):
+    """按语言生成 build/fonts/<语言>/；返回 (ok, 说明)。"""
     out_dir = out_dir or DEFAULT_OUT
     log = log or (lambda msg: None)
     src = src or os.environ.get("PR2_ORIG_FONTS") or DEFAULT_SRC
 
-    if not os.path.isfile(PRESETS):
-        return False, ("缺少 %s；复制 presets.example.toml 为 presets.toml，"
-                       "再按自己机器上的 donor 修改" % PRESETS)
-
-    langs, lang_donors, fallback = _presets()
-    if not langs:
-        return True, "presets 里没有配置任何语言的 donor，跳过字体缝合"
-
-    chars = needed_chars(langs)
-    donors = {}
-    for name in FONTS:
-        ds = list(lang_donors.get(name, []))
-        if fallback:
-            ds.append(fallback)
-        seen, uniq = set(), []
-        for item in ds:
-            if item not in seen:
-                seen.add(item)
-                uniq.append(item)
-        donors[name] = uniq
-
-    key = _key(chars, donors, src, langs)
-    cache = _load_cache(out_dir)
-    if not force and cache.get("key") == key and all(
-            os.path.isfile(os.path.join(out_dir, f)) for f in FONTS):
-        _write_notice(out_dir)
-        return True, "字体已是最新（%d 个用字），无需重缝" % len(chars)
+    wanted = [l for l in (langs or list_presets()) if l]
+    if not wanted:
+        return False, ("没有找到语言配置：请在 fontstitch/presets/ 下放 "
+                       "<语言>.toml（可从 presets.example.toml 复制）")
 
     if not _fonttools():
         return False, ("缺 fontTools，字体未更新：python -m pip install fonttools，"
@@ -351,67 +296,90 @@ def ensure_fonts(out_dir=None, src=None, log=None, force=False):
         if not os.path.isfile(os.path.join(src, name)):
             return False, "缺少原版字体 %s" % os.path.join(src, name)
 
-    os.makedirs(out_dir, exist_ok=True)
-    codes = sorted(ord(c) for c in chars)
-    log("字体缝合：语言 %s，%d 个用字，%d 个原版字体"
-        % ("、".join(langs), len(codes), len(FONTS)))
-    try:
-        for name in FONTS:
-            base = os.path.join(src, name)
-            out = os.path.join(out_dir, name)
-            log("  %s" % name)
-            missing, _ = _stitch_one(base, out, donors[name], codes, log)
-            if missing:
-                log("   仍有 %d 个字符缺字形：%s" % (
-                    len(missing), " ".join("U+%04X" % c for c in missing[:12])))
-            log("   完成：%.1f KB" % (os.path.getsize(out) / 1024.0))
-    except Exception as exc:
-        return False, "字体缝合失败：%s" % exc
+    done, failed = [], []
+    for lang in wanted:
+        if not os.path.isfile(preset_path(lang)):
+            log("  %s：缺 presets/%s.toml，跳过" % (lang, lang))
+            failed.append(lang)
+            continue
+        try:
+            chars = needed_chars([lang])
+            codes = sorted(ord(c) for c in chars)
+            lang_dir = os.path.join(out_dir, lang)
+            key = _key(lang, chars, _donors_for(lang, None), src)
+            cache = _load_cache(lang_dir)
+            if (not force and cache.get("key") == key and all(
+                    os.path.isfile(os.path.join(lang_dir, f)) for f in FONTS)):
+                log("  %s：已是最新（%d 个用字）" % (lang, len(chars)))
+                done.append(lang)
+                continue
+            os.makedirs(lang_dir, exist_ok=True)
+            log("  %s：%d 个用字" % (lang, len(chars)))
+            for name in FONTS:
+                base = os.path.join(src, name)
+                out = os.path.join(lang_dir, name)
+                log("    %s" % name)
+                missing = _stitch_one(base, out, _donors_for(lang, name), codes, log)
+                if missing:
+                    log("      仍有 %d 个字符缺字形：%s" % (
+                        len(missing), " ".join("U+%04X" % c for c in missing[:12])))
+            _save_cache(lang_dir, {"key": key, "chars": len(chars)})
+            _write_notice(lang_dir)
+            done.append(lang)
+        except Exception as exc:
+            log("  %s：失败 %s" % (lang, exc))
+            failed.append(lang)
 
-    _save_cache(out_dir, {"key": key, "chars": len(chars)})
-    _write_notice(out_dir)
+    if failed and not done:
+        return False, "字体缝合失败：%s" % "、".join(failed)
+    msg = "字体已处理：%s" % "、".join(done)
+    if failed:
+        msg += "；失败/跳过：%s" % "、".join(failed)
+        return False, msg
     log("注意：缝合字体只限本机自用，不要分发/上传/打包。")
-    return True, "字体已重新缝合（%d 个用字）" % len(chars)
+    return True, msg
 
 
-def check_prereqs(src=None):
-    """检查缝合字体需要的前置条件；返回 (信息行, 问题行)。"""
-    src = src or os.environ.get("PR2_ORIG_FONTS") or DEFAULT_SRC
-    langs, donors, fallback = _presets()
+def check_prereqs(langs=None):
+    """检查原版字体、donor、fontTools；返回 (信息行, 问题行)。"""
+    src = os.environ.get("PR2_ORIG_FONTS") or DEFAULT_SRC
+    selected = langs or list_presets()
     info, bad = [], []
-    if not os.path.isfile(PRESETS):
-        info.append("已配置语言：（无）")
-        bad.append("缺少 presets.toml；复制 presets.example.toml 为 presets.toml 后修改")
-    else:
-        info.append("已配置语言：%s" % ("、".join(langs) if langs else "（无）"))
-    if not langs and os.path.isfile(PRESETS):
-        bad.append("presets.toml 里没有任何 [语言] 段，不会缝合任何字体")
-    for name in FONTS:
-        base = os.path.join(src, name)
-        if not os.path.isfile(base):
-            bad.append("缺原版字体 %s（用 extract_fonts.py 从游戏导出）" % base)
-        for donor, _idx in donors.get(name, []):
+    info.append("已配置语言：%s" % ("、".join(selected) if selected else "（无）"))
+    if not selected:
+        bad.append("没有 presets/<语言>.toml；可从 presets.example.toml 复制")
+    for lang in selected:
+        if not os.path.isfile(preset_path(lang)):
+            bad.append("缺 presets/%s.toml" % lang)
+            continue
+        donors, fallback = load_preset(lang)
+        if not donors:
+            bad.append("%s 没有 [[pair]] donor" % lang)
+        for donor, _idx in donors:
             p = _resolve(donor)
             if not os.path.isfile(p):
-                bad.append("缺 donor %s（%s 需要）" % (p, name))
+                bad.append("缺 donor %s（%s 需要）" % (p, lang))
+    for name in FONTS:
+        if not os.path.isfile(os.path.join(src, name)):
+            bad.append("缺原版字体 %s（用 extract_fonts.py 从游戏导出）" % name)
     if not _fonttools():
         bad.append("缺 fontTools（pip install fonttools，或设 PR2_FONTTOOLS_SITE）")
-    if fallback:
-        p = _resolve(fallback[0])
-        if not os.path.isfile(p):
-            info.append("兜底 donor 不存在（非必需）：%s" % p)
     return info, bad
 
 
 def main():
-    ap = argparse.ArgumentParser(description="用 fontstitch 给原版字体补中文字形")
+    ap = argparse.ArgumentParser(description="按语言缝合游戏字体")
     ap.add_argument("--src", default="", help="原版拉丁字体目录")
-    ap.add_argument("--out", default=DEFAULT_OUT, help="输出目录（默认 build\\fonts）")
+    ap.add_argument("--out", default=DEFAULT_OUT, help="输出根目录（默认 build\\fonts）")
+    ap.add_argument("--lang", action="append", default=[],
+                    help="只处理这个语言，可重复")
+    ap.add_argument("--all", action="store_true", help="处理 presets/ 下全部语言")
     ap.add_argument("--force", action="store_true", help="忽略缓存，强制重缝")
-    ap.add_argument("--check", action="store_true", help="只检查前置条件，不写文件")
+    ap.add_argument("--check", action="store_true", help="只检查前置条件")
     args = ap.parse_args()
+    langs = args.lang or None
     if args.check:
-        info, bad = check_prereqs(args.src or None)
+        info, bad = check_prereqs(langs)
         for line in info:
             print(line)
         for line in bad:
@@ -420,12 +388,11 @@ def main():
             return 1
         print("字体缝合前置条件齐全。")
         return 0
-    ok, msg = ensure_fonts(out_dir=args.out, src=args.src or None,
-                           log=print, force=args.force)
+    ok, msg = ensure_fonts(out_dir=args.out, langs=langs,
+                           src=args.src or None, log=print, force=args.force)
     print(msg)
     if ok:
-        print("把这里的 4 个 TTF 复制到 <游戏目录>\\fonts\\ 覆盖，重启游戏生效。")
-        print("警告：缝合字体仅限本机自用，不要分发或打包进发布物。")
+        print("部署时只复制目标语言那一套：build\\fonts\\<语言>\\")
     return 0 if ok else 1
 
 

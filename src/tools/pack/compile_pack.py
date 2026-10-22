@@ -283,11 +283,15 @@ def main():
     code = build(lang, a.out, a.strict)
 
     # 编完语言包顺手检查字体：译文里出现新字（比如新补的「嫩」）时，
-    # 字体不重裁就会画成空白。字体出错不算构建失败 —— 语言包本身没问题。
+    # 字体不重缝就会画成空白。字体出错不算构建失败 —— 语言包本身没问题。
     if code == 0 and not a.no_fonts:
         try:
+            fdir = os.path.join(TOOLS, "font")
+            if fdir not in sys.path:
+                sys.path.insert(0, fdir)
             import subset_fonts
-            ok, msg = subset_fonts.ensure_fonts(log=lambda m: print(m))
+            ok, msg = subset_fonts.ensure_fonts(
+                langs=[lang], log=lambda m: print(m))
             print("字体：" + msg)
             if not ok:
                 print("（部署时字体不会更新；详见上一行提示）")
