@@ -30,6 +30,76 @@ static void SiblingPath(char* out, const char* self, const char* name) {
     strcpy(out, tmp);
 }
 
+static void DirOf(const char* path, char* out) {
+    strcpy(out, path);
+    char* p = strrchr(out, '\\');
+    if (p) *p = '\0';
+    else strcpy(out, ".");
+}
+
+/* 读 PR2Packs\locale.ini 的 language=；读不到返回 0。 */
+static int ReadLocaleLang(const char* self, char* out, size_t cap) {
+    char root[MAX_PATH], ini[MAX_PATH], line[512];
+    DirOf(self, root);
+    snprintf(ini, sizeof(ini), "%s\\PR2Packs\\locale.ini", root);
+    FILE* f = fopen(ini, "rb");
+    if (!f) return 0;
+    int found = 0;
+    while (fgets(line, sizeof(line), f)) {
+        char* p = line;
+        while (*p == ' ' || *p == '\t') p++;
+        if (strncmp(p, "language", 8) != 0) continue;
+        p += 8;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p != '=') continue;
+        p++;
+        while (*p == ' ' || *p == '\t') p++;
+        char* end = p;
+        while (*end && *end != '\r' && *end != '\n' && *end != ' ' && *end != '\t') end++;
+        *end = '\0';
+        if (*p && strlen(p) < cap) {
+            strcpy(out, p);
+            found = 1;
+        }
+        break;
+    }
+    fclose(f);
+    return found;
+}
+
+/* 把 fonts\<语言>\*.ttf 复制到 fonts\ 根目录，供游戏按固定文件名加载。
+ * 发行包只放子目录；启动器在 CreateProcess 之前做这一步。 */
+static int CopyFontSet(const char* self, const char* lang) {
+    char root[MAX_PATH], langDir[MAX_PATH], pattern[MAX_PATH], dstDir[MAX_PATH];
+    DirOf(self, root);
+    snprintf(langDir, sizeof(langDir), "%s\\fonts\\%s", root, lang);
+    if (GetFileAttributesA(langDir) == INVALID_FILE_ATTRIBUTES) return 0;
+    snprintf(dstDir, sizeof(dstDir), "%s\\fonts", root);
+
+    snprintf(pattern, sizeof(pattern), "%s\\*.ttf", langDir);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+
+    int copied = 0;
+    do {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        char src[MAX_PATH], dst[MAX_PATH];
+        snprintf(src, sizeof(src), "%s\\%s", langDir, fd.cFileName);
+        snprintf(dst, sizeof(dst), "%s\\%s", dstDir, fd.cFileName);
+        if (CopyFileA(src, dst, FALSE)) {
+            copied++;
+        } else {
+            printf("[PR2Launch] 字体复制失败: %s (错误 %lu)\n", src, GetLastError());
+        }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    if (copied) {
+        printf("[PR2Launch] 已切换字体: fonts\\%s\\ (%d 个 TTF)\n", lang, copied);
+    }
+    return copied;
+}
+
 /* 语言代码只允许字母数字、连字符和下划线，且不能是 "." 或 ".." —— 它要
  * 拼进 PR2Packs\<code>.txt 这样的路径，放任 "../" 就是目录穿越。
  * 返回 1 表示可用，0 表示不可用。
@@ -93,6 +163,19 @@ int main(int argc, char** argv) {
     if (GetFileAttributesA(dllPath) == INVALID_FILE_ATTRIBUTES) {
         printf("[PR2Launch] 同目录下找不到 PR2TextSource.dll: %s\n", dllPath);
         return 1;
+    }
+
+    /* 字体按语言放在 fonts\<语言>\；游戏只认 fonts\ 根目录下的固定文件名，
+     * 所以在启动前把目标语言那一套复制到根目录。没有子目录时保持旧行为。 */
+    {
+        char localeLang[64];
+        const char* fontLang = lang;
+        if (!fontLang && ReadLocaleLang(self, localeLang, sizeof(localeLang))) {
+            fontLang = localeLang;
+        }
+        if (fontLang && ValidLangCode(fontLang)) {
+            CopyFontSet(self, fontLang);
+        }
     }
 
     /* 传给子进程：下面 CreateProcessA 的环境参数是 NULL，意思是

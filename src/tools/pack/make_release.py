@@ -66,7 +66,7 @@ def copy_fonts(lang, stage, mode, log):
     if mode == "none":
         log("跳过字体（发行包不含字体）")
         return
-    dst = os.path.join(stage, "fonts")
+    dst = os.path.join(stage, "fonts", lang)
     if mode == "stitch":
         src = os.path.join(BUILD, "fonts", lang)
         if not os.path.isdir(src):
@@ -99,6 +99,10 @@ def write_readme(lang, stage, mode):
   1. 把本压缩包里的全部文件解压到游戏根目录（和 PR2.exe 同一层）。
   2. 运行 PR2Launcher.exe 启动游戏。
   3. 不要直接运行 PR2.exe，那样不会加载语言包。
+
+字体：
+  字体在 fonts\\<语言>\\；启动器会按语言把它复制到 fonts\\ 根目录。
+  同一目录可以放多个语言（fonts\\zh、fonts\\ja），启动器按 locale.ini 或 --lang 选择。
 
 卸载：
   删除 PR2Launcher.exe、PR2TextSource.dll、PR2Packs\\%s.txt；
