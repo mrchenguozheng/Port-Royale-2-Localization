@@ -1322,3 +1322,12 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem;
 }
 .seed-text[readonly] { opacity: 0.75; }
+
+.seed-inline { margin-top: 0.5rem; border-top: 1px dashed var(--line); padding-top: 0.35rem; }
+.seed-inline .seed-head { color: var(--fg-dim); font-size: 0.8em; margin-bottom: 0.15rem; }
+.seed-inline .seed-body {
+  font-family: var(--font-mono); font-size: 0.92em; white-space: pre-wrap;
+  color: var(--fg-dim); background: var(--bg-row-alt); border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+}
+.seed-inline.diff .seed-body { border-left: 3px solid var(--accent); }

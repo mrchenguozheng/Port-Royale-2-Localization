@@ -79,6 +79,7 @@ const S = {
   undo: {} as Record<string, string[]>,
   last: {} as Record<string, string>,
   suppressUndo: false,
+  seed: {} as Record<string, string>,
   dirtyIds: [] as string[],
   size: 24,
   problems: {} as Record<string, Problem[]>,
@@ -651,6 +652,21 @@ async function loadEntryInfo(id: string) {
     cleanBtn.addEventListener('click', () => void revertClean(id));
     actions.appendChild(cleanBtn);
     box.appendChild(actions);
+    try {
+      const sd = await api<{ text: string }>(
+        `/api/seed?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
+      S.seed[id] = sd.text;
+      const body = document.querySelector('.seed-inline .seed-body');
+      if (body) body.textContent = sd.text;
+      const sb = document.querySelector('.seed-inline');
+      const ed = zhEditor();
+      const norm = (t: string) => t.replace(/\s+/g, '');
+      if (sb && ed) sb.classList.toggle('diff', norm(ed.textContent || '') !== norm(sd.text));
+    } catch {
+      const body = document.querySelector('.seed-inline .seed-body');
+      if (body) body.textContent = '（没有初版）';
+    }
+
     const extraSp = r.extra_spaces || 0;
     box.appendChild(el('span', 'info-sp',
       extraSp > 0 ? `空格：多 ${extraSp} 处` : '空格：与干净文本一致'));
@@ -822,6 +838,11 @@ function zhCell(e: Entry): HTMLElement {
   ed.spellcheck = false;
   ed.appendChild(renderRich(textOf(e)));
   box.appendChild(ed);
+  const seedBox = el('div', 'seed-inline');
+  seedBox.appendChild(el('div', 'seed-head', '初版'));
+  const seedBody = el('div', 'seed-body', '（读取中…）');
+  seedBox.appendChild(seedBody);
+  box.appendChild(seedBox);
 
   // 中文输入法组合期间不能重绘 DOM，否则会把组合中的字打断
   let composing = false;
@@ -850,6 +871,12 @@ function zhCell(e: Entry): HTMLElement {
     ed.replaceChildren(renderRich(fixed));
     setCaretOffset(ed, off);
     record(fixed);
+    const sb = document.querySelector('.seed-inline');
+    if (sb) {
+      const seed = S.seed[e.id];
+      const norm = (t: string) => t.replace(/\s+/g, '');
+      sb.classList.toggle('diff', !!seed && norm(seed) !== norm(fixed));
+    }
   };
 
   ed.addEventListener('dragover', (ev) => ev.preventDefault());
