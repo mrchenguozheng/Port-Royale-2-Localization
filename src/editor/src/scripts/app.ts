@@ -76,6 +76,9 @@ const S = {
   orig: new Map<string, string>(),
   //: id -> 英文原文里每种占位符需要的个数
   req: {} as Record<string, Record<string, number>>,
+  undo: {} as Record<string, string[]>,
+  last: {} as Record<string, string>,
+  suppressUndo: false,
   dirtyIds: [] as string[],
   size: 24,
   problems: {} as Record<string, Problem[]>,
@@ -464,6 +467,36 @@ function refLine(which: 'A' | 'B', e: Entry): HTMLElement {
 
 /* 一条 = 左「语境」+ 右「id/审核 + 参照 A/B + 译文」。
  * 参照语言的选择器就贴在参照文本前面，换语言不用回头顶。 */
+function setEditorText(text: string) {
+  const ed = zhEditor();
+  if (!ed) return;
+  S.suppressUndo = true;
+  ed.replaceChildren(renderRich(text));
+  ed.dispatchEvent(new Event('input', { bubbles: true }));
+  S.suppressUndo = false;
+  ed.focus();
+}
+
+function undoEdit(id: string) {
+  const st = S.undo[id] || [];
+  if (!st.length) return;
+  const prev = st.pop() as string;
+  setEditorText(prev);
+  void loadEntryInfo(id);
+}
+
+async function revertClean(id: string) {
+  try {
+    const r = await api<{ text: string }>(
+      `/api/clean?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
+    setEditorText(r.text);
+    void loadEntryInfo(id);
+  } catch (err) {
+    const box = document.getElementById('infoBar');
+    if (box) box.textContent = '还原失败：' + (err as Error).message;
+  }
+}
+
 async function loadEntryInfo(id: string) {
   const box = document.getElementById('infoBar');
   if (!box) return;
@@ -497,6 +530,16 @@ async function loadEntryInfo(id: string) {
       box.appendChild(el('span', 'info-warn',
         `占位符数量不符：${badCount} 个（原文与译文必须逐个数一致）`));
     }
+    const actions = el('span', 'info-actions');
+    const undoBtn = el('button', 'mini', '撤销');
+    undoBtn.title = '撤销上一次编辑';
+    undoBtn.addEventListener('click', () => undoEdit(id));
+    actions.appendChild(undoBtn);
+    const cleanBtn = el('button', 'mini', '还原干净原文');
+    cleanBtn.title = '用 references 里的干净文本替换当前译文';
+    cleanBtn.addEventListener('click', () => void revertClean(id));
+    actions.appendChild(cleanBtn);
+    box.appendChild(actions);
     const extraSp = r.extra_spaces || 0;
     box.appendChild(el('span', 'info-sp',
       extraSp > 0 ? `空格：多 ${extraSp} 处` : '空格：与干净文本一致'));
@@ -687,6 +730,7 @@ function setCaretOffset(root: HTMLElement, offset: number) {
 }
 
 function zhCell(e: Entry): HTMLElement {
+  S.last[e.id] = S.last[e.id] ?? textOf(e);
   const box = el('div', 'cell-zh');
   const ed = el('div', 'edit') as HTMLDivElement;
   ed.contentEditable = 'true';
@@ -697,6 +741,15 @@ function zhCell(e: Entry): HTMLElement {
   // 中文输入法组合期间不能重绘 DOM，否则会把组合中的字打断
   let composing = false;
   const record = (v: string) => {
+    if (!S.suppressUndo) {
+      const prev = S.last[e.id];
+      if (prev !== undefined && prev !== v) {
+        const st = S.undo[e.id] || (S.undo[e.id] = []);
+        st.push(prev);
+        if (st.length > 50) st.shift();
+      }
+    }
+    S.last[e.id] = v;
     if (v === (S.orig.get(e.id) ?? '')) {
       S.edits.delete(e.id);
       S.dirtyIds = S.dirtyIds.filter((x) => x !== e.id);

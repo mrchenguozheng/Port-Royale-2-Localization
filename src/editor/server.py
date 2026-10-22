@@ -30,6 +30,7 @@ import re
 import sys
 import threading
 import time
+import tomllib
 import subprocess
 import traceback
 import urllib.parse
@@ -1092,6 +1093,22 @@ class Handler(BaseHTTPRequestHandler):
                 if c:
                     out[hid] = c
             return self.send_json(out)
+
+        if path == "/api/clean":
+            hid = (query.get("id") or [""])[0]
+            lang = (query.get("lang") or ["zh"])[0]
+            ref_name = ("zh.gog_1.1.2.3.toml" if lang == "zh"
+                        else "%s.toml" % lang)
+            ref_path = os.path.join(os.path.dirname(SRC), "src", "references", ref_name)
+            if not os.path.isfile(ref_path):
+                return self.send_json({"detail": "没有干净文本源"}, 404)
+            try:
+                clean = tomllib.load(open(ref_path, "rb")).get(hid)
+            except Exception as exc:
+                return self.send_json({"detail": str(exc)}, 400)
+            if clean is None:
+                return self.send_json({"detail": "干净文本里没有这一条"}, 404)
+            return self.send_json({"text": clean})
 
         if path == "/api/entry-info":
             hid = (query.get("id") or [""])[0]

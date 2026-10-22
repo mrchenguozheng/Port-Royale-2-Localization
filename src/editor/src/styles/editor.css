@@ -1309,3 +1309,5 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   cursor: grab; user-select: none;
 }
 .ph-token.dragging { opacity: 0.4; }
+
+.info-bar .info-actions { margin-left: auto; display: inline-flex; gap: 0.35rem; }
