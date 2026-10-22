@@ -32,7 +32,7 @@ exit /b 0
 :status
 call "%SRC%find_python.bat"
 if not defined PY goto :nopython
-"%PY%" "%TOOLS%server_status.py"
+"%PY%" "%TOOLS%install\server_status.py"
 echo.
 pause
 endlocal

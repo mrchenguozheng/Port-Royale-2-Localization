@@ -5,7 +5,7 @@
 但本文件只写了 `from .base import *`，直到运行时才 NameError。
 这个脚本静态扫一遍，提交前跑一次即可。
 
-    python src/tools/lint_imports.py            # 默认扫 src/tools/pr2ctl/*.py
+    python src/tools/lint_imports.py            # 默认扫 src/tools/install/pr2ctl/*.py
     python src/tools/lint_imports.py 文件...    # 扫指定文件
 
 退出码：0 = 干净，1 = 有可疑名字。
@@ -18,7 +18,7 @@ import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PKG = os.path.join(HERE, "pr2ctl")
+PKG = os.path.join(HERE, "install", "pr2ctl")
 
 BUILTINS = set(dir(builtins)) | {"__name__", "__file__", "__doc__", "__package__"}
 

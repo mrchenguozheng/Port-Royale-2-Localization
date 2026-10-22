@@ -61,11 +61,11 @@ if TOOLS not in sys.path:
     sys.path.insert(0, TOOLS)
 
 import translate as T          # noqa: E402
-import compile_pack as C       # noqa: E402
+from pack import compile_pack as C       # noqa: E402
 import terms_check             # noqa: E402
-import apply_zh_rules as ZH_GEN  # noqa: E402
-import lang_rules  # noqa: E402
-import pr2ctl as P            # noqa: E402
+from text import apply_zh_rules as ZH_GEN  # noqa: E402
+from text import lang_rules  # noqa: E402
+from install import pr2ctl as P  # noqa: E402
 
 
 #: 真实端口，由 main() 在启动前填上。工具窗口靠 /api/health 判断
@@ -948,8 +948,60 @@ def new_lang(code, src):
             pass
         raise
 
-    return {"code": code, "from": src, "aligned": aligned,
-            "dropped": dropped, "filled": filled}
+    result = {"code": code, "from": src, "aligned": aligned,
+              "dropped": dropped, "filled": filled}
+    try:
+        result["presets"] = _font_module().add_language_presets(code, src)
+    except Exception as exc:
+        result["presets_error"] = str(exc)
+    return result
+
+
+# ---------------------------------------------------------------- 字体前置状态
+
+def _font_module():
+    """按需把 src/tools/font 加进 sys.path，返回 subset_fonts 模块。"""
+    fdir = os.path.join(TOOLS, "font")
+    if fdir not in sys.path:
+        sys.path.insert(0, fdir)
+    import subset_fonts
+    return subset_fonts
+
+
+def font_status():
+    """安装页「第一次用」卡片的字体状态（按语言）。"""
+    sf = _font_module()
+    langs = sf.list_presets()
+    base_missing = [n for n in sf.FONTS
+                    if not os.path.isfile(os.path.join(sf.DEFAULT_SRC, n))]
+    rows = []
+    problems = []
+    for lang in langs:
+        donors, _fallback = sf.load_preset(lang)
+        donor_rows = [{"path": sf._resolve(d), "exists": os.path.isfile(sf._resolve(d))}
+                      for d, _idx in donors]
+        built = sum(1 for n in sf.FONTS
+                    if os.path.isfile(os.path.join(sf.DEFAULT_OUT, lang, n)))
+        rows.append({"lang": lang, "donors": donor_rows,
+                     "built": built, "total": len(sf.FONTS)})
+        miss = [d for d in donor_rows if not d["exists"]]
+        if miss:
+            problems.append("%s 缺 %d 个 donor" % (lang, len(miss)))
+    if base_missing:
+        problems.append("缺 %d 个原版字体（需要从游戏导出）" % len(base_missing))
+    if not sf._fonttools():
+        problems.append("缺 fontTools")
+    if not langs:
+        problems.append("没有 presets/<语言>.toml（可从 presets.example.toml 复制）")
+    return {
+        "ok": not problems,
+        "fonttools": bool(sf._fonttools()),
+        "base": {"dir": sf.DEFAULT_SRC, "missing": base_missing,
+                 "total": len(sf.FONTS)},
+        "languages": rows,
+        "problems": problems,
+        "presets_dir": sf.PRESETS_DIR,
+    }
 
 
 # ---------------------------------------------------------------- HTTP
@@ -1079,6 +1131,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/health":
             return self.send_json(health_info())
 
+        if path == "/api/font-status":
+            return self.send_json(font_status())
+
         if path == "/api/server/instances":
             return self.send_json(server_instances())
 
@@ -1086,6 +1141,16 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"editable": T.target_langs(),
                                    "all": T.all_langs(),
                                    "base": T.BASE_LANG})
+
+        if path == "/api/lang-summary":
+            lang = (query.get("lang") or ["zh"])[0]
+            rows = load_all()
+            base = getattr(T, "BASE_LANG", "en.gog_1.1.2.3")
+            total = len(rows)
+            todo = sum(1 for r in rows
+                       if not r.get(lang) or r.get(lang) == r.get(base))
+            return self.send_json({"lang": lang, "total": total,
+                                   "todo": todo, "done": total - todo})
 
         if path == "/api/lang-exists":
             # 输入框一边打字一边问：这个名字能不能用、是不是已经有一份了。
@@ -1326,6 +1391,31 @@ class Handler(BaseHTTPRequestHandler):
 
     def post_api(self, path):
         body = self.read_json()
+
+        if path == "/api/font/export":
+            game = (body.get("dir") or "").strip()
+            if not game:
+                return self.send_json({"ok": False, "error": "先填写游戏目录"})
+            out = os.path.join(os.path.dirname(SRC), "assets", "fonts", "original")
+            script = os.path.join(TOOLS, "font", "extract_fonts.py")
+            proc = subprocess.run(
+                [sys.executable, script, "--game-dir", game, "--out", out],
+                cwd=os.path.dirname(SRC), capture_output=True,
+                text=True, encoding="utf-8", errors="replace")
+            output = (proc.stdout or "") + (proc.stderr or "")
+            return self.send_json({"ok": proc.returncode == 0,
+                                   "output": output,
+                                   "status": font_status()})
+
+        if path == "/api/font/stitch":
+            sf = _font_module()
+            lines = []
+            langs = body.get("langs") or None
+            ok, msg = sf.ensure_fonts(langs=langs,
+                                      force=bool(body.get("force", True)),
+                                      log=lines.append)
+            return self.send_json({"ok": ok, "message": msg, "log": lines,
+                                   "status": font_status()})
 
         if path == "/api/server/stop":
             try:

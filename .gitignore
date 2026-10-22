@@ -213,6 +213,9 @@ test_*.toml
 
 # 从 pr2_loca.cpr 导出的原版字体（纯拉丁，仅作对照，体积大，不进仓库）
 assets/fonts/original/
+# 缝合后的字体是衍生作品（游戏原版字体 + 商业 donor），仅限本地使用，
+# 禁止分发/上传/打包；build/ 本身已忽略，这里再显式标一次。
+build/fonts/
 
 # 本地临时文件（pip 依赖、调试脚本）
 .tmp/
@@ -220,3 +223,7 @@ assets/fonts/original/
 # 分词实验用的额外 venv
 .venv-spacy/
 .venv-hanlp/
+
+# 字体 donor 的个人配置（每个语言一份，路径可能含本机信息），只提交 example
+src/tools/font/fontstitch/presets/
+src/tools/font/fontstitch/presets.toml
