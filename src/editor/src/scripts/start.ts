@@ -3,6 +3,14 @@ const S = { status: null, timer: 0 };
 
     const $ = (id) => document.getElementById(id);
 
+    function toast(msg) {
+      const a = document.getElementById('toast');
+      if (!a) return;
+      a.textContent = msg;
+      if (typeof a.toast === 'function') a.toast();
+      else { a.classList.add('show'); setTimeout(() => a.classList.remove('show'), 1800); }
+    }
+
     async function api(path, body) {
       const opt = body === undefined ? {} : {
         method: 'POST',
@@ -53,7 +61,7 @@ const S = { status: null, timer: 0 };
       try {
         fillStatus(await api('/api/start/status'));
       } catch (err) {
-        $('dirMsg').textContent = '读取状态失败：' + err.message;
+        toast('读取状态失败：' + err.message);
       }
     }
 
@@ -90,7 +98,7 @@ const S = { status: null, timer: 0 };
                 const st = await api('/api/start/use', { sha: it.sha });
                 fillStatus(st);
                 await loadDirs();
-              } catch (err) { $('dirMsg').textContent = (err as Error).message; }
+              } catch (err) { toast((err as Error).message); }
             });
             actions.appendChild(use);
           }
@@ -104,7 +112,7 @@ const S = { status: null, timer: 0 };
             try {
               await api('/api/start/forget', { sha: it.sha });
               await loadDirs();
-            } catch (err) { $('dirMsg').textContent = (err as Error).message; }
+            } catch (err) { toast((err as Error).message); }
           });
           actions.appendChild(forget);
           li.appendChild(actions);
@@ -116,16 +124,16 @@ const S = { status: null, timer: 0 };
     }
 
     async function saveDir() {
-      $('dirMsg').textContent = '检测中…';
+      toast('检测中…');
       try {
         const st = await api('/api/start/dir', { path: $('dir').value.trim() });
         fillStatus(st);
         const savedDir = st.dir || $('dir').value.trim();
         const savedVer = st.version || '未知版本';
-        $('dirMsg').textContent = '已记住：' + savedDir + '（' + savedVer + '）';
+        toast('已记住：' + savedDir + '（' + savedVer + '）');
         await loadDirs();
       } catch (err) {
-        $('dirMsg').textContent = err.message;
+        toast(err.message);
       }
     }
 
@@ -163,13 +171,13 @@ const S = { status: null, timer: 0 };
     }
 
     $('browseDir').addEventListener('click', async () => {
-      $('dirMsg').textContent = '等待选择目录…';
+      toast('等待选择目录…');
       try {
         const r = await api('/api/start/pick', {});
         $('dir').value = r.path;
         await saveDir();
       } catch (err) {
-        $('dirMsg').textContent = (err as Error).message;
+        toast((err as Error).message);
       }
     });
 

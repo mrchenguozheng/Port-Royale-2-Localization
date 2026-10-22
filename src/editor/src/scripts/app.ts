@@ -495,7 +495,7 @@ async function filter() {
     await renderPage(1);
   } catch (err) {
     // 别再把失败咽掉：列表清空、条数不动，看着像「搜索没反应」。
-    $('stat').textContent = '搜索失败：' + (err as Error).message;
+    toast('搜索失败：' + (err as Error).message);
   } finally {
     S.loading = false;
     setLoading(false);
@@ -631,7 +631,7 @@ async function editMeaning(id: string, token: string, cur: string) {
     void loadEntryInfo(id);
   } catch (err) {
     const box = document.getElementById('infoBar');
-    if (box) box.textContent = '含义保存失败：' + (err as Error).message;
+    toast('含义保存失败：' + (err as Error).message);
   }
 }
 
@@ -669,7 +669,7 @@ async function openRules(id: string) {
     }
     ($('ruleModal') as any).show?.();
   } catch (err) {
-    $('stat').textContent = '规则轨迹读取失败：' + (err as Error).message;
+    toast('规则轨迹读取失败：' + (err as Error).message);
   }
 }
 
@@ -687,7 +687,7 @@ async function openSeed(id: string) {
     ($('seedModal') as any).show?.();
     ta.focus();
   } catch (err) {
-    $('stat').textContent = '读取初版失败：' + (err as Error).message;
+    toast('读取初版失败：' + (err as Error).message);
   }
 }
 
@@ -708,7 +708,7 @@ async function saveSeed() {
     ($('seedSave') as HTMLButtonElement).disabled = true;
     $('seedLockInfo').textContent = '初版已保存，已重新锁定。工作文本未变。';
   } catch (err) {
-    $('seedLockInfo').textContent = '保存失败：' + (err as Error).message;
+    toast('保存失败：' + (err as Error).message);
   }
 }
 
@@ -729,7 +729,7 @@ async function setTermRule(id: string, term: string, skip: boolean) {
     updateStat();
   } catch (err) {
     const box = document.getElementById('infoBar');
-    if (box) box.textContent = '规则保存失败：' + (err as Error).message;
+    toast('规则保存失败：' + (err as Error).message);
   }
 }
 
@@ -839,7 +839,7 @@ async function loadEntryInfo(id: string) {
       box.appendChild(el('span', 'info-tag', '标记：' + r.tags.join('、')));
     }
   } catch (err) {
-    box.textContent = '提示读取失败：' + (err as Error).message;
+    toast('提示读取失败：' + (err as Error).message);
   }
 }
 
@@ -1347,7 +1347,7 @@ async function save() {
     updateStat();
     $('stat').textContent = `已保存 ${r.changed} 处（共 ${r.written} 条）`;
   } catch (err) {
-    $('stat').textContent = '保存失败：' + (err as Error).message;
+    toast('保存失败：' + (err as Error).message);
   }
 }
 
@@ -1757,7 +1757,7 @@ async function openCtx(id: string) {
       }
     }
   } catch (err) {
-    body.textContent = '读取失败：' + (err as Error).message;
+    toast('读取失败：' + (err as Error).message);
   }
 }
 
