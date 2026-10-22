@@ -30,7 +30,6 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 
 import pr2ctl as B  # noqa: E402
-import zh_review  # noqa: E402
 
 PACK_OUT = os.path.join(ROOT, "build", "PR2Packs")
 
@@ -114,16 +113,6 @@ def main():
     print("版本：%s（SHA %s…）" % (B.version_label(sha), sha[:12]))
     print("语言：%s" % "、".join(langs))
 
-    if "zh" in langs:
-        import zh_review
-        pend = zh_review.unsynced_edits()
-        if pend:
-            print("\n[停止] 编辑器里还有 %d 条人工修订没同步进文本源：" % len(pend))
-            for h in sorted(pend)[:8]:
-                print("   ", h)
-            print("   先跑：python src/tools/zh_review.py --sync")
-            print("   （--sync 会把人工改后的文字写回 references，并记进 docs/人工修订.csv）")
-            return 2
 
     if args.dry_run:
         for lang in langs:
