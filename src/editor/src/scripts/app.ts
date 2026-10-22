@@ -699,6 +699,11 @@ async function loadEntryInfo(id: string) {
       if (c.en > 1) chip.appendChild(el('span', 'ph-x', '×' + c.en));
       chip.appendChild(el('span', 'ph-tok', c.token));
       chip.appendChild(el('span', 'ph-mean', meaning.get(c.token) || '原文没有'));
+      const editMean = el('button', 'mini ph-btn', '改');
+      editMean.title = '修改这个占位符在本条里的含义';
+      editMean.addEventListener('click', () =>
+        void editMeaning(id, c.token, meaning.get(c.token) || ''));
+      chip.appendChild(editMean);
       box.appendChild(chip);
     }
     if (badCount) {
@@ -1056,11 +1061,13 @@ function highlightSpaces(text: string): DocumentFragment {
 const TOKEN_RX = /@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]/g;
 
 function tokenSpan(tok: string): HTMLElement {
-  const span = el('span', 'ph-token', tok);
+  const span = el('span', 'ph-token');
   span.contentEditable = 'false';
   span.setAttribute('contenteditable', 'false');
   span.draggable = true;
   span.dataset.token = tok;
+  const tokNode = el('span', 'ph-tok-node', tok);
+  span.appendChild(tokNode);
   const meaning = S.curMeaning.get(tok);
   if (meaning) setTokenMeaning(span, tok, meaning);
   span.title = '拖动可换位置；占位符不能删除';
@@ -1077,30 +1084,21 @@ function tokenSpan(tok: string): HTMLElement {
 }
 
 function setTokenMeaning(span: HTMLElement, tok: string, meaning: string) {
-  let wrap = span.querySelector('.ph-mean-inline') as HTMLElement | null;
-  if (!wrap) {
-    wrap = el('span', 'ph-mean-inline');
-    wrap.contentEditable = 'false';
-    wrap.appendChild(el('span', 'ph-mean-text'));
-    const btn = el('button', 'ph-mean-btn', '改');
-    (btn as HTMLButtonElement).type = 'button';
-    (btn as HTMLButtonElement).tabIndex = -1;
-    btn.draggable = false;
-    btn.title = '修改这个占位符的含义';
-    btn.addEventListener('mousedown', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-    });
-    btn.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      void editMeaning(S.curId, tok, S.curMeaning.get(tok) || '');
-    });
-    wrap.appendChild(btn);
-    span.appendChild(wrap);
+  const tokNode = span.querySelector('.ph-tok-node') as HTMLElement | null;
+  let mi = span.querySelector('.ph-mean-inline') as HTMLElement | null;
+  if (!meaning) {
+    if (mi) mi.remove();
+    if (tokNode) tokNode.classList.remove('hide');
+    return;
   }
-  const text = wrap.querySelector('.ph-mean-text') as HTMLElement | null;
-  if (text) text.textContent = meaning;
+  if (tokNode) tokNode.classList.add('hide');
+  if (!mi) {
+    mi = el('span', 'ph-mean-inline');
+    mi.contentEditable = 'false';
+    span.appendChild(mi);
+  }
+  mi.textContent = meaning;
+  mi.title = tok;
 }
 
 function renderRich(text: string): DocumentFragment {

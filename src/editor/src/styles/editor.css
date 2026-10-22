@@ -1338,10 +1338,3 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   font-family: system-ui, sans-serif;
   user-select: none;
 }
-.ph-token .ph-mean-btn {
-  border: 1px solid var(--line); background: transparent;
-  color: var(--fg-dim); border-radius: 3px;
-  font-size: 0.9em; line-height: 1.1; padding: 0 0.25rem;
-  cursor: pointer;
-}
-.ph-token .ph-mean-btn:hover { color: var(--accent); border-color: var(--accent); }
