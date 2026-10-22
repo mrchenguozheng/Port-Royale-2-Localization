@@ -519,6 +519,44 @@ async function revertClean(id: string) {
 
 let seedId = '';
 
+function diffNodes(a: string, b: string): DocumentFragment {
+  const f = document.createDocumentFragment();
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
+  let j = 0;
+  while (j < a.length - i && j < b.length - i &&
+         a[a.length - 1 - j] === b[b.length - 1 - j]) j += 1;
+  f.appendChild(document.createTextNode(b.slice(0, i)));
+  const mark = document.createElement('mark');
+  mark.textContent = b.slice(i, b.length - j);
+  f.appendChild(mark);
+  f.appendChild(document.createTextNode(b.slice(b.length - j)));
+  return f;
+}
+
+async function openRules(id: string) {
+  try {
+    const r = await api<{ stages: { label: string; text: string }[] }>(
+      `/api/rule-trace?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
+    $('ruleTitle').textContent = '规则轨迹 · ' + id;
+    const box = $('ruleStages');
+    box.innerHTML = '';
+    let prev: string | null = null;
+    for (const st of r.stages) {
+      const row = el('div', 'rule-stage');
+      row.appendChild(el('div', 'rule-label', st.label));
+      const body = el('div', 'rule-text');
+      body.appendChild(prev === null ? document.createTextNode(st.text) : diffNodes(prev, st.text));
+      row.appendChild(body);
+      box.appendChild(row);
+      prev = st.text;
+    }
+    $('ruleModal').hidden = false;
+  } catch (err) {
+    $('stat').textContent = '规则轨迹读取失败：' + (err as Error).message;
+  }
+}
+
 async function openSeed(id: string) {
   try {
     const r = await api<{ text: string }>(
@@ -639,6 +677,10 @@ async function loadEntryInfo(id: string) {
     }
 
     const actions = el('span', 'info-actions');
+    const ruleBtn = el('button', 'mini', '规则');
+    ruleBtn.title = '查看这条译文逐阶段套用的格式化规则';
+    ruleBtn.addEventListener('click', () => void openRules(id));
+    actions.appendChild(ruleBtn);
     const undoBtn = el('button', 'mini', '撤销');
     undoBtn.title = '撤销上一次编辑';
     undoBtn.addEventListener('click', () => undoEdit(id));
@@ -1580,6 +1622,10 @@ async function openCtx(id: string) {
   }
 }
 
+$('ruleClose').addEventListener('click', () => { $('ruleModal').hidden = true; });
+$('ruleModal').addEventListener('click', (ev) => {
+  if (ev.target === $('ruleModal')) $('ruleModal').hidden = true;
+});
 $('seedUnlock').addEventListener('click', () => void unlockSeed());
 $('seedSave').addEventListener('click', () => void saveSeed());
 $('seedClose').addEventListener('click', closeSeed);

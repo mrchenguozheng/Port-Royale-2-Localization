@@ -1335,3 +1335,11 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 
 .seed-inline .ref-head { display: flex; align-items: center; gap: 0.5rem; }
 .seed-inline .seed-edit { margin-left: auto; }
+
+.rule-stages { display: flex; flex-direction: column; gap: 0.5rem; max-height: 60vh; overflow: auto; }
+.rule-stage .rule-label { color: var(--fg-dim); font-size: 0.8em; }
+.rule-stage .rule-text {
+  font-family: var(--font-mono); font-size: 0.92em; white-space: pre-wrap;
+  background: var(--bg-row-alt); border-radius: 4px; padding: 0.3rem 0.5rem;
+}
+.rule-stage mark { background: rgba(255, 170, 0, 0.28); color: var(--fg); }

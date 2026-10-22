@@ -68,6 +68,7 @@ import compile_pack as C       # noqa: E402
 import terms_check             # noqa: E402
 import zh_review              # noqa: E402
 import apply_zh_rules as ZH_GEN  # noqa: E402
+import lang_rules  # noqa: E402
 import pr2ctl as P            # noqa: E402
 
 
@@ -191,6 +192,42 @@ def server_instances():
         info["current"] = port == CURRENT_PORT
         out.append(info)
     return {"current": CURRENT_PORT, "instances": out}
+
+
+def rule_trace(hid, lang):
+    """逐阶段还原这条译文经过的格式化规则。"""
+    seed_path = os.path.join(os.path.dirname(SRC), "src", "seed", "%s.toml" % lang)
+    if not os.path.isfile(seed_path):
+        return None
+    doc = tomllib.load(open(seed_path, "rb"))
+    if hid not in doc:
+        return None
+    seed = doc[hid]
+    rules = lang_rules.get(lang)
+    stages = [{"key": "seed", "label": "初版", "text": seed}]
+
+    if lang == "zh":
+        norm = rules.normalize(seed)
+        stages.append({"key": "punct", "label": "标点规范化", "text": norm})
+        conj = ZH_GEN.fix_conj(norm)
+        stages.append({"key": "conj", "label": "连词后空格", "text": conj})
+        given, surn, extras, towns = ZH_GEN.build_names(doc)
+        parts = ZH_GEN.TAG.split(conj)
+        res = []
+        for i, part in enumerate(parts):
+            if i % 2 == 1 or not part:
+                res.append(part)
+                continue
+            spans = ZH_GEN.find_names(part, given, surn, extras + towns)
+            res.append(ZH_GEN.pad_names(part, spans, towns) if spans else part)
+        stages.append({"key": "names", "label": "人名/城镇名空格", "text": "".join(res)})
+    else:
+        stages.append({"key": "punct", "label": "规范化",
+                       "text": rules.normalize(seed)})
+
+    live = {r["id"]: r.get(lang, "") for r in load_all()}.get(hid, "")
+    stages.append({"key": "live", "label": "当前译文", "text": live})
+    return stages
 
 
 def known_dirs():
@@ -1159,6 +1196,14 @@ class Handler(BaseHTTPRequestHandler):
                     out[hid] = c
             return self.send_json(out)
 
+        if path == "/api/rule-trace":
+            hid = (query.get("id") or [""])[0]
+            lang = (query.get("lang") or ["zh"])[0]
+            stages = rule_trace(hid, lang)
+            if stages is None:
+                return self.send_json({"detail": "没有初版或条目"}, 404)
+            return self.send_json({"id": hid, "stages": stages})
+
         if path == "/api/seed":
             hid = (query.get("id") or [""])[0]
             lang = (query.get("lang") or ["zh"])[0]
@@ -1485,6 +1530,14 @@ class Handler(BaseHTTPRequestHandler):
             lang = body.get("lang", "")
             return self.send_json({"ok": True,
                                    "written": save_all(lang, rows_of(body))})
+
+        if path == "/api/rule-trace":
+            hid = (query.get("id") or [""])[0]
+            lang = (query.get("lang") or ["zh"])[0]
+            stages = rule_trace(hid, lang)
+            if stages is None:
+                return self.send_json({"detail": "没有初版或条目"}, 404)
+            return self.send_json({"id": hid, "stages": stages})
 
         if path == "/api/seed":
             lang = body.get("lang", "zh")
