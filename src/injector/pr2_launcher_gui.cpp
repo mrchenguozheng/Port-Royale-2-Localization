@@ -253,10 +253,14 @@ static void ReadPackMeta(const char* path, char* alias, int acap,
     FILE* f = fopen(path, "rb");
     if (!f) return;
     char line[1024];
-    while (fgets(line, sizeof(line), f)) {
+    for (int n = 0; n < 64 && fgets(line, sizeof(line), f); n++) {
         char* p = line;
         Trim(p);
-        if (strncmp(p, "# pack-meta ", 12) != 0) continue;
+        if (!*p || *p == ';') continue;
+        if (strncmp(p, "# pack-meta ", 12) != 0) {
+            if (*p == '#') continue;
+            break;              /* 第一条 hash = text 之后不再读 */
+        }
         p += 12;
         char* eq = strchr(p, '=');
         if (!eq) continue;
