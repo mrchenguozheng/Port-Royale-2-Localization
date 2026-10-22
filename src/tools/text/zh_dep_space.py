@@ -156,7 +156,7 @@ def main():
             rows.append((k, text, new))
 
     print("段落 ≥%d 字：改动 %d 条，补 %d 个空格" % (args.min_chars, len(rows), total))
-    out = args.out or os.path.join(ROOT, "docs", "csv", "zh-dep-space.csv")
+    out = args.out or os.path.join(ROOT, "docs", "csv", "generated", "zh-dep-space.csv")
     with io.open(out, "w", encoding="utf-8-sig", newline="") as fh:
         wr = csv.writer(fh)
         wr.writerow(["hash", "old", "new"])

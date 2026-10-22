@@ -3,7 +3,7 @@
 
 输出：
   docs/说话人分级.md       —— 方法、统计、分级示例
-  docs/csv/speaker-audit.csv   —— 逐条：hash / 级别 / 类别 / 规则 / 人称 / 英文 / 法文
+  docs/csv/analysis/speaker-audit.csv   —— 逐条：hash / 级别 / 类别 / 规则 / 人称 / 英文 / 法文
 
 分级（2026-10-21 收紧定义）：
   A 确定   —— 文本直接写明身份：落款、自称、头衔标签
@@ -194,7 +194,7 @@ def build_rows():
 
 
 def write_csv(rows):
-    path = os.path.join(DOCS, "csv", "speaker-audit.csv")
+    path = os.path.join(DOCS, "csv", "analysis", "speaker-audit.csv")
     key = lambda r: (r["tier"], ORDER.index(r["category"]) if r["category"] in ORDER else 99, r["hash"])
     cols = ["hash", "tier", "category", "rule", "person", "kind", "family", "family_size",
             "family_role", "en", "fr", "keep", "evidence"]
@@ -211,7 +211,7 @@ def write_md(rows):
     A = [r for r in rows if r["tier"] == "A"]
 
     L = ["# 说话人分级（只依据英/法原文）", "",
-         "> 自动生成：`python src/tools/analysis/speaker_audit.py`。逐条明细：[speaker-audit.csv](csv/speaker-audit.csv)。",
+         "> 自动生成：`python src/tools/analysis/speaker_audit.py`。逐条明细：[speaker-audit.csv](csv/analysis/speaker-audit.csv)。",
          "> 判定只使用**英语**和**法语**原文。日语是我们自己译的，用它反推说话人是循环论证，所以不参与。", "",
          "## 分级定义", "",
          "| 级别 | 含义 | 条数 |", "|---|---|---|",

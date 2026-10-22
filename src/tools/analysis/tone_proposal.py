@@ -2,13 +2,13 @@
 """生成「语体拟改清单」：只列能判定的，其余标成待人工确认。
 
 输入：
-  docs/csv/speaker-audit.csv   （说话人分级）
-  docs/csv/voice-hash-map.csv  （语音↔hash↔NPC，副王 35 条台词）
+  docs/csv/analysis/speaker-audit.csv   （说话人分级）
+  docs/csv/voice/voice-hash-map.csv  （语音↔hash↔NPC，副王 35 条台词）
   src/live/ja.toml
 
 输出：
   docs/语体拟改清单.md
-  docs/csv/tone-proposal.csv
+  docs/csv/analysis/tone-proposal.csv
 """
 
 import csv
@@ -58,8 +58,8 @@ def style(t):
 
 
 def load():
-    audit = list(csv.DictReader(io.open(os.path.join(DOCS, "csv", "speaker-audit.csv"), encoding="utf-8-sig")))
-    voice = list(csv.DictReader(io.open(os.path.join(DOCS, "csv", "voice-hash-map.csv"), encoding="utf-8-sig")))
+    audit = list(csv.DictReader(io.open(os.path.join(DOCS, "csv", "analysis", "speaker-audit.csv"), encoding="utf-8-sig")))
+    voice = list(csv.DictReader(io.open(os.path.join(DOCS, "csv", "voice", "voice-hash-map.csv"), encoding="utf-8-sig")))
     ja = tomllib.load(open(os.path.join(ROOT, "src", "live", "ja.toml"), "rb"))
     return audit, voice, ja
 
@@ -131,7 +131,7 @@ def main():
                 "ja": t,
             })
 
-    out = os.path.join(DOCS, "csv", "tone-proposal.csv")
+    out = os.path.join(DOCS, "csv", "analysis", "tone-proposal.csv")
     cols = ["batch", "hash", "category", "family", "person", "current_style",
             "action", "proposed", "why", "en", "ja"]
     with io.open(out, "w", encoding="utf-8-sig", newline="") as fh:
@@ -152,7 +152,7 @@ def main():
     cat_stats = {c: (len(v), sum(1 for r in v if r["person"] == "第1人称")) for c, v in by_cat.items()}
 
     L = ["# 语体拟改清单（待确认，尚未改动）", "",
-         "> 生成：`python src/tools/analysis/tone_proposal.py`；逐条：[tone-proposal.csv](csv/tone-proposal.csv)。",
+         "> 生成：`python src/tools/analysis/tone_proposal.py`；逐条：[tone-proposal.csv](csv/analysis/tone-proposal.csv)。",
          "> 依据：[说话人分级](说话人分级.md) + 语音表（[语音映射](语音映射.md)）。", "",
          "## 一句话结论", "",
          "| 批次 | 范围 | 可自动判定 | 结论 |", "|---|---|---|---|",
@@ -189,7 +189,7 @@ def main():
           "所以自动批改会把官员的台词降成常体。", "",
           "建议的复核方式：只看 **person = 第1人称** 且 **category 属于海盗/酒馆** 的条目，"
           "这些才可能是该角色本人在说话：", "", "```bash",
-          "python -c \"import csv,io;rows=[r for r in csv.DictReader(io.open('docs/csv/speaker-audit.csv',encoding='utf-8-sig')) if r['person']=='第1人称' and r['category'] in ('海盗/私掠','酒馆/醉汉')];print(len(rows))\"",
+          "python -c \"import csv,io;rows=[r for r in csv.DictReader(io.open('docs/csv/analysis/speaker-audit.csv',encoding='utf-8-sig')) if r['person']=='第1人称' and r['category'] in ('海盗/私掠','酒馆/醉汉')];print(len(rows))\"",
           "```", "", "## 第三批：模板族一致性", "",
           "共 **%d 族**（≥3 条），逐族比对「敬体/常体」，**风格混杂的 %d 族**——"
           "说明同一套模板的译文语气本来就是统一的，不需要按族批量改。" % (len(fam), mixed), ""]

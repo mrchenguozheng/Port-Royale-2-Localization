@@ -45,7 +45,7 @@ def rules_path(lang):
 
 
 def report_path(lang):
-    return os.path.join(ROOT, "docs", "csv", "占位符语义.%s.csv" % lang)
+    return os.path.join(ROOT, "docs", "csv", "analysis", "占位符语义.%s.csv" % lang)
 
 PAIR = re.compile(r"%0?(\d+)([ \u3000・]*)(%0?(\d+))")
 TITLES = ("Governor", "Captain", "Viceroy", "King", "Queen", "Prince",
