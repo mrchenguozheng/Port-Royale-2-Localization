@@ -1335,9 +1335,16 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .cell-zh .edit .hl-sp.hit-names { background: rgba(80, 200, 120, 0.35); }
 
 .ph-token .ph-mean-inline {
-  margin-left: 0.3rem; padding-right: 0.1rem;
+  margin-left: 0.3rem;
+  display: inline-flex; align-items: center; gap: 0.2rem;
   color: var(--fg-dim); font-size: 0.82em;
   font-family: system-ui, sans-serif;
-  cursor: pointer; user-select: none;
+  user-select: none;
 }
-.ph-token .ph-mean-inline:hover { color: var(--accent); text-decoration: underline; }
+.ph-token .ph-mean-btn {
+  border: 1px solid var(--line); background: transparent;
+  color: var(--fg-dim); border-radius: 3px;
+  font-size: 0.9em; line-height: 1.1; padding: 0 0.25rem;
+  cursor: pointer;
+}
+.ph-token .ph-mean-btn:hover { color: var(--accent); border-color: var(--accent); }

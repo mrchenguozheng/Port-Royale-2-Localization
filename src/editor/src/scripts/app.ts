@@ -1116,19 +1116,30 @@ function tokenSpan(tok: string): HTMLElement {
 }
 
 function setTokenMeaning(span: HTMLElement, tok: string, meaning: string) {
-  let mi = span.querySelector('.ph-mean-inline') as HTMLElement | null;
-  if (!mi) {
-    mi = el('span', 'ph-mean-inline');
-    mi.contentEditable = 'false';
-    mi.title = '点击修改含义';
-    mi.addEventListener('mousedown', (ev) => ev.preventDefault());
-    mi.addEventListener('click', (ev) => {
+  let wrap = span.querySelector('.ph-mean-inline') as HTMLElement | null;
+  if (!wrap) {
+    wrap = el('span', 'ph-mean-inline');
+    wrap.contentEditable = 'false';
+    wrap.appendChild(el('span', 'ph-mean-text'));
+    const btn = el('button', 'ph-mean-btn', '改');
+    (btn as HTMLButtonElement).type = 'button';
+    (btn as HTMLButtonElement).tabIndex = -1;
+    btn.draggable = false;
+    btn.title = '修改这个占位符的含义';
+    btn.addEventListener('mousedown', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    btn.addEventListener('click', (ev) => {
+      ev.preventDefault();
       ev.stopPropagation();
       void editMeaning(S.curId, tok, S.curMeaning.get(tok) || '');
     });
-    span.appendChild(mi);
+    wrap.appendChild(btn);
+    span.appendChild(wrap);
   }
-  mi.textContent = meaning;
+  const text = wrap.querySelector('.ph-mean-text') as HTMLElement | null;
+  if (text) text.textContent = meaning;
 }
 
 function renderRich(text: string, hits?: Hit[]): DocumentFragment {
