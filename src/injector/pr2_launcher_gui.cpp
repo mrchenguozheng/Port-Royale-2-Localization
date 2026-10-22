@@ -143,8 +143,9 @@ static const wchar_t* TF(const char* key, ...) {
     return W(buf);
 }
 
-static void ReadLauncherLang(char* out, int cap) {
+static void ReadLauncherValue(const char* key, char* out, int cap) {
     char path[MAX_PATH], line[512];
+    int klen = (int)strlen(key);
     out[0] = 0;
     snprintf(path, sizeof(path), "%s\\launcher.ini", g_root);
     FILE* f = fopen(path, "rb");
@@ -152,8 +153,8 @@ static void ReadLauncherLang(char* out, int cap) {
     while (fgets(line, sizeof(line), f)) {
         char* p = line;
         Trim(p);
-        if (strncmp(p, "ui_language", 11) != 0) continue;
-        p += 11;
+        if (strncmp(p, key, klen) != 0) continue;
+        p += klen;
         while (*p == ' ' || *p == '\t') p++;
         if (*p != '=') continue;
         p++;
@@ -165,6 +166,43 @@ static void ReadLauncherLang(char* out, int cap) {
         break;
     }
     fclose(f);
+}
+
+static void ReadLauncherLang(char* out, int cap) {
+    ReadLauncherValue("ui_language", out, cap);
+}
+
+static void SaveLauncherValue(const char* key, const char* value) {
+    char path[MAX_PATH], tmp[MAX_PATH], line[1024];
+    snprintf(path, sizeof(path), "%s\\launcher.ini", g_root);
+    snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+    int klen = (int)strlen(key);
+    int replaced = 0;
+    FILE* in = fopen(path, "rb");
+    FILE* out = fopen(tmp, "wb");
+    if (!out) { if (in) fclose(in); return; }
+    if (in) {
+        while (fgets(line, sizeof(line), in)) {
+            char probe[1024];
+            strncpy(probe, line, sizeof(probe) - 1);
+            probe[sizeof(probe) - 1] = 0;
+            Trim(probe);
+            if (strncmp(probe, key, klen) == 0) {
+                char* p = probe + klen;
+                while (*p == ' ' || *p == '\t') p++;
+                if (*p == '=') {
+                    fprintf(out, "%s=%s\n", key, value);
+                    replaced = 1;
+                    continue;
+                }
+            }
+            fputs(line, out);
+        }
+        fclose(in);
+    }
+    if (!replaced) fprintf(out, "%s=%s\n", key, value);
+    fclose(out);
+    if (!MoveFileExA(tmp, path, MOVEFILE_REPLACE_EXISTING)) remove(tmp);
 }
 
 static void AddAlias(const char* code, const char* name) {
@@ -380,7 +418,19 @@ static void LoadLanguages(void) {
     }
 
     int sel = 0;
-    if (ReadLocale(current, sizeof(current))) {
+    int foundLast = 0;
+    char last[64];
+    ReadLauncherValue("last_language", last, sizeof(last));
+    if (last[0]) {
+        for (int i = 0; i < g_codeCount; i++) {
+            if (_stricmp(g_codes[i], last) == 0) {
+                sel = i;
+                foundLast = 1;
+                break;
+            }
+        }
+    }
+    if (!foundLast && ReadLocale(current, sizeof(current))) {
         for (int i = 0; i < g_codeCount; i++) {
             if (_stricmp(g_codes[i], current) == 0) { sel = i; break; }
         }
@@ -427,6 +477,7 @@ static void Launch(const char* lang, int vanilla) {
     if (code != 0) {
         MessageBoxW(NULL, TF("error.exit_code", code), T("title"), MB_ICONERROR);
     } else {
+        if (!vanilla && lang && *lang) SaveLauncherValue("last_language", lang);
         SetWindowTextW(g_status, vanilla ? T("status.vanilla") : T("status.launched"));
     }
 }
