@@ -419,7 +419,7 @@ function drawSideList() {
   box.innerHTML = '';
   const frag = document.createDocumentFragment();
   sideItems.forEach((it, i) => {
-    const d = el('div', 'list-item' + (it.reviewed ? ' done' : ''));
+    const d = el('div', 'list-item');
     d.dataset.id = it.id;
     const head = el('div', 'li-head');
     head.appendChild(el('span', 'li-no', '#' + (i + 1)));

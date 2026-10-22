@@ -986,7 +986,6 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 }
 .list-item:hover { background: var(--bg-row); }
 .list-item.active { background: var(--accent-soft); border-left: 3px solid var(--accent); }
-.list-item.done .li-id::after { content: " ✓"; color: var(--ok); }
 .li-id { font-family: var(--font-mono); font-size: 0.75em; color: var(--fg-id); }
 .li-text {
   font-size: 0.78em;
