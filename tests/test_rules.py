@@ -26,6 +26,12 @@ class TestZhRules(unittest.TestCase):
         out = zh.normalize("支付 @g$TotalPrice$ 元")
         self.assertIn("@g$TotalPrice$", out)
 
+    def test_space_dash(self):
+        self.assertEqual(ZH.space_dash("关头—— 就在"), "关头 —— 就在")
+        self.assertEqual(ZH.space_dash("关头 —— 就在"), "关头 —— 就在")
+        self.assertEqual(ZH.space_dash("—— 开头"), "—— 开头")
+        self.assertEqual(ZH.space_dash("范围 1554 — 1618"), "范围 1554 — 1618")
+
     def test_space_years(self):
         self.assertEqual(ZH.space_years("约1554 — 1618年"), "约 1554 — 1618 年")
         self.assertEqual(ZH.space_years("在1502 年"), "在 1502 年")

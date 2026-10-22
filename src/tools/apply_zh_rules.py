@@ -183,6 +183,16 @@ def space_years(text):
     return "".join(parts)
 
 
+def space_dash(text):
+    """中文破折号 —— 的前后各留一个空格（段首/段尾除外）。"""
+    def repl(m):
+        pre = " " if m.start() > 0 else ""
+        post = " " if m.end() < len(text) else ""
+        return pre + "——" + post
+
+    return re.sub(r" *—— *", repl, text)
+
+
 def space_before_double_break(text):
     """<n><n> 前必须有一个空格（段首除外）。"""
     if text.startswith("<n><n>"):
@@ -216,7 +226,7 @@ def generate():
                 continue
             spans = find_names(part, given, surn, extras + towns)
             res.append(pad_names(part, spans, towns) if spans else part)
-        c = space_before_double_break(space_years("".join(res)))
+        c = space_before_double_break(space_dash(space_years("".join(res))))
         stats["punct"] += a != text
         stats["conj"] += b != a
         stats["name"] += c != b
