@@ -59,3 +59,53 @@ note = "思源 Heavy 缺字用宋体补"
 # 只有配置了语言时才启用。
 [fallback]
 donor_file = "%WINDIR%\\Fonts\\NotoSansJP-VF.ttf"
+
+[ja]
+
+[[ja.pair]]
+id = "arial"
+game = "Arial"
+game_file = "ARIAL.TTF"
+donor = "微软雅黑"
+donor_file = "%WINDIR%\\Fonts\\msyh.ttc"
+donor_index = 0
+note = "日语正文/UI；与 Arial 同为 2048 UPM"
+
+[[ja.pair]]
+id = "elgreco"
+game = "ElGreco"
+game_file = "ELGRECO_.TTF"
+donor = "Noto Serif JP"
+donor_file = "%WINDIR%\\Fonts\\NotoSerifJP-VF.ttf"
+note = "日语衬线，配装饰标题"
+
+[[ja.pair]]
+id = "tiepolo-black"
+game = "Tiepolo-Black"
+game_file = "Tiepolo_black.ttf"
+donor = "Noto Serif JP"
+donor_file = "%WINDIR%\\Fonts\\NotoSerifJP-VF.ttf"
+note = "日语衬线，字重接近"
+
+[[ja.pair]]
+id = "tiepolo-bold"
+game = "Tiepolo-Bold"
+game_file = "Tiepolo_bold.ttf"
+donor = "Noto Serif JP"
+donor_file = "%WINDIR%\\Fonts\\NotoSerifJP-VF.ttf"
+note = "日语衬线"
+
+[[ja.supplement]]
+game_file = "ELGRECO_.TTF"
+donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
+note = "Noto Serif JP 缺字补"
+
+[[ja.supplement]]
+game_file = "Tiepolo_black.ttf"
+donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
+note = "Noto Serif JP 缺字补"
+
+[[ja.supplement]]
+game_file = "Tiepolo_bold.ttf"
+donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
+note = "Noto Serif JP 缺字补"
