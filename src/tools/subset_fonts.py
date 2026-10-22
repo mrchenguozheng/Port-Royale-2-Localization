@@ -313,12 +313,48 @@ def ensure_fonts(out_dir=None, src=None, log=None, force=False):
     return True, "字体已重新缝合（%d 个用字）" % len(chars)
 
 
+def check_prereqs(src=None):
+    """检查缝合字体需要的前置条件；返回 (信息行, 问题行)。"""
+    src = src or os.environ.get("PR2_ORIG_FONTS") or DEFAULT_SRC
+    langs, donors, fallback = _presets()
+    info, bad = [], []
+    info.append("已配置语言：%s" % ("、".join(langs) if langs else "（无）"))
+    if not langs:
+        bad.append("presets.toml 里没有任何 [语言] 段，不会缝合任何字体")
+    for name in FONTS:
+        base = os.path.join(src, name)
+        if not os.path.isfile(base):
+            bad.append("缺原版字体 %s（用 extract_fonts.py 从游戏导出）" % base)
+        for donor, _idx in donors.get(name, []):
+            p = _resolve(donor)
+            if not os.path.isfile(p):
+                bad.append("缺 donor %s（%s 需要）" % (p, name))
+    if not _fonttools():
+        bad.append("缺 fontTools（pip install fonttools，或设 PR2_FONTTOOLS_SITE）")
+    if fallback:
+        p = _resolve(fallback[0])
+        if not os.path.isfile(p):
+            info.append("兜底 donor 不存在（非必需）：%s" % p)
+    return info, bad
+
+
 def main():
     ap = argparse.ArgumentParser(description="用 fontstitch 给原版字体补中文字形")
     ap.add_argument("--src", default="", help="原版拉丁字体目录")
     ap.add_argument("--out", default=DEFAULT_OUT, help="输出目录（默认 build\\fonts）")
     ap.add_argument("--force", action="store_true", help="忽略缓存，强制重缝")
+    ap.add_argument("--check", action="store_true", help="只检查前置条件，不写文件")
     args = ap.parse_args()
+    if args.check:
+        info, bad = check_prereqs(args.src or None)
+        for line in info:
+            print(line)
+        for line in bad:
+            print("缺少：" + line)
+        if bad:
+            return 1
+        print("字体缝合前置条件齐全。")
+        return 0
     ok, msg = ensure_fonts(out_dir=args.out, src=args.src or None,
                            log=print, force=args.force)
     print(msg)
