@@ -8,7 +8,7 @@ r"""pr2ctl.core — Port Royale 2 本地化工具的核心逻辑（无 UI 依赖
 一个窗口分三段，段号就是步骤号：
 
 界面无关：版本识别、构建、部署、启动、设置读写都在这里。
-tkinter 窗口（build_install.py）只负责显示与回调。
+界面层（Web 安装页）只负责显示与回调。
 """
 
 import ctypes

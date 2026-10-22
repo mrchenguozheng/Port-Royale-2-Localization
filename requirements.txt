@@ -2,7 +2,7 @@
 #
 # 核心流程只用 Python 标准库：
 #   - 编辑器后端是 http.server + json，不需要 fastapi / uvicorn，也不需要 venv；
-#   - translate / compile_pack / build_install / normalize_text / check_breaks /
+#   - translate / compile_pack / pr2ctl / normalize_text / check_breaks /
 #     extract_strings / extract_fonts 全部只有标准库。
 #
 # 下面都是「可选增强」，缺了会自动降级，不会让构建失败。

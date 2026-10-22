@@ -34,7 +34,7 @@ Steam 版 `PR2.exe` 带 Valve CEG 完整性校验，**改 exe 哪怕一个字节
 
 ## 快速开始
 
-需要 Visual Studio（C++ 桌面开发组件）+ Python 3.11 以上且带 tkinter（当前用 3.15）。
+需要 Visual Studio（C++ 桌面开发组件）+ Python 3.11 以上（当前用 3.15）。
 
 ```
 start.bat

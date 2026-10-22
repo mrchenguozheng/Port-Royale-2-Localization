@@ -18,6 +18,12 @@ def launch_game(target, lang=None):
     lang 非空时给启动器传 --lang=xx，它写进子进程的 PR2_PACK_LANG，
     DLL 优先用它而不是 locale.ini —— 只影响这一次启动，不写任何文件。
     """
+    if not lang:
+        try:
+            from .settings import game_language
+            lang = game_language(target) or None
+        except Exception:
+            lang = None
     exe = os.path.join(target, LAUNCHER)
     if not os.path.isfile(exe):
         return False, "该目录下没有 %s，请先复制到游戏目录。" % LAUNCHER

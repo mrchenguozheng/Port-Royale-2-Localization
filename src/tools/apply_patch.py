@@ -29,7 +29,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 
-import build_install as B  # noqa: E402
+import pr2ctl as B  # noqa: E402
 import zh_review  # noqa: E402
 
 PACK_OUT = os.path.join(ROOT, "build", "PR2Packs")

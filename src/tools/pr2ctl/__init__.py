@@ -8,7 +8,7 @@
     launch.py    启动游戏、拉起编辑器
     settings.py  记住目录与选择
 
-build_install.py（窗口）与 apply_patch.py 都从这里取函数。
+Web 安装页（src/editor）与 apply_patch.py 都从这里取函数。
 """
 
 from .base import *      # noqa: F401,F403
