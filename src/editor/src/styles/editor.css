@@ -1323,16 +1323,11 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 }
 .seed-text[readonly] { opacity: 0.75; }
 
-.seed-inline {
-  display: flex; gap: 0.6rem; align-items: baseline;
-  margin-top: 0.4rem; padding: 0.3rem 0.5rem;
-  border-top: 1px dashed var(--line);
-}
-.seed-inline .seed-head { flex: 0 0 auto; color: var(--fg-dim); font-size: 0.8em; }
+.seed-inline { min-width: 0; }
+.seed-inline .ref-label { color: var(--fg-dim); font-size: 0.85em; }
 .seed-inline .seed-body {
-  flex: 1 1 auto; min-width: 0;
   font-family: var(--font-mono); font-size: 0.9em; white-space: pre-wrap;
   color: var(--fg-dim); background: var(--bg-row-alt); border-radius: 4px;
-  padding: 0.2rem 0.5rem;
+  padding: 0.3rem 0.5rem; margin-top: 0.2rem;
 }
 .seed-inline.diff .seed-body { border-left: 3px solid var(--accent); }

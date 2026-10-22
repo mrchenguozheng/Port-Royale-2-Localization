@@ -732,24 +732,26 @@ function rowOf(e: Entry): HTMLElement {
   main.appendChild(info);
 
   const compare = el('div', 'compare');
-  const src = el('div', 'col-src');
-  src.appendChild(refLine('A', e));
-  src.appendChild(refLine('B', e));
-  compare.appendChild(src);
 
-  const dst = el('div', 'col-dst');
+  // 2×2：左上原文 A、右上译文编辑、左下原文 B、右下初版
+  compare.appendChild(refLine('A', e));
+
   const zhBlock = el('div', 'zh-block');
   zhBlock.appendChild(el('div', 'zh-head', langName(S.lang)));
   zhBlock.appendChild(zhCell(e));
-  dst.appendChild(zhBlock);
-  compare.appendChild(dst);
-  main.appendChild(compare);
+  compare.appendChild(zhBlock);
 
-  // 初版对照：整行放在编辑区下方，避免挤乱译文框
-  const seedBox = el('div', 'seed-inline');
-  seedBox.appendChild(el('span', 'seed-head', '初版'));
-  seedBox.appendChild(el('span', 'seed-body', '（读取中…）'));
-  main.appendChild(seedBox);
+  compare.appendChild(refLine('B', e));
+
+  const seedBox = el('div', 'seed-inline ref-block');
+  const seedHead = el('div', 'ref-head');
+  seedHead.appendChild(el('span', 'ref-label', '初版'));
+  seedBox.appendChild(seedHead);
+  const seedBody = el('div', 'seed-body', '（读取中…）');
+  seedBox.appendChild(seedBody);
+  compare.appendChild(seedBox);
+
+  main.appendChild(compare);
 
   const flags = el('div', 'flags');
   const ps = S.problems[e.id];
