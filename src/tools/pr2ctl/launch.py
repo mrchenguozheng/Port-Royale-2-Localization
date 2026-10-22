@@ -2,6 +2,7 @@
 """pr2ctl.launch —— 启动游戏、原版对比、拉起/关闭编辑器。"""
 
 from .base import *  # noqa: F401,F403
+from .build import child_env
 
 def launch_game(target, lang=None):
     """用注入器启动器把游戏拉起来（带语言包）。返回 (是否成功, 说明)。

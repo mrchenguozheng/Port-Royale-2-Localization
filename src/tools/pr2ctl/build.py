@@ -2,6 +2,7 @@
 """pr2ctl.build —— 调 cl.exe 构建注入器，编译语言包。"""
 
 from .base import *  # noqa: F401,F403
+from .detect import missing_outputs, read_ini_language
 
 def child_env():
     r"""子进程环境：UTF-8 + 无缓冲。
