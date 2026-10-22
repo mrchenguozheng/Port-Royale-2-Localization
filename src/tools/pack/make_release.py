@@ -62,7 +62,7 @@ def copy_runtime(stage, log):
         log("复制 %s" % name)
 
 
-def copy_fonts(lang, stage, mode, log):
+def copy_fonts(lang, stage, mode, log, cache=True):
     if mode == "none":
         log("跳过字体（发行包不含字体）")
         return
@@ -83,7 +83,7 @@ def copy_fonts(lang, stage, mode, log):
         sys.path.insert(0, fdir)
     import make_noto_fonts
     log("生成 Noto 替换字体 %s …" % lang)
-    make_noto_fonts.ensure_noto_fonts(lang, dst, log=log)
+    make_noto_fonts.ensure_noto_fonts(lang, dst, log=log, cache=cache)
 
 
 def write_readme(lang, stage, mode):
@@ -156,7 +156,7 @@ def make_zip(stage, out_dir):
     return zip_path
 
 
-def make_release(lang, version, out_dir, mode, log=None):
+def make_release(lang, version, out_dir, mode, log=None, cache=True):
     log = log or print
     stage = os.path.join(out_dir, "PR2-%s-%s" % (lang, version))
     if os.path.isdir(stage):
@@ -168,7 +168,7 @@ def make_release(lang, version, out_dir, mode, log=None):
     if os.path.isdir(lang_dir):
         shutil.copytree(lang_dir, os.path.join(stage, "lang"),
                         dirs_exist_ok=True)
-    copy_fonts(lang, stage, mode, log)
+    copy_fonts(lang, stage, mode, log, cache=cache)
     write_readme(lang, stage, mode)
     copy_license(stage, log)
     zip_path = make_zip(stage, out_dir)
@@ -183,6 +183,8 @@ def main():
     ap.add_argument("--version", default="dev")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
     ap.add_argument("--fonts", choices=("noto", "stitch", "none"), default="noto")
+    ap.add_argument("--no-font-cache", action="store_true",
+                    help="忽略 build/font-cache 里的 Noto 字体缓存")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     for lang in args.lang:

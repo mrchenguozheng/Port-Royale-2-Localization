@@ -15,6 +15,7 @@
 """
 
 import argparse
+import hashlib
 import os
 import shutil
 import sys
@@ -25,6 +26,8 @@ SRC = os.path.dirname(TOOLS)
 ROOT = os.path.dirname(SRC)
 
 OUT_NAMES = ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf")
+CACHE_VERSION = 1
+DEFAULT_CACHE = os.path.join(ROOT, "build", "font-cache", "noto")
 
 #: 每个语言用哪套 Noto。静态文件优先，没有就用 VF 实例化。
 LANGS = {
@@ -101,9 +104,55 @@ def _static(path, weight, out_path):
     return out_path
 
 
-def ensure_noto_fonts(lang, out_dir, log=None):
+def _sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _fonttools_version():
+    try:
+        import fontTools
+        return getattr(fontTools, "version", "unknown")
+    except Exception:
+        return "none"
+
+
+def _cache_path(cache_dir, source, weight, name):
+    key = "%s|%s|%s|%s|%s" % (
+        CACHE_VERSION, _sha256_file(source), weight, name, _fonttools_version())
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+    return os.path.join(cache_dir, digest[:2], digest, name)
+
+
+def _emit(source, is_var, weight, dst, cache_dir, use_cache, log):
+    if use_cache and cache_dir:
+        cached = _cache_path(cache_dir, source, weight, os.path.basename(dst))
+        if os.path.isfile(cached) and os.path.getsize(cached) > 1024:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copyfile(cached, dst)
+            log("  [cache] %s" % os.path.basename(dst))
+            return
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    if is_var:
+        _static(source, weight, dst)
+    else:
+        shutil.copyfile(source, dst)
+    if use_cache and cache_dir:
+        os.makedirs(os.path.dirname(cached), exist_ok=True)
+        tmp = cached + ".tmp"
+        shutil.copyfile(dst, tmp)
+        os.replace(tmp, cached)
+
+
+def ensure_noto_fonts(lang, out_dir, log=None, cache=True, cache_dir=None):
     """生成某语言的四个 Noto 替换字体；返回 {文件名: 字节数}。"""
     log = log or (lambda m: None)
+    cache_dir = DEFAULT_CACHE if cache_dir is None else cache_dir
+    if not cache:
+        cache_dir = None
     cfg = LANGS.get(lang)
     if not cfg:
         raise ValueError("没有为语言 %s 配置 Noto 字体映射" % lang)
@@ -134,10 +183,7 @@ def ensure_noto_fonts(lang, out_dir, log=None):
     result = {}
     for name, (path, is_var, weight) in mapping.items():
         dst = os.path.join(out_dir, name)
-        if is_var:
-            _static(path, weight, dst)
-        else:
-            shutil.copyfile(path, dst)
+        _emit(path, is_var, weight, dst, cache_dir, cache, log)
         result[name] = os.path.getsize(dst)
         log("  %-18s <- %s wght=%s (%.1f MB)" % (
             name, os.path.basename(path), weight, result[name] / 1048576.0))
@@ -158,8 +204,12 @@ def main():
     ap = argparse.ArgumentParser(description="生成发行版 Noto 替换字体（不裁剪）")
     ap.add_argument("--lang", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--cache-dir", default=None)
+    ap.add_argument("--no-cache", action="store_true", help="忽略字体缓存")
     args = ap.parse_args()
-    result = ensure_noto_fonts(args.lang, args.out, log=print)
+    result = ensure_noto_fonts(args.lang, args.out, log=print,
+                               cache=not args.no_cache,
+                               cache_dir=args.cache_dir)
     print("已生成 %d 个字体到 %s（共 %.1f MB）" % (
         len(result), args.out, sum(result.values()) / 1048576.0))
     return 0
