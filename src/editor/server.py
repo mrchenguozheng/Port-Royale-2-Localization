@@ -491,14 +491,15 @@ ORDER_FILE = os.path.join(HERE, "data", "table-order.txt")
 _ORDER = None
 
 PH_MEAN = {
-    "@T$": "城镇名", "@N$": "人名", "@n$": "国家", "@D$": "日期",
-    "@I$": "整数", "@a$": "数量", "@G$": "货物/商品", "@g$": "金额",
-    "@S$": "船型", "@l$": "位置（海图）", "@C$": "船队", "@P$": "海盗名",
+    "@T$": "Town", "@N$": "Person", "@n$": "Country", "@D$": "Date",
+    "@I$": "Integer", "@a$": "Quantity", "@G$": "Goods", "@g$": "Amount",
+    "@S$": "Ship type", "@l$": "Location", "@C$": "Fleet", "@P$": "Pirate",
 }
 TAG_MEAN = [
-    ("<n:", "段落间距"), ("<n>", "换行"), ("<c>", "颜色：开始"), ("<o:", "颜色值"),
-    ("<r>", "红色文字"), ("<t>", "制表"), ("<ts:", "制表位"), ("<g:", "图标/图形"),
-    ("<gs:", "图形脚本标记（需原样保留）"), ("<f:", "字体"),
+    ("<n:", "Paragraph spacing"), ("<n>", "Line break"), ("<c>", "Color: start"),
+    ("<o:", "Color value"), ("<r>", "Red text"), ("<t>", "Tab"),
+    ("<ts:", "Tab stop"), ("<g:", "Icon/graphic"),
+    ("<gs:", "Graphic script marker (keep as is)"), ("<f:", "Font"),
 ]
 
 
@@ -559,13 +560,13 @@ def context_of(hid, lang):
     es = en.strip()
     role_hint = {}
     if es.startswith("%1 %2 %3"):
-        role_hint = {"%1": "等级/头衔", "%2": "名", "%3": "姓"}
+        role_hint = {"%1": "Rank/Title", "%2": "Given name", "%3": "Surname"}
     elif es.startswith("%1 %2 "):
-        role_hint = {"%1": "等级/头衔", "%2": "姓名"}
+        role_hint = {"%1": "Rank/Title", "%2": "Full name"}
     elif re.search(r"\b(Governor|Captain|Viceroy|King|Queen|Prince|Princess|"
                    r"Lord|Sir|Mr|Mrs|Ms|Dr|Admiral|General|Colonel|Major|"
                    r"Lieutenant)\s+%1 %2", en):
-        role_hint = {"%1": "名", "%2": "姓"}
+        role_hint = {"%1": "Given name", "%2": "Surname"}
 
     overrides = meaning_for(lang, hid)
     ph = []
@@ -575,7 +576,7 @@ def context_of(hid, lang):
         else:
             mean = (role_hint.get(tok)
                     or next((v for k, v in PH_MEAN.items()
-                             if tok.startswith(k)), "变量/参数"))
+                             if tok.startswith(k)), "Variable"))
         ph.append({"token": tok, "meaning": mean})
 
     tags = []
