@@ -11,6 +11,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 COMPILE = os.path.join(HERE, "compile_pack.py")
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
+BUILD = os.path.join(ROOT, "build")
+FONT_DIR = os.path.join(BUILD, "fonts")
 
 
 def _line(raw):
@@ -39,3 +41,34 @@ def compile_pack(lang, out_dir, no_fonts=True, on_line=None, env=None):
     if no_fonts:
         cmd.append("--no-fonts")
     return run_stream(cmd, on_line=on_line, env=env)
+
+
+def build_fonts(langs, out_dir=None, mode="stitch", log=None, force=False, cache=True):
+    """生成字体：mode = stitch（本机开发）| noto（发行）。
+
+    stitch 输出到 <out_dir>/<语言>/，与 subset_fonts 一致；
+    noto 也输出到 <out_dir>/<语言>/，与发行包布局一致。
+    返回 (ok, message)。
+    """
+    log = log or (lambda m: None)
+    langs = list(langs or [])
+    if mode == "none":
+        return True, "跳过字体"
+    if not langs:
+        return False, "没有语言"
+
+    font_tools = os.path.join(ROOT, "src", "tools", "font")
+    if font_tools not in sys.path:
+        sys.path.insert(0, font_tools)
+
+    if mode == "noto":
+        import make_noto_fonts
+        for lang in langs:
+            dst = os.path.join(out_dir or FONT_DIR, lang)
+            log("生成 Noto 替换字体 %s …" % lang)
+            make_noto_fonts.ensure_noto_fonts(lang, dst, log=log, cache=cache)
+        return True, "Noto 字体：%s" % "、".join(langs)
+
+    import subset_fonts
+    return subset_fonts.ensure_fonts(
+        out_dir=out_dir or FONT_DIR, langs=langs, log=log, force=force)

@@ -167,11 +167,11 @@ def run_build(langs, events):
         # 字体：语言包编完后统一检查一次。译文里出现新字而字体没跟上，
         # 游戏里就画成空白 —— 所以并进同一个构建动作，别让人单记一步。
         try:
-            sys.path.insert(0, os.path.join(HERE, "font"))
-            import subset_fonts
+            from pack import build_artifacts
             events.put(("line", "检查字体…"))
-            ok, msg = subset_fonts.ensure_fonts(
-                langs=langs, log=lambda m: events.put(("line", m)))
+            ok, msg = build_artifacts.build_fonts(
+                langs, mode="stitch",
+                log=lambda m: events.put(("line", m)))
             events.put(("line", "字体：" + msg))
         except Exception as exc:                  # 字体失败不该让构建失败
             events.put(("line", "字体检查跳过：%s" % exc))

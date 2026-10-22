@@ -63,23 +63,20 @@ def copy_fonts(lang, stage, mode, log, cache=True):
         log("跳过字体（发行包不含字体）")
         return
     dst = os.path.join(stage, "fonts", lang)
+    from build_artifacts import build_fonts
+    out_base = os.path.join(stage, "fonts")
     if mode == "stitch":
-        src = os.path.join(BUILD, "fonts", lang)
-        if not os.path.isdir(src):
-            raise FileNotFoundError("缺 %s；先跑 subset_fonts.py --lang %s" % (src, lang))
-        os.makedirs(dst, exist_ok=True)
-        for name in os.listdir(src):
-            if name.lower().endswith(".ttf"):
-                shutil.copy2(os.path.join(src, name), os.path.join(dst, name))
+        ok, msg = build_fonts([lang], out_dir=None, mode="stitch", log=log)
+        if not ok:
+            raise FileNotFoundError(msg)
+        shutil.copytree(os.path.join(BUILD, "fonts", lang), dst, dirs_exist_ok=True)
         log("复制缝合字体（仅限私有/自用包）")
         return
 
-    fdir = os.path.join(TOOLS, "font")
-    if fdir not in sys.path:
-        sys.path.insert(0, fdir)
-    import make_noto_fonts
-    log("生成 Noto 替换字体 %s …" % lang)
-    make_noto_fonts.ensure_noto_fonts(lang, dst, log=log, cache=cache)
+    ok, msg = build_fonts([lang], out_dir=out_base, mode="noto",
+                          log=log, cache=cache)
+    if not ok:
+        raise RuntimeError(msg)
     # 字体目录只留 TTF；来源说明移到包根，避免游戏扫描 fonts\<语言>\*.* 时
     # 看到无关的 .txt。
     notice = os.path.join(dst, "NOTO-SOURCES.txt")
