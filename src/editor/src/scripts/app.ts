@@ -747,12 +747,13 @@ async function loadEntryInfo(id: string) {
     const ph = r.placeholders || [];
     const meaning = new Map(ph.map((p) => [p.token, p.meaning]));
     S.curMeaning = meaning;
-    if (!S.meaningSaved[id] && ph.length) {
-      S.meaningSaved[id] = true;
+    const mk = S.lang + ':' + id;
+    if (!S.meaningSaved[mk] && ph.length) {
+      S.meaningSaved[mk] = true;
       const map: Record<string, string> = {};
       for (const p of ph) map[p.token] = p.meaning;
       void api('/api/placeholder-meanings', { lang: S.lang, id, meanings: map }).catch(() => {
-        S.meaningSaved[id] = false;
+        S.meaningSaved[mk] = false;
       });
     }
     document.querySelectorAll('.ph-token').forEach((node) => {
@@ -1325,8 +1326,13 @@ function redraw(id: string) {
   const old = $('rows').querySelector(`.row[data-id="${cssEsc(id)}"]`);
   const src = S.rows.find((x) => x.id === id);
   if (!old || !src) return;
+  if (!old.isConnected) return;      // 另一个 redraw 已经换掉了这一行
   const fresh = rowOf(src);
-  old.replaceWith(fresh);
+  try {
+    old.replaceWith(fresh);
+  } catch {
+    return;
+  }
   void loadEntryInfo(id);
 }
 
@@ -1790,7 +1796,10 @@ function showBootError(msg: string) {
   $('stat').textContent = '载入失败：' + msg;
 }
 
-window.addEventListener('error', (ev) => showBootError(ev.message || '脚本错误'));
+window.addEventListener('error', (ev) => {
+  console.error('[pr2] window error', ev.error || ev.message);
+  showBootError(ev.message || '脚本错误');
+});
 window.addEventListener('unhandledrejection', (ev) => {
   const r = ev.reason as Error | undefined;
   showBootError(r && r.message ? r.message : String(ev.reason));
