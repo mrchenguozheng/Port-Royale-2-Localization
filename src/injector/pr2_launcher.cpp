@@ -11,8 +11,10 @@
  *                  不带这个参数时行为与从前完全一样。
  */
 #include <windows.h>
+#include <wincrypt.h>
 #include <stdio.h>
 #include <string.h>
+#pragma comment(lib, "advapi32.lib")
 
 /* 源文件是 UTF-8（cl 用 /utf-8 编译），所以 printf 送出去的是 UTF-8 字节。
  * 控制台默认代码页是 936，直接 printf 会显示成乱码，必须先切到 UTF-8。 */
@@ -108,6 +110,42 @@ static const char* ORIG_FONT_NAMES[4] = {
 static const DWORD ORIG_FONT_SIZES[4] = {
     296712, 65680, 52876, 53120
 };
+static const char* ORIG_FONT_HASHES[4] = {
+    "1906a771ed879a5de75a3ff552fbad533827fe7b39e18319ce9d9ae134c346c7",
+    "f3715e59051796963fc6569d85c16b9abfd6eaf949bcc8a9578c1fe0a423acf9",
+    "267f1a2de1c1e738202ca31008c587e045d25268c93662d8fd80b79615d314e7",
+    "fd10e52dd5040de4fc00e09919b5e5e360039360deff5bfc2219ffa61061c465"
+};
+
+static int FileSha256(const char* path, char out[65]) {
+    HANDLE f = CreateFileA(path, GENERIC_READ,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (f == INVALID_HANDLE_VALUE) return 0;
+    HCRYPTPROV prov = 0;
+    HCRYPTHASH hash = 0;
+    BYTE digest[32];
+    DWORD dlen = sizeof(digest);
+    int ok = 0;
+    if (CryptAcquireContextA(&prov, NULL, NULL, PROV_RSA_AES, CRYPT_VERIFYCONTEXT)) {
+        if (CryptCreateHash(prov, CALG_SHA_256, 0, 0, &hash)) {
+            BYTE buf[65536];
+            DWORD got = 0;
+            while (ReadFile(f, buf, sizeof(buf), &got, NULL) && got > 0) {
+                if (!CryptHashData(hash, buf, got, 0)) break;
+            }
+            if (CryptGetHashParam(hash, HP_HASHVAL, digest, &dlen, 0)) {
+                for (DWORD i = 0; i < dlen; i++) sprintf(out + i * 2, "%02x", digest[i]);
+                out[dlen * 2] = 0;
+                ok = 1;
+            }
+            CryptDestroyHash(hash);
+        }
+        CryptReleaseContext(prov, 0);
+    }
+    CloseHandle(f);
+    return ok;
+}
 
 static DWORD FileSizeOf(const char* path) {
     WIN32_FILE_ATTRIBUTE_DATA d;
@@ -118,9 +156,14 @@ static DWORD FileSizeOf(const char* path) {
 
 static int LooksLikeOriginalFonts(const char* root) {
     for (int i = 0; i < 4; i++) {
-        char p[MAX_PATH];
+        char p[MAX_PATH], hex[65];
         snprintf(p, sizeof(p), "%s\\fonts\\%s", root, ORIG_FONT_NAMES[i]);
         if (FileSizeOf(p) != ORIG_FONT_SIZES[i]) return 0;
+        if (!FileSha256(p, hex) || _stricmp(hex, ORIG_FONT_HASHES[i]) != 0) {
+            printf("[PR2Launch] 字体大小像原版但 SHA-256 不匹配，跳过备份: %s\n",
+                   ORIG_FONT_NAMES[i]);
+            return 0;
+        }
     }
     return 1;
 }
@@ -153,9 +196,14 @@ static int RestoreOriginalFonts(const char* self) {
     if (GetFileAttributesA(bak) == INVALID_FILE_ATTRIBUTES) return 0;
     int n = 0;
     for (int i = 0; i < 4; i++) {
-        char src[MAX_PATH], dst[MAX_PATH];
+        char src[MAX_PATH], dst[MAX_PATH], hex[65];
         snprintf(src, sizeof(src), "%s\\%s", bak, ORIG_FONT_NAMES[i]);
         snprintf(dst, sizeof(dst), "%s\\fonts\\%s", root, ORIG_FONT_NAMES[i]);
+        if (!FileSha256(src, hex) || _stricmp(hex, ORIG_FONT_HASHES[i]) != 0) {
+            printf("[PR2Launch] 原版备份哈希不匹配，拒绝恢复: %s\n",
+                   ORIG_FONT_NAMES[i]);
+            continue;
+        }
         if (CopyFileA(src, dst, FALSE)) n++;
     }
     if (n) printf("[PR2Launch] 已恢复原版字体 (%d/4)\n", n);
