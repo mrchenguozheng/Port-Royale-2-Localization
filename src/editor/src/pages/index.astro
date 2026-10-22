@@ -88,10 +88,11 @@ const title = 'PR2 本地化 · 译文编辑';
       <h2>2 构建与部署</h2>
       <div id="langs" class="langs"></div>
       <div class="row">
-        <button id="build">构建注入器 + 语言包</button>
+        <button id="buildInjector">编译注入器（DLL + 启动器）</button>
+        <button id="buildPacks">编译语言包</button>
         <button id="deploy">部署到游戏目录</button>
       </div>
-      <p class="msg">构建会调用 MSVC 编译 DLL 与启动器；部署只复制文件，不改 PR2.exe。</p>
+      <p class="msg">编译注入器会调用 MSVC；编译语言包只处理勾选的译文；部署只复制文件，不改 PR2.exe。</p>
     </section>
 
     <section class="card">

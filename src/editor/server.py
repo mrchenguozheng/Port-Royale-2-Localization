@@ -1119,6 +1119,9 @@ class Handler(BaseHTTPRequestHandler):
             P.save_settings(st)
             return self.send_json({"ok": True, **start_status()})
 
+        if path == "/api/start/build-injector":
+            return self.send_json(start_run("injector", lambda ev: P.build_injector(ev)))
+
         if path == "/api/start/build":
             langs = [x for x in (body.get("langs") or []) if x in P.available_langs()]
             if not langs:
@@ -1488,6 +1491,9 @@ class Handler(BaseHTTPRequestHandler):
             st["last_dir"] = d
             P.save_settings(st)
             return self.send_json({"ok": True, **start_status()})
+
+        if path == "/api/start/build-injector":
+            return self.send_json(start_run("injector", lambda ev: P.build_injector(ev)))
 
         if path == "/api/start/build":
             langs = [x for x in (body.get("langs") or []) if x in P.available_langs()]

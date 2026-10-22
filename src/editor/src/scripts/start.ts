@@ -172,7 +172,8 @@ const S = { status: null, timer: 0 };
 
     $('pickDir').addEventListener('click', () => void saveDir());
     $('dir').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') void saveDir(); });
-    $('build').addEventListener('click', () => void runJob('build', { langs: chosenLangs() }));
+    $('buildInjector').addEventListener('click', () => void runJob('build-injector', {}));
+    $('buildPacks').addEventListener('click', () => void runJob('build', { langs: chosenLangs() }));
     $('deploy').addEventListener('click', () => void runJob('deploy', { langs: chosenLangs() }));
 
     $('setLang').addEventListener('click', async () => {
