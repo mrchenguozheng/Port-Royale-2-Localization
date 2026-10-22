@@ -1560,7 +1560,13 @@ $('save').addEventListener('click', () => void save());
 let codeTimer = 0;
 $('addLang').addEventListener('click', openAddLang);
 $('newCancel').addEventListener('click', closeAddLang);
-$('newOk').addEventListener('click', () => void createLang());
+document.addEventListener('click', (ev) => {
+  const el = ev.target as HTMLElement | null;
+  if (el && el.closest('#newOk')) {
+    ev.preventDefault();
+    void createLang();
+  }
+});
 $('newCode').addEventListener('input', () => {
   clearTimeout(codeTimer);
   codeTimer = window.setTimeout(() => void refreshCodeState(), 250);
