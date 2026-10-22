@@ -20,10 +20,10 @@ const title = 'PR2 本地化编辑器';
     <header class="toolbar">
       <span class="brand">PR2 本地化工作台</span>
       <nav class="tabs">
-        <a class="tab active" href="/">编辑器</a>
-        <a class="tab" href="/start">安装与启动</a>
+        <button class="tab active" data-view="editor" type="button">编辑器</button>
+        <button class="tab" data-view="start" type="button">安装与启动</button>
       </nav>
-      <label class="tb">编辑
+      <span class="editor-controls"><label class="tb">编辑
         <select id="lang"></select>
       </label>
       <button id="addLang" class="mini icon-btn" title="添加一种语言"><span class="ic ic-plus" aria-hidden="true"></span></button>
@@ -42,8 +42,49 @@ const title = 'PR2 本地化编辑器';
           <option value="48">48</option>
         </select>
       </label>
-      <button id="save" disabled>保存</button>
+      <button id="save" disabled>保存</button></span>
     </header>
+
+    <main id="view-start" class="start-view" hidden>
+
+    <section class="card">
+      <h2>1 游戏目录</h2>
+      <div class="row">
+        <input id="dir" type="text" spellcheck="false"
+               placeholder="例如 <游戏目录>" />
+        <button id="pickDir">检测并记住</button>
+      </div>
+      <p id="dirMsg" class="msg"></p>
+      <p id="statusLine" class="msg"></p>
+    </section>
+
+    <section class="card">
+      <h2>2 构建与部署</h2>
+      <div id="langs" class="langs"></div>
+      <div class="row">
+        <button id="build">构建注入器 + 语言包</button>
+        <button id="deploy">部署到游戏目录</button>
+      </div>
+      <p class="msg">构建会调用 MSVC 编译 DLL 与启动器；部署只复制文件，不改 PR2.exe。</p>
+    </section>
+
+    <section class="card">
+      <h2>3 启动</h2>
+      <div class="row">
+        <label>语言 <select id="launchLang"></select></label>
+        <button id="setLang">设为游戏语言</button>
+        <button id="play">启动游戏（已注入）</button>
+        <button id="vanilla">启动原版对比</button>
+        <button id="openEditor">打开编辑器</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>日志</h2>
+      <pre id="log" class="log"></pre>
+    </section>
+      </main>
+
 
     <footer class="statusbar">
       <span class="nav-group">
@@ -123,5 +164,6 @@ const title = 'PR2 本地化编辑器';
     </div>
 
     <script src="../scripts/app.ts"></script>
+  <script>import '../scripts/start';</script>
   </body>
 </html>
