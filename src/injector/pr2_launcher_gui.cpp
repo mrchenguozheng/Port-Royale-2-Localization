@@ -1,6 +1,6 @@
 /* pr2_launcher_gui.cpp -- 带界面的语言选择启动器。
  *
- * 界面字符串来自 lang/gui.<ui>.ini（UTF-8）；找不到时回退 en，再回退内置英文。
+ * 界面字符串来自 ui/<ui>.ini（UTF-8）；找不到时回退 ui/en.ini，再回退内置英文。
  * 不重新实现注入：只调用同目录的 PR2Launcher.exe --lang=<代码>。
  */
 #include <windows.h>
@@ -181,10 +181,10 @@ static void SaveLocaleLanguage(const char* lang) {
 static void LoadGuiStringsFor(const char* ui) {
     g_strCount = 0;
     char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s\\lang\\gui.%s.ini", g_root, ui);
+    snprintf(path, sizeof(path), "%s\\ui\\%s.ini", g_root, ui);
     LoadIni(path);
     if (!g_strCount && _stricmp(ui, "en") != 0) {
-        snprintf(path, sizeof(path), "%s\\lang\\gui.en.ini", g_root);
+        snprintf(path, sizeof(path), "%s\\ui\\en.ini", g_root);
         LoadIni(path);
     }
 }

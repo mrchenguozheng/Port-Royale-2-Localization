@@ -169,9 +169,9 @@ def make_release(lang, version, out_dir, mode, log=None, cache=True):
     os.makedirs(stage)
     build_pack(lang, stage, log)
     copy_runtime(stage, log)
-    lang_dir = os.path.join(ROOT, "src", "injector", "lang")
-    if os.path.isdir(lang_dir):
-        shutil.copytree(lang_dir, os.path.join(stage, "lang"),
+    ui_dir = os.path.join(ROOT, "src", "injector", "ui")
+    if os.path.isdir(ui_dir):
+        shutil.copytree(ui_dir, os.path.join(stage, "ui"),
                         dirs_exist_ok=True)
     copy_fonts(lang, stage, mode, log, cache=cache)
     write_readme(lang, stage, mode)

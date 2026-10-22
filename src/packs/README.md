@@ -10,7 +10,7 @@ src/packs/<代码>.toml
 
 ```toml
 alias = "简体中文"   # GUI 列表里的显示名
-gui = "zh"           # 用哪份 lang/gui.<gui>.ini 当 GUI 界面语言
+gui = "zh"           # 用哪份 ui/<gui>.ini 当 GUI 界面语言
 ```
 
 `compile_pack.py` 会把它们写成语言包开头的注释：
