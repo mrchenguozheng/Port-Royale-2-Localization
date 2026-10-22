@@ -233,3 +233,41 @@ def _server_exe():
             return cand
     return exe
 
+
+
+def game_processes():
+    """列出正在运行的 PR2.exe / PR2Launcher.exe。"""
+    import csv as _csv
+    import io as _io
+    import subprocess as _sp
+    try:
+        out = _sp.run(["tasklist", "/FO", "CSV", "/NH"],
+                      capture_output=True).stdout
+    except OSError:
+        return []
+    text = out.decode("mbcs", "replace")
+    procs = []
+    for row in _csv.reader(_io.StringIO(text)):
+        if len(row) < 2:
+            continue
+        name, pid = row[0].strip(), row[1].strip()
+        if name.lower() in (GAME_EXE.lower(), LAUNCHER.lower()):
+            procs.append({"name": name, "pid": pid})
+    return procs
+
+
+def kill_game():
+    """强制结束 PR2.exe / PR2Launcher.exe，返回 (ok, message)。"""
+    import subprocess as _sp
+    procs = game_processes()
+    if not procs:
+        return False, "没有运行中的游戏进程"
+    killed = []
+    for it in procs:
+        r = _sp.run(["taskkill", "/PID", it["pid"], "/F"],
+                    capture_output=True)
+        if r.returncode == 0:
+            killed.append(it)
+    if not killed:
+        return False, "结束进程失败（可能需要管理员权限）"
+    return True, "已结束 " + "、".join("%s(pid %s)" % (x["name"], x["pid"]) for x in killed)

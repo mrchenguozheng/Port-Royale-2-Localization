@@ -105,6 +105,19 @@ const S = { status: null, timer: 0 };
       }
     }
 
+    async function loadGameState() {
+      try {
+        const r = await api('/api/start/running');
+        const procs = r.procs || [];
+        $('gameState').textContent = r.running
+          ? '游戏状态：运行中（' + procs.map((p) => `${p.name} pid ${p.pid}`).join('、') + '）'
+          : '游戏状态：未运行';
+      } catch (err) {
+        $('gameState').textContent = '游戏状态：读取失败';
+        toast('读取游戏状态失败：' + err.message);
+      }
+    }
+
     async function loadDirs() {
       try {
         const r = await api('/api/start/dirs');
@@ -222,6 +235,19 @@ const S = { status: null, timer: 0 };
 
     $('pickDir').addEventListener('click', () => void saveDir());
     $('srvRefresh').addEventListener('click', () => void loadServers());
+    $('checkGame').addEventListener('click', () => void loadGameState());
+    $('killGame').addEventListener('click', () => {
+      void (async () => {
+        if (!window.confirm('强制结束游戏进程？未保存的游戏进度会丢失。')) return;
+        try {
+          const r = await api('/api/start/kill', {});
+          toast(r.message || (r.ok ? '已结束游戏进程' : '结束失败'));
+        } catch (err) {
+          toast('结束失败：' + err.message);
+        }
+        await loadGameState();
+      })();
+    });
     $('dir').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') void saveDir(); });
     $('buildInjector').addEventListener('click', () => void runJob('build-injector', {}));
     $('buildPacks').addEventListener('click', () => void runJob('build', { langs: chosenLangs() }));
@@ -252,6 +278,7 @@ const S = { status: null, timer: 0 };
     void refresh();
     void loadDirs();
     void loadServers();
+    void loadGameState();
 
     // 每次切回「安装与启动」都刷新一次，目录列表与状态不会停留在旧数据。
     for (const tab of document.querySelectorAll('.tab')) {
@@ -260,6 +287,8 @@ const S = { status: null, timer: 0 };
           void refresh();
           void loadDirs();
           void loadServers();
+          void loadGameState();
+    void loadGameState();
         }
       });
     }

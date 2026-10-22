@@ -1146,6 +1146,15 @@ class Handler(BaseHTTPRequestHandler):
             ok, code = P.set_game_language(d, code)
             return self.send_json({"ok": ok, "lang": code, **start_status()})
 
+        if path == "/api/start/running":
+            procs = P.game_processes()
+            return self.send_json({"running": bool(procs), "procs": procs})
+
+        if path == "/api/start/kill":
+            ok, msg = P.kill_game()
+            return self.send_json({"ok": ok, "message": msg,
+                                   "procs": P.game_processes()})
+
         if path == "/api/start/launch":
             d = start_dir()
             if not d or not P.is_game_dir(d):
@@ -1518,6 +1527,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"ok": False, "error": "没有这个语言包：%s" % code})
             ok, code = P.set_game_language(d, code)
             return self.send_json({"ok": ok, "lang": code, **start_status()})
+
+        if path == "/api/start/running":
+            procs = P.game_processes()
+            return self.send_json({"running": bool(procs), "procs": procs})
+
+        if path == "/api/start/kill":
+            ok, msg = P.kill_game()
+            return self.send_json({"ok": ok, "message": msg,
+                                   "procs": P.game_processes()})
 
         if path == "/api/start/launch":
             d = start_dir()
