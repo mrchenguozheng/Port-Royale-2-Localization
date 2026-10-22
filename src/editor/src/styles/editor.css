@@ -1239,7 +1239,10 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   padding: 1rem 1.2rem 2rem;
 }
 #view-start .card {
+  /* flex 子项 + margin:auto 会退化成内容宽度，必须显式给宽度 */
+  width: min(900px, 100%);
   max-width: 900px;
+  box-sizing: border-box;
   margin: 0 auto 1rem;
 }
 
