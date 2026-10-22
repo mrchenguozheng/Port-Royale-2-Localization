@@ -114,7 +114,9 @@ const S = { status: null, timer: 0 };
       try {
         const st = await api('/api/start/dir', { path: $('dir').value.trim() });
         fillStatus(st);
-        $('dirMsg').textContent = '已记住：' + st.dir + '（' + (st.version || '未知版本') + '）';
+        const savedDir = st.dir || $('dir').value.trim();
+        const savedVer = st.version || '未知版本';
+        $('dirMsg').textContent = '已记住：' + savedDir + '（' + savedVer + '）';
         await loadDirs();
       } catch (err) {
         $('dirMsg').textContent = err.message;
