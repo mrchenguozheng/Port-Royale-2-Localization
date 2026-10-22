@@ -1283,6 +1283,11 @@ class Handler(BaseHTTPRequestHandler):
                     out[hid] = c
             return self.send_json(out)
 
+        if path == "/api/placeholder-meanings":
+            hid = (query.get("id") or [""])[0]
+            return self.send_json({"id": hid,
+                                   "meanings": load_meaning_overrides().get(hid.lower(), {})})
+
         if path == "/api/rule-hits":
             hid = (query.get("id") or [""])[0]
             lang = (query.get("lang") or ["zh"])[0]
@@ -1291,10 +1296,6 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"detail": "没有初版或条目"}, 404)
             return self.send_json(data)
 
-        if path == "/api/placeholder-meanings":
-            hid = (query.get("id") or [""])[0]
-            return self.send_json({"id": hid,
-                                   "meanings": load_meaning_overrides().get(hid.lower(), {})})
 
         if path == "/api/rule-trace":
             hid = (query.get("id") or [""])[0]
@@ -1649,10 +1650,6 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"detail": "没有初版或条目"}, 404)
             return self.send_json(data)
 
-        if path == "/api/placeholder-meanings":
-            hid = (query.get("id") or [""])[0]
-            return self.send_json({"id": hid,
-                                   "meanings": load_meaning_overrides().get(hid.lower(), {})})
 
         if path == "/api/rule-trace":
             hid = (query.get("id") or [""])[0]
@@ -1661,6 +1658,7 @@ class Handler(BaseHTTPRequestHandler):
             if stages is None:
                 return self.send_json({"detail": "没有初版或条目"}, 404)
             return self.send_json({"id": hid, "stages": stages})
+
 
         if path == "/api/placeholder-meaning":
             hid = (body.get("id") or "").strip().lower()
@@ -1699,6 +1697,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"ok": False, "error": "缺少 id 或术语"})
             rules = save_hash_rule(hid, term, bool(body.get("skip")))
             return self.send_json({"ok": True, "rules": rules})
+
+
+        if path == "/api/placeholder-meanings":
+            hid = (body.get("id") or "").strip().lower()
+            meanings = body.get("meanings") or {}
+            if not hid or not isinstance(meanings, dict):
+                return self.send_json({"ok": False, "error": "参数不对"})
+            for tok, mean in meanings.items():
+                save_meaning(hid, str(tok), str(mean))
+            return self.send_json({"ok": True,
+                                   "meanings": load_meaning_overrides().get(hid, {})})
 
         if path == "/api/patch":
             lang = body.get("lang", "")

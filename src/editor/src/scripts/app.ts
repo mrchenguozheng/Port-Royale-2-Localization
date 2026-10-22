@@ -82,6 +82,7 @@ const S = {
   seed: {} as Record<string, string>,
   curMeaning: new Map<string, string>(),
   curId: '',
+  meaningSaved: {} as Record<string, boolean>,
   dirtyIds: [] as string[],
   size: 24,
   problems: {} as Record<string, Problem[]>,
@@ -667,6 +668,14 @@ async function loadEntryInfo(id: string) {
     const ph = r.placeholders || [];
     const meaning = new Map(ph.map((p) => [p.token, p.meaning]));
     S.curMeaning = meaning;
+    if (!S.meaningSaved[id] && ph.length) {
+      S.meaningSaved[id] = true;
+      const map: Record<string, string> = {};
+      for (const p of ph) map[p.token] = p.meaning;
+      void api('/api/placeholder-meanings', { id, meanings: map }).catch(() => {
+        S.meaningSaved[id] = false;
+      });
+    }
     document.querySelectorAll('.ph-token').forEach((node) => {
       const elx = node as HTMLElement;
       const m = meaning.get(elx.dataset.token || '');
