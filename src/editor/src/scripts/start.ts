@@ -76,6 +76,50 @@ const S = { status: null, timer: 0 };
       }
     }
 
+    function setFontStatus(st) {
+      const base = $('fontBaseState');
+      const donor = $('fontDonorState');
+      const built = $('fontBuildState');
+      if (base) {
+        const miss = (st.base && st.base.missing) ? st.base.missing.length : 0;
+        base.textContent = miss
+          ? `缺 ${miss} 个（需从游戏导出）`
+          : `已就绪（${st.base.total}/${st.base.total}）`;
+        base.className = 'step-state ' + (miss ? 'bad' : 'ok');
+      }
+      if (donor) {
+        const all = st.donors || [];
+        const have = all.filter((d) => d.exists).length;
+        donor.textContent = all.length
+          ? `${have}/${all.length} 个可用 · fontTools ${st.fonttools ? '已装' : '缺'}`
+          : `presets 未配置 donor · fontTools ${st.fonttools ? '已装' : '缺'}`;
+        donor.className = 'step-state ' + (all.length && have === all.length ? 'ok' : 'bad');
+      }
+      if (built) {
+        built.textContent = st.built.count === st.built.total
+          ? `已生成（${st.built.count}/${st.built.total}）`
+          : `未生成（${st.built.count}/${st.built.total}）`;
+        built.className = 'step-state ' + (st.built.count === st.built.total ? 'ok' : 'bad');
+      }
+      const preset = $('fontPreset');
+      if (preset) preset.textContent = st.presets || '';
+      const msg = $('fontMsg');
+      if (msg) {
+        msg.textContent = (st.problems && st.problems.length)
+          ? '待处理：' + st.problems.join('；')
+          : '字体前置条件齐全。';
+      }
+    }
+
+    async function loadFontStatus() {
+      try {
+        setFontStatus(await api('/api/font-status'));
+      } catch (err) {
+        const msg = $('fontMsg');
+        if (msg) msg.textContent = '读取字体状态失败：' + err.message;
+      }
+    }
+
 
     function fmtUptime(sec) {
       const s = Math.max(0, Number(sec) || 0);
@@ -253,6 +297,53 @@ const S = { status: null, timer: 0 };
     $('buildPacks').addEventListener('click', () => void runJob('build', { langs: chosenLangs() }));
     $('deploy').addEventListener('click', () => void runJob('deploy', { langs: chosenLangs() }));
 
+    $('fontCheck').addEventListener('click', () => void loadFontStatus());
+
+    $('fontExport').addEventListener('click', () => {
+      void (async () => {
+        const dir = ($('dir') as HTMLInputElement).value.trim();
+        if (!dir) { toast('先填写游戏目录'); return; }
+        const btn = $('fontExport') as HTMLButtonElement;
+        btn.disabled = true;
+        $('log').textContent = '导出原版字体…';
+        try {
+          const r = await api('/api/font/export', { dir });
+          $('log').textContent = r.output || (r.ok ? '导出完成' : '导出失败');
+          setFontStatus(r.status);
+          toast(r.ok ? '原版字体已导出' : '导出失败，见日志');
+        } catch (err) {
+          $('log').textContent = (err as Error).message;
+        } finally {
+          btn.disabled = false;
+        }
+      })();
+    });
+
+    $('fontStitch').addEventListener('click', () => {
+      void (async () => {
+        if (!window.confirm('按当前译文重新缝合四个字体？可能需要十几秒。')) return;
+        const btn = $('fontStitch') as HTMLButtonElement;
+        btn.disabled = true;
+        $('log').textContent = '字体缝合中…';
+        try {
+          const r = await api('/api/font/stitch', { force: true });
+          $('log').textContent = (r.log || []).join('\n') +
+            (r.message ? '\n' + r.message : '');
+          setFontStatus(r.status);
+          toast(r.ok ? '字体已缝合' : '缝合失败，见日志');
+        } catch (err) {
+          $('log').textContent = (err as Error).message;
+        } finally {
+          btn.disabled = false;
+        }
+      })();
+    });
+
+    $('firstRunEdit').addEventListener('click', () => {
+      document.querySelector('.tab[data-view="editor"]')?.dispatchEvent(
+        new MouseEvent('click', { bubbles: true }));
+    });
+
     $('setLang').addEventListener('click', async () => {
       try {
         const st = await api('/api/start/lang', { lang: $('launchLang').value });
@@ -279,6 +370,7 @@ const S = { status: null, timer: 0 };
     void loadDirs();
     void loadServers();
     void loadGameState();
+    void loadFontStatus();
 
     // 每次切回「安装与启动」都刷新一次，目录列表与状态不会停留在旧数据。
     for (const tab of document.querySelectorAll('.tab')) {
@@ -288,7 +380,7 @@ const S = { status: null, timer: 0 };
           void loadDirs();
           void loadServers();
           void loadGameState();
-    void loadGameState();
+          void loadFontStatus();
         }
       });
     }

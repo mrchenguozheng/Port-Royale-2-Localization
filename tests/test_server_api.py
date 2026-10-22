@@ -20,6 +20,7 @@ SERVER = os.path.join(ROOT, "src", "editor", "server.py")
 
 GET_URLS = [
     "/api/health",
+    "/api/font-status",
     "/api/langs",
     "/api/count?lang=zh",
     "/api/list?lang=zh",

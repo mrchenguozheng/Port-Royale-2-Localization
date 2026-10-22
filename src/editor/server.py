@@ -952,6 +952,55 @@ def new_lang(code, src):
             "dropped": dropped, "filled": filled}
 
 
+# ---------------------------------------------------------------- 字体前置状态
+
+def _font_module():
+    """按需把 src/tools/font 加进 sys.path，返回 subset_fonts 模块。"""
+    fdir = os.path.join(TOOLS, "font")
+    if fdir not in sys.path:
+        sys.path.insert(0, fdir)
+    import subset_fonts
+    return subset_fonts
+
+
+def font_status():
+    """安装页「第一次用」卡片的字体状态。"""
+    sf = _font_module()
+    langs, donors, fallback = sf._presets()
+    base_missing = [n for n in sf.FONTS
+                    if not os.path.isfile(os.path.join(sf.DEFAULT_SRC, n))]
+    built = [n for n in sf.FONTS
+             if os.path.isfile(os.path.join(sf.DEFAULT_OUT, n))]
+    donor_rows = []
+    for name in sf.FONTS:
+        for donor, _idx in donors.get(name, []):
+            p = sf._resolve(donor)
+            donor_rows.append({"game_file": name, "path": p,
+                               "exists": os.path.isfile(p)})
+    problems = []
+    if base_missing:
+        problems.append("缺 %d 个原版字体（需要从游戏导出）" % len(base_missing))
+    missing_donors = [d for d in donor_rows if not d["exists"]]
+    if missing_donors:
+        problems.append("缺 %d 个 donor 字体" % len(missing_donors))
+    if not sf._fonttools():
+        problems.append("缺 fontTools")
+    if not langs:
+        problems.append("presets 里没有配置任何语言")
+    return {
+        "ok": not problems,
+        "languages": langs,
+        "fonttools": bool(sf._fonttools()),
+        "base": {"dir": sf.DEFAULT_SRC, "missing": base_missing,
+                 "total": len(sf.FONTS)},
+        "built": {"dir": sf.DEFAULT_OUT, "count": len(built),
+                  "total": len(sf.FONTS)},
+        "donors": donor_rows,
+        "problems": problems,
+        "presets": os.path.join(TOOLS, "font", "fontstitch", "presets.toml"),
+    }
+
+
 # ---------------------------------------------------------------- HTTP
 
 class Handler(BaseHTTPRequestHandler):
@@ -1078,6 +1127,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/health":
             return self.send_json(health_info())
+
+        if path == "/api/font-status":
+            return self.send_json(font_status())
 
         if path == "/api/server/instances":
             return self.send_json(server_instances())
@@ -1326,6 +1378,29 @@ class Handler(BaseHTTPRequestHandler):
 
     def post_api(self, path):
         body = self.read_json()
+
+        if path == "/api/font/export":
+            game = (body.get("dir") or "").strip()
+            if not game:
+                return self.send_json({"ok": False, "error": "先填写游戏目录"})
+            out = os.path.join(os.path.dirname(SRC), "assets", "fonts", "original")
+            script = os.path.join(TOOLS, "font", "extract_fonts.py")
+            proc = subprocess.run(
+                [sys.executable, script, "--game-dir", game, "--out", out],
+                cwd=os.path.dirname(SRC), capture_output=True,
+                text=True, encoding="utf-8", errors="replace")
+            output = (proc.stdout or "") + (proc.stderr or "")
+            return self.send_json({"ok": proc.returncode == 0,
+                                   "output": output,
+                                   "status": font_status()})
+
+        if path == "/api/font/stitch":
+            sf = _font_module()
+            lines = []
+            ok, msg = sf.ensure_fonts(force=bool(body.get("force", True)),
+                                      log=lines.append)
+            return self.send_json({"ok": ok, "message": msg, "log": lines,
+                                   "status": font_status()})
 
         if path == "/api/server/stop":
             try:

@@ -69,7 +69,23 @@ const title = 'PR2 本地化 · 译文编辑';
   <section id="view-start" class="view" hidden>
     <div class="start-col">
 
-
+    <section class="card first-run">
+      <h2>第一次用？按这个顺序</h2>
+      <ol class="steps">
+        <li><b>选游戏目录</b><span class="step-note">下面第 1 步</span></li>
+        <li><b>导出原版字体</b><span id="fontBaseState" class="step-state">检查中…</span>
+          <button id="fontExport" class="mini">导出</button></li>
+        <li><b>准备 donor 字体</b><span id="fontDonorState" class="step-state">检查中…</span>
+          <button id="fontCheck" class="mini">检查</button></li>
+        <li><b>新建语言并翻译</b><button id="firstRunEdit" class="mini">去编辑</button></li>
+        <li><b>配置 presets</b><code id="fontPreset" class="step-path"></code></li>
+        <li><b>缝合字体</b><span id="fontBuildState" class="step-state">检查中…</span>
+          <button id="fontStitch" class="mini">缝合</button></li>
+        <li><b>编译语言包并部署</b><span class="step-note">下面第 2 步</span></li>
+        <li><b>启动验证</b><span class="step-note">下面第 3 步</span></li>
+      </ol>
+      <p id="fontMsg" class="msg"></p>
+    </section>
 
     <section class="card">
       <h2>1 游戏目录</h2>
