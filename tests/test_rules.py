@@ -26,6 +26,12 @@ class TestZhRules(unittest.TestCase):
         out = zh.normalize("支付 @g$TotalPrice$ 元")
         self.assertIn("@g$TotalPrice$", out)
 
+    def test_space_ellipsis(self):
+        self.assertEqual(ZH.space_ellipsis("等等…… 我"), "等等 …… 我")
+        self.assertEqual(ZH.space_ellipsis("等等 …… 我"), "等等 …… 我")
+        self.assertEqual(ZH.space_ellipsis("…… 开头"), "…… 开头")
+        self.assertEqual(ZH.space_ellipsis("……"), "……")
+
     def test_space_dash(self):
         self.assertEqual(ZH.space_dash("关头—— 就在"), "关头 —— 就在")
         self.assertEqual(ZH.space_dash("关头 —— 就在"), "关头 —— 就在")
