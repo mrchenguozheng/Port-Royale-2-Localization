@@ -36,7 +36,7 @@ CONJ = ("因为", "所以", "但是", "如果", "虽然", "然后", "而且", "�
         "即使", "尽管", "然而", "可是", "因而", "从而", "况且", "何况", "假如", "要是",
         "一旦", "以便", "以免", "甚至", "反而", "否则", "不然", "总之", "也就是说")
 SINGLE_CONJ = {"但": "是", "而": "是且也又在对就", "却": "是也又就",
-               "并": "且不没未非能会已将无发", "或": "者是许", "因": "为", "所": "以"}
+               "并": "且不没未非能会已将无发", "或": "者是许", "因": "为此", "所": "以"}
 PUNCT_CHARS = "，。！？；：、…—）)」』】》”’·"
 TITLES = ("先生", "爵士", "女士", "小姐", "夫人", "船长", "总督", "副王", "国王",
           "女王", "伯爵", "将军", "指挥官", "上校", "中尉", "少校", "神父", "医生")
@@ -215,6 +215,11 @@ def space_dash(text):
     return re.sub(r" *—— *", repl, text)
 
 
+def join_words(text):
+    """不该断开的常用词：因此。"""
+    return re.sub(r"因\s+此", "因此", text)
+
+
 def space_ellipsis(text):
     """中文省略号 …… 的前后各留一个空格（段首/段尾除外）。"""
     def repl(m):
@@ -258,7 +263,7 @@ def generate():
                 continue
             spans = find_names(part, given, surn, extras + towns)
             res.append(pad_names(part, spans, towns) if spans else part)
-        c = space_before_double_break(space_ellipsis(space_dash(space_years("".join(res)))))
+        c = space_before_double_break(space_ellipsis(space_dash(space_years(join_words("".join(res))))))
         stats["punct"] += a != text
         stats["conj"] += b != a
         stats["name"] += c != b

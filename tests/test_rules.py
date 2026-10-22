@@ -26,6 +26,10 @@ class TestZhRules(unittest.TestCase):
         out = zh.normalize("支付 @g$TotalPrice$ 元")
         self.assertIn("@g$TotalPrice$", out)
 
+    def test_join_words(self):
+        self.assertEqual(ZH.join_words("。 因 此， 只有"), "。 因此， 只有")
+        self.assertEqual(ZH.join_words("因此"), "因此")
+
     def test_space_ellipsis(self):
         self.assertEqual(ZH.space_ellipsis("等等…… 我"), "等等 …… 我")
         self.assertEqual(ZH.space_ellipsis("等等 …… 我"), "等等 …… 我")
