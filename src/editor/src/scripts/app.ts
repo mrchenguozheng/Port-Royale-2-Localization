@@ -1522,13 +1522,13 @@ $('lang').addEventListener('change', (ev) => {
       sel.value = S.lang;
       return;
     }
+    const keepId = S.rows[0] ? S.rows[0].id : '';
     S.lang = next;
     remember(LS_LANG, S.lang);
-    // 换编辑语言：重新取列表与当前页。
+    // 换编辑语言：列表重取，但仍停在当前这条。
     await loadSideList();
     await reload(true);
-    const sp = Number(saved(pageKey()));
-    if (sp > 1) await renderPage(sp);
+    if (keepId) await jumpToId(keepId);
     updatePath();
   })();
 });
