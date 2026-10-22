@@ -1077,13 +1077,33 @@ class Handler(BaseHTTPRequestHandler):
             if c is None:
                 return self.send_json({"detail": "no such entry"}, 404)
             zh = c.get("zh") or ""
+            en = c.get("en") or ""
             spaces = [i for i, ch in enumerate(zh) if ch == " "]
+            en_ph = placeholders_of(en)
+            zh_ph = placeholders_of(zh)
+            missing = [t for t in en_ph if t not in zh_ph]
+            extra = [t for t in zh_ph if t not in en_ph]
+            # 「干净文本」的空格：只算夹在拉丁字母/数字之间的那些
+            # （如 Port Royale 2）；标点后补的排版空格不算。
+            clean_spaces = 0
+            for i, ch in enumerate(zh):
+                if ch != " ":
+                    continue
+                l = zh[i - 1] if i else ""
+                r = zh[i + 1] if i + 1 < len(zh) else ""
+                if (l.isascii() and l.isalnum()) or (r.isascii() and r.isalnum()):
+                    clean_spaces += 1
             return self.send_json({
                 "placeholders": c.get("placeholders") or [],
                 "tags": c.get("tags") or [],
-                "spaces": spaces,
+                "missing": missing,
+                "extra": extra,
+                "used": zh_ph,
+                "spaces": len(spaces),
+                "clean_spaces": clean_spaces,
+                "extra_spaces": len(spaces) - clean_spaces,
                 "length": len(zh),
-                "en_len": len(c.get("en") or ""),
+                "en_len": len(en),
             })
 
         if path == "/api/context":

@@ -472,18 +472,76 @@ async function loadEntryInfo(id: string) {
       `/api/entry-info?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
     if (box !== document.getElementById('infoBar')) return;
     const ph = r.placeholders || [];
-    const phText = ph.length ? ph.map((p) => `${p.token} = ${p.meaning}`).join(' · ')
-                             : '无';
-    box.appendChild(el('span', 'info-ph', '占位符：' + phText));
-    const spaces = r.spaces || [];
+    const missing = new Set(r.missing || []);
+    const used = new Set(r.used || []);
+    const extras = r.extra || [];
+    if (!ph.length && !extras.length) {
+      box.appendChild(el('span', 'info-ph', '占位符：无'));
+    }
+    for (const p of ph) {
+      const chip = el('span', 'ph-chip');
+      chip.appendChild(el('span', 'ph-tok', p.token));
+      chip.appendChild(el('span', 'ph-mean', p.meaning));
+      if (missing.has(p.token)) {
+        const b = el('button', 'mini ph-btn', '插入');
+        b.addEventListener('click', () => insertAtCaret(p.token));
+        chip.appendChild(b);
+      } else if (used.has(p.token)) {
+        const b = el('button', 'mini ph-btn', '移除');
+        b.addEventListener('click', () => removeToken(p.token));
+        chip.appendChild(b);
+      }
+      box.appendChild(chip);
+    }
+    for (const t of extras) {
+      const chip = el('span', 'ph-chip ph-extra');
+      chip.appendChild(el('span', 'ph-tok', t));
+      chip.appendChild(el('span', 'ph-mean', '原文没有'));
+      const b = el('button', 'mini ph-btn', '移除');
+      b.addEventListener('click', () => removeToken(t));
+      chip.appendChild(b);
+      box.appendChild(chip);
+    }
+    const extraSp = r.extra_spaces || 0;
     box.appendChild(el('span', 'info-sp',
-      `空格：${spaces.length} 处` + (spaces.length ? `（位置 ${spaces.slice(0, 24).join(', ')}）` : '')));
+      extraSp > 0 ? `空格：多 ${extraSp} 处` : '空格：与干净文本一致'));
     if (r.tags && r.tags.length) {
       box.appendChild(el('span', 'info-tag', '标记：' + r.tags.join('、')));
     }
   } catch {
     box.textContent = '';
   }
+}
+
+function zhEditor(): HTMLElement | null {
+  return document.querySelector('.cell-zh .edit') as HTMLElement | null;
+}
+
+function insertAtCaret(text: string) {
+  const ed = zhEditor();
+  if (!ed) return;
+  ed.focus();
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && ed.contains(sel.anchorNode)) {
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(document.createTextNode(text));
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  } else {
+    ed.appendChild(document.createTextNode(text));
+  }
+  ed.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function removeToken(tok: string) {
+  const ed = zhEditor();
+  if (!ed) return;
+  const text = ed.textContent || '';
+  ed.textContent = text.split(tok).join('');
+  ed.dispatchEvent(new Event('input', { bubbles: true }));
+  ed.focus();
 }
 
 function rowOf(e: Entry): HTMLElement {
