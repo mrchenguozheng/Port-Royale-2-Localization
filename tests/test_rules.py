@@ -49,6 +49,13 @@ class TestZhRules(unittest.TestCase):
         self.assertEqual(ZH.space_dash("—— 开头"), "—— 开头")
         self.assertEqual(ZH.space_dash("范围 1554 — 1618"), "范围 1554 — 1618")
 
+    def test_space_tokens(self):
+        self.assertEqual(
+            ZH.space_tokens("在1502 年元旦—— 就这样<n><n>下一段"),
+            "在 1502 年元旦 —— 就这样 <n><n>下一段")
+        self.assertEqual(ZH.space_tokens("<n><n>开头"), "<n><n>开头")
+        self.assertEqual(ZH.space_tokens("<o:0xFF131512>年"), "<o:0xFF131512>年")
+
     def test_space_years(self):
         self.assertEqual(ZH.space_years("约1554 — 1618年"), "约 1554 — 1618 年")
         self.assertEqual(ZH.space_years("在1502 年"), "在 1502 年")

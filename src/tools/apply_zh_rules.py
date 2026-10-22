@@ -197,6 +197,46 @@ def _is_han(ch):
     return ch and "\u4e00" <= ch <= "\u9fff"
 
 
+SPLIT_RX = re.compile(r"(<n><n>|<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z])")
+
+
+def space_tokens(text):
+    """一次扫描：4 位年份、——、…… 补空格，<n><n> 前补空格。"""
+    out = []
+    for part in SPLIT_RX.split(text):
+        if part == "<n><n>":
+            if out and not out[-1].endswith(" "):
+                out.append(" ")
+            out.append(part)
+            continue
+        if not part:
+            continue
+        if part[0] in "<@" or (part.startswith("%") and len(part) <= 6):
+            out.append(part)
+            continue
+
+        seg = part
+
+        def year_repl(m):
+            s0 = m.group(0)
+            left = seg[m.start() - 1] if m.start() > 0 else ""
+            right = seg[m.end()] if m.end() < len(seg) else ""
+            pre = " " if _is_han(left) else ""
+            post = " " if _is_han(right) else ""
+            return pre + s0 + post
+
+        seg = re.sub(r"(?<!\d)\d{4}(?!\d)", year_repl, seg)
+
+        def mark_repl(m):
+            mark = m.group(0).strip()
+            pre = " " if m.start() > 0 and seg[m.start() - 1] not in " \n" else ""
+            post = "" if m.end() >= len(seg) or seg[m.end()] in " \n" else " "
+            return pre + mark + post
+
+        out.append(re.sub(r" *—— *| *…… *", mark_repl, seg))
+    return "".join(out)
+
+
 def space_years(text):
     """4 位年份与相邻汉字之间补空格（标签/占位符内部不动）。"""
     parts = TAG.split(text)
@@ -297,7 +337,7 @@ def generate():
                 continue
             spans = find_names(part, given, surn, extras + towns)
             res.append(pad_names(part, spans, towns) if spans else part)
-        c = collapse_spaces(soft_wrap(space_marks(space_years(fix_conj("".join(res))))))
+        c = collapse_spaces(soft_wrap(space_tokens(fix_conj("".join(res)))))
         stats["punct"] += a != text
         stats["conj"] += b != a
         stats["name"] += c != b
