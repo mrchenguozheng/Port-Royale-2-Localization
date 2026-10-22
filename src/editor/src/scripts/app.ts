@@ -96,7 +96,13 @@ const $ = (id: string) => document.getElementById(id)!;
 
 function initTabs() {
   for (const t of document.querySelectorAll('.tab')) {
-    t.addEventListener('click', () => setView((t as HTMLElement).dataset.view || 'editor'));
+    t.addEventListener('click', () => {
+      const view = (t as HTMLElement).dataset.view || 'editor';
+      void (async () => {
+        if (view === 'start' && !(await guardLeave())) return;
+        setView(view);
+      })();
+    });
   }
   setView(location.pathname.replace(/\/$/, '') === '/install' || location.hash === '#start' ? 'start' : 'editor');
 }
@@ -238,7 +244,22 @@ function pageCount(): number {
 }
 
 /** 取第 p 页并渲染。越界会被夹回有效范围。 */
+async function guardLeave(): Promise<boolean> {
+  if (!S.dirtyIds.length) return true;
+  const ok = window.confirm('当前条目还有未保存的改动，先保存再离开？');
+  if (!ok) return false;
+  await save();
+  return S.dirtyIds.length === 0;
+}
+
+window.addEventListener('beforeunload', (ev) => {
+  if (!S.dirtyIds.length) return;
+  ev.preventDefault();
+  ev.returnValue = '';
+});
+
 async function renderPage(p: number) {
+  if (!(await guardLeave())) return;
   setLoading(true);
   const pages = pageCount();
   p = Math.min(Math.max(1, p), pages);
@@ -489,6 +510,13 @@ async function revertClean(id: string) {
   try {
     const r = await api<{ text: string }>(
       `/api/clean?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
+    const ed = zhEditor();
+    const cur = ed ? (ed.textContent || '') : '';
+    if (cur) {
+      const st = S.undo[id] || (S.undo[id] = []);
+      st.push(cur);
+      if (st.length > 20) st.shift();
+    }
     setEditorText(r.text);
     void loadEntryInfo(id);
   } catch (err) {
@@ -746,7 +774,7 @@ function zhCell(e: Entry): HTMLElement {
       if (prev !== undefined && prev !== v) {
         const st = S.undo[e.id] || (S.undo[e.id] = []);
         st.push(prev);
-        if (st.length > 50) st.shift();
+        if (st.length > 20) st.shift();
       }
     }
     S.last[e.id] = v;
@@ -1193,10 +1221,16 @@ $('pageInput').addEventListener('change', () => {
 });
 
 $('lang').addEventListener('change', (ev) => {
-  S.lang = (ev.target as HTMLSelectElement).value;
-  remember(LS_LANG, S.lang);
-  // 换编辑语言等于换了一列数据：审核勾选也要换一份，再把当前页重画。
+  const sel = ev.target as HTMLSelectElement;
+  const next = sel.value;
   void (async () => {
+    if (!(await guardLeave())) {
+      sel.value = S.lang;
+      return;
+    }
+    S.lang = next;
+    remember(LS_LANG, S.lang);
+    // 换编辑语言等于换了一列数据：审核勾选也要换一份，再把当前页重画。
     try {
       const f = await api<{ ids: string[]; count: number }>(
         '/api/review-flags?lang=' + encodeURIComponent(S.lang));
