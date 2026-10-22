@@ -308,16 +308,16 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                                 NULL, NULL);
         CreateWindowW(L"BUTTON", T("button.launch"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                      16, 84, 170, 32, hwnd, (HMENU)ID_LAUNCH, NULL, NULL);
+                      16, 84, 190, 32, hwnd, (HMENU)ID_LAUNCH, NULL, NULL);
         CreateWindowW(L"BUTTON", T("button.vanilla"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                      196, 84, 150, 32, hwnd, (HMENU)ID_VANILLA, NULL, NULL);
+                      216, 84, 150, 32, hwnd, (HMENU)ID_VANILLA, NULL, NULL);
         CreateWindowW(L"BUTTON", T("button.refresh"),
                       WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-                      356, 84, 80, 32, hwnd, (HMENU)ID_REFRESH, NULL, NULL);
+                      376, 84, 80, 32, hwnd, (HMENU)ID_REFRESH, NULL, NULL);
         g_status = CreateWindowW(L"STATIC", L"",
                                  WS_CHILD | WS_VISIBLE | SS_LEFT,
-                                 16, 126, 420, 40, hwnd, (HMENU)ID_STATUS,
+                                 16, 126, 440, 40, hwnd, (HMENU)ID_STATUS,
                                  NULL, NULL);
         LoadLanguages();
         return 0;
@@ -361,7 +361,7 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
     HWND hwnd = CreateWindowW(L"PR2LauncherGUI", T("title"),
                               WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU |
                               WS_MINIMIZEBOX,
-                              CW_USEDEFAULT, CW_USEDEFAULT, 470, 210,
+                              CW_USEDEFAULT, CW_USEDEFAULT, 490, 210,
                               NULL, NULL, inst, NULL);
     ShowWindow(hwnd, show);
     UpdateWindow(hwnd);
