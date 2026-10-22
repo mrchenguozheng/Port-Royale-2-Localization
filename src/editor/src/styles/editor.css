@@ -1339,6 +1339,9 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .cell-zh .edit .hl-sp.hit-names {
   background: rgba(80, 200, 120, 0.5); box-shadow: inset 0 -2px 0 #50c878;
 }
+.cell-zh .edit .hl-sp.hit-pad {
+  background: rgba(255, 170, 0, 0.5); box-shadow: inset 0 -2px 0 #ffaa00;
+}
 
 .ph-token .ph-mean-inline {
   margin-left: 0.3rem;

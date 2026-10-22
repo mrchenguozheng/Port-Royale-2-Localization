@@ -580,7 +580,7 @@ async function openRules(id: string) {
         `/api/rule-hits?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
       const row = el('div', 'rule-stage');
       row.appendChild(el('div', 'rule-label',
-        hr.same ? '命中标注' : '命中标注（当前译文与规则生成不同，这里标的是生成结果）'));
+        hr.same ? '命中标注' : '命中标注（当前译文与初版文字不同，无法标注）'));
       const body = el('div', 'rule-text');
       let pos = 0;
       for (const hit of (hr.hits || []).slice().sort((a, b) => a.start - b.start)) {
@@ -1288,6 +1288,7 @@ function redraw(id: string) {
   if (!old || !src) return;
   const fresh = rowOf(src);
   old.replaceWith(fresh);
+  void loadEntryInfo(id);
 }
 
 function cssEsc(s: string): string {
