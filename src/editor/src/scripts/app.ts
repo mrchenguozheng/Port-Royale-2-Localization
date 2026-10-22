@@ -1365,7 +1365,12 @@ function openAddLang() {
   ($('newOk') as HTMLButtonElement).disabled = false;
 
   const from = $('newFrom') as HTMLSelectElement;
-  fill(from, S.refLangs, S.refLangs.includes(S.lang) ? S.lang : 'en');
+  // 默认模板必须存在且与基准表对齐；fr 这类条数不一致的会在服务端被拒绝。
+  const def = S.refLangs.includes(S.lang)
+    ? S.lang
+    : (S.refLangs.includes(S.refA) ? S.refA
+      : (S.refLangs.find((x) => x.startsWith('en')) || S.refLangs[0] || ''));
+  fill(from, S.refLangs, def);
 
   $('modal').hidden = false;
   code.focus();
