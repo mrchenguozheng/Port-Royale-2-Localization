@@ -171,7 +171,7 @@ function setView(view: string) {
   for (const t of document.querySelectorAll('.tab')) {
     t.classList.toggle('active', (t as HTMLElement).dataset.view === view);
   }
-  history.replaceState(null, '', start ? '/install' : (S.rows[0] ? `/translate/${S.page}` : '/translate'));
+  history.replaceState(null, '', start ? '/install' : (S.rows[0] ? `/translate/${S.lang}/${S.page}` : '/translate'));
 }
 
 async function boot() {
@@ -195,6 +195,9 @@ async function boot() {
   if (savedA && S.refLangs.includes(savedA)) S.refA = savedA;
   const savedB = saved(LS_REFB);
   if (savedB !== null && (savedB === FOLLOW || S.refLangs.includes(savedB))) S.refB = savedB;
+
+  const mFull = initialPath.match(/^\/translate\/([A-Za-z][A-Za-z-]*)\/(.+)$/);
+  if (mFull && S.langs.includes(mFull[1])) S.lang = mFull[1];
 
   S.filter = 'all';
   // 参照默认取基准语言（en.gog_1.1.2.3 这类带来源与版本的名字）。
@@ -220,17 +223,24 @@ async function boot() {
   const sp = Number(saved(pageKey()));
   if (sp > 1) await renderPage(sp);
 
-  const mNum = initialPath.match(/^\/translate\/(\d+)$/);
+  const mFullHash = initialPath.match(/^\/translate\/[A-Za-z][A-Za-z-]*\/(?:0x)?([0-9a-f]{8})$/i);
+  const mFullNum = initialPath.match(/^\/translate\/[A-Za-z][A-Za-z-]*\/(\d+)$/);
   const mHash = initialPath.match(/^\/translate\/(?:0x)?([0-9a-f]{8})$/i);
-  if (mHash) await jumpToId('0x' + mHash[1].toLowerCase());
-  else if (mNum) await renderPage(Number(mNum[1]));
+  const mNum = initialPath.match(/^\/translate\/(\d+)$/);
+  if (mFullHash || mHash) {
+    await jumpToId('0x' + (mFullHash ? mFullHash[1] : mHash![1]).toLowerCase());
+  } else if (mFullNum) {
+    await renderPage(Number(mFullNum[1]));
+  } else if (mNum) {
+    await renderPage(Number(mNum[1]));
+  }
   updatePath();
 }
 
 function updatePath() {
   if (document.body.classList.contains('view-start')) return;
   const row = S.rows[0];
-  const path = row ? `/translate/${S.page}` : '/translate';
+  const path = row ? `/translate/${S.lang}/${S.page}` : '/translate';
   if (location.pathname !== path) history.replaceState(null, '', path);
 }
 
