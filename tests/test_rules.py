@@ -52,6 +52,28 @@ class TestZhRules(unittest.TestCase):
         self.assertEqual(ZH.space_before_double_break("<n><n>开头"),
                          "<n><n>开头")
 
+    def test_live_long_text_names_have_spaces(self):
+        """长句里的已知人名前后必须已有空格（标点/标题除外）。"""
+        import tomllib
+        doc = tomllib.load(open(os.path.join(ROOT, "src", "seed", "zh.toml"), "rb"))
+        given, surn, extras, _towns = ZH.build_names(doc)
+        live = tomllib.load(open(os.path.join(ROOT, "src", "live", "zh.toml"), "rb"))
+        bad = []
+        for h, v in live.items():
+            if not isinstance(v, str) or len(v) < 30:
+                continue
+            parts = ZH.TAG.split(v)
+            for i, part in enumerate(parts):
+                if i % 2:
+                    continue
+                for start, end in ZH.find_names(part, given, surn, extras):
+                    left = part[start - 1] if start else ""
+                    right = part[end] if end < len(part) else ""
+                    han = lambda c: bool(c) and "\u4e00" <= c <= "\u9fff"
+                    if (han(left) or han(right)):
+                        bad.append((h, part[start:end]))
+        self.assertEqual(bad, [])
+
     def test_generate_keys_match_live(self):
         # live 可手改，不再要求和规则输出逐字一致，但键集合必须一致。
         order, out, _ = ZH.generate()
