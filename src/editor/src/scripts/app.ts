@@ -1043,14 +1043,9 @@ function zhCell(e: Entry): HTMLElement {
 function highlightSpaces(text: string, hits?: Hit[], base = 0): DocumentFragment {
   const f = document.createDocumentFragment();
   if (!text) return f;
-
   let buf = '';
-  let run = false;
-  const flush = () => {
-    if (run) { f.appendChild(el('span', 'hl-sp run', buf)); buf = ''; run = false; }
-  };
-
   let idx = base;
+  const flush = () => { if (buf) { f.appendChild(document.createTextNode(buf)); buf = ''; } };
   for (const ch of text) {
     if (ch === ' ') {
       const hit = hits ? hits.find((h) => idx >= h.start && idx < h.end) : undefined;
@@ -1059,7 +1054,6 @@ function highlightSpaces(text: string, hits?: Hit[], base = 0): DocumentFragment
         f.appendChild(el('span', 'hl-sp hit-' + hit.type, ch));
       } else {
         buf += ch;
-        run = true;
       }
     } else {
       flush();
@@ -1071,11 +1065,14 @@ function highlightSpaces(text: string, hits?: Hit[], base = 0): DocumentFragment
   return f;
 }
 
+interface Hit { start: number; end: number; type: string; }
+
 const TOKEN_RX = /@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]/g;
 
 function tokenSpan(tok: string): HTMLElement {
   const span = el('span', 'ph-token', tok);
   span.contentEditable = 'false';
+  span.setAttribute('contenteditable', 'false');
   span.draggable = true;
   span.dataset.token = tok;
   span.title = '拖动可换位置；占位符不能删除';
@@ -1090,8 +1087,6 @@ function tokenSpan(tok: string): HTMLElement {
   span.addEventListener('dragend', () => span.classList.remove('dragging'));
   return span;
 }
-
-interface Hit { start: number; end: number; type: string; }
 
 function renderRich(text: string, hits?: Hit[]): DocumentFragment {
   const f = document.createDocumentFragment();
