@@ -3,7 +3,7 @@
 r"""src/tools/compile_pack.py — 把 translations\<语言>.toml 编译成引擎能读的语言包
 
     python src/tools/compile_pack.py                        # 编 zh（默认）
-    python src/tools/compile_pack.py --lang de --out <游戏目录>
+    python src/tools/compile_pack.py --lang de --out <输出目录>
 
 只做一件事：**占位符校验**。译文里的 %1 / @D$EndDate$ 必须与原文
 一一对应，种类、数量、写法全都要对；顺序可以按中文语序调。
