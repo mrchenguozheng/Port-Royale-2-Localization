@@ -53,9 +53,10 @@ conj_re = re.compile(
 
 
 def fix_conj(text):
-    return conj_re.sub(
+    text = conj_re.sub(
         lambda m: m.group("pre") + m.group("gap") + m.group("conj") + " " + m.group("next"),
         text)
+    return text.replace("因 此", "因此")
 
 
 def load_list(name):
@@ -80,6 +81,27 @@ def build_names(doc):
 name_re = None
 
 
+_NAME_CACHE = {}
+
+
+def _name_regexes(all_names):
+    key = frozenset(all_names)
+    hit = _NAME_CACHE.get(key)
+    if hit is not None:
+        return hit
+
+    bare = sorted((n for n in all_names if len(n) >= 3), key=len, reverse=True)
+    bare_re = re.compile("|".join(map(re.escape, bare))) if bare else None
+
+    names_alt = "|".join(map(re.escape, sorted(all_names, key=len, reverse=True)))
+    titles_alt = "|".join(map(re.escape, sorted(TITLES, key=len, reverse=True)))
+    titled_re = re.compile(
+        "(%s)\\s*((?:[\\u4e00-\\u9fff]{1,3}世|\\d+世)(?:\\s*(?:%s))?|(?:%s))"
+        % (names_alt, titles_alt, titles_alt))
+    _NAME_CACHE[key] = (bare_re, titled_re)
+    return bare_re, titled_re
+
+
 def find_names(text, given, surn, extras):
     global name_re
     if name_re is None:
@@ -90,22 +112,10 @@ def find_names(text, given, surn, extras):
     spans = [(m.start(), m.end()) for m in name_re.finditer(text)]
 
     all_names = set(given) | set(surn) | set(extras)
-    # 三字及以上的名字可以单独出现；两字名只在后面接序数/头衔时才算。
-    for name in sorted((n for n in all_names if len(n) >= 3), key=len, reverse=True):
-        start = 0
-        while True:
-            k = text.find(name, start)
-            if k < 0:
-                break
-            spans.append((k, k + len(name)))
-            start = k + len(name)
-
-    titled = re.compile(
-        "(%s)\\s*((?:[\\u4e00-\\u9fff]{1,3}世|\\d+世)(?:\\s*(?:%s))?|(?:%s))"
-        % ("|".join(map(re.escape, sorted(all_names, key=len, reverse=True))),
-           "|".join(map(re.escape, sorted(TITLES, key=len, reverse=True))),
-           "|".join(map(re.escape, sorted(TITLES, key=len, reverse=True)))))
-    spans.extend(m.span() for m in titled.finditer(text))
+    bare_re, titled_re = _name_regexes(all_names)
+    if bare_re:
+        spans.extend(m.span() for m in bare_re.finditer(text))
+    spans.extend(m.span() for m in titled_re.finditer(text))
 
     # 引号里的通常是船名/书名，不按人名加空格。
     quotes = [(m.start(), m.end()) for m in
@@ -205,14 +215,22 @@ def space_years(text):
     return "".join(parts)
 
 
-def space_dash(text):
-    """中文破折号 —— 的前后各留一个空格（段首/段尾除外）。"""
-    def repl(m):
-        pre = " " if m.start() > 0 else ""
-        post = " " if m.end() < len(text) else ""
-        return pre + "——" + post
+def space_marks(text):
+    """——、…… 前后加空格；<n><n> 前加空格。"""
+    marks = {"——", "……", "<n><n>"}
 
-    return re.sub(r" *—— *", repl, text)
+    def repl(m):
+        mark = m.group(0).strip()
+        before_only = mark == "<n><n>"
+        pre = " " if m.start() > 0 and text[m.start() - 1] not in " \n" else ""
+        post = "" if before_only or m.end() >= len(text) or text[m.end()] in " \n" else " "
+        return pre + mark + post
+
+    return re.sub(r" *—— *| *…… *|<n><n>", repl, text)
+
+
+def space_dash(text):
+    return space_marks(text)
 
 
 def soft_wrap(text, limit=16, step=12):
@@ -242,20 +260,15 @@ def join_words(text):
 
 
 def space_ellipsis(text):
-    """中文省略号 …… 的前后各留一个空格（段首/段尾除外）。"""
-    def repl(m):
-        pre = " " if m.start() > 0 else ""
-        post = " " if m.end() < len(text) else ""
-        return pre + "……" + post
-
-    return re.sub(r" *…… *", repl, text)
+    return space_marks(text)
 
 
 def space_before_double_break(text):
-    """<n><n> 前必须有一个空格（段首除外）。"""
-    if text.startswith("<n><n>"):
-        return text
-    return re.sub(r"(?<! )<n><n>", " <n><n>", text)
+    return space_marks(text)
+
+
+def collapse_spaces(text):
+    return re.sub(r" {2,}", " ", text)
 
 
 def generate():
@@ -284,7 +297,7 @@ def generate():
                 continue
             spans = find_names(part, given, surn, extras + towns)
             res.append(pad_names(part, spans, towns) if spans else part)
-        c = soft_wrap(space_before_double_break(space_ellipsis(space_dash(space_years(join_words("".join(res)))))))
+        c = collapse_spaces(soft_wrap(space_marks(space_years(fix_conj("".join(res))))))
         stats["punct"] += a != text
         stats["conj"] += b != a
         stats["name"] += c != b
