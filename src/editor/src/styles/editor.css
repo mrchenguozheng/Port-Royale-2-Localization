@@ -27,9 +27,9 @@
   --fg-id:      #6e7781;
   --line:       #d0d7de;
   --line-soft:  #e4e8ed;
-  --accent:     #2563eb;
-  --warn:       #b45309;
-  --err:        #cf222e;
+  --accent:     #333333;
+  --warn:       #444444;
+  --err:        #222222;
 
   /* --cols 由 JS 设成参照语言个数。 */
   --cols: 2;
@@ -44,8 +44,8 @@
   --font-zh:   "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC",
                var(--font-mono);
 
-  --sp-mark: #dbe4f0;      /* 空格高亮底色 */
-  --sp-mark-b: #c9d6e6;
+  --sp-mark: #e6e6e6;      /* 空格高亮底色 */
+  --sp-mark-b: #d4d4d4;
 }
 
 * { box-sizing: border-box; }
@@ -521,12 +521,12 @@ main {
 /* ── 主题与配色 ───────────────────────────────────────── */
 
 :root {
-  --ok: #1a7f37;
-  --accent-soft: rgba(37, 99, 235, 0.12);
+  --ok: #333333;
+  --accent-soft: rgba(0, 0, 0, 0.08);
   --bg-zh: #ffffff;
   --head-bg: #f6f8fa;
-  --tag: #0550ae;
-  --term: #9a6700;
+  --tag: #444444;
+  --term: #555555;
 }
 
 
@@ -609,26 +609,6 @@ body, .bar, .head, .row, .stack, .cell-zh, .cell-zh .edit, .sp-layer,
 .ctx-ph { color: var(--fg-dim); }
 .ctx-nb { color: var(--fg-id); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ── 更鲜明的深色配色 ─────────────────────────────────── */
-:root {
-  --bg:         #0e1116;
-  --bg-soft:    #171b22;
-  --bg-row:     #212a36;
-  --bg-row-alt: #1a2029;
-  --fg:         #e7eef9;
-  --fg-dim:     #9aa8bb;
-  --fg-id:      #78859a;
-  --line:       #333d4d;
-  --line-soft:  #27303c;
-  --accent:     #6cb6ff;
-  --ok:         #4ade80;
-  --warn:       #fbbf24;
-  --err:        #f87171;
-  --tag:        #9ecbff;
-  --term:       #fbbf24;
-  --head-bg:    #12161d;
-  --bg-zh:      #10151b;
-}
 
 /* 顶部操作栏：原来在底部，挪上来少跑眼睛 */
 .topbar {
@@ -1275,7 +1255,7 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .ph-chip.ph-extra { border-color: var(--danger, #d9534f); }
 .ph-btn { padding: 0 0.35rem; font-size: 0.85em; }
 
-.ph-chip.ph-missing { border-color: var(--accent); background: rgba(255, 170, 0, 0.08); }
+.ph-chip.ph-missing { border-color: var(--accent); background: #f0f0f0; }
 
 .ph-chip.ph-bad { border-color: var(--danger, #d9534f); background: rgba(217, 83, 79, 0.12); }
 .ph-chip .ph-x { color: var(--danger, #d9534f); font-family: var(--font-mono); }
@@ -1284,7 +1264,7 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .ph-token {
   display: inline-block; margin: 0 1px; padding: 0 0.3rem;
   border: 1px solid var(--accent); border-radius: 4px;
-  background: rgba(255, 170, 0, 0.12);
+  background: #ececec;
   color: var(--accent); font-family: var(--font-mono); font-size: 0.95em;
   cursor: grab; user-select: none;
 }
@@ -1321,12 +1301,9 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   font-family: var(--font-mono); font-size: 0.92em; white-space: pre-wrap;
   background: var(--bg-row-alt); border-radius: 4px; padding: 0.3rem 0.5rem;
 }
-.rule-stage mark { background: rgba(255, 170, 0, 0.28); color: var(--fg); }
+.rule-stage mark { background: #dcdcdc; color: var(--fg); }
 
 .rule-stage .hit { border-radius: 2px; }
-.rule-stage .hit-punct { background: rgba(255, 170, 0, 0.28); }
-.rule-stage .hit-conj { background: rgba(80, 160, 255, 0.28); }
-.rule-stage .hit-names { background: rgba(80, 200, 120, 0.28); }
 .rule-stage .hit:hover { outline: 1px solid var(--accent); }
 
 
@@ -1418,3 +1395,18 @@ sl-select::part(listbox) {
 sl-option::part(base) { background: transparent; color: var(--fg); }
 sl-option:hover::part(base) { background: var(--bg-row); }
 sl-dialog::part(panel) { background: var(--head-bg); }
+
+/* 全灰度：Shoelace 主色也换成灰 */
+:root {
+  --sl-color-primary-50: #f7f7f7;
+  --sl-color-primary-100: #ededed;
+  --sl-color-primary-200: #e0e0e0;
+  --sl-color-primary-300: #cccccc;
+  --sl-color-primary-400: #b3b3b3;
+  --sl-color-primary-500: #999999;
+  --sl-color-primary-600: #333333;
+  --sl-color-primary-700: #2b2b2b;
+  --sl-color-primary-800: #222222;
+  --sl-color-primary-900: #1a1a1a;
+  --sl-focus-ring-color: rgba(0, 0, 0, 0.25);
+}

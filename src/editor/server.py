@@ -226,42 +226,6 @@ def rule_trace(hid, lang):
     return stages
 
 
-def rule_hits(hid, lang):
-    """以当前工作文本为准：标出「种子文本里没有、但正文里有」的空格。"""
-    seed_path = os.path.join(os.path.dirname(SRC), "src", "seed", "%s.toml" % lang)
-    if not os.path.isfile(seed_path):
-        return None
-    seed_doc = tomllib.load(open(seed_path, "rb"))
-    seed = seed_doc.get(hid)
-    if seed is None:
-        return None
-    live = {r["id"]: r.get(lang, "") for r in load_all()}.get(hid, "")
-
-    # 去掉空格后若文字不同，说明不是同一份内容，不标。
-    if seed.replace(" ", "") != live.replace(" ", ""):
-        return {"text": live, "live": live, "same": False, "hits": []}
-
-    # 种子文本里已有的空格边界（前面有多少个非空格字符）
-    bounds = set()
-    k = 0
-    for ch in seed:
-        if ch == " ":
-            bounds.add(k)
-        else:
-            k += 1
-
-    hits = []
-    k = 0
-    for i, ch in enumerate(live):
-        if ch == " ":
-            if k not in bounds:
-                hits.append({"start": i, "end": i + 1, "type": "pad",
-                             "label": "规则补的空格"})
-        else:
-            k += 1
-    return {"text": live, "live": live, "same": True, "hits": hits}
-
-
 def known_dirs():
     """settings 里记住过的游戏目录，按最近使用排序。"""
     st = P.load_settings()
