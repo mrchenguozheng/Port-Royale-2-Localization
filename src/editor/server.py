@@ -77,6 +77,9 @@ CURRENT_TOKEN = os.environ.get("PR2_EDITOR_TOKEN", "")
 #: serve_forever() 的那个实例。关服务时用它。
 SERVER = None
 
+#: 启动时刻与前端产物的时间，用来在页面上判断「后端是不是旧的」。
+STARTED = time.time()
+
 
 # ---------------------------------------------------------------- 校验
 
@@ -146,6 +149,43 @@ def _canon_breaks(s):
 START_JOB = {"running": False, "lines": [], "done": False, "ok": False,
              "kind": "", "error": ""}
 START_LOCK = threading.Lock()
+
+
+def health_info():
+    dist = DIST
+    try:
+        dist_mtime = max(os.path.getmtime(os.path.join(dp, f))
+                         for dp, _dn, fn in os.walk(dist) for f in fn)
+    except (OSError, ValueError):
+        dist_mtime = 0
+    return {
+        "app": "pr2-editor",
+        "pid": os.getpid(),
+        "port": CURRENT_PORT,
+        "token": CURRENT_TOKEN,
+        "started": STARTED,
+        "uptime": int(time.time() - STARTED),
+        "python": sys.version.split()[0],
+        "root": os.path.dirname(SRC),
+        "dist_mtime": int(dist_mtime),
+    }
+
+
+def server_instances():
+    """扫一遍编辑器常用端口，列出还在跑的实例（含自己）。"""
+    out = []
+    for port in range(8777, 8777 + 24):
+        try:
+            with urllib.request.urlopen(
+                    "http://127.0.0.1:%d/api/health" % port, timeout=0.3) as resp:
+                info = json.loads(resp.read().decode("utf-8"))
+        except Exception:
+            continue
+        if not isinstance(info, dict) or info.get("app") != "pr2-editor":
+            continue
+        info["current"] = port == CURRENT_PORT
+        out.append(info)
+    return {"current": CURRENT_PORT, "instances": out}
 
 
 def start_dir():
@@ -832,6 +872,16 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_file(full)
 
     def get_api(self, path, query):
+        if path == "/api/server/stop":
+            try:
+                port = int(body.get("port") or 0)
+            except (TypeError, ValueError):
+                return self.send_json({"ok": False, "error": "端口不对"})
+            if port in (0, CURRENT_PORT):
+                return self.send_json({"ok": False, "error": "不能停当前服务"})
+            ok = P.editor_shutdown(port)
+            return self.send_json({"ok": ok, "port": port})
+
         if path == "/api/start/dir":
             d = (body.get("path") or "").strip()
             if not P.is_game_dir(d):
@@ -891,8 +941,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/zh-review":
             return self.send_json(zh_review.status())
         if path == "/api/health":
-            return self.send_json({"app": "pr2-editor", "pid": os.getpid(),
-                                   "port": CURRENT_PORT, "token": CURRENT_TOKEN})
+            return self.send_json(health_info())
+
+        if path == "/api/server/instances":
+            return self.send_json(server_instances())
 
         if path == "/api/langs":
             return self.send_json({"editable": T.target_langs(),
@@ -1039,6 +1091,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def post_api(self, path):
         body = self.read_json()
+
+        if path == "/api/server/stop":
+            try:
+                port = int(body.get("port") or 0)
+            except (TypeError, ValueError):
+                return self.send_json({"ok": False, "error": "端口不对"})
+            if port in (0, CURRENT_PORT):
+                return self.send_json({"ok": False, "error": "不能停当前服务"})
+            ok = P.editor_shutdown(port)
+            return self.send_json({"ok": ok, "port": port})
 
         if path == "/api/start/dir":
             d = (body.get("path") or "").strip()
