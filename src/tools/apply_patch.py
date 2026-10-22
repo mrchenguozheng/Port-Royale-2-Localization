@@ -128,8 +128,7 @@ def main():
     if args.dry_run:
         for lang in langs:
             print("\n[计划] %s" % lang)
-            if not args.no_normalize:
-                    if not args.no_check:
+            if not args.no_check:
                 print("  check_breaks --lang %s --strict" % lang)
             print("  compile_pack --lang %s%s" % (lang, " --no-fonts" if args.no_fonts else ""))
         print("\n[计划] deploy -> %s（复制 %s）" % (target, "、".join(langs)))
