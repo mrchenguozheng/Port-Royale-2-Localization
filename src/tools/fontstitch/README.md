@@ -84,7 +84,12 @@ Arial 补满整个 GB2312（6,763 字）实测 **2.13 MB / 8,084 字形**。
 | Tiepolo-Bold | 标题 | 华文中宋 | 覆盖 24k 字符，最稳 |
 | Arial | 正文/UI | 微软雅黑 | 同为 2048 UPM，免缩放；12px 黑体最清晰 |
 
-这四组同时记录在 [`presets.toml`](presets.toml) 里（含 donor 路径与 `donor_index`），作为配置参考；`augment` 仍按显式路径调用，不依赖它。
+四组配对按语言记录在 [`presets.toml`](presets.toml)：`[[zh.pair]]` 是中文
+主 donor，`[[zh.supplement]]` 是缺字补充，`[fallback]` 是最后兜底。
+
+PR2 的 `subset_fonts.py` 直接读取这份配置：**只有配置了 `[<语言>]` 段的语言
+才会被缝进字体**，没配置的语言（目前是 `ja`）直接跳过。`augment` 本身仍按
+显式路径调用，不依赖配置。
 
 ## 限制
 

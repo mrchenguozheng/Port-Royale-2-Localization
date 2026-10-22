@@ -21,8 +21,11 @@
 依赖
 ----
 需要 fontTools。默认解释器没装时会尝试 ``PR2_FONTTOOLS_SITE``，再试
-``~/.workbuddy/binaries/python/envs/*/Lib/site-packages``。donor 路径来自
-``src/tools/fontstitch/presets.toml``，可用 ``%WINDIR%`` 等变量。
+``~/.workbuddy/binaries/python/envs/*/Lib/site-packages``。
+
+donor 按语言配置在 ``src/tools/fontstitch/presets.toml``：只有写了
+``[<语言>]`` 段的语言才会被缝进字体，没配置的语言直接跳过。目前只有
+``zh`` 配了 donor，``ja`` 等没有配置，所以不会给它们缝字形。
 
 缺 donor 或缺 fontTools 时只返回失败说明，不会把现有 build/fonts 覆盖成坏文件。
 """
@@ -38,7 +41,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.dirname(HERE)                       # 仓库的 src\
 ROOT = os.path.dirname(SRC_DIR)                       # 仓库根
 STRINGS = os.path.join(SRC_DIR, "live")
-REFS = os.path.join(SRC_DIR, "orig")
 
 DEFAULT_SRC = os.path.join(ROOT, "assets", "fonts", "original")
 DEFAULT_OUT = os.path.join(ROOT, "build", "fonts")
@@ -51,17 +53,7 @@ PRESETS = os.path.join(STITCH_DIR, "presets.toml")
 EXTRA = ("，。、；：！？…—～·「」『』“”《》【】（）〔〕〈〉［］％０１２３４５６７８９"
          "　￥· ‐–")
 
-#: 装饰字体：主 donor 覆盖不到的字符（假名、部分标点）用宋体补。
-SUPPLEMENT = {
-    "ELGRECO_.TTF": [("%WINDIR%\\Fonts\\STZHONGS.TTF", 0)],
-    "Tiepolo_black.ttf": [("%WINDIR%\\Fonts\\STZHONGS.TTF", 0)],
-    "Tiepolo_bold.ttf": [("%WINDIR%\\Fonts\\STZHONGS.TTF", 0)],
-}
-
-#: 最后一层兜底：假名和少数标点。
-FALLBACK = [("%WINDIR%\\Fonts\\NotoSansJP-VF.ttf", 0)]
-
-STITCH_VERSION = 2
+STITCH_VERSION = 3
 
 
 def toml_chars(paths):
@@ -77,17 +69,17 @@ def toml_chars(paths):
     return chars
 
 
-def text_files():
+def text_files(langs):
     out = []
-    if os.path.isdir(REFS):
-        out += sorted(os.path.join(REFS, f) for f in os.listdir(REFS) if f.endswith(".toml"))
-    if os.path.isdir(STRINGS):
-        out += sorted(os.path.join(STRINGS, f) for f in os.listdir(STRINGS) if f.endswith(".toml"))
+    for lang in langs:
+        p = os.path.join(STRINGS, lang + ".toml")
+        if os.path.isfile(p):
+            out.append(p)
     return out
 
 
-def needed_chars():
-    return toml_chars(text_files())
+def needed_chars(langs):
+    return toml_chars(text_files(langs))
 
 
 def _fonttools():
@@ -119,14 +111,29 @@ def _fontstitch():
     return fontstitch
 
 
-def _pairs():
+def _presets():
+    """返回 (语言列表, {game_file: [(donor, index)]}, fallback)。"""
     if not os.path.isfile(PRESETS):
-        return {}
+        return [], {}, None
     doc = tomllib.load(open(PRESETS, "rb"))
-    out = {}
-    for p in doc.get("pair", []):
-        out[p["game_file"]] = (p["donor_file"], int(p.get("donor_index", 0)))
-    return out
+    langs = []
+    donors = {}
+    for lang, cfg in doc.items():
+        if lang == "fallback" or not isinstance(cfg, dict):
+            continue
+        langs.append(lang)
+        for key in ("pair", "supplement"):
+            for p in cfg.get(key, []):
+                gf = p.get("game_file")
+                if not gf:
+                    continue
+                donors.setdefault(gf, []).append(
+                    (p["donor_file"], int(p.get("donor_index", 0))))
+    fb = None
+    f = doc.get("fallback") or {}
+    if f.get("donor_file"):
+        fb = (f["donor_file"], int(f.get("donor_index", 0)))
+    return sorted(langs), donors, fb
 
 
 def _upm(path, index=0):
@@ -142,9 +149,9 @@ def _resolve(path):
     return _fontstitch().resolve_path(path)
 
 
-def _key(chars, donors, src):
+def _key(chars, donors, src, langs):
     h = hashlib.sha1("".join(sorted(chars)).encode("utf-8")).hexdigest()
-    rows = [STITCH_VERSION, h, len(chars)]
+    rows = [STITCH_VERSION, sorted(langs), h, len(chars)]
     for base in FONTS:
         p = os.path.join(src, base)
         try:
@@ -248,17 +255,18 @@ def ensure_fonts(out_dir=None, src=None, log=None, force=False):
     """确保 build/fonts 覆盖当前全部用字；返回 (ok, 说明)。"""
     out_dir = out_dir or DEFAULT_OUT
     log = log or (lambda msg: None)
-    chars = needed_chars()
     src = src or os.environ.get("PR2_ORIG_FONTS") or DEFAULT_SRC
 
-    pairs = _pairs()
+    langs, lang_donors, fallback = _presets()
+    if not langs:
+        return True, "presets 里没有配置任何语言的 donor，跳过字体缝合"
+
+    chars = needed_chars(langs)
     donors = {}
     for name in FONTS:
-        ds = []
-        if name in pairs:
-            ds.append(pairs[name])
-        ds += SUPPLEMENT.get(name, [])
-        ds.append(FALLBACK[0])
+        ds = list(lang_donors.get(name, []))
+        if fallback:
+            ds.append(fallback)
         seen, uniq = set(), []
         for item in ds:
             if item not in seen:
@@ -266,7 +274,7 @@ def ensure_fonts(out_dir=None, src=None, log=None, force=False):
                 uniq.append(item)
         donors[name] = uniq
 
-    key = _key(chars, donors, src)
+    key = _key(chars, donors, src, langs)
     cache = _load_cache(out_dir)
     if not force and cache.get("key") == key and all(
             os.path.isfile(os.path.join(out_dir, f)) for f in FONTS):
@@ -284,7 +292,8 @@ def ensure_fonts(out_dir=None, src=None, log=None, force=False):
 
     os.makedirs(out_dir, exist_ok=True)
     codes = sorted(ord(c) for c in chars)
-    log("字体缝合：%d 个用字，%d 个原版字体" % (len(codes), len(FONTS)))
+    log("字体缝合：语言 %s，%d 个用字，%d 个原版字体"
+        % ("、".join(langs), len(codes), len(FONTS)))
     try:
         for name in FONTS:
             base = os.path.join(src, name)
