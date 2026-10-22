@@ -1306,7 +1306,7 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .seed-inline { min-width: 0; }
 .seed-inline .ref-label { color: var(--fg-dim); font-size: 0.85em; }
 .seed-inline .seed-body {
-  font-family: var(--font-mono); font-size: 0.9em; white-space: pre-wrap;
+  font-family: var(--font-mono); font-size: var(--text-size); white-space: pre-wrap;
   color: var(--fg-dim); background: var(--bg-row-alt); border-radius: 4px;
   padding: 0.3rem 0.5rem; margin-top: 0.2rem;
 }
