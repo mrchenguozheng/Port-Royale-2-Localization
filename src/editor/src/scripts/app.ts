@@ -1572,6 +1572,37 @@ $('save').addEventListener('click', () => void save());
 // 添加语言
 let codeTimer = 0;
 $('addLang').addEventListener('click', openAddLang);
+
+$('delLang').addEventListener('click', () => {
+  void (async () => {
+    if (!S.lang) return;
+    if (S.dirtyIds.length) {
+      toast('还有未保存的改动，先保存再删除语言');
+      return;
+    }
+    if (!window.confirm(`删除语言 ${S.lang}？\n会删除它的 live 与 seed 文件，无法恢复。`)) return;
+    const gone = S.lang;
+    try {
+      await api('/api/del-lang', { code: gone });
+    } catch (e) {
+      toast('删除失败：' + (e as Error).message);
+      return;
+    }
+    const d = await api<{ editable: string[]; all: string[]; base: string }>('/api/langs');
+    S.langs = d.editable;
+    S.refLangs = d.all;
+    S.lang = S.langs.includes('zh') ? 'zh' : (S.langs[0] || '');
+    remember(LS_LANG, S.lang);
+    fill($('lang'), S.langs, S.lang);
+    S.edits.clear();
+    S.orig.clear();
+    S.dirtyIds = [];
+    setDirty(false);
+    await loadSideList();
+    await reload();
+    toast('已删除语言 ' + gone);
+  })();
+});
 $('newCancel').addEventListener('click', closeAddLang);
 document.addEventListener('click', (ev) => {
   const el = ev.target as HTMLElement | null;

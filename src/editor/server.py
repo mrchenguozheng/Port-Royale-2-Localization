@@ -1624,6 +1624,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"ok": True, "written": written,
                                    "changed": changed})
 
+        if path == "/api/del-lang":
+            return self.send_json({"ok": True, **delete_lang(body.get("code", ""))})
+
         if path == "/api/newlang":
             made = new_lang(body.get("code", ""), body.get("from", ""))
             return self.send_json({"ok": True, **made})
@@ -1635,6 +1638,44 @@ class Handler(BaseHTTPRequestHandler):
             return None
 
         return self.send_error_json(404, "unknown api: %s" % path)
+
+
+
+def delete_lang(code):
+    """删除一个可编辑语言包（live + seed）；只读参考语言不动。"""
+    code = (code or "").strip()
+    if not code:
+        raise ValueError("缺少语言代码")
+    if code == "zh":
+        raise ValueError("中文是当前目标语言，不能删除")
+    if code in T.REFERENCE_LANGS:
+        raise ValueError("只读参考语言不能删除")
+    live = os.path.join(T.STRINGS_DIR, code + ".toml")
+    seed = os.path.join(os.path.dirname(SRC), "src", "seed", code + ".toml")
+    if not os.path.isfile(live):
+        raise ValueError("没有这个语言包：%s" % code)
+    os.remove(live)
+    if os.path.isfile(seed):
+        os.remove(seed)
+    # 清掉该语言的含义覆盖
+    if os.path.isfile(MEANINGS):
+        try:
+            data = tomllib.load(open(MEANINGS, "rb"))
+        except Exception:
+            data = {}
+        if code in data:
+            data.pop(code)
+            lines = ["# 按语言 + hash 的占位符含义覆盖（编辑器里手动修改）。", ""]
+            for lg in sorted(data):
+                for h in sorted(data[lg]):
+                    lines.append('["%s"."%s"]' % (lg, h))
+                    for tok in sorted(data[lg][h]):
+                        val = str(data[lg][h][tok]).replace("\\", "\\\\").replace('"', '\\"')
+                        lines.append('"%s" = "%s"' % (tok.replace('"', '\\"'), val))
+                    lines.append("")
+            with open(MEANINGS, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write("\n".join(lines))
+    return {"code": code}
 
 
 def stop_server():
