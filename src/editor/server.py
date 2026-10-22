@@ -857,7 +857,19 @@ class Handler(BaseHTTPRequestHandler):
 })();
 """
 
+    def redirect(self, to):
+        self.send_response(302)
+        self.send_header("Location", to)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def get_static(self, path):
+        if path in ("/start",):
+            return self.redirect("/install")
+        if path == "/":
+            return self.redirect("/translate")
+        if path in ("/translate", "/install"):
+            path = "/index.html"
         if path == "/zh-review-banner.js":
             data = self.BANNER_JS.encode("utf-8")
             self.send_response(200)

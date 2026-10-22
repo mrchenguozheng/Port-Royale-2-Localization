@@ -22,7 +22,7 @@ if not defined PY goto :nopython
 title PR2 Localization
 echo Starting local server... close this window to stop it.
 echo.
-"%PY%" "%SRC%editor\server.py" --restart --open-page /start
+"%PY%" "%SRC%editor\server.py" --restart --open-page /install
 echo.
 echo Server stopped.
 pause

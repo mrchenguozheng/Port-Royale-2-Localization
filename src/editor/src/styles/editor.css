@@ -1217,8 +1217,13 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 
 /* 工作台视图切换 */
 .editor-controls { display: inline-flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-.view-start .editor-controls,
-.view-start .statusbar { opacity: 0.45; pointer-events: none; }
+.view { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; width: 100%; }
+.view[hidden] { display: none !important; }
+.editor-bar {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.45rem 0.9rem; border-bottom: 1px solid var(--line);
+  background: var(--head-bg); flex-wrap: wrap;
+}
 .workspace[hidden], .statusbar[hidden], #view-start[hidden] { display: none !important; }
 #view-start {
   width: 100%;

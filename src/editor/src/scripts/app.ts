@@ -93,7 +93,7 @@ function initTabs() {
   for (const t of document.querySelectorAll('.tab')) {
     t.addEventListener('click', () => setView((t as HTMLElement).dataset.view || 'editor'));
   }
-  setView(location.hash === '#start' ? 'start' : 'editor');
+  setView(location.pathname.replace(/\/$/, '') === '/install' || location.hash === '#start' ? 'start' : 'editor');
 }
 
 let loadingTimer = 0;
@@ -150,16 +150,15 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
 
 function setView(view: string) {
   const start = view === 'start';
+  const editor = document.getElementById('view-editor');
   const panel = document.getElementById('view-start');
-  const ws = document.querySelector('.workspace') as HTMLElement | null;
+  if (editor) editor.hidden = start;
   if (panel) panel.hidden = !start;
-  if (ws) ws.hidden = start;
   document.body.classList.toggle('view-start', start);
   for (const t of document.querySelectorAll('.tab')) {
     t.classList.toggle('active', (t as HTMLElement).dataset.view === view);
   }
-  const hash = start ? '#start' : location.pathname;
-  history.replaceState(null, '', hash);
+  history.replaceState(null, '', start ? '/install' : '/translate');
 }
 
 async function boot() {

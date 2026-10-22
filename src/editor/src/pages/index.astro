@@ -17,13 +17,17 @@ const title = 'PR2 本地化 · 译文编辑';
     <title>{title}</title>
   </head>
   <body>
-    <header class="toolbar">
-      <span class="brand">PR2 本地化工作台</span>
-      <nav class="tabs">
-        <button class="tab active" data-view="editor" type="button">译文编辑</button>
-        <button class="tab" data-view="start" type="button">安装与启动</button>
-      </nav>
-      <span class="editor-controls"><label class="tb">编辑
+  <header class="toolbar">
+    <span class="brand">PR2 本地化工作台</span>
+    <nav class="tabs">
+      <button class="tab active" data-view="editor" type="button">译文编辑</button>
+      <button class="tab" data-view="start" type="button">安装与启动</button>
+    </nav>
+  </header>
+
+  <section id="view-editor" class="view">
+    <div class="editor-bar">
+<span class="editor-controls"><label class="tb">编辑
         <select id="lang"></select>
       </label>
       <button id="addLang" class="mini icon-btn" title="添加一种语言"><span class="ic ic-plus" aria-hidden="true"></span></button>
@@ -43,9 +47,44 @@ const title = 'PR2 本地化 · 译文编辑';
         </select>
       </label>
       <button id="save" disabled>保存</button></span>
-    </header>
+    </div>
 
-    <main id="view-start" class="start-view" hidden>
+    <div class="workspace">
+      <aside id="list" class="side-list" aria-label="条目列表"></aside>
+      <main id="rows"></main>
+    </div>
+
+    <footer class="statusbar">
+      <span class="nav-group">
+        <button id="first" class="mini" hidden>首条</button>
+        <button id="prev" class="mini">‹ 上一条</button>
+        <input id="pageInput" class="page-num" type="number" min="1" step="1"
+               aria-label="第几条" />
+        <span id="pageCount">共 0 条</span>
+        <button id="next" class="mini">下一条 ›</button>
+        <button id="last" class="mini" hidden>末条</button>
+      </span>
+
+      <span class="nav-group">
+        <button id="prevUnrev">上一条未审</button>
+        <button id="nextUnrev">下一条未审</button>
+        <button id="randomUnrev">随机未审</button>
+      </span>
+
+      <span class="jump-box">
+        <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false"
+               autocomplete="off" />
+        <div id="jumpList" class="jump-list" hidden></div>
+      </span>
+      <button id="jumpGo">跳转</button>
+
+      <span id="stat"></span>
+      <span id="dirty" class="dirty"></span>
+    </footer>
+  </section>
+
+  <section id="view-start" class="view" hidden>
+
 
     <section class="card">
       <h2>1 游戏目录</h2>
@@ -90,47 +129,12 @@ const title = 'PR2 本地化 · 译文编辑';
       <h2>日志</h2>
       <pre id="log" class="log"></pre>
     </section>
-      </main>
-
-
-    <footer class="statusbar">
-      <span class="nav-group">
-        <button id="first" class="mini" hidden>首条</button>
-        <button id="prev" class="mini">‹ 上一条</button>
-        <input id="pageInput" class="page-num" type="number" min="1" step="1"
-               aria-label="第几条" />
-        <span id="pageCount">共 0 条</span>
-        <button id="next" class="mini">下一条 ›</button>
-        <button id="last" class="mini" hidden>末条</button>
-      </span>
-
-      <span class="nav-group">
-        <button id="prevUnrev">上一条未审</button>
-        <button id="nextUnrev">下一条未审</button>
-        <button id="randomUnrev">随机未审</button>
-      </span>
-
-      <span class="jump-box">
-        <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false"
-               autocomplete="off" />
-        <div id="jumpList" class="jump-list" hidden></div>
-      </span>
-      <button id="jumpGo">跳转</button>
-
-      <span id="stat"></span>
-      <span id="dirty" class="dirty"></span>
-    </footer>
+    </section>
 
     <div id="loading" class="loading" hidden>
       <div class="spinner" aria-hidden="true"></div>
       <span>载入中…</span>
     </div>
-
-    <div class="workspace">
-      <aside id="list" class="side-list" aria-label="条目列表"></aside>
-      <main id="rows"></main>
-    </div>
-
 
     <!-- 语境推断 -->
     <div id="ctxModal" class="modal" hidden>
