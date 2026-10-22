@@ -52,6 +52,22 @@ class TestZhRules(unittest.TestCase):
         self.assertEqual(ZH.space_before_double_break("<n><n>开头"),
                          "<n><n>开头")
 
+    def test_names_with_titles_and_quotes(self):
+        import tomllib
+        doc = tomllib.load(open(os.path.join(ROOT, "src", "seed", "zh.toml"), "rb"))
+        given, surn, extras, _towns = ZH.build_names(doc)
+        spans = ZH.find_names("自伊丽莎白女王时代", given, surn, extras)
+        self.assertEqual([("自伊丽莎白女王时代")[a:b] for a, b in spans], ["伊丽莎白女王"])
+        spans = ZH.find_names("亨利八世国王和教宗", given, surn, extras)
+        self.assertEqual([("亨利八世国王和教宗")[a:b] for a, b in spans], ["亨利八世国王"])
+        # 引号里的船名不按人名处理
+        spans = ZH.find_names("「安妮女王复仇号」", given, surn, extras)
+        self.assertEqual(spans, [])
+        # 中间点不能被空格拆开
+        spans = ZH.find_names("胡安·德·塞普尔维达之类", given, surn, extras)
+        self.assertEqual([("胡安·德·塞普尔维达之类")[a:b] for a, b in spans],
+                         ["胡安·德·塞普尔维达"])
+
     def test_live_long_text_names_have_spaces(self):
         """长句里的已知人名前后必须已有空格（标点/标题除外）。"""
         import tomllib

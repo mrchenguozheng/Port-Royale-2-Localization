@@ -37,7 +37,7 @@ CONJ = ("因为", "所以", "但是", "如果", "虽然", "然后", "而且", "�
         "一旦", "以便", "以免", "甚至", "反而", "否则", "不然", "总之", "也就是说")
 SINGLE_CONJ = {"但": "是", "而": "是且也又在对就", "却": "是也又就",
                "并": "且不没未非能会已将无发", "或": "者是许", "因": "为", "所": "以"}
-PUNCT_CHARS = "，。！？；：、…—）)」』】》”’"
+PUNCT_CHARS = "，。！？；：、…—）)」』】》”’·"
 TITLES = ("先生", "爵士", "女士", "小姐", "夫人", "船长", "总督", "副王", "国王",
           "女王", "伯爵", "将军", "指挥官", "上校", "中尉", "少校", "神父", "医生")
 NAME_STOP = "的了他是在和与也就都但而或又着过们吗呢吧啊呀哦嗯，。！？、；：…—（）()「」『』【】《》 \u3000<@%"
@@ -88,7 +88,10 @@ def find_names(text, given, surn, extras):
             % ("|".join(map(re.escape, sorted(given, key=len, reverse=True))),
                re.escape(NAME_STOP), "|".join(map(re.escape, TITLES))))
     spans = [(m.start(), m.end()) for m in name_re.finditer(text)]
-    for name in extras:
+
+    all_names = set(given) | set(surn) | set(extras)
+    # 三字及以上的名字可以单独出现；两字名只在后面接序数/头衔时才算。
+    for name in sorted((n for n in all_names if len(n) >= 3), key=len, reverse=True):
         start = 0
         while True:
             k = text.find(name, start)
@@ -96,10 +99,28 @@ def find_names(text, given, surn, extras):
                 break
             spans.append((k, k + len(name)))
             start = k + len(name)
-    spans.sort()
+
+    titled = re.compile(
+        "(%s)((?:[\\u4e00-\\u9fff]{1,3}世|\\d+世)?(?:%s))"
+        % ("|".join(map(re.escape, sorted(all_names, key=len, reverse=True))),
+           "|".join(map(re.escape, sorted(TITLES, key=len, reverse=True)))))
+    spans.extend(m.span() for m in titled.finditer(text))
+
+    # 引号里的通常是船名/书名，不按人名加空格。
+    quotes = [(m.start(), m.end()) for m in
+              re.finditer(r"「[^」]*」|『[^』]*』|《[^》]*》", text)]
+
+    def in_quote(s0, e0):
+        return any(q0 <= s0 and e0 <= q1 for q0, q1 in quotes)
+
+    spans = [(s0, e0) for s0, e0 in spans if not in_quote(s0, e0)]
+
+    spans.sort(key=lambda x: (x[0], -x[1]))
     merged = []
     for sp in spans:
         if merged and sp[0] < merged[-1][1]:
+            if sp[1] > merged[-1][1]:
+                merged[-1] = (merged[-1][0], sp[1])
             continue
         merged.append(sp)
     return merged
