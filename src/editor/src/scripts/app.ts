@@ -1788,7 +1788,9 @@ function showBootError(msg: string) {
 
 window.addEventListener('error', (ev) => {
   console.error('[pr2] window error', ev.error || ev.message);
-  showBootError(ev.message || '脚本错误');
+  const err = ev.error as Error | undefined;
+  const stack = err && err.stack ? '\n' + err.stack.split('\n').slice(1, 4).join('\n') : '';
+  showBootError((ev.message || '脚本错误') + stack);
 });
 window.addEventListener('unhandledrejection', (ev) => {
   const r = ev.reason as Error | undefined;
