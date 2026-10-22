@@ -190,6 +190,27 @@ def server_instances():
     return {"current": CURRENT_PORT, "instances": out}
 
 
+def known_dirs():
+    """settings 里记住过的游戏目录，按最近使用排序。"""
+    st = P.load_settings()
+    cur = st.get("current") or ""
+    out = []
+    for sha, entry in (st.get("dirs") or {}).items():
+        d = entry.get("dir") or ""
+        valid = bool(d) and P.is_game_dir(d)
+        label = entry.get("label") or (P.version_label(sha) if valid else "")
+        out.append({
+            "sha": sha,
+            "dir": d,
+            "label": label,
+            "last_used": entry.get("last_used") or "",
+            "current": sha == cur,
+            "valid": valid,
+        })
+    out.sort(key=lambda x: x.get("last_used") or "", reverse=True)
+    return out
+
+
 def start_dir():
     """当前游戏目录。current 存的是 PR2.exe 的 SHA，不是路径。"""
     st = P.load_settings()
@@ -919,6 +940,30 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"ok": False, "error": "已取消"})
             return self.send_json({"ok": True, "path": chosen})
 
+        if path == "/api/start/use":
+            sha = (body.get("sha") or "").strip()
+            st = P.load_settings()
+            entry = (st.get("dirs") or {}).get(sha)
+            if not entry:
+                return self.send_json({"ok": False, "error": "没有这个目录"})
+            st["current"] = sha
+            st["last_dir"] = entry.get("dir") or st.get("last_dir", "")
+            P.save_settings(st)
+            return self.send_json({"ok": True, **start_status()})
+
+        if path == "/api/start/forget":
+            sha = (body.get("sha") or "").strip()
+            st = P.load_settings()
+            dirs = st.get("dirs") or {}
+            entry = dirs.pop(sha, None)
+            if not entry:
+                return self.send_json({"ok": False, "error": "没有这个目录"})
+            if st.get("current") == sha:
+                st["current"] = ""
+                st["last_dir"] = ""
+            P.save_settings(st)
+            return self.send_json({"ok": True, "dirs": known_dirs()})
+
         if path == "/api/start/dir":
             d = (body.get("path") or "").strip()
             if not P.is_game_dir(d):
@@ -994,6 +1039,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/start/status":
             return self.send_json(start_status())
+
+        if path == "/api/start/dirs":
+            return self.send_json({"dirs": known_dirs()})
 
         if path == "/api/start/job":
             with START_LOCK:
@@ -1158,6 +1206,30 @@ class Handler(BaseHTTPRequestHandler):
             if not chosen:
                 return self.send_json({"ok": False, "error": "已取消"})
             return self.send_json({"ok": True, "path": chosen})
+
+        if path == "/api/start/use":
+            sha = (body.get("sha") or "").strip()
+            st = P.load_settings()
+            entry = (st.get("dirs") or {}).get(sha)
+            if not entry:
+                return self.send_json({"ok": False, "error": "没有这个目录"})
+            st["current"] = sha
+            st["last_dir"] = entry.get("dir") or st.get("last_dir", "")
+            P.save_settings(st)
+            return self.send_json({"ok": True, **start_status()})
+
+        if path == "/api/start/forget":
+            sha = (body.get("sha") or "").strip()
+            st = P.load_settings()
+            dirs = st.get("dirs") or {}
+            entry = dirs.pop(sha, None)
+            if not entry:
+                return self.send_json({"ok": False, "error": "没有这个目录"})
+            if st.get("current") == sha:
+                st["current"] = ""
+                st["last_dir"] = ""
+            P.save_settings(st)
+            return self.send_json({"ok": True, "dirs": known_dirs()})
 
         if path == "/api/start/dir":
             d = (body.get("path") or "").strip()

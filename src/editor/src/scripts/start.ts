@@ -57,12 +57,65 @@ const S = { status: null, timer: 0 };
       }
     }
 
+
+    async function loadDirs() {
+      try {
+        const r = await api('/api/start/dirs');
+        const ul = $('dirList');
+        ul.innerHTML = '';
+        for (const it of r.dirs || []) {
+          const li = document.createElement('li');
+          const label = document.createElement('span');
+          label.className = 'dir-label';
+          label.textContent = (it.label || '未知版本') + (it.current ? ' · 当前' : '');
+          const path = document.createElement('span');
+          path.className = 'dir-path';
+          path.textContent = it.dir;
+          li.appendChild(label);
+          li.appendChild(path);
+          if (!it.valid) {
+            const bad = document.createElement('span');
+            bad.className = 'dir-bad';
+            bad.textContent = '目录不存在';
+            li.appendChild(bad);
+          }
+          if (!it.current && it.valid) {
+            const use = document.createElement('button');
+            use.textContent = '使用';
+            use.className = 'mini';
+            use.addEventListener('click', async () => {
+              try {
+                const st = await api('/api/start/use', { sha: it.sha });
+                fillStatus(st);
+                await loadDirs();
+              } catch (err) { $('dirMsg').textContent = (err as Error).message; }
+            });
+            li.appendChild(use);
+          }
+          const forget = document.createElement('button');
+          forget.textContent = '移除';
+          forget.className = 'mini';
+          forget.addEventListener('click', async () => {
+            try {
+              await api('/api/start/forget', { sha: it.sha });
+              await loadDirs();
+            } catch (err) { $('dirMsg').textContent = (err as Error).message; }
+          });
+          li.appendChild(forget);
+          ul.appendChild(li);
+        }
+      } catch (err) {
+        $('dirList').innerHTML = '';
+      }
+    }
+
     async function saveDir() {
       $('dirMsg').textContent = '检测中…';
       try {
         const st = await api('/api/start/dir', { path: $('dir').value.trim() });
         fillStatus(st);
-        $('dirMsg').textContent = '已记住：' + st.dir;
+        $('dirMsg').textContent = '已记住：' + st.dir + '（' + (st.version || '未知版本') + '）';
+        await loadDirs();
       } catch (err) {
         $('dirMsg').textContent = err.message;
       }
