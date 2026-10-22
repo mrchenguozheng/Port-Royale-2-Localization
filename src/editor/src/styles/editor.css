@@ -1333,3 +1333,10 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .cell-zh .edit .hl-sp.hit-punct { background: rgba(255, 170, 0, 0.35); }
 .cell-zh .edit .hl-sp.hit-conj { background: rgba(80, 160, 255, 0.35); }
 .cell-zh .edit .hl-sp.hit-names { background: rgba(80, 200, 120, 0.35); }
+
+.ph-token::after {
+  content: attr(data-meaning);
+  margin-left: 0.3rem; padding-right: 0.1rem;
+  color: var(--fg-dim); font-size: 0.82em;
+  font-family: system-ui, sans-serif;
+}

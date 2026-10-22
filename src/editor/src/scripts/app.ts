@@ -80,6 +80,7 @@ const S = {
   last: {} as Record<string, string>,
   suppressUndo: false,
   seed: {} as Record<string, string>,
+  curMeaning: new Map<string, string>(),
   colorSpaces: false,
   hits: {} as Record<string, { text: string; hits: { start: number; end: number; type: string }[] }>,
   dirtyIds: [] as string[],
@@ -673,6 +674,12 @@ async function loadEntryInfo(id: string) {
     if (box !== document.getElementById('infoBar')) return;
     const ph = r.placeholders || [];
     const meaning = new Map(ph.map((p) => [p.token, p.meaning]));
+    S.curMeaning = meaning;
+    document.querySelectorAll('.ph-token').forEach((node) => {
+      const elx = node as HTMLElement;
+      const m = meaning.get(elx.dataset.token || '');
+      if (m) elx.dataset.meaning = m;
+    });
     const counts = r.counts || [];
     S.req[id] = {};
     for (const c of counts) S.req[id][c.token] = c.en;
@@ -1075,6 +1082,8 @@ function tokenSpan(tok: string): HTMLElement {
   span.setAttribute('contenteditable', 'false');
   span.draggable = true;
   span.dataset.token = tok;
+  const meaning = S.curMeaning.get(tok);
+  if (meaning) span.dataset.meaning = meaning;
   span.title = '拖动可换位置；占位符不能删除';
   span.addEventListener('dragstart', (ev) => {
     const dt = (ev as DragEvent).dataTransfer;
