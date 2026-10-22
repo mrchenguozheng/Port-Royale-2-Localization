@@ -188,7 +188,10 @@ int main(int argc, char** argv) {
 
     STARTUPINFOA si = {0}; si.cb = sizeof(si);
     PROCESS_INFORMATION pi = {0};
-    if (!CreateProcessA(exePath, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi)) {
+    char gameDir[MAX_PATH];
+    DirOf(self, gameDir);
+    if (!CreateProcessA(exePath, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED,
+                        NULL, gameDir, &si, &pi)) {
         printf("[PR2Launch] 启动 PR2.exe 失败 (错误 %lu)\n", GetLastError());
         return 1;
     }
