@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "pr2_fonts.h"
+#include "pr2_locale.h"
 
 #define ID_LANG    1001
 #define ID_LAUNCH  1002
@@ -142,44 +143,6 @@ static const wchar_t* TF(const char* key, ...) {
     return W(buf);
 }
 
-static void SaveIniValue(const char* path, const char* key, const char* value) {
-    char tmp[MAX_PATH], line[1024];
-    snprintf(tmp, sizeof(tmp), "%s.tmp", path);
-    int klen = (int)strlen(key);
-    int replaced = 0;
-    FILE* in = fopen(path, "rb");
-    FILE* out = fopen(tmp, "wb");
-    if (!out) { if (in) fclose(in); return; }
-    if (in) {
-        while (fgets(line, sizeof(line), in)) {
-            char probe[1024];
-            strncpy(probe, line, sizeof(probe) - 1);
-            probe[sizeof(probe) - 1] = 0;
-            Trim(probe);
-            if (strncmp(probe, key, klen) == 0) {
-                char* p = probe + klen;
-                while (*p == ' ' || *p == '\t') p++;
-                if (*p == '=') {
-                    fprintf(out, "%s=%s\n", key, value);
-                    replaced = 1;
-                    continue;
-                }
-            }
-            fputs(line, out);
-        }
-        fclose(in);
-    }
-    if (!replaced) fprintf(out, "%s=%s\n", key, value);
-    fclose(out);
-    if (!MoveFileExA(tmp, path, MOVEFILE_REPLACE_EXISTING)) remove(tmp);
-}
-
-static void SaveLocaleLanguage(const char* lang) {
-    char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s\\PR2Packs\\locale.ini", g_root);
-    SaveIniValue(path, "language", lang);
-}
-
 static void LoadGuiStringsFor(const char* ui) {
     g_strCount = 0;
     char path[MAX_PATH];
@@ -267,31 +230,6 @@ static void DirOf(const char* path, char* out) {
     else strcpy(out, ".");
 }
 
-static int ReadLocale(char* out, int cap) {
-    char path[MAX_PATH], line[512];
-    snprintf(path, sizeof(path), "%s\\PR2Packs\\locale.ini", g_root);
-    FILE* f = fopen(path, "rb");
-    if (!f) return 0;
-    int found = 0;
-    while (fgets(line, sizeof(line), f)) {
-        char* p = line;
-        while (*p == ' ' || *p == '\t') p++;
-        if (strncmp(p, "language", 8) != 0) continue;
-        p += 8;
-        while (*p == ' ' || *p == '\t') p++;
-        if (*p != '=') continue;
-        p++;
-        while (*p == ' ' || *p == '\t') p++;
-        char* e = p;
-        while (*e && *e != '\r' && *e != '\n' && *e != ' ' && *e != '\t') e++;
-        *e = '\0';
-        if (*p) { strncpy(out, p, cap - 1); out[cap - 1] = '\0'; found = 1; }
-        break;
-    }
-    fclose(f);
-    return found;
-}
-
 static void LoadLanguages(void) {
     char pattern[MAX_PATH], current[64];
     g_codeCount = 0;
@@ -326,7 +264,7 @@ static void LoadLanguages(void) {
     }
 
     int sel = 0;
-    if (ReadLocale(current, sizeof(current))) {
+    if (pr2_read_locale_language(g_root, current, sizeof(current))) {
         for (int i = 0; i < g_codeCount; i++) {
             if (_stricmp(g_codes[i], current) == 0) { sel = i; break; }
         }
@@ -373,7 +311,7 @@ static void Launch(const char* lang, int vanilla) {
     if (code != 0) {
         MessageBoxW(NULL, TF("error.exit_code", code), T("title"), MB_ICONERROR);
     } else {
-        if (!vanilla && lang && *lang) SaveLocaleLanguage(lang);
+        if (!vanilla && lang && *lang) pr2_write_locale_language(g_root, lang);
         SetWindowTextW(g_status, vanilla ? T("status.vanilla") : T("status.launched"));
     }
 }

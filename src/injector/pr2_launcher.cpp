@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include "pr2_fonts.h"
+#include "pr2_locale.h"
 #pragma comment(lib, "advapi32.lib")
 
 /* 源文件是 UTF-8（cl 用 /utf-8 编译），所以 printf 送出去的是 UTF-8 字节。
@@ -39,36 +40,6 @@ static void DirOf(const char* path, char* out) {
     char* p = strrchr(out, '\\');
     if (p) *p = '\0';
     else strcpy(out, ".");
-}
-
-/* 读 PR2Packs\locale.ini 的 language=；读不到返回 0。 */
-static int ReadLocaleLang(const char* self, char* out, size_t cap) {
-    char root[MAX_PATH], ini[MAX_PATH], line[512];
-    DirOf(self, root);
-    snprintf(ini, sizeof(ini), "%s\\PR2Packs\\locale.ini", root);
-    FILE* f = fopen(ini, "rb");
-    if (!f) return 0;
-    int found = 0;
-    while (fgets(line, sizeof(line), f)) {
-        char* p = line;
-        while (*p == ' ' || *p == '\t') p++;
-        if (strncmp(p, "language", 8) != 0) continue;
-        p += 8;
-        while (*p == ' ' || *p == '\t') p++;
-        if (*p != '=') continue;
-        p++;
-        while (*p == ' ' || *p == '\t') p++;
-        char* end = p;
-        while (*end && *end != '\r' && *end != '\n' && *end != ' ' && *end != '\t') end++;
-        *end = '\0';
-        if (*p && strlen(p) < cap) {
-            strcpy(out, p);
-            found = 1;
-        }
-        break;
-    }
-    fclose(f);
-    return found;
 }
 
 /* 把 fonts\<语言>\*.ttf 复制到 fonts\ 根目录，供游戏按固定文件名加载。
@@ -305,7 +276,7 @@ int main(int argc, char** argv) {
     {
         char localeLang[64];
         const char* fontLang = lang;
-        if (!fontLang && ReadLocaleLang(self, localeLang, sizeof(localeLang))) {
+        if (!fontLang && pr2_read_locale_language(gameDir, localeLang, sizeof(localeLang))) {
             fontLang = localeLang;
         }
         char langDir[MAX_PATH];
