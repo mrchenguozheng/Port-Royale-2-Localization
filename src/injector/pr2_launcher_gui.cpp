@@ -17,9 +17,6 @@
 static char g_root[MAX_PATH];
 static char g_codes[64][64];
 static int  g_codeCount = 0;
-static char g_aliasCodes[64][64];
-static char g_aliasNames[64][256];
-static int  g_aliasCount = 0;
 static char g_packAlias[64][256];
 static char g_packGui[64][16];
 static char g_defaultUi[16] = "en";
@@ -210,56 +207,6 @@ static void SaveLocaleLanguage(const char* lang) {
     SaveIniValue(path, "language", lang);
 }
 
-static void AddAlias(const char* code, const char* name) {
-    if (!code || !*code || !name || !*name) return;
-    for (int i = 0; i < g_aliasCount; i++) {
-        if (_stricmp(g_aliasCodes[i], code) == 0) {
-            strncpy(g_aliasNames[i], name, 255);
-            g_aliasNames[i][255] = 0;
-            return;
-        }
-    }
-    if (g_aliasCount >= 64) return;
-    strncpy(g_aliasCodes[g_aliasCount], code, 63);
-    g_aliasCodes[g_aliasCount][63] = 0;
-    strncpy(g_aliasNames[g_aliasCount], name, 255);
-    g_aliasNames[g_aliasCount][255] = 0;
-    g_aliasCount++;
-}
-
-static void LoadAliasFile(const char* path, const char* prefix) {
-    FILE* f = fopen(path, "rb");
-    if (!f) return;
-    char line[1024];
-    while (fgets(line, sizeof(line), f)) {
-        char* p = line;
-        Trim(p);
-        if (!*p || *p == '#' || *p == ';' || *p == '[') continue;
-        char* eq = strchr(p, '=');
-        if (!eq) continue;
-        *eq = 0;
-        char* key = p; Trim(key);
-        char* val = eq + 1; Trim(val);
-        int plen = (int)strlen(prefix);
-        if (plen && strncmp(key, prefix, plen) == 0) key += plen;
-        AddAlias(key, val);
-    }
-    fclose(f);
-}
-
-static void LoadAliases(void) {
-    char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s\\launcher.ini", g_root);
-    LoadAliasFile(path, "alias.");
-}
-
-static const char* AliasOf(const char* code) {
-    for (int i = 0; i < g_aliasCount; i++) {
-        if (_stricmp(g_aliasCodes[i], code) == 0) return g_aliasNames[i];
-    }
-    return code;
-}
-
 static void LoadGuiStringsFor(const char* ui) {
     g_strCount = 0;
     char path[MAX_PATH];
@@ -413,7 +360,7 @@ static void LoadLanguages(void) {
                          g_packGui[g_codeCount], 16);
             const char* label = g_packAlias[g_codeCount][0]
                               ? g_packAlias[g_codeCount]
-                              : AliasOf(g_codes[g_codeCount]);
+                              : g_codes[g_codeCount];
             SendMessageW(g_combo, CB_ADDSTRING, 0, (LPARAM)W(label));
             g_codeCount++;
         } while (FindNextFileA(h, &fd));
@@ -530,7 +477,6 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE prev, LPSTR cmd, int show) {
     GetModuleFileNameA(NULL, g_root, MAX_PATH);
     DirOf(g_root, g_root);
     LoadGuiStrings();
-    LoadAliases();
 
     WNDCLASSW wc = {0};
     wc.lpfnWndProc = WndProc;
