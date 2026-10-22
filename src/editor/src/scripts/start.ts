@@ -3,6 +3,14 @@ const S = { status: null, timer: 0 };
 
     const $ = (id) => document.getElementById(id);
 
+    function clearChildren(el) {
+      for (const c of Array.from(el.children)) {
+        if (c.parentNode === el) {
+          try { el.removeChild(c); } catch { /* 组件可能已接管 */ }
+        }
+      }
+    }
+
     function toast(msg) {
       const a = document.getElementById('toast');
       if (!a) return;
@@ -33,7 +41,7 @@ const S = { status: null, timer: 0 };
       $('dir').value = st.dir || '';
 
       const box = $('langs');
-      box.innerHTML = '';
+      clearChildren(box);
       for (const code of st.langs || []) {
         const lab = document.createElement('label');
         lab.className = 'lang';
@@ -47,7 +55,7 @@ const S = { status: null, timer: 0 };
       }
 
       const sel = $('launchLang');
-      sel.innerHTML = '';
+      clearChildren(sel);
       for (const code of st.packs || []) {
         const o = document.createElement('option');
         o.value = code;
@@ -70,7 +78,7 @@ const S = { status: null, timer: 0 };
       try {
         const r = await api('/api/start/dirs');
         const ul = $('dirList');
-        ul.innerHTML = '';
+        clearChildren(ul);
         for (const it of r.dirs || []) {
           const li = document.createElement('li');
           const actions = document.createElement('span');
@@ -119,7 +127,7 @@ const S = { status: null, timer: 0 };
           ul.appendChild(li);
         }
       } catch (err) {
-        $('dirList').innerHTML = '';
+        clearChildren($('dirList'));
       }
     }
 
