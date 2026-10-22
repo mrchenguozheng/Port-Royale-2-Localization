@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "pr2_fonts.h"
+
 #define ID_LANG    1001
 #define ID_LAUNCH  1002
 #define ID_VANILLA 1003
@@ -290,18 +292,6 @@ static int ReadLocale(char* out, int cap) {
     return found;
 }
 
-static int HasLanguageFonts(const char* lang) {
-    static const char* names[4] = {
-        "ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf"
-    };
-    for (int i = 0; i < 4; i++) {
-        char p[MAX_PATH];
-        snprintf(p, sizeof(p), "%s\\fonts\\%s\\%s", g_root, lang, names[i]);
-        if (GetFileAttributesA(p) == INVALID_FILE_ATTRIBUTES) return 0;
-    }
-    return 1;
-}
-
 static void LoadLanguages(void) {
     char pattern[MAX_PATH], current[64];
     g_codeCount = 0;
@@ -357,7 +347,7 @@ static void Launch(const char* lang, int vanilla) {
             MessageBoxW(NULL, T("error.no_language"), T("title"), MB_ICONWARNING);
             return;
         }
-        if (!HasLanguageFonts(lang)) {
+        if (!pr2_language_fonts_complete(g_root, lang)) {
             if (MessageBoxW(NULL, TF("error.font_missing", lang), T("title"),
                             MB_YESNO | MB_ICONWARNING) != IDYES) {
                 return;

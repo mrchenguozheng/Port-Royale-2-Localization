@@ -14,6 +14,8 @@
 #include <wincrypt.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "pr2_fonts.h"
 #pragma comment(lib, "advapi32.lib")
 
 /* 源文件是 UTF-8（cl 用 /utf-8 编译），所以 printf 送出去的是 UTF-8 字节。
@@ -104,9 +106,6 @@ static int CopyFontSet(const char* self, const char* lang) {
 
 /* 原版字体备份：只在第一次替换前做一次，且只认已知的原版大小。
  * 这样即使用户已经用 Noto 覆盖过根目录，也不会把 Noto 误存成原版。 */
-static const char* ORIG_FONT_NAMES[4] = {
-    "ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf"
-};
 static const DWORD ORIG_FONT_SIZES[4] = {
     296712, 65680, 52876, 53120
 };
@@ -155,13 +154,13 @@ static DWORD FileSizeOf(const char* path) {
 }
 
 static int LooksLikeOriginalFonts(const char* root) {
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < PR2_FONT_COUNT; i++) {
         char p[MAX_PATH], hex[65];
-        snprintf(p, sizeof(p), "%s\\fonts\\%s", root, ORIG_FONT_NAMES[i]);
+        snprintf(p, sizeof(p), "%s\\fonts\\%s", root, PR2_FONT_NAMES[i]);
         if (FileSizeOf(p) != ORIG_FONT_SIZES[i]) return 0;
         if (!FileSha256(p, hex) || _stricmp(hex, ORIG_FONT_HASHES[i]) != 0) {
             printf("[PR2Launch] 字体大小像原版但 SHA-256 不匹配，跳过备份: %s\n",
-                   ORIG_FONT_NAMES[i]);
+                   PR2_FONT_NAMES[i]);
             return 0;
         }
     }
@@ -179,26 +178,14 @@ static void BackupOriginalFonts(const char* self) {
     }
     CreateDirectoryA(bak, NULL);
     int n = 0;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < PR2_FONT_COUNT; i++) {
         char src[MAX_PATH], dst[MAX_PATH];
-        snprintf(src, sizeof(src), "%s\\fonts\\%s", root, ORIG_FONT_NAMES[i]);
-        snprintf(dst, sizeof(dst), "%s\\%s", bak, ORIG_FONT_NAMES[i]);
+        snprintf(src, sizeof(src), "%s\\fonts\\%s", root, PR2_FONT_NAMES[i]);
+        snprintf(dst, sizeof(dst), "%s\\%s", bak, PR2_FONT_NAMES[i]);
         if (CopyFileA(src, dst, FALSE)) n++;
     }
     if (n == 4) printf("[PR2Launch] 已备份原版字体: fonts\\_original\\\n");
     else printf("[PR2Launch] 原版字体备份不完整（%d/4）\n", n);
-}
-
-static int LanguageFontsComplete(const char* root, const char* lang) {
-    static const char* names[4] = {
-        "ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf"
-    };
-    for (int i = 0; i < 4; i++) {
-        char p[MAX_PATH];
-        snprintf(p, sizeof(p), "%s\\fonts\\%s\\%s", root, lang, names[i]);
-        if (GetFileAttributesA(p) == INVALID_FILE_ATTRIBUTES) return 0;
-    }
-    return 1;
 }
 
 static int RestoreOriginalFonts(const char* self) {
@@ -207,13 +194,13 @@ static int RestoreOriginalFonts(const char* self) {
     snprintf(bak, sizeof(bak), "%s\\fonts\\_original", root);
     if (GetFileAttributesA(bak) == INVALID_FILE_ATTRIBUTES) return 0;
     int n = 0;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < PR2_FONT_COUNT; i++) {
         char src[MAX_PATH], dst[MAX_PATH], hex[65];
-        snprintf(src, sizeof(src), "%s\\%s", bak, ORIG_FONT_NAMES[i]);
-        snprintf(dst, sizeof(dst), "%s\\fonts\\%s", root, ORIG_FONT_NAMES[i]);
+        snprintf(src, sizeof(src), "%s\\%s", bak, PR2_FONT_NAMES[i]);
+        snprintf(dst, sizeof(dst), "%s\\fonts\\%s", root, PR2_FONT_NAMES[i]);
         if (!FileSha256(src, hex) || _stricmp(hex, ORIG_FONT_HASHES[i]) != 0) {
             printf("[PR2Launch] 原版备份哈希不匹配，拒绝恢复: %s\n",
-                   ORIG_FONT_NAMES[i]);
+                   PR2_FONT_NAMES[i]);
             continue;
         }
         if (CopyFileA(src, dst, FALSE)) n++;
@@ -329,7 +316,7 @@ int main(int argc, char** argv) {
         }
         if (langDir[0] &&
             GetFileAttributesA(langDir) != INVALID_FILE_ATTRIBUTES &&
-            LanguageFontsComplete(gameDir, fontLang)) {
+            pr2_language_fonts_complete(gameDir, fontLang)) {
             SetEnvironmentVariableA("PR2_FONT_DIR", fontLang);
             printf("[PR2Launch] 字体使用 fonts\\%s\\（不覆盖原版）\n", fontLang);
         } else {
