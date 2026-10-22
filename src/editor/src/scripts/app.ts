@@ -1083,10 +1083,10 @@ function setTokenMeaning(span: HTMLElement, tok: string, meaning: string) {
   let mi = span.querySelector('.ph-mean-inline') as HTMLElement | null;
   if (!meaning) {
     if (mi) mi.remove();
-    if (tokNode) tokNode.classList.remove('hide');
+    if (tokNode) { tokNode.classList.remove('hide'); tokNode.style.display = ''; }
     return;
   }
-  if (tokNode) tokNode.classList.add('hide');
+  if (tokNode) { tokNode.classList.add('hide'); tokNode.style.display = 'none'; }
   if (!mi) {
     mi = el('span', 'ph-mean-inline');
     mi.contentEditable = 'false';
