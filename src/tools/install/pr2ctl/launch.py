@@ -58,20 +58,25 @@ def launch_game(target, lang=None):
 
 
 def launch_vanilla(target):
-    """直接启动原版 PR2.exe，不注入任何东西。返回 (是否成功, 说明)。
+    """启动原版 PR2.exe，并先恢复 fonts\\_original\\ 里的原版字体。
 
-    用来对比：同一个界面到底有没有换成译文。游戏按相对路径读资源，
-    所以 cwd 必须是游戏目录。
+    直接用 PR2.exe 启动也可以，但那样会继续用上一次替换过的字体；
+    走 PR2Launcher.exe --vanilla 才能先把原版字体恢复回来。
+    没有启动器时退回直接启动。
     """
     if not is_game_dir(target):
         return False, "该目录下没有 %s，请重新选择游戏目录。" % GAME_EXE
+    launcher = os.path.join(target, LAUNCHER)
     try:
+        if os.path.isfile(launcher):
+            subprocess.Popen([launcher, "--vanilla"], cwd=target, close_fds=True)
+            return True, "已恢复原版字体，启动原版 %s（未注入）。" % GAME_EXE
         subprocess.Popen([os.path.join(target, GAME_EXE)], cwd=target,
                          close_fds=True)
     except OSError as exc:
         return False, "启动 %s 失败：%s\n\n%s" % (GAME_EXE, exc,
                                                 _oserr_hint(exc))
-    return True, "已直接启动 %s（未注入任何组件，显示原版英文）。" % GAME_EXE
+    return True, "已直接启动 %s（未注入任何组件）。" % GAME_EXE
 
 
 def _oserr_hint(exc):

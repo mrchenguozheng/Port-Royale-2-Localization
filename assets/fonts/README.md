@@ -32,3 +32,6 @@ python src/tools/font/extract_fonts.py --game-dir "<游戏目录>" --out assets/
 
 `fonts/_orig_bak` 里通常不是游戏原版，而是之前换上的中文字体；
 不要把那份当成原版备份。
+
+启动器会在第一次替换前自动备份到游戏目录的 `fonts/_original/`，
+`PR2Launcher.exe --vanilla` 会先恢复这份再启动原版游戏。

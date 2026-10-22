@@ -100,6 +100,68 @@ static int CopyFontSet(const char* self, const char* lang) {
     return copied;
 }
 
+/* 原版字体备份：只在第一次替换前做一次，且只认已知的原版大小。
+ * 这样即使用户已经用 Noto 覆盖过根目录，也不会把 Noto 误存成原版。 */
+static const char* ORIG_FONT_NAMES[4] = {
+    "ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf"
+};
+static const DWORD ORIG_FONT_SIZES[4] = {
+    296712, 65680, 52876, 53120
+};
+
+static DWORD FileSizeOf(const char* path) {
+    WIN32_FILE_ATTRIBUTE_DATA d;
+    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &d)) return 0xFFFFFFFF;
+    if (d.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) return 0xFFFFFFFF;
+    return d.nFileSizeLow;
+}
+
+static int LooksLikeOriginalFonts(const char* root) {
+    for (int i = 0; i < 4; i++) {
+        char p[MAX_PATH];
+        snprintf(p, sizeof(p), "%s\\fonts\\%s", root, ORIG_FONT_NAMES[i]);
+        if (FileSizeOf(p) != ORIG_FONT_SIZES[i]) return 0;
+    }
+    return 1;
+}
+
+static void BackupOriginalFonts(const char* self) {
+    char root[MAX_PATH], bak[MAX_PATH];
+    DirOf(self, root);
+    snprintf(bak, sizeof(bak), "%s\\fonts\\_original", root);
+    if (GetFileAttributesA(bak) != INVALID_FILE_ATTRIBUTES) return;
+    if (!LooksLikeOriginalFonts(root)) {
+        printf("[PR2Launch] fonts 根目录不是原版字体，跳过原版备份\n");
+        return;
+    }
+    CreateDirectoryA(bak, NULL);
+    int n = 0;
+    for (int i = 0; i < 4; i++) {
+        char src[MAX_PATH], dst[MAX_PATH];
+        snprintf(src, sizeof(src), "%s\\fonts\\%s", root, ORIG_FONT_NAMES[i]);
+        snprintf(dst, sizeof(dst), "%s\\%s", bak, ORIG_FONT_NAMES[i]);
+        if (CopyFileA(src, dst, FALSE)) n++;
+    }
+    if (n == 4) printf("[PR2Launch] 已备份原版字体: fonts\\_original\\\n");
+    else printf("[PR2Launch] 原版字体备份不完整（%d/4）\n", n);
+}
+
+static int RestoreOriginalFonts(const char* self) {
+    char root[MAX_PATH], bak[MAX_PATH];
+    DirOf(self, root);
+    snprintf(bak, sizeof(bak), "%s\\fonts\\_original", root);
+    if (GetFileAttributesA(bak) == INVALID_FILE_ATTRIBUTES) return 0;
+    int n = 0;
+    for (int i = 0; i < 4; i++) {
+        char src[MAX_PATH], dst[MAX_PATH];
+        snprintf(src, sizeof(src), "%s\\%s", bak, ORIG_FONT_NAMES[i]);
+        snprintf(dst, sizeof(dst), "%s\\fonts\\%s", root, ORIG_FONT_NAMES[i]);
+        if (CopyFileA(src, dst, FALSE)) n++;
+    }
+    if (n) printf("[PR2Launch] 已恢复原版字体 (%d/4)\n", n);
+    return n;
+}
+
 /* 语言代码只允许字母数字、连字符和下划线，且不能是 "." 或 ".." —— 它要
  * 拼进 PR2Packs\<code>.txt 这样的路径，放任 "../" 就是目录穿越。
  * 返回 1 表示可用，0 表示不可用。
@@ -127,6 +189,8 @@ int main(int argc, char** argv) {
     char self[MAX_PATH];
     int  i;
     const char* lang = NULL;
+    int vanilla = 0;
+    int noFontCopy = 0;
 
     UseUtf8Console();
     GetModuleFileNameA(NULL, self, MAX_PATH);
@@ -136,11 +200,16 @@ int main(int argc, char** argv) {
     for (i = 1; i < argc; i++) {
         if (strncmp(argv[i], "--lang=", 7) == 0) {
             lang = argv[i] + 7;
+        } else if (strcmp(argv[i], "--vanilla") == 0) {
+            vanilla = 1;
+        } else if (strcmp(argv[i], "--no-font-copy") == 0) {
+            noFontCopy = 1;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            printf("[PR2Launch] 用法: %s [--lang=<代码>]\n", "PR2Launcher.exe");
-            printf("[PR2Launch]   --lang  这一次启动用哪个语言包，\n");
-            printf("[PR2Launch]           覆盖 PR2Packs\\locale.ini 的 language=。\n");
-            printf("[PR2Launch]           不带这个参数就用 locale.ini 里的语言。\n");
+            printf("[PR2Launch] 用法: %s [--lang=<代码>] [--vanilla]\n", "PR2Launcher.exe");
+            printf("[PR2Launch]   --lang     这一次启动用哪个语言包，\n");
+            printf("[PR2Launch]              覆盖 PR2Packs\\locale.ini 的 language=。\n");
+            printf("[PR2Launch]   --vanilla  恢复原版字体后直接启动 PR2.exe，不注入。\n");
+            printf("[PR2Launch]   --no-font-copy  不复制字体（配合 PR2_FONT_DIR 做重定向测试）。\n");
             return 0;
         }
     }
@@ -160,6 +229,26 @@ int main(int argc, char** argv) {
         printf("[PR2Launch] 同目录下找不到 PR2.exe: %s\n", exePath);
         return 1;
     }
+
+    BackupOriginalFonts(self);
+
+    if (vanilla) {
+        RestoreOriginalFonts(self);
+        STARTUPINFOA vsi = {0}; vsi.cb = sizeof(vsi);
+        PROCESS_INFORMATION vpi = {0};
+        char vdir[MAX_PATH];
+        DirOf(self, vdir);
+        if (!CreateProcessA(exePath, NULL, NULL, NULL, FALSE, 0, NULL, vdir,
+                            &vsi, &vpi)) {
+            printf("[PR2Launch] 启动原版 PR2.exe 失败 (错误 %lu)\n", GetLastError());
+            return 1;
+        }
+        CloseHandle(vpi.hThread);
+        CloseHandle(vpi.hProcess);
+        printf("[PR2Launch] 已恢复原版字体，启动原版 PR2.exe（未注入）\n");
+        return 0;
+    }
+
     if (GetFileAttributesA(dllPath) == INVALID_FILE_ATTRIBUTES) {
         printf("[PR2Launch] 同目录下找不到 PR2TextSource.dll: %s\n", dllPath);
         return 1;
@@ -167,7 +256,7 @@ int main(int argc, char** argv) {
 
     /* 字体按语言放在 fonts\<语言>\；游戏只认 fonts\ 根目录下的固定文件名，
      * 所以在启动前把目标语言那一套复制到根目录。没有子目录时保持旧行为。 */
-    {
+    if (!noFontCopy) {
         char localeLang[64];
         const char* fontLang = lang;
         if (!fontLang && ReadLocaleLang(self, localeLang, sizeof(localeLang))) {
