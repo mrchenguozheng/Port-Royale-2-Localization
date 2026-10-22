@@ -249,8 +249,6 @@ static void LoadAliasFile(const char* path, const char* prefix) {
 
 static void LoadAliases(void) {
     char path[MAX_PATH];
-    snprintf(path, sizeof(path), "%s\\lang\\aliases.ini", g_root);
-    LoadAliasFile(path, "");
     snprintf(path, sizeof(path), "%s\\launcher.ini", g_root);
     LoadAliasFile(path, "alias.");
 }
