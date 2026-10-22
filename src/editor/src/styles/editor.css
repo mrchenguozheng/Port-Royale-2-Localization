@@ -1349,3 +1349,7 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .rule-stage .hit-conj { background: rgba(80, 160, 255, 0.28); }
 .rule-stage .hit-names { background: rgba(80, 200, 120, 0.28); }
 .rule-stage .hit:hover { outline: 1px solid var(--accent); }
+
+.hl-sp.hit-punct { background: rgba(255, 170, 0, 0.35); }
+.hl-sp.hit-conj { background: rgba(80, 160, 255, 0.35); }
+.hl-sp.hit-names { background: rgba(80, 200, 120, 0.35); }

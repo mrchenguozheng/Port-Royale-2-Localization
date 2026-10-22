@@ -80,6 +80,8 @@ const S = {
   last: {} as Record<string, string>,
   suppressUndo: false,
   seed: {} as Record<string, string>,
+  colorSpaces: false,
+  hits: {} as Record<string, { text: string; hits: { start: number; end: number; type: string }[] }>,
   dirtyIds: [] as string[],
   size: 24,
   problems: {} as Record<string, Problem[]>,
@@ -534,6 +536,21 @@ function diffNodes(a: string, b: string): DocumentFragment {
   return f;
 }
 
+async function toggleSpaceColor(id: string) {
+  S.colorSpaces = !S.colorSpaces;
+  if (S.colorSpaces) {
+    try {
+      const r = await api<{ text: string; hits: { start: number; end: number; type: string }[] }>(
+        `/api/rule-hits?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
+      S.hits[id] = { text: r.text, hits: r.hits || [] };
+    } catch {
+      S.colorSpaces = false;
+    }
+  }
+  redraw(id);
+  void loadEntryInfo(id);
+}
+
 async function openRules(id: string) {
   try {
     const r = await api<{ stages: { label: string; text: string }[] }>(
@@ -701,6 +718,10 @@ async function loadEntryInfo(id: string) {
     }
 
     const actions = el('span', 'info-actions');
+    const colorBtn = el('button', 'mini', S.colorSpaces ? '空格着色 ✓' : '空格着色');
+    colorBtn.title = '在正文里用颜色标出规则插入的空格';
+    colorBtn.addEventListener('click', () => void toggleSpaceColor(id));
+    actions.appendChild(colorBtn);
     const ruleBtn = el('button', 'mini', '规则');
     ruleBtn.title = '查看这条译文逐阶段套用的格式化规则';
     ruleBtn.addEventListener('click', () => void openRules(id));
@@ -914,7 +935,9 @@ function zhCell(e: Entry): HTMLElement {
   const ed = el('div', 'edit') as HTMLDivElement;
   ed.contentEditable = 'true';
   ed.spellcheck = false;
-  ed.appendChild(renderRich(textOf(e)));
+  const initText = textOf(e);
+  const initHit = S.colorSpaces ? S.hits[e.id] : undefined;
+  ed.appendChild(renderRich(initText, initHit && initHit.text === initText ? initHit.hits : undefined));
   box.appendChild(ed);
 
   // 中文输入法组合期间不能重绘 DOM，否则会把组合中的字打断
@@ -941,7 +964,8 @@ function zhCell(e: Entry): HTMLElement {
   const repaint = () => {
     const fixed = enforceTokens(e.id, editorText(ed));
     const off = caretOffset(ed);
-    ed.replaceChildren(renderRich(fixed));
+    const h = S.colorSpaces ? S.hits[e.id] : undefined;
+    ed.replaceChildren(renderRich(fixed, h && h.text === fixed ? h.hits : undefined));
     setCaretOffset(ed, off);
     record(fixed);
     const sb = document.querySelector('.seed-inline');
@@ -1012,7 +1036,7 @@ function zhCell(e: Entry): HTMLElement {
  *
  *  只替换 U+0020。全角空格 U+3000 不是引擎的分词符，标它会误导。
  */
-function highlightSpaces(text: string): DocumentFragment {
+function highlightSpaces(text: string, hits?: Hit[], base = 0): DocumentFragment {
   const f = document.createDocumentFragment();
   if (!text) return f;
 
@@ -1022,9 +1046,22 @@ function highlightSpaces(text: string): DocumentFragment {
     if (run) { f.appendChild(el('span', 'hl-sp run', buf)); buf = ''; run = false; }
   };
 
+  let idx = base;
   for (const ch of text) {
-    if (ch === ' ') { buf += ch; run = true; }   // 连续合并，避免上百个节点
-    else { flush(); f.appendChild(document.createTextNode(ch)); }
+    if (ch === ' ') {
+      const hit = hits ? hits.find((h) => idx >= h.start && idx < h.end) : undefined;
+      if (hit) {
+        flush();
+        f.appendChild(el('span', 'hl-sp hit-' + hit.type, ch));
+      } else {
+        buf += ch;
+        run = true;
+      }
+    } else {
+      flush();
+      f.appendChild(document.createTextNode(ch));
+    }
+    idx += 1;
   }
   flush();
   return f;
@@ -1050,18 +1087,20 @@ function tokenSpan(tok: string): HTMLElement {
   return span;
 }
 
-function renderRich(text: string): DocumentFragment {
+interface Hit { start: number; end: number; type: string; }
+
+function renderRich(text: string, hits?: Hit[]): DocumentFragment {
   const f = document.createDocumentFragment();
   if (!text) return f;
   let pos = 0;
   TOKEN_RX.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = TOKEN_RX.exec(text))) {
-    if (m.index > pos) f.appendChild(highlightSpaces(text.slice(pos, m.index)));
+    if (m.index > pos) f.appendChild(highlightSpaces(text.slice(pos, m.index), hits, pos));
     f.appendChild(tokenSpan(m[0]));
     pos = m.index + m[0].length;
   }
-  if (pos < text.length) f.appendChild(highlightSpaces(text.slice(pos)));
+  if (pos < text.length) f.appendChild(highlightSpaces(text.slice(pos), hits, pos));
   return f;
 }
 
