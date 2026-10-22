@@ -1142,6 +1142,16 @@ class Handler(BaseHTTPRequestHandler):
                                    "all": T.all_langs(),
                                    "base": T.BASE_LANG})
 
+        if path == "/api/lang-summary":
+            lang = (query.get("lang") or ["zh"])[0]
+            rows = load_all()
+            base = getattr(T, "BASE_LANG", "en.gog_1.1.2.3")
+            total = len(rows)
+            todo = sum(1 for r in rows
+                       if not r.get(lang) or r.get(lang) == r.get(base))
+            return self.send_json({"lang": lang, "total": total,
+                                   "todo": todo, "done": total - todo})
+
         if path == "/api/lang-exists":
             # 输入框一边打字一边问：这个名字能不能用、是不是已经有一份了。
             return self.send_json(lang_status((query.get("code") or [""])[0]))

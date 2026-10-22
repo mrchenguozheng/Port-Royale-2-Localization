@@ -1162,6 +1162,10 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   .lang { display: inline-flex; align-items: center; gap: 0.35rem; }
   .msg { color: var(--fg-dim); font-size: 0.9em; margin: 0.4rem 0 0; }
   .first-run { border-color: var(--accent); }
+  .wizard-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+  .wizard-head h2 { margin: 0; }
+  .wiz-lang { color: var(--fg-dim); font-size: 0.9em; display: inline-flex; align-items: center; gap: 0.4rem; }
+  .wiz-steps li { line-height: 2; }
   .steps { margin: 0.2rem 0 0; padding-left: 1.3rem; display: grid; gap: 0.35rem; }
   .steps li { line-height: 1.7; }
   .step-state { margin-left: 0.5rem; font-size: 0.85em; color: var(--fg-dim); }

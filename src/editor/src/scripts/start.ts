@@ -76,10 +76,29 @@ const S = { status: null, timer: 0 };
       }
     }
 
+    function wizLang(): string {
+      const sel = $('wizLang') as HTMLSelectElement;
+      return (sel && sel.value) || 'zh';
+    }
+
+    function fillWizLangs(st) {
+      const sel = $('wizLang') as HTMLSelectElement;
+      if (!sel) return;
+      const cur = sel.value;
+      clearChildren(sel);
+      const langs = st.langs || [];
+      for (const code of langs) {
+        const o = document.createElement('option');
+        o.value = code;
+        o.textContent = code;
+        sel.appendChild(o);
+      }
+      sel.value = langs.includes(cur) ? cur
+        : (langs.includes(st.locale) ? st.locale : (langs[0] || 'zh'));
+    }
+
     function setFontStatus(st) {
       const base = $('fontBaseState');
-      const donor = $('fontDonorState');
-      const built = $('fontBuildState');
       if (base) {
         const miss = (st.base && st.base.missing) ? st.base.missing.length : 0;
         base.textContent = miss
@@ -87,8 +106,9 @@ const S = { status: null, timer: 0 };
           : `已就绪（${st.base.total}/${st.base.total}）`;
         base.className = 'step-state ' + (miss ? 'bad' : 'ok');
       }
+      const rows = st.languages || [];
+      const donor = $('fontDonorState');
       if (donor) {
-        const rows = st.languages || [];
         const parts = rows.map((r) => {
           const all = r.donors || [];
           const have = all.filter((d) => d.exists).length;
@@ -100,16 +120,15 @@ const S = { status: null, timer: 0 };
           (r) => (r.donors || []).length && (r.donors || []).every((d) => d.exists));
         donor.className = 'step-state ' + (allOk ? 'ok' : 'bad');
       }
+      const built = $('wizBuildState');
       if (built) {
-        const rows = st.languages || [];
-        built.textContent = rows.length
-          ? rows.map((r) => `${r.lang} ${r.built}/${r.total}`).join(' · ')
-          : '未生成';
-        const allBuilt = rows.length > 0 && rows.every((r) => r.built === r.total);
-        built.className = 'step-state ' + (allBuilt ? 'ok' : 'bad');
+        const lang = wizLang();
+        const row = rows.find((r) => r.lang === lang);
+        built.textContent = row
+          ? `${lang} ${row.built}/${row.total}`
+          : `${lang} 无 presets`;
+        built.className = 'step-state ' + (row && row.built === row.total ? 'ok' : 'bad');
       }
-      const preset = $('fontPreset');
-      if (preset) preset.textContent = st.presets_dir || '';
       const msg = $('fontMsg');
       if (msg) {
         msg.textContent = (st.problems && st.problems.length)
@@ -124,6 +143,56 @@ const S = { status: null, timer: 0 };
       } catch (err) {
         const msg = $('fontMsg');
         if (msg) msg.textContent = '读取字体状态失败：' + err.message;
+      }
+    }
+
+    async function loadWizard() {
+      try {
+        const st = await api('/api/start/status');
+        fillStatus(st);
+        fillWizLangs(st);
+        const fs = await api('/api/font-status');
+        setFontStatus(fs);
+        const lang = wizLang();
+
+        const dir = $('wizDirState');
+        if (dir) {
+          dir.textContent = st.valid ? `已就绪（${st.version || st.dir}）` : '未选择';
+          dir.className = 'step-state ' + (st.valid ? 'ok' : 'bad');
+        }
+
+        const text = $('wizTextState');
+        try {
+          const sum = await api(`/api/lang-summary?lang=${encodeURIComponent(lang)}`);
+          if (text) {
+            text.textContent = `${sum.done}/${sum.total} 条已翻译`;
+            text.className = 'step-state ' + (sum.todo ? 'bad' : 'ok');
+          }
+        } catch {
+          if (text) text.textContent = '翻译进度读取失败';
+        }
+
+        const dep = $('wizDeployState');
+        const packOk = (st.packs || []).includes(lang);
+        if (dep) {
+          dep.textContent = packOk ? `已编译 ${lang}` : `未编译 ${lang}`;
+          dep.className = 'step-state ' + (packOk ? 'ok' : 'bad');
+        }
+
+        const row = (fs.languages || []).find((r) => r.lang === lang);
+        const missDonor = (fs.languages || []).some(
+          (r) => (r.donors || []).some((d) => !d.exists));
+        let next = '启动游戏验证';
+        if (!st.valid) next = '选择游戏目录';
+        else if ((fs.base.missing || []).length) next = '导出原版字体';
+        else if (!fs.fonttools || missDonor) next = '准备 donor 字体';
+        else if (!packOk || !row || row.built < row.total) next = '生成语言包 + 字体';
+        else if (st.locale !== lang) next = '部署并设为游戏语言';
+        const hint = $('wizHint');
+        if (hint) hint.textContent = '下一步：' + next;
+      } catch (err) {
+        const hint = $('wizHint');
+        if (hint) hint.textContent = '读取向导状态失败：' + (err as Error).message;
       }
     }
 
@@ -252,7 +321,7 @@ const S = { status: null, timer: 0 };
         if (st.running) return;
         if (S.timer) { clearInterval(S.timer); S.timer = 0; }
         if (st.done && st.error) $('log').textContent += '\n[错误] ' + st.error;
-        await refresh();
+        await loadWizard();
       } catch { /* ignore */ }
     }
 
@@ -326,25 +395,36 @@ const S = { status: null, timer: 0 };
       })();
     });
 
-    $('fontStitch').addEventListener('click', () => {
+    $('wizDir').addEventListener('click', () => {
+      const dir = $('dir') as HTMLInputElement;
+      if (dir.value.trim()) { void saveDir(); return; }
+      ($('browseDir') as HTMLButtonElement).click();
+    });
+
+    $('wizBuild').addEventListener('click', () => {
+      void runJob('build', { langs: [wizLang()] });
+    });
+
+    $('wizDeploy').addEventListener('click', () => {
+      void runJob('deploy', { langs: [wizLang()] });
+    });
+
+    $('wizLaunch').addEventListener('click', () => {
       void (async () => {
-        if (!window.confirm('按当前译文重新缝合四个字体？可能需要十几秒。')) return;
-        const btn = $('fontStitch') as HTMLButtonElement;
-        btn.disabled = true;
-        $('log').textContent = '字体缝合中…';
+        const lang = wizLang();
         try {
-          const r = await api('/api/font/stitch', { force: true });
-          $('log').textContent = (r.log || []).join('\n') +
-            (r.message ? '\n' + r.message : '');
-          setFontStatus(r.status);
-          toast(r.ok ? '字体已缝合' : '缝合失败，见日志');
+          await api('/api/start/lang', { lang });
+          const r = await api('/api/start/launch', { lang });
+          $('log').textContent = r.message || '';
+          toast(r.ok ? '已启动游戏' : (r.message || '启动失败'));
         } catch (err) {
           $('log').textContent = (err as Error).message;
-        } finally {
-          btn.disabled = false;
+          toast('启动失败：' + (err as Error).message);
         }
       })();
     });
+
+    $('wizLang').addEventListener('change', () => void loadWizard());
 
     $('firstRunEdit').addEventListener('click', () => {
       document.querySelector('.tab[data-view="editor"]')?.dispatchEvent(
@@ -377,7 +457,7 @@ const S = { status: null, timer: 0 };
     void loadDirs();
     void loadServers();
     void loadGameState();
-    void loadFontStatus();
+    void loadWizard();
 
     // 每次切回「安装与启动」都刷新一次，目录列表与状态不会停留在旧数据。
     for (const tab of document.querySelectorAll('.tab')) {
@@ -387,7 +467,7 @@ const S = { status: null, timer: 0 };
           void loadDirs();
           void loadServers();
           void loadGameState();
-          void loadFontStatus();
+          void loadWizard();
         }
       });
     }

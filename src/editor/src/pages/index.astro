@@ -69,21 +69,29 @@ const title = 'PR2 本地化 · 译文编辑';
   <section id="view-start" class="view" hidden>
     <div class="start-col">
 
-    <section class="card first-run">
-      <h2>第一次用？按这个顺序</h2>
-      <ol class="steps">
-        <li><b>选游戏目录</b><span class="step-note">下面第 1 步</span></li>
-        <li><b>导出原版字体</b><span id="fontBaseState" class="step-state">检查中…</span>
-          <button id="fontExport" class="mini">导出</button></li>
-        <li><b>准备 donor 字体</b><span id="fontDonorState" class="step-state">检查中…</span>
-          <button id="fontCheck" class="mini">检查</button></li>
-        <li><b>新建语言并翻译</b><button id="firstRunEdit" class="mini">去编辑</button></li>
-        <li><b>配置 presets</b><code id="fontPreset" class="step-path"></code></li>
-        <li><b>缝合字体</b><span id="fontBuildState" class="step-state">检查中…</span>
-          <button id="fontStitch" class="mini">缝合</button></li>
-        <li><b>编译语言包并部署</b><span class="step-note">下面第 2 步</span></li>
-        <li><b>启动验证</b><span class="step-note">下面第 3 步</span></li>
+    <section class="card first-run wizard">
+      <div class="wizard-head">
+        <h2>安装向导</h2>
+        <label class="wiz-lang">目标语言
+          <select id="wizLang"></select>
+        </label>
+      </div>
+      <ol class="steps wiz-steps">
+        <li><b>1 准备游戏目录</b><span id="wizDirState" class="step-state">检查中…</span>
+          <button id="wizDir" class="mini">选择/检测</button></li>
+        <li><b>2 准备字体</b><span id="fontBaseState" class="step-state">检查中…</span>
+          <span id="fontDonorState" class="step-state">检查中…</span>
+          <button id="fontExport" class="mini">导出原版</button>
+          <button id="fontCheck" class="mini">检查 donor</button></li>
+        <li><b>3 翻译内容</b><span id="wizTextState" class="step-state">检查中…</span>
+          <button id="firstRunEdit" class="mini">去翻译</button></li>
+        <li><b>4 生成语言包 + 字体</b><span id="wizBuildState" class="step-state">检查中…</span>
+          <button id="wizBuild" class="mini">生成</button></li>
+        <li><b>5 安装并启动</b><span id="wizDeployState" class="step-state">检查中…</span>
+          <button id="wizDeploy" class="mini">部署</button>
+          <button id="wizLaunch" class="mini">启动</button></li>
       </ol>
+      <p id="wizHint" class="msg"></p>
       <p id="fontMsg" class="msg"></p>
     </section>
 
