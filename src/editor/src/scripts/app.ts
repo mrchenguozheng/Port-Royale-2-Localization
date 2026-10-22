@@ -55,6 +55,8 @@ function remember(key: string, value: string): void {
   try { localStorage.setItem(key, value); } catch { /* 隐私模式等，忽略 */ }
 }
 
+let infoSeq = 0;
+
 const S = {
   langs: [] as string[],
   refLangs: [] as string[],
@@ -522,7 +524,6 @@ async function editMeaning(id: string, token: string, cur: string) {
   if (val === null) return;
   try {
     await api('/api/placeholder-meaning', { id, token, meaning: val.trim() });
-    S.meaningSaved[id] = false;
     void loadEntryInfo(id);
   } catch (err) {
     const box = document.getElementById('infoBar');
@@ -652,14 +653,15 @@ async function setTermRule(id: string, term: string, skip: boolean) {
 }
 
 async function loadEntryInfo(id: string) {
+  const seq = ++infoSeq;
   const box = document.getElementById('infoBar');
   if (!box) return;
-  box.textContent = '';
   try {
     const r = await api<{ placeholders: { token: string; meaning: string }[];
       tags: string[]; spaces: number[]; length: number; en_len: number }>(
       `/api/entry-info?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
-    if (box !== document.getElementById('infoBar')) return;
+    if (seq !== infoSeq || box !== document.getElementById('infoBar')) return;
+    box.textContent = '';
     const ph = r.placeholders || [];
     const meaning = new Map(ph.map((p) => [p.token, p.meaning]));
     S.curMeaning = meaning;
