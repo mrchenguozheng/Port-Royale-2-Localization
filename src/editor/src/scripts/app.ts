@@ -1413,16 +1413,19 @@ async function createLang() {
 
   if (S.dirtyIds.length) {
     err.textContent = `还有 ${S.dirtyIds.length} 条改动没保存 —— 先保存，再新建语言。`;
+    toast(err.textContent);
     return;
   }
 
   err.textContent = '';
+  toast('正在创建 ' + code + ' …');
   try {
     await api<{ ok: boolean; code: string; from: string }>(
       '/api/newlang', { code, from });
   } catch (e) {
     // 竞态兜底：比如另一个窗口刚好抢先建了同名文件
     err.textContent = (e as Error).message;
+    toast('创建失败：' + (e as Error).message);
     void refreshCodeState();
     return;
   }
@@ -1442,6 +1445,7 @@ async function createLang() {
   fill($('lang'), S.langs, code);
   await reload();
   $('stat').textContent = `已新建 ${code}（复制自 ${from}），共 ${S.total} 条待改`;
+  toast(`已创建 ${code}`);
 }
 
 // ── 事件 ────────────────────────────────────────────────
