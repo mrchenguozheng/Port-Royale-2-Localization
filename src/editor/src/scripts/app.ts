@@ -110,11 +110,9 @@ function setLoading(on: boolean) {
     }, 120);
   } else {
     clearTimeout(loadingTimer);
-    if (loadingShown) {
-      const b = box();
-      if (b) b.hidden = true;
-      loadingShown = false;
-    }
+    const b = box();
+    if (b) b.hidden = true;
+    loadingShown = false;
   }
 }
 

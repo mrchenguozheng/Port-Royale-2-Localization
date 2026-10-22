@@ -27,41 +27,34 @@ const title = 'PR2 本地化 · 译文编辑';
 
   <section id="view-editor" class="view">
     <div class="editor-bar">
-<span class="editor-controls"><label class="tb">编辑
-        <select id="lang"></select>
-      </label>
-      <button id="addLang" class="mini icon-btn" title="添加一种语言"><span class="ic ic-plus" aria-hidden="true"></span></button>
-      <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…"
-             spellcheck="false" />
-      <label class="tb">字号
-        <select id="size">
-          <option value="14">14</option>
-          <option value="16">16</option>
-          <option value="18">18</option>
-          <option value="20">20</option>
-          <option value="24" selected>24</option>
-          <option value="28">28</option>
-          <option value="32">32</option>
-          <option value="40">40</option>
-          <option value="48">48</option>
-        </select>
-      </label>
-      <button id="save" disabled>保存</button></span>
-    </div>
+      <span class="editor-tools">
+        <label class="tb">编辑
+          <select id="lang"></select>
+        </label>
+        <button id="addLang" class="mini icon-btn" title="添加一种语言"><span class="ic ic-plus" aria-hidden="true"></span></button>
+        <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…" spellcheck="false" />
+        <label class="tb">字号
+          <select id="size">
+            <option value="14">14</option>
+            <option value="16">16</option>
+            <option value="18">18</option>
+            <option value="20">20</option>
+            <option value="24" selected>24</option>
+            <option value="28">28</option>
+            <option value="32">32</option>
+            <option value="40">40</option>
+            <option value="48">48</option>
+          </select>
+        </label>
+        <button id="save" disabled>保存</button>
+      </span>
 
-    <div class="workspace">
-      <aside id="list" class="side-list" aria-label="条目列表"></aside>
-      <main id="rows"></main>
-    </div>
-
-    <footer class="statusbar">
       <span class="nav-group">
         <button id="first" class="mini" hidden>首条</button>
-        <button id="prev" class="mini">‹ 上一条</button>
-        <input id="pageInput" class="page-num" type="number" min="1" step="1"
-               aria-label="第几条" />
+        <button id="prev" class="mini">&lsaquo; 上一条</button>
+        <input id="pageInput" class="page-num" type="number" min="1" step="1" aria-label="第几条" />
         <span id="pageCount">共 0 条</span>
-        <button id="next" class="mini">下一条 ›</button>
+        <button id="next" class="mini">下一条 &rsaquo;</button>
         <button id="last" class="mini" hidden>末条</button>
       </span>
 
@@ -72,15 +65,19 @@ const title = 'PR2 本地化 · 译文编辑';
       </span>
 
       <span class="jump-box">
-        <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false"
-               autocomplete="off" />
+        <input id="jumpHash" placeholder="0x… 跳转" spellcheck="false" autocomplete="off" />
         <div id="jumpList" class="jump-list" hidden></div>
       </span>
       <button id="jumpGo">跳转</button>
 
       <span id="stat"></span>
       <span id="dirty" class="dirty"></span>
-    </footer>
+    </div>
+
+    <div class="workspace">
+      <aside id="list" class="side-list" aria-label="条目列表"></aside>
+      <main id="rows"></main>
+    </div>
   </section>
 
   <section id="view-start" class="view" hidden>

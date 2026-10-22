@@ -1220,10 +1220,17 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .view { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; width: 100%; }
 .view[hidden] { display: none !important; }
 .editor-bar {
-  display: flex; align-items: center; gap: 0.6rem;
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem;
   padding: 0.45rem 0.9rem; border-bottom: 1px solid var(--line);
-  background: var(--head-bg); flex-wrap: wrap;
+  background: var(--head-bg); flex-wrap: wrap; row-gap: 0.4rem;
 }
+.editor-tools { display: inline-flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.editor-bar .nav-group { display: inline-flex; align-items: center; gap: 0.35rem; }
+.editor-bar .nav-group + .nav-group { padding-left: 0.6rem; border-left: 1px solid var(--line); }
+.editor-bar .jump-box { display: inline-flex; position: relative; }
+.editor-bar .jump-box input { width: 10rem; font-family: var(--font-mono); }
+.editor-bar #stat { color: var(--fg-dim); font-size: 0.9em; }
+.editor-bar #pageCount { color: var(--fg-dim); font-size: 0.9em; }
 .workspace[hidden], .statusbar[hidden], #view-start[hidden] { display: none !important; }
 #view-start {
   width: 100%;
