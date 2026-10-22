@@ -1460,10 +1460,6 @@ $('lang').addEventListener('change', (ev) => {
     await reload(true);
     const sp = Number(saved(pageKey()));
     if (sp > 1) await renderPage(sp);
-    const mNum = initialPath.match(/^\/translate\/(\d+)$/);
-    const mHash = initialPath.match(/^\/translate\/(0x[0-9a-f]{8})$/i);
-    if (mHash) await jumpToId(mHash[1].toLowerCase());
-    else if (mNum) await renderPage(Number(mNum[1]));
     updatePath();
   })();
 });
