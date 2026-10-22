@@ -84,6 +84,11 @@ def copy_fonts(lang, stage, mode, log, cache=True):
     import make_noto_fonts
     log("生成 Noto 替换字体 %s …" % lang)
     make_noto_fonts.ensure_noto_fonts(lang, dst, log=log, cache=cache)
+    # 字体目录只留 TTF；来源说明移到包根，避免游戏扫描 fonts\<语言>\*.* 时
+    # 看到无关的 .txt。
+    notice = os.path.join(dst, "NOTO-SOURCES.txt")
+    if os.path.isfile(notice):
+        shutil.move(notice, os.path.join(stage, "NOTO-SOURCES.txt"))
 
 
 def write_readme(lang, stage, mode):
