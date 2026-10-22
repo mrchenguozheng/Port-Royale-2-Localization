@@ -11,12 +11,15 @@ const S = { status: null, timer: 0 };
       }
     }
 
+    let toastTimer = 0;
+
     function toast(msg) {
       const a = document.getElementById('toast');
       if (!a) return;
       a.textContent = msg;
-      if (typeof a.toast === 'function') a.toast();
-      else { a.classList.add('show'); setTimeout(() => a.classList.remove('show'), 1800); }
+      a.open = true;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { a.open = false; }, 1800);
     }
 
     async function api(path, body) {

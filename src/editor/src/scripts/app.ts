@@ -430,16 +430,15 @@ function fill(sel: HTMLElement, items: string[], cur: string) {
 
 let toastTimer = 0;
 
+let toastTimer = 0;
+
 function toast(msg: string) {
-  const a = document.getElementById('toast') as HTMLElement & { toast?: () => void };
+  const a = document.getElementById('toast') as HTMLElement & { open?: boolean };
   if (!a) return;
   a.textContent = msg;
-  if (typeof a.toast === 'function') {
-    a.toast();
-    return;
-  }
-  a.classList.add('show');
-  window.setTimeout(() => a.classList.remove('show'), 1800);
+  a.open = true;
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => { a.open = false; }, 1800);
 }
 
 function fillSizeSelect() {
