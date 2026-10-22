@@ -77,6 +77,34 @@ const S = { status: null, timer: 0 };
     }
 
 
+    function fmtUptime(sec) {
+      const s = Math.max(0, Number(sec) || 0);
+      if (s < 60) return `${s} 秒`;
+      if (s < 3600) return `${Math.floor(s / 60)} 分钟`;
+      return `${Math.floor(s / 3600)} 小时 ${Math.floor((s % 3600) / 60)} 分`;
+    }
+
+    async function loadServers() {
+      const info = $('srvInfo');
+      const ul = $('srvList');
+      try {
+        const r = await api('/api/server/instances');
+        const list = r.instances || [];
+        info.textContent = `当前端口 ${r.current} · 运行中的编辑器 ${list.length} 个`;
+        clearChildren(ul);
+        for (const it of list) {
+          const li = document.createElement('li');
+          li.textContent =
+            `端口 ${it.port} · pid ${it.pid} · 已运行 ${fmtUptime(it.uptime)}` +
+            (it.current ? ' · 当前窗口' : '');
+          ul.appendChild(li);
+        }
+      } catch (err) {
+        info.textContent = '读取服务状态失败';
+        toast('读取服务状态失败：' + err.message);
+      }
+    }
+
     async function loadDirs() {
       try {
         const r = await api('/api/start/dirs');
@@ -193,6 +221,7 @@ const S = { status: null, timer: 0 };
     });
 
     $('pickDir').addEventListener('click', () => void saveDir());
+    $('srvRefresh').addEventListener('click', () => void loadServers());
     $('dir').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') void saveDir(); });
     $('buildInjector').addEventListener('click', () => void runJob('build-injector', {}));
     $('buildPacks').addEventListener('click', () => void runJob('build', { langs: chosenLangs() }));
@@ -222,6 +251,7 @@ const S = { status: null, timer: 0 };
 
     void refresh();
     void loadDirs();
+    void loadServers();
 
     // 每次切回「安装与启动」都刷新一次，目录列表与状态不会停留在旧数据。
     for (const tab of document.querySelectorAll('.tab')) {
@@ -229,6 +259,7 @@ const S = { status: null, timer: 0 };
         if ((tab as HTMLElement).dataset.view === 'start') {
           void refresh();
           void loadDirs();
+          void loadServers();
         }
       });
     }
