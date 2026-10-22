@@ -745,6 +745,12 @@ function rowOf(e: Entry): HTMLElement {
   compare.appendChild(dst);
   main.appendChild(compare);
 
+  // 初版对照：整行放在编辑区下方，避免挤乱译文框
+  const seedBox = el('div', 'seed-inline');
+  seedBox.appendChild(el('span', 'seed-head', '初版'));
+  seedBox.appendChild(el('span', 'seed-body', '（读取中…）'));
+  main.appendChild(seedBox);
+
   const flags = el('div', 'flags');
   const ps = S.problems[e.id];
   const ts = S.terms[e.id];
@@ -838,11 +844,6 @@ function zhCell(e: Entry): HTMLElement {
   ed.spellcheck = false;
   ed.appendChild(renderRich(textOf(e)));
   box.appendChild(ed);
-  const seedBox = el('div', 'seed-inline');
-  seedBox.appendChild(el('div', 'seed-head', '初版'));
-  const seedBody = el('div', 'seed-body', '（读取中…）');
-  seedBox.appendChild(seedBody);
-  box.appendChild(seedBox);
 
   // 中文输入法组合期间不能重绘 DOM，否则会把组合中的字打断
   let composing = false;
