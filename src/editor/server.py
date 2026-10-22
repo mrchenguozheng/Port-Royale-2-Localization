@@ -1068,123 +1068,9 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_file(full)
 
     def get_api(self, path, query):
-        if path == "/api/server/stop":
-            try:
-                port = int(body.get("port") or 0)
-            except (TypeError, ValueError):
-                return self.send_json({"ok": False, "error": "端口不对"})
-            if port in (0, CURRENT_PORT):
-                return self.send_json({"ok": False, "error": "不能停当前服务"})
-            ok = P.editor_shutdown(port)
-            return self.send_json({"ok": ok, "port": port})
-
-        if path == "/api/start/pick":
-            try:
-                out = subprocess.run(
-                    ["powershell", "-NoProfile", "-STA", "-Command",
-                     "Add-Type -AssemblyName System.Windows.Forms; "
-                     "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
-                     "$d.Description = '选择 Port Royale 2 游戏目录'; "
-                     "$d.ShowNewFolderButton = $false; "
-                     "if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) "
-                     "{ Write-Output $d.SelectedPath }"],
-                    capture_output=True, text=True, timeout=180,
-                    creationflags=0x08000000)
-                chosen = (out.stdout or "").strip().splitlines()
-                chosen = chosen[-1].strip() if chosen else ""
-            except Exception as exc:
-                return self.send_json({"ok": False, "error": "打开目录选择框失败：%s" % exc})
-            if not chosen:
-                return self.send_json({"ok": False, "error": "已取消"})
-            return self.send_json({"ok": True, "path": chosen})
-
-        if path == "/api/start/use":
-            sha = (body.get("sha") or "").strip()
-            st = P.load_settings()
-            entry = (st.get("dirs") or {}).get(sha)
-            if not entry:
-                return self.send_json({"ok": False, "error": "没有这个目录"})
-            st["current"] = sha
-            st["last_dir"] = entry.get("dir") or st.get("last_dir", "")
-            P.save_settings(st)
-            return self.send_json({"ok": True, **start_status()})
-
-        if path == "/api/start/forget":
-            sha = (body.get("sha") or "").strip()
-            st = P.load_settings()
-            dirs = st.get("dirs") or {}
-            entry = dirs.pop(sha, None)
-            if not entry:
-                return self.send_json({"ok": False, "error": "没有这个目录"})
-            if st.get("current") == sha:
-                st["current"] = ""
-                st["last_dir"] = ""
-            P.save_settings(st)
-            return self.send_json({"ok": True, "dirs": known_dirs()})
-
-        if path == "/api/start/dir":
-            d = (body.get("path") or "").strip()
-            if not P.is_game_dir(d):
-                return self.send_json({"ok": False,
-                                       "error": "该目录里没有 %s" % P.GAME_EXE})
-            st = P.load_settings()
-            sha, _build = P.identify_dir(d)
-            st.setdefault("dirs", {})[sha] = {
-                "dir": d,
-                "label": P.version_label(sha),
-                "last_used": time.strftime("%Y-%m-%d %H:%M:%S"),
-            }
-            st["current"] = sha
-            st["last_dir"] = d
-            P.save_settings(st)
-            return self.send_json({"ok": True, **start_status()})
-
-        if path == "/api/start/build-injector":
-            return self.send_json(start_run("injector", lambda ev: P.build_injector(ev)))
-
-        if path == "/api/start/build":
-            langs = [x for x in (body.get("langs") or []) if x in P.available_langs()]
-            if not langs:
-                return self.send_json({"ok": False, "error": "没有勾选语言"})
-            return self.send_json(start_run("build", lambda ev: P.run_build(langs, ev)))
-
-        if path == "/api/start/deploy":
-            langs = [x for x in (body.get("langs") or []) if x in P.available_langs()]
-            d = start_dir()
-            if not d or not P.is_game_dir(d):
-                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
-            return self.send_json(start_run(
-                "deploy", lambda ev: P.run_deploy(d, langs or None, ev)))
-
-        if path == "/api/start/lang":
-            d = start_dir()
-            if not d or not P.is_game_dir(d):
-                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
-            code = (body.get("lang") or "").strip()
-            if code not in P.available_langs():
-                return self.send_json({"ok": False, "error": "没有这个语言包：%s" % code})
-            ok, code = P.set_game_language(d, code)
-            return self.send_json({"ok": ok, "lang": code, **start_status()})
-
         if path == "/api/start/running":
             procs = P.game_processes()
             return self.send_json({"running": bool(procs), "procs": procs})
-
-        if path == "/api/start/kill":
-            ok, msg = P.kill_game()
-            return self.send_json({"ok": ok, "message": msg,
-                                   "procs": P.game_processes()})
-
-        if path == "/api/start/launch":
-            d = start_dir()
-            if not d or not P.is_game_dir(d):
-                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
-            lang = body.get("lang") or P.game_language(d) or None
-            if body.get("vanilla"):
-                ok, msg = P.launch_vanilla(d)
-            else:
-                ok, msg = P.launch_game(d, lang)
-            return self.send_json({"ok": ok, "message": msg})
 
         if path == "/api/health":
             return self.send_json(health_info())
@@ -1243,19 +1129,6 @@ class Handler(BaseHTTPRequestHandler):
             if stages is None:
                 return self.send_json({"detail": "没有初版或条目"}, 404)
             return self.send_json({"id": hid, "stages": stages})
-
-        if path == "/api/placeholder-meaning":
-            lang = (body.get("lang") or "zh").strip() or "zh"
-            hid = (body.get("id") or "").strip().lower()
-            token = (body.get("token") or "").strip()
-            meaning = body.get("meaning", None)
-            if meaning is not None:
-                meaning = str(meaning)
-            if not hid or not token:
-                return self.send_json({"ok": False, "error": "缺少 id 或占位符"})
-            save_meaning(lang, hid, token, meaning)
-            return self.send_json({"ok": True,
-                                   "meanings": meaning_for(lang, hid)})
 
         if path == "/api/seed":
             hid = (query.get("id") or [""])[0]
@@ -1548,10 +1421,6 @@ class Handler(BaseHTTPRequestHandler):
             ok, code = P.set_game_language(d, code)
             return self.send_json({"ok": ok, "lang": code, **start_status()})
 
-        if path == "/api/start/running":
-            procs = P.game_processes()
-            return self.send_json({"running": bool(procs), "procs": procs})
-
         if path == "/api/start/kill":
             ok, msg = P.kill_game()
             return self.send_json({"ok": ok, "message": msg,
@@ -1580,24 +1449,6 @@ class Handler(BaseHTTPRequestHandler):
             lang = body.get("lang", "")
             return self.send_json({"ok": True,
                                    "written": save_all(lang, rows_of(body))})
-
-        if path == "/api/rule-hits":
-            hid = (query.get("id") or [""])[0]
-            lang = (query.get("lang") or ["zh"])[0]
-            data = rule_hits(hid, lang)
-            if data is None:
-                return self.send_json({"detail": "没有初版或条目"}, 404)
-            return self.send_json(data)
-
-
-        if path == "/api/rule-trace":
-            hid = (query.get("id") or [""])[0]
-            lang = (query.get("lang") or ["zh"])[0]
-            stages = rule_trace(hid, lang)
-            if stages is None:
-                return self.send_json({"detail": "没有初版或条目"}, 404)
-            return self.send_json({"id": hid, "stages": stages})
-
 
         if path == "/api/placeholder-meaning":
             lang = (body.get("lang") or "zh").strip() or "zh"
