@@ -636,12 +636,31 @@ def context_of(hid, lang):
 
 # ---------------------------------------------------------------- 数据
 
+_ALL_CACHE = {"key": None, "rows": None}
+
+
+def _all_key():
+    parts = []
+    for lang in T.all_langs():
+        p = T.lang_path(lang)
+        try:
+            st = os.stat(p)
+            parts.append((lang, st.st_mtime_ns, st.st_size))
+        except OSError:
+            parts.append((lang, 0, 0))
+    return tuple(parts)
+
+
 def load_all():
     """读全部语言，按 id 合并成前端要的形态。
 
     走 translate.load_toml —— 它已经在做合并，且强制条目数与顺序与
     基准表（en.gog_1.1.2.3）一致。这条是硬要求：多一条会让后面全部错位。
     """
+    key = _all_key()
+    if _ALL_CACHE["key"] == key:
+        return _ALL_CACHE["rows"]
+
     doc = T.load_toml()
     langs = T.all_langs()
     # 参考语言缺的 id（版本差异）：给前端一个显式标记，
@@ -656,6 +675,7 @@ def load_all():
         if gone:
             r["missing"] = gone
         rows.append(r)
+    _ALL_CACHE.update(key=key, rows=rows)
     return rows
 
 
