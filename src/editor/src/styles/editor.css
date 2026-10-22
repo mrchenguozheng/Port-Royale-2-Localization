@@ -1217,7 +1217,8 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 
 /* 工作台视图切换 */
 .editor-controls { display: inline-flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
-.view-start .editor-controls { display: none; }
+.view-start .editor-controls,
+.view-start .statusbar { opacity: 0.45; pointer-events: none; }
 .workspace[hidden], .statusbar[hidden], #view-start[hidden] { display: none !important; }
 #view-start {
   width: 100%;

@@ -152,10 +152,8 @@ function setView(view: string) {
   const start = view === 'start';
   const panel = document.getElementById('view-start');
   const ws = document.querySelector('.workspace') as HTMLElement | null;
-  const sb = document.querySelector('.statusbar') as HTMLElement | null;
   if (panel) panel.hidden = !start;
   if (ws) ws.hidden = start;
-  if (sb) sb.hidden = start;
   document.body.classList.toggle('view-start', start);
   for (const t of document.querySelectorAll('.tab')) {
     t.classList.toggle('active', (t as HTMLElement).dataset.view === view);
