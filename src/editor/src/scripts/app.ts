@@ -482,14 +482,20 @@ async function loadEntryInfo(id: string) {
       const chip = el('span', 'ph-chip');
       chip.appendChild(el('span', 'ph-tok', p.token));
       chip.appendChild(el('span', 'ph-mean', p.meaning));
-      if (missing.has(p.token)) {
-        const b = el('button', 'mini ph-btn', '插入');
-        b.addEventListener('click', () => insertAtCaret(p.token));
-        chip.appendChild(b);
-      } else if (used.has(p.token)) {
-        const b = el('button', 'mini ph-btn', '移除');
-        b.addEventListener('click', () => removeToken(p.token));
-        chip.appendChild(b);
+      const ins = el('button', 'mini ph-btn', '插入');
+      ins.addEventListener('click', () => {
+        insertAtCaret(p.token);
+        void loadEntryInfo(id);
+      });
+      chip.appendChild(ins);
+      if (missing.has(p.token)) chip.classList.add('ph-missing');
+      if (used.has(p.token)) {
+        const rm = el('button', 'mini ph-btn', '移除');
+        rm.addEventListener('click', () => {
+          removeToken(p.token);
+          void loadEntryInfo(id);
+        });
+        chip.appendChild(rm);
       }
       box.appendChild(chip);
     }
