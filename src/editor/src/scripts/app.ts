@@ -523,7 +523,8 @@ async function editMeaning(id: string, token: string, cur: string) {
   const val = window.prompt('占位符 ' + token + ' 的含义（留空恢复自动判断）', cur);
   if (val === null) return;
   try {
-    await api('/api/placeholder-meaning', { lang: S.lang, id, token, meaning: val.trim() });
+    await api('/api/placeholder-meaning',
+      { lang: S.lang, id, token, meaning: val.trim() });
     void loadEntryInfo(id);
   } catch (err) {
     const box = document.getElementById('infoBar');
@@ -695,7 +696,8 @@ async function loadEntryInfo(id: string) {
       }
       if (c.en > 1) chip.appendChild(el('span', 'ph-x', '×' + c.en));
       chip.appendChild(el('span', 'ph-tok', c.token));
-      chip.appendChild(el('span', 'ph-mean', meaning.get(c.token) || '原文没有'));
+      chip.appendChild(el('span', 'ph-mean',
+        meaning.has(c.token) ? (meaning.get(c.token) || '（空）') : '原文没有'));
       const editMean = el('button', 'mini ph-btn', '改');
       editMean.title = '修改这个占位符在本条里的含义';
       editMean.addEventListener('click', () =>

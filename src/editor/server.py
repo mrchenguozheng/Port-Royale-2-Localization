@@ -427,10 +427,10 @@ def save_meaning(lang, hid, token, meaning):
     by_lang = dict(data.get(lang) or {})
     key = hid.lower()
     cur = dict(by_lang.get(key) or {})
-    if meaning:
-        cur[token] = meaning
-    else:
+    if meaning is None:
         cur.pop(token, None)
+    else:
+        cur[token] = meaning        # 允许空字符串
     if cur:
         by_lang[key] = cur
     else:
@@ -617,10 +617,12 @@ def context_of(hid, lang):
     overrides = meaning_for(lang, hid)
     ph = []
     for tok in placeholders_of(en):
-        mean = (overrides.get(tok)
-                or role_hint.get(tok)
-                or next((v for k, v in PH_MEAN.items()
-                         if tok.startswith(k)), "变量/参数"))
+        if tok in overrides:
+            mean = overrides[tok]      # 空字符串也算显式含义
+        else:
+            mean = (role_hint.get(tok)
+                    or next((v for k, v in PH_MEAN.items()
+                             if tok.startswith(k)), "变量/参数"))
         ph.append({"token": tok, "meaning": mean})
 
     tags = []
@@ -1321,7 +1323,9 @@ class Handler(BaseHTTPRequestHandler):
             lang = (body.get("lang") or "zh").strip() or "zh"
             hid = (body.get("id") or "").strip().lower()
             token = (body.get("token") or "").strip()
-            meaning = (body.get("meaning") or "").strip()
+            meaning = body.get("meaning", None)
+            if meaning is not None:
+                meaning = str(meaning)
             if not hid or not token:
                 return self.send_json({"ok": False, "error": "缺少 id 或占位符"})
             save_meaning(lang, hid, token, meaning)
@@ -1677,7 +1681,9 @@ class Handler(BaseHTTPRequestHandler):
             lang = (body.get("lang") or "zh").strip() or "zh"
             hid = (body.get("id") or "").strip().lower()
             token = (body.get("token") or "").strip()
-            meaning = (body.get("meaning") or "").strip()
+            meaning = body.get("meaning", None)
+            if meaning is not None:
+                meaning = str(meaning)
             if not hid or not token:
                 return self.send_json({"ok": False, "error": "缺少 id 或占位符"})
             save_meaning(lang, hid, token, meaning)
