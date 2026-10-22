@@ -97,7 +97,7 @@ def write_readme(lang, stage, mode):
 
 安装（解压即用）：
   1. 把本压缩包里的全部文件解压到游戏根目录（和 PR2.exe 同一层）。
-  2. 双击 PR2LauncherGUI.exe，选语言后点「启动本地化」。
+  2. 双击 PR2LauncherGUI.exe，选语言后点「以所选语言启动」。
      也可以命令行：PR2Launcher.exe --lang=<语言>。
   3. 不要直接运行 PR2.exe，那样不会加载语言包。
 
