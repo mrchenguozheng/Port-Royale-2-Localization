@@ -53,10 +53,6 @@ if sys.stderr is None:
     sys.stderr = open(os.devnull, "w", encoding="utf-8", errors="replace")
 
 DIST = os.path.join(HERE, "dist")                            # astro build 的产物
-#: 人工审核勾选：build\zh.review-flags.json，按语言存 id 列表。
-FLAGS = os.path.join(os.path.dirname(SRC), "build", "zh.review-flags.json")
-#: 人工审核时改过文字的记录（谁在什么时候把哪条从什么改成了什么）。
-EDITLOG = os.path.join(os.path.dirname(SRC), "build", "review-edits.jsonl")
 DEFAULT_PORT = 8777
 
 # translate / compile_pack 是脚本不是包，直接把 tools\ 加进 sys.path 来 import。
@@ -67,7 +63,6 @@ if TOOLS not in sys.path:
 import translate as T          # noqa: E402
 import compile_pack as C       # noqa: E402
 import terms_check             # noqa: E402
-import zh_review              # noqa: E402
 import apply_zh_rules as ZH_GEN  # noqa: E402
 import lang_rules  # noqa: E402
 import pr2ctl as P            # noqa: E402
@@ -519,12 +514,6 @@ def save_hash_rule(hid, term, skip):
 
 def filter_ids(kind, lang):
     rows = load_all()
-    if kind == "reviewed":
-        flags = set(load_flags().get(lang, []))
-        return [r["id"] for r in rows if r["id"] in flags]
-    if kind == "unreviewed":
-        flags = set(load_flags().get(lang, []))
-        return [r["id"] for r in rows if r["id"] not in flags]
     if kind == "attention":
         keep = set(attention_ids(lang))
         return [r["id"] for r in rows if r["id"] in keep]
@@ -680,10 +669,9 @@ def context_of(hid, lang):
                           "en": (r.get(T.BASE_LANG, "") or "")[:120],
                           "zh": (r.get(lang, "") or "")[:120]})
 
-    flags = set(load_flags().get(lang, []))
     return {"id": hid, "category": cat, "reasons": reasons,
             "placeholders": ph, "tags": tags, "en": en, "zh": zh,
-            "reviewed": hid in flags, "neighbors": neigh}
+            "neighbors": neigh}
 
 
 # ---------------------------------------------------------------- 数据
@@ -773,33 +761,6 @@ def _keep_header(path, lines):
     return head + lines
 
 
-def load_flags():
-    try:
-        return json.load(open(FLAGS, encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-
-
-def save_flags(d):
-    os.makedirs(os.path.dirname(FLAGS), exist_ok=True)
-    with open(FLAGS, "w", encoding="utf-8") as fh:
-        json.dump(d, fh, ensure_ascii=False, indent=1)
-
-
-def log_edit(lang, hid, old, new):
-    """记一条人工改字：审核时改动的条目要能追溯、能进翻译工作流。"""
-    if old == new:
-        return
-    rec = {"ts": time.strftime("%Y-%m-%d %H:%M:%S"), "lang": lang,
-           "id": hid, "old": old, "new": new}
-    try:
-        os.makedirs(os.path.dirname(EDITLOG), exist_ok=True)
-        with open(EDITLOG, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
-
-
 def save_all(lang, rows):
     r"""把译文写回 translations\<lang>.toml（整表写，要求顺序完整）。
 
@@ -878,8 +839,6 @@ def patch_all(lang, rows):
         text = upd.get(rid)
         if text is None:
             text = cur.get(rid, "")      # 没传的保持原样
-        if rid in upd and rid in cur:
-            log_edit(lang, rid, cur[rid], text)
         lines.append('"%s" = "%s"' % (rid, toml_escape(text)))
     lines = _keep_header(path, lines)
 
@@ -1047,9 +1006,6 @@ class Handler(BaseHTTPRequestHandler):
             ctype += "; charset=utf-8"
         with open(path, "rb") as f:
             data = f.read()
-        if os.path.basename(path) == "index.html":
-            data = data.replace(b"</body>",
-                                b'<script src="/zh-review-banner.js"></script></body>')
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
@@ -1088,36 +1044,6 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---- GET
 
-    BANNER_JS = """
-(() => {
-  const box = document.createElement('div');
-  box.id = 'zh-review-banner';
-  box.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;'
-    + 'background:#b45309;color:#fff;font:14px/1.6 sans-serif;padding:6px 12px;'
-    + 'text-align:center;cursor:pointer;display:none';
-  document.addEventListener('DOMContentLoaded', async () => {
-    try {
-      const r = await fetch('/api/zh-review');
-      const st = await r.json();
-      if (st.status === 'ok') return;
-      box.textContent = st.count == null
-        ? '中文文本源已变更：还没有接受过审核稿，需要人工审核'
-        : '中文文本源已变更：' + st.count + ' 条待人工审核（点此跳到该条）';
-      box.onclick = async () => {
-        const id = (st.changed || [])[0];
-        if (id && window.pr2JumpTo) {
-          const ok = await window.pr2JumpTo(id);
-          if (ok) { box.style.display = 'none'; return; }
-        }
-        alert((st.changed || []).join('\\n') || '（无清单）');
-      };
-      document.body.appendChild(box);
-      box.style.display = 'block';
-    } catch (e) {}
-  });
-})();
-"""
-
     def redirect(self, to):
         self.send_response(302)
         self.send_header("Location", to)
@@ -1131,14 +1057,6 @@ class Handler(BaseHTTPRequestHandler):
             return self.redirect("/translate")
         if path in ("/translate", "/install"):
             path = "/index.html"
-        if path == "/zh-review-banner.js":
-            data = self.BANNER_JS.encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/javascript; charset=utf-8")
-            self.send_header("Content-Length", str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
-            return
         rel = path.lstrip("/") or "index.html"
         full = os.path.normpath(os.path.join(DIST, rel))
         # 目录穿越：拼出来的路径必须还在 dist\ 里
@@ -1255,12 +1173,6 @@ class Handler(BaseHTTPRequestHandler):
                 ok, msg = P.launch_game(d, lang)
             return self.send_json({"ok": ok, "message": msg})
 
-        if path == "/api/review-flags":
-            lang = (query.get("lang") or ["zh"])[0]
-            ids = sorted(load_flags().get(lang, []))
-            return self.send_json({"lang": lang, "ids": ids, "count": len(ids)})
-        if path == "/api/zh-review":
-            return self.send_json(zh_review.status())
         if path == "/api/health":
             return self.send_json(health_info())
 
@@ -1417,13 +1329,11 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/list":
             lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
-            flags = set(load_flags().get(lang, []))
             rows = load_all()
             return self.send_json([
                 {"id": r["id"],
                  "en": (r.get(T.BASE_LANG, "") or "")[:60],
-                 "zh": (r.get(lang, "") or "")[:60],
-                 "reviewed": r["id"] in flags}
+                 "zh": (r.get(lang, "") or "")[:60]}
                 for r in rows])
 
         if path == "/api/ids":
@@ -1633,19 +1543,6 @@ class Handler(BaseHTTPRequestHandler):
                 ok, msg = P.launch_game(d, lang)
             return self.send_json({"ok": ok, "message": msg})
 
-        if path == "/api/review-flags":
-            lang = body.get("lang", "zh")
-            hid = body.get("id", "")
-            on = bool(body.get("on"))
-            d = load_flags()
-            cur = set(d.get(lang, []))
-            if on:
-                cur.add(hid)
-            else:
-                cur.discard(hid)
-            d[lang] = sorted(cur)
-            save_flags(d)
-            return self.send_json({"ok": True, "count": len(d[lang])})
 
         if path == "/api/check":
             text = body.get("text", "")

@@ -91,8 +91,6 @@ const S = {
   /** 术语一致性： id -> ["Frigate：应为「巡防舰」", …] */
   terms: {} as Record<string, string[]>,
   /** 人工审核勾选：当前语言已勾选的 id 集合 */
-  reviewed: new Set<string>(),
-  reviewedCount: 0,
   /** 当前正在编辑的那一条（同一时间只允许一条） */
   activeId: null as string | null,
   loading: false,
@@ -210,12 +208,6 @@ async function boot() {
     S.terms = {};
   }
 
-  try {
-    const f = await api<{ ids: string[]; count: number }>(
-      '/api/review-flags?lang=' + encodeURIComponent(S.lang));
-    S.reviewed = new Set(f.ids || []);
-    S.reviewedCount = f.count || 0;
-  } catch { S.reviewed = new Set(); S.reviewedCount = 0; }
 
   initTabs();
   fill($('lang'), S.langs, S.lang);
@@ -401,7 +393,7 @@ async function filter() {
 
 // ── 左侧条目列表 ────────────────────────────────────────
 
-interface ListItem { id: string; en: string; zh: string; reviewed: boolean; }
+interface ListItem { id: string; en: string; zh: string; }
 
 let sideItems: ListItem[] = [];
 
@@ -1438,13 +1430,7 @@ $('lang').addEventListener('change', (ev) => {
     }
     S.lang = next;
     remember(LS_LANG, S.lang);
-    // 换编辑语言等于换了一列数据：审核勾选也要换一份，再把当前页重画。
-    try {
-      const f = await api<{ ids: string[]; count: number }>(
-        '/api/review-flags?lang=' + encodeURIComponent(S.lang));
-      S.reviewed = new Set(f.ids || []);
-      S.reviewedCount = f.count || 0;
-    } catch { S.reviewed = new Set(); S.reviewedCount = 0; }
+    // 换编辑语言：重新取列表与当前页。
     await loadSideList();
     await reload(true);
     const sp = Number(saved(pageKey()));
@@ -1497,62 +1483,9 @@ async function jumpToId(id: string): Promise<boolean> {
 
   const row = document.querySelector(`.row[data-id="${cssEsc(id)}"]`);
   if (row) {
-    row.classList.add('flash');
     row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    window.setTimeout(() => row.classList.remove('flash'), 2500);
   }
   return true;
-}
-
-async function unreviewedIds(): Promise<string[]> {
-  const c = await api<{ ids: string[] }>(
-    `/api/count?filter=unreviewed&lang=${encodeURIComponent(S.lang)}`);
-  return c.ids || [];
-}
-
-let randomBusy = false;
-
-async function randomUnreviewed() {
-  if (randomBusy) return;
-  randomBusy = true;
-  const btn = $('randomUnrev') as HTMLButtonElement;
-  if (btn) btn.disabled = true;
-  try {
-    const ids = await unreviewedIds();
-    if (!ids.length) { $('stat').textContent = '没有未审核的条目了'; return; }
-    await jumpToId(ids[Math.floor(Math.random() * ids.length)]);
-  } catch (err) {
-    $('stat').textContent = '随机跳转失败：' + (err as Error).message;
-  } finally {
-    window.setTimeout(() => {
-      randomBusy = false;
-      if (btn) btn.disabled = false;
-    }, 400);
-  }
-}
-
-async function prevUnreviewed() {
-  try {
-    const ids = await unreviewedIds();
-    if (!ids.length) { $('stat').textContent = '没有未审核的条目了'; return; }
-    const cur = S.rows.length ? S.rows[0].id : '';
-    const i = cur ? ids.indexOf(cur) : 0;
-    await jumpToId(ids[(i - 1 + ids.length) % ids.length]);
-  } catch (err) {
-    $('stat').textContent = '跳转失败：' + (err as Error).message;
-  }
-}
-
-async function nextUnreviewed() {
-  try {
-    const ids = await unreviewedIds();
-    if (!ids.length) { $('stat').textContent = '没有未审核的条目了'; return; }
-    const cur = S.rows.length ? S.rows[0].id : '';
-    const i = cur ? ids.indexOf(cur) : -1;
-    await jumpToId(ids[(i + 1) % ids.length]);
-  } catch (err) {
-    $('stat').textContent = '跳转失败：' + (err as Error).message;
-  }
 }
 
 async function jumpToHash(raw: string) {
@@ -1660,7 +1593,7 @@ async function openCtx(id: string) {
     const c = await api<{
       id: string; category: string; reasons: string[];
       placeholders: { token: string; meaning: string }[];
-      tags: string[]; en: string; zh: string; reviewed: boolean;
+      tags: string[]; en: string; zh: string;
       neighbors: { id: string; en: string; zh: string }[];
     }>(`/api/context?id=${encodeURIComponent(id)}&lang=${encodeURIComponent(S.lang)}`);
 
@@ -1680,7 +1613,6 @@ async function openCtx(id: string) {
     if (c.tags.length) line('格式标记', c.tags.join('、'));
     line('原文', c.en);
     line('当前译文', c.zh);
-    line('审核', c.reviewed ? '已勾选' : '未勾选');
 
     if (c.neighbors.length) {
       body.appendChild(el('div', 'ctx-head', '表格中相邻的条目（同屏/同功能的可能性高）'));
