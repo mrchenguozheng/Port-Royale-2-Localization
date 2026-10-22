@@ -171,7 +171,7 @@ function setView(view: string) {
   for (const t of document.querySelectorAll('.tab')) {
     t.classList.toggle('active', (t as HTMLElement).dataset.view === view);
   }
-  history.replaceState(null, '', start ? '/install' : (S.rows[0] ? `/translate/${S.lang}/${S.page}` : '/translate'));
+  history.replaceState(null, '', start ? '/install' : (S.rows[0] ? `/translate/${S.lang}/${S.page}` : `/translate/${S.lang}`));
 }
 
 async function boot() {
@@ -225,14 +225,10 @@ async function boot() {
 
   const mFullHash = initialPath.match(/^\/translate\/[A-Za-z][A-Za-z-]*\/(?:0x)?([0-9a-f]{8})$/i);
   const mFullNum = initialPath.match(/^\/translate\/[A-Za-z][A-Za-z-]*\/(\d+)$/);
-  const mHash = initialPath.match(/^\/translate\/(?:0x)?([0-9a-f]{8})$/i);
-  const mNum = initialPath.match(/^\/translate\/(\d+)$/);
-  if (mFullHash || mHash) {
-    await jumpToId('0x' + (mFullHash ? mFullHash[1] : mHash![1]).toLowerCase());
+  if (mFullHash) {
+    await jumpToId('0x' + mFullHash[1].toLowerCase());
   } else if (mFullNum) {
     await renderPage(Number(mFullNum[1]));
-  } else if (mNum) {
-    await renderPage(Number(mNum[1]));
   }
   updatePath();
 }
@@ -240,7 +236,7 @@ async function boot() {
 function updatePath() {
   if (document.body.classList.contains('view-start')) return;
   const row = S.rows[0];
-  const path = row ? `/translate/${S.lang}/${S.page}` : '/translate';
+  const path = row ? `/translate/${S.lang}/${S.page}` : `/translate/${S.lang}`;
   if (location.pathname !== path) history.replaceState(null, '', path);
 }
 

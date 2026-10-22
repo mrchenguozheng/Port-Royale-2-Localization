@@ -1054,8 +1054,13 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/start",):
             return self.redirect("/install")
         if path == "/":
-            return self.redirect("/translate")
-        if path in ("/translate", "/install") or path.startswith("/translate/"):
+            return self.redirect("/translate/zh")
+        if path == "/translate":
+            return self.redirect("/translate/zh")
+        if re.match(r"^/translate/(?:0x)?[0-9a-f]{8}$", path, re.I) or \
+                re.match(r"^/translate/\d+$", path):
+            return self.redirect("/translate/zh/" + path.rsplit("/", 1)[1])
+        if path == "/install" or path.startswith("/translate/"):
             path = "/index.html"
         rel = path.lstrip("/") or "index.html"
         full = os.path.normpath(os.path.join(DIST, rel))
