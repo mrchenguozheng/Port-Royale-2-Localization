@@ -1341,3 +1341,21 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 /* 占位符有含义时只显示含义，字符节点隐藏（仍参与正文序列化） */
 .ph-token .ph-tok-node.hide { display: none !important; }
 .ph-token .ph-tok-node.hide + .ph-mean-inline { margin-left: 0; }
+
+/* 对比区各块各自滚动，避免长文本把整页/整行撑开 */
+.compare { align-items: start; }
+.cell-zh .edit {
+  overflow: auto;
+  max-height: 60vh;
+  overscroll-behavior: contain;
+}
+.ref-block .body {
+  max-height: 22vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.seed-inline .seed-body {
+  max-height: 18vh;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
