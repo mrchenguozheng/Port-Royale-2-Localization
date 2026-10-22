@@ -98,6 +98,9 @@ const S = { status: null, timer: 0 };
           forget.textContent = '移除';
           forget.className = 'mini';
           forget.addEventListener('click', async () => {
+            if (!window.confirm(
+              `从已记住的目录里移除这个路径？\n\n${it.dir || ''}\n\n` +
+              '不会删除游戏文件，只是不再自动列出。')) return;
             try {
               await api('/api/start/forget', { sha: it.sha });
               await loadDirs();
