@@ -35,7 +35,7 @@ BUILD = os.path.join(ROOT, "build")
 PACK_OUT = os.path.join(BUILD, "PR2Packs")
 
 LABELS = {"zh": "简体中文", "ja": "日本語"}
-FLAT = ("PR2Launcher.exe", "PR2TextSource.dll")
+FLAT = ("PR2Launcher.exe", "PR2LauncherGUI.exe", "PR2TextSource.dll")
 
 
 def build_pack(lang, stage, log):
@@ -97,7 +97,8 @@ def write_readme(lang, stage, mode):
 
 安装（解压即用）：
   1. 把本压缩包里的全部文件解压到游戏根目录（和 PR2.exe 同一层）。
-  2. 运行 PR2Launcher.exe 启动游戏。
+  2. 双击 PR2LauncherGUI.exe，选语言后点「启动本地化」。
+     也可以命令行：PR2Launcher.exe --lang=<语言>。
   3. 不要直接运行 PR2.exe，那样不会加载语言包。
 
 字体：
@@ -105,7 +106,7 @@ def write_readme(lang, stage, mode):
   同一目录可以放多个语言（fonts\\zh、fonts\\ja），启动器按 locale.ini 或 --lang 选择。
 
 卸载：
-  删除 PR2Launcher.exe、PR2TextSource.dll、PR2Packs\\%s.txt；
+  删除 PR2Launcher.exe、PR2LauncherGUI.exe、PR2TextSource.dll、PR2Packs\\%s.txt；
   如果覆盖过 fonts\\ 里的字体，请先用备份恢复。
 
 注意：

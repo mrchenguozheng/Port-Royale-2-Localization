@@ -37,7 +37,7 @@ PACK_OUT = os.path.join(BUILD, "PR2Packs")
 LOCALE_INI = os.path.join(SRC, "locale.ini")
 
 # 直接复制进游戏目录的文件。
-FLAT_FILES = ("PR2Launcher.exe", "PR2TextSource.dll")
+FLAT_FILES = ("PR2Launcher.exe", "PR2LauncherGUI.exe", "PR2TextSource.dll")
 # 整个目录一起复制。
 PACK_DIR = "PR2Packs"
 GAME_EXE = "PR2.exe"
