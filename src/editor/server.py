@@ -318,6 +318,71 @@ def attention_ids(lang):
     return bad
 
 
+
+HASH_RULES = os.path.join(os.path.dirname(SRC), "glossary", "hash_rules.toml")
+_HASH_CACHE = {"key": None, "data": {}}
+
+
+def load_hash_rules():
+    """按 hash 的例外规则，目前只有 skip_terms（不检查这些术语）。"""
+    try:
+        key = os.path.getmtime(HASH_RULES)
+    except OSError:
+        return {}
+    if _HASH_CACHE["key"] != key:
+        try:
+            with open(HASH_RULES, "rb") as fh:
+                data = tomllib.load(fh)
+        except Exception:
+            data = {}
+        _HASH_CACHE.update(key=key, data=data)
+    return _HASH_CACHE["data"]
+
+
+def hash_rule(hid):
+    return load_hash_rules().get(hid.lower(), {})
+
+
+def filter_term_issues(issues):
+    out = []
+    for x in issues:
+        skip = hash_rule(x.get("id", "")).get("skip_terms", [])
+        if x.get("term") in skip:
+            continue
+        out.append(x)
+    return out
+
+
+def save_hash_rule(hid, term, skip):
+    data = {}
+    if os.path.isfile(HASH_RULES):
+        try:
+            data = tomllib.load(open(HASH_RULES, "rb"))
+        except Exception:
+            data = {}
+    key = hid.lower()
+    cur = dict(data.get(key) or {})
+    terms = list(cur.get("skip_terms") or [])
+    if skip and term not in terms:
+        terms.append(term)
+    if not skip and term in terms:
+        terms.remove(term)
+    if terms:
+        cur["skip_terms"] = terms
+        data[key] = cur
+    else:
+        data.pop(key, None)
+    lines = ["# 按 hash 的术语例外：skip_terms 里的术语在这条不检查。", ""]
+    for k in sorted(data):
+        lines.append('["%s"]' % k)
+        vals = ", ".join('"%s"' % v.replace('"', '\\"') for v in data[k].get("skip_terms", []))
+        lines.append("skip_terms = [%s]" % vals)
+        lines.append("")
+    io_open = open
+    with io_open(HASH_RULES, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\n".join(lines))
+    return data.get(key, {})
+
 def filter_ids(kind, lang):
     rows = load_all()
     if kind == "reviewed":
@@ -1110,6 +1175,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"detail": "干净文本里没有这一条"}, 404)
             return self.send_json({"text": clean})
 
+        if path == "/api/hash-rules":
+            hid = (query.get("id") or [""])[0]
+            return self.send_json({"id": hid, "rules": hash_rule(hid)})
+
         if path == "/api/entry-info":
             hid = (query.get("id") or [""])[0]
             lang = (query.get("lang") or ["zh"])[0]
@@ -1231,7 +1300,7 @@ class Handler(BaseHTTPRequestHandler):
             rows = load_all()
             en = {r["id"]: r.get(T.BASE_LANG, "") for r in rows}
             doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in ignore}
-            issues = terms_check.check_lang(lang, groups, en, doc)
+            issues = filter_term_issues(terms_check.check_lang(lang, groups, en, doc))
             out = {}
             for x in issues:
                 out.setdefault(x["id"], []).append(
@@ -1416,6 +1485,14 @@ class Handler(BaseHTTPRequestHandler):
             lang = body.get("lang", "")
             return self.send_json({"ok": True,
                                    "written": save_all(lang, rows_of(body))})
+
+        if path == "/api/hash-rule":
+            hid = (body.get("id") or "").strip()
+            term = (body.get("term") or "").strip()
+            if not hid or not term:
+                return self.send_json({"ok": False, "error": "缺少 id 或术语"})
+            rules = save_hash_rule(hid, term, bool(body.get("skip")))
+            return self.send_json({"ok": True, "rules": rules})
 
         if path == "/api/patch":
             lang = body.get("lang", "")

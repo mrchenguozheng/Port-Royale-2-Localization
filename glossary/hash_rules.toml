@@ -1,0 +1,4 @@
+# 按 hash 的术语例外：skip_terms 里的术语在这条不检查。
+
+["0x28b1f98d"]
+skip_terms = ["Ship's Boy"]

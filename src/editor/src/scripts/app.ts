@@ -525,6 +525,21 @@ async function revertClean(id: string) {
   }
 }
 
+async function setTermRule(id: string, term: string, skip: boolean) {
+  try {
+    await api('/api/hash-rule', { id, term, skip });
+    const t = await api<{ issues: Record<string, string[]>; count: number }>(
+      '/api/terms?lang=' + encodeURIComponent(S.lang));
+    S.terms = t.issues || {};
+    redraw(id);
+    void loadEntryInfo(id);
+    updateStat();
+  } catch (err) {
+    const box = document.getElementById('infoBar');
+    if (box) box.textContent = '规则保存失败：' + (err as Error).message;
+  }
+}
+
 async function loadEntryInfo(id: string) {
   const box = document.getElementById('infoBar');
   if (!box) return;
@@ -558,6 +573,32 @@ async function loadEntryInfo(id: string) {
       box.appendChild(el('span', 'info-warn',
         `占位符数量不符：${badCount} 个（原文与译文必须逐个数一致）`));
     }
+    let rules: { skip_terms?: string[] } = {};
+    try {
+      rules = (await api<{ rules: { skip_terms?: string[] } }>(
+        `/api/hash-rules?id=${encodeURIComponent(id)}`)).rules || {};
+    } catch { rules = {}; }
+    const skipped = new Set(rules.skip_terms || []);
+    for (const issue of S.terms[id] || []) {
+      const term = issue.split('：应为')[0];
+      if (skipped.has(term)) continue;
+      const chip = el('span', 'term-chip');
+      chip.appendChild(el('span', 'term-text', '术语：' + issue));
+      const b = el('button', 'mini', '忽略');
+      b.title = '这条不用这个术语';
+      b.addEventListener('click', () => void setTermRule(id, term, true));
+      chip.appendChild(b);
+      box.appendChild(chip);
+    }
+    for (const term of skipped) {
+      const chip = el('span', 'term-chip term-off');
+      chip.appendChild(el('span', 'term-text', '已忽略：' + term));
+      const b = el('button', 'mini', '恢复');
+      b.addEventListener('click', () => void setTermRule(id, term, false));
+      chip.appendChild(b);
+      box.appendChild(chip);
+    }
+
     const actions = el('span', 'info-actions');
     const undoBtn = el('button', 'mini', '撤销');
     undoBtn.title = '撤销上一次编辑';
@@ -574,8 +615,8 @@ async function loadEntryInfo(id: string) {
     if (r.tags && r.tags.length) {
       box.appendChild(el('span', 'info-tag', '标记：' + r.tags.join('、')));
     }
-  } catch {
-    box.textContent = '';
+  } catch (err) {
+    box.textContent = '提示读取失败：' + (err as Error).message;
   }
 }
 

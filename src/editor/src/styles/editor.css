@@ -1311,3 +1311,6 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .ph-token.dragging { opacity: 0.4; }
 
 .info-bar .info-actions { margin-left: auto; display: inline-flex; gap: 0.35rem; }
+
+.term-chip { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--warn, #e0a000); }
+.term-chip.term-off { color: var(--fg-dim); }
