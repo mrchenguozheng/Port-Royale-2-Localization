@@ -265,7 +265,7 @@ int main(int argc, char** argv) {
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("[PR2Launch] 用法: %s [--lang=<代码>] [--vanilla]\n", "PR2Launcher.exe");
             printf("[PR2Launch]   --lang     这一次启动用哪个语言包，\n");
-            printf("[PR2Launch]              覆盖 PR2Packs\\locale.ini 的 language=。\n");
+            printf("[PR2Launch]              优先于 PR2Packs\\locale.ini 的 language=，不写文件。\n");
             printf("[PR2Launch]   --vanilla  恢复原版字体后直接启动 PR2.exe，不注入。\n");
                         return 0;
         }
@@ -346,7 +346,7 @@ int main(int argc, char** argv) {
      * LoadEditFile() 里读它，读不到就退回 locale.ini。 */
     if (lang) {
         SetEnvironmentVariableA("PR2_PACK_LANG", lang);
-        printf("[PR2Launch] 本次使用语言包: %s.txt (覆盖 locale.ini)\n", lang);
+        printf("[PR2Launch] 本次使用语言包: %s.txt (优先于 locale.ini，本次启动生效)\n", lang);
     }
 
     STARTUPINFOA si = {0}; si.cb = sizeof(si);
