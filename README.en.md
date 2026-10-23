@@ -7,7 +7,30 @@ external language pack, and the original `PR2.exe` is never modified.
 
 ---
 
-## Read this first: support scope
+## Players: extract and launch
+
+No installer, no Python, no build required.
+
+1. Download the language zip from Releases, for example `PR2-zh-v0.5.0.zip`;
+2. **Extract everything into the game root next to `PR2.exe`**;
+3. Run `PR2LauncherGUI.exe`;
+4. Select the target language;
+5. Click **Launch selected language**.
+
+After a successful launch the GUI writes `PR2Packs\locale.ini`, which becomes the
+default next time.
+
+Notes:
+
+- **Do not run `PR2.exe` directly** — it will not load a language pack;
+- Keep the four original fonts in the root `fonts\`;
+- If fonts are missing, the GUI warns; re-extract the full `fonts\<lang>\` folder.
+
+Full steps, uninstall and troubleshooting: [Player guide](docs/en/user-guide.md).
+
+---
+
+## Support scope
 
 **This project supports only the GOG English build `1.1.2.3`, used to run other
 language packs on top of the English build.**
@@ -24,7 +47,7 @@ work are in [Pending issues](docs/en/pending.md).
 
 ---
 
-## Quick start
+## Developers: build and translate
 
 Requirements: Visual Studio (Desktop development with C++) and Python 3.11+
 (currently 3.15).
@@ -53,21 +76,13 @@ You can also use the cards directly:
 During development, `apply_patch.bat` runs the whole chain: normalize → validate →
 build → deploy → verify.
 
-Launch with `PR2Launcher.exe` from the game directory
-(**do not run `PR2.exe` directly**, it will not load a language pack).
-To persist a language choice use **Set as game language**; launching once does not
-write to disk. Release players use `PR2LauncherGUI.exe`, which writes the choice
-back after a successful launch.
-
 See [Build & Install](docs/en/build-and-install.md) for button details.
 
----
-
-## Repository layout
+### Repository layout
 
 ```
 pr2-localization/
-├─ start.bat                  daily entry point: start the workbench
+├─ start.bat                  development entry: start the workbench
 ├─ apply_patch.bat            normalize → validate → build → deploy
 ├─ src/
 │  ├─ live/                   translation source (saved by the editor)
@@ -89,17 +104,12 @@ pr2-localization/
 └─ tests/                     rules and API tests
 ```
 
-`start.bat` lives at the repository root because it targets people who received
-the repository, not only people editing source.
-
 | File | Role |
 |---|---|
 | `PR2Launcher.exe` | Launcher. Starts `PR2.exe` suspended, injects the DLL, resumes it (build artifact) |
 | `PR2TextSource.dll` | Core logic. Hooks three engine text paths and replaces strings (build artifact) |
 | `PR2Packs\` | Language packs. `<lang>.txt` + `locale.ini`; plain text is editable |
 | `fonts\` | Localized fonts; missing CJK glyphs show as blanks |
-
----
 
 ## Adding a language
 
@@ -123,7 +133,8 @@ Entries do not have to be complete — missing entries fall back to English.
 
 | Document | Contents |
 |---|---|
-| [Documentation index](docs/README.md) | Use/build/translate/pending sections; start here |
+| [Documentation index](docs/README.md) | Player/developer/translation/pending sections; start here |
+| [Player guide](docs/en/user-guide.md) | Download, extract, launch, uninstall, troubleshooting |
 | [Build & Install](docs/en/build-and-install.md) | Install page, build/deploy/launch, scripts |
 | [New language](docs/en/new-language.md) | From font export to an in-game language |
 | [Release](docs/en/release.md) | Per-language zips, Noto fonts, GitHub Actions |

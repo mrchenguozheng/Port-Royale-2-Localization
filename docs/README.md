@@ -8,7 +8,13 @@ Chinese-only for now.
 
 > **Supported game build: GOG English `1.1.2.3` only.** Other builds are out of scope.
 
-## Use and release
+## Players
+
+| Document | Contents |
+|---|---|
+| [Player guide](en/user-guide.md) | Download, extract, launch, uninstall, troubleshooting |
+
+## Build and release
 
 | Document | When to read |
 |---|---|
