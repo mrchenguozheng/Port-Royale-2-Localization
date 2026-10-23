@@ -227,7 +227,3 @@ build/fonts/
 # 字体 donor 的个人配置（每个语言一份，路径可能含本机信息），只提交 example
 src/tools/font/fontstitch/presets/
 src/tools/font/fontstitch/presets.toml
-
-# Translator editor preference
-data/.translator-state.json
-editor/.translator-state.json

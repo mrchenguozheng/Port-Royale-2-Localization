@@ -31,8 +31,7 @@ from shared.core import (  # noqa: E402
 DATA = os.path.join(HERE, "data")
 WEB = os.path.join(HERE, "web")
 UI_DIR = os.path.join(WEB, "i18n")
-LANG = ""            # selected default; requests may use any editable language
-STATE = os.path.join(HERE, ".translator-state.json")
+LANG = ""            # explicit --lang override; otherwise show the chooser
 PORT = 8781
 UI_RE = re.compile(r"^[a-z0-9_-]{1,32}$")
 
@@ -50,26 +49,6 @@ def send(handler, code, body, ctype="application/json; charset=utf-8"):
 
 def editable_langs():
     return lang_codes(DATA)
-
-
-def prefs_load():
-    try:
-        with open(STATE, "r", encoding="utf-8") as fh:
-            return json.load(fh)
-    except Exception:
-        return {}
-
-
-def prefs_save(**changes):
-    data = prefs_load()
-    data.update(changes)
-    try:
-        with open(STATE, "w", encoding="utf-8", newline="\n") as fh:
-            json.dump(data, fh, ensure_ascii=False)
-            fh.write("\n")
-    except OSError:
-        pass
-    return data
 
 
 def resolve_lang(value):
@@ -243,12 +222,6 @@ class Handler(BaseHTTPRequestHandler):
                                  (hid, "; ".join(x["text"] for x in errors))})
             return send(self, 200, {"ok": True,
                                     "changed": save_live(DATA, lang, updates)})
-        if path == "/api/prefs":
-            lang = resolve_lang(body.get("lang"))
-            if not lang:
-                return send(self, 400, {"error": "unknown language"})
-            prefs_save(lang=lang)
-            return send(self, 200, {"ok": True, "lang": lang})
         if path == "/api/ui":
             code = str(body.get("lang") or "en")
             base = ui_load("en")["base"]
@@ -271,15 +244,7 @@ def main():
     WEB = os.path.abspath(args.web_dir)
     UI_DIR = os.path.join(WEB, "i18n")
     codes = lang_codes(DATA)
-    saved = str(prefs_load().get("lang") or "")
-    if args.lang and args.lang in codes:
-        LANG = args.lang
-    elif saved in codes:
-        LANG = saved
-    elif len(codes) == 1:
-        LANG = codes[0]
-    else:
-        LANG = ""
+    LANG = args.lang if args.lang in codes else ""
     PORT = args.port
     if not os.path.isfile(os.path.join(WEB, "index.html")):
         raise SystemExit("missing web/index.html in %s" % WEB)
