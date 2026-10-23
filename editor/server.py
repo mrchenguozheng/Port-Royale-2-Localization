@@ -119,7 +119,7 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
-        pass
+        print("[http] " + (fmt % args), flush=True)
 
     def do_GET(self):
         parsed = urllib.parse.urlsplit(self.path)
@@ -289,6 +289,7 @@ def main():
     url = ("http://127.0.0.1:%d/translate/%s" % (PORT, LANG)
            if LANG else "http://127.0.0.1:%d/" % PORT)
     print("PR2 Translator: %s" % url)
+    print("Keep this window open. Press Ctrl+C or close it to stop.", flush=True)
     if not args.no_open:
         threading.Timer(0.3, lambda: webbrowser.open(url)).start()
     httpd.serve_forever()
