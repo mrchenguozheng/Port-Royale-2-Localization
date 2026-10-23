@@ -1,192 +1,182 @@
 # Port Royale 2 Localization
 
-A localization project for **Port Royale 2**: UI text is replaced through an
-external language pack, and the original `PR2.exe` is never modified.
+《Port Royale 2》的本地化项目：**用外挂语言包替换界面文本，原版 `PR2.exe` 全程不改。**
 
-[中文说明](README.zh-CN.md) · [Documentation index](docs/README.md)
+[English](../README.md) · [中文文档索引](docs/README.zh-CN.md)
 
 ---
 
-## Read this first: support and test status
+## ⛔ 先看这里：支持范围与测试状态
 
-**Only the GOG English build has been patched and tested in-game.** Other builds:
+**只有 GOG 英文版是打过补丁、并在游戏里实测过的。** 其它版本的情况：
 
-| Build | Patched? | Result |
+| 版本 | 是否打过补丁 | 测试结果 |
 |---|---|---|
-| **GOG English** `1.1.2.3` | ✅ Yes | ✅ **Tested** — UI text, language switching and CJK fonts work |
-| **GOG French** `1.1.2.42` | ❌ No | ⚠️ **Untested** (string table extracted only as a reference) |
-| **Steam English** | ✅ Injection tried | ❌ **Tested, did not take effect** — see below |
+| **GOG 英文** `1.1.2.3` | ✅ 已打补丁 | ✅ **测通** —— 界面文本、语言切换、中文字体都正常 |
+| **GOG 法语** `1.1.2.42` | ❌ 没打过 | ⚠️ **未测试**（只从它的 `PR2.exe` 里提取过字符串表，用作翻译参照） |
+| **Steam 英文** | ✅ 试过注入 | ❌ **测了，没生效** —— 见下 |
 
-### Why Steam does not work
+### Steam 版为什么不生效
 
-The Steam `PR2.exe` is protected by Valve CEG. Changing even one byte makes it
-fail at startup with `Application load error 3:0000065432`. This project therefore
-uses runtime injection: the launcher injects a DLL into the game process, and the
-DLL takes over the engine's text lookups without touching the exe.
+Steam 版 `PR2.exe` 带 Valve CEG 完整性校验，**改 exe 哪怕一个字节**都会启动即报
+`Application load error 3:0000065432`。所以本方案走运行时注入：启动器把 DLL 注入
+游戏进程，DLL 接管引擎的取字调用，从不修改 exe 文件。
 
-In theory CEG should not interfere, but in practice the language pack did not take
-effect in the Steam build. Open questions:
+理论上这不该受 CEG 影响，但实测在 Steam 版上**注入后语言包没有生效**，原因尚未定位。
+待查方向：
 
-- whether CEG self-checks before the injection point;
-- whether `A2dLib-2.20A.dll` lives elsewhere in the Steam build;
-- whether the fixed hook offsets (taken from the GOG build) match the Steam build.
+- CEG 的自校验时机是否早于注入点；
+- `A2dLib-2.20A.dll` 在 Steam 版的存放位置是否不同；
+- hook 用的固定偏移（按 GOG 版取）在 Steam 版是否对不上。
 
-**Verify on the GOG English build before trying Steam.**
-The investigation plan is in [Pending issues](docs/en/pending.md).
+**用 Steam 版之前，请先在 GOG 英文版上确认能用。**
+查证计划和最小实验写在[待定事项](docs/待定.md#1-steam-版注入后语言包不生效最优先)里。
 
 ---
 
-## Quick start
+## 快速开始
 
-Requirements: Visual Studio (Desktop development with C++) and Python 3.11+
-(currently 3.15).
+需要 Visual Studio（C++ 桌面开发组件）+ Python 3.11 以上（当前用 3.15）。
 
-```bat
+```
 start.bat
 ```
 
-It starts the local workbench and opens the **Install & Launch** page in your
-browser. It does **not** build anything automatically.
+它启动本地工作台服务，打开浏览器到「安装与启动」页，**不自动编译**。
 
-The page has a five-step wizard:
+页面顶部是五步安装向导：
 
-1. Select the game directory;
-2. Prepare fonts;
-3. Translate content;
-4. Build language pack + fonts;
-5. Deploy and launch.
+1. 准备游戏目录；
+2. 准备字体；
+3. 翻译内容；
+4. 生成语言包 + 字体；
+5. 安装并启动。
 
-You can also use the cards directly:
+也可以直接点下面的卡片：
 
-- **Build & Deploy**: build the injector, build language packs, deploy to the game directory;
-- **Launch**: **Set as game language** writes `locale.ini`; **Launch (injected)** starts with the selected language;
-- **Translation editor**: same workbench, switch tabs at the top.
+- **构建与部署**：编译注入器、编译语言包、部署到游戏目录；
+- **启动**：「设为游戏语言」写 `locale.ini`，「启动游戏（已注入）」按当前下拉语言启动；
+- **译文编辑**：和安装页同一个工作台，顶部页签切换。
 
-During development, `apply_patch.bat` runs the whole chain: normalize → validate →
-build → deploy → verify.
+开发时改完译文，也可以直接双击 `apply_patch.bat`：归一化 → 校验 → 编译 → 部署 → 核对一次跑完。
 
-Launch with `PR2Launcher.exe` from the game directory
-(**do not run `PR2.exe` directly**, it will not load a language pack).
-To persist a language choice use **Set as game language**; launching once does not
-write to disk. Release players use `PR2LauncherGUI.exe`, which writes the choice
-back after a successful launch.
+之后用游戏目录里的 `PR2Launcher.exe` 启动
+（**不要直接跑 `PR2.exe`**，那样不会加载语言包）。
+想持久换语言，点「设为游戏语言」；只启动一次不写盘。
+发行版玩家用 `PR2LauncherGUI.exe`，启动成功后会自动写回。
 
-See [Build & Install](docs/en/build-and-install.md) for button details.
+按钮细节见[构建与安装](docs/构建与安装.md)。
 
 ---
 
-## Repository layout
+## 仓库结构
 
 ```
 pr2-localization/
-├─ start.bat                  daily entry point: start the workbench
-├─ apply_patch.bat            normalize → validate → build → deploy
+├─ start.bat                  日常入口：启动工作台
+├─ apply_patch.bat            归一化 → 校验 → 编译 → 部署，一条命令跑完
 ├─ src/
-│  ├─ live/                   translation source (saved by the editor)
-│  ├─ seed/                   initial text (unlocked entry by entry)
-│  ├─ orig/                   original English/French (read-only reference)
-│  ├─ editor/                 translation editor (Astro frontend + server.py)
-│  ├─ injector/               injector sources (C++)
+│  ├─ live/                  译文维护源（编辑器保存到这里）
+│  ├─ seed/                  初版文本（按条解锁用）
+│  ├─ orig/                  原版英文/法文（只读参照）
+│  ├─ editor/                译文编辑器（Astro 前端 + server.py）
+│  ├─ injector/              注入组件源码（C++）
 │  └─ tools/
-│     ├─ pack/                build, deploy, new language
-│     ├─ text/                normalization, CJK rules, tokenization
-│     ├─ font/                font stitching and export (fontstitch/)
-│     ├─ analysis/            speaker, tone, width analysis
-│     ├─ install/             pr2ctl build/deploy/launch implementation
-│     └─ data/                names, places, tokenizer dictionaries
-├─ assets/fonts/original/     original Latin fonts (gitignored; export yourself)
-├─ build/                     artifacts: PR2Packs/, fonts/, injector
-├─ docs/                      documentation
-├─ glossary/                  terminology
-└─ tests/                     rules and API tests
+│     ├─ pack/               编译、部署、新建语言
+│     ├─ text/               归一化、中文/日文规则、分词
+│     ├─ font/               字体缝合与导出（含 fontstitch/）
+│     ├─ analysis/           说话人、语气、宽度等分析
+│     ├─ install/            pr2ctl 构建/部署/启动实现
+│     └─ data/               人名、地名、分词词典
+├─ assets/fonts/original/    游戏原版拉丁字体（gitignore，需自己导出）
+├─ build/                    产物：PR2Packs/、fonts/、注入器
+├─ docs/                     说明文档
+├─ glossary/                 术语对照表
+└─ tests/                    规则与 API 单测
 ```
 
-`start.bat` lives at the repository root because it targets people who received
-the repository, not only people editing source.
+`start.bat` 放在仓库根，是因为它面向的是「拿到这个仓库的人」，
+而不是「要改源码的人」—— 放在根目录，双击的路径最短。
 
-| File | Role |
+| 文件 | 角色 |
 |---|---|
-| `PR2Launcher.exe` | Launcher. Starts `PR2.exe` suspended, injects the DLL, resumes it (build artifact) |
-| `PR2TextSource.dll` | Core logic. Hooks three engine text paths and replaces strings (build artifact) |
-| `PR2Packs\` | Language packs. `<lang>.txt` + `locale.ini`; plain text is editable |
-| `fonts\` | Localized fonts; missing CJK glyphs show as blanks |
+| `PR2Launcher.exe` | 启动器。挂起方式启动 `PR2.exe`，注入 DLL 后恢复执行（构建产物） |
+| `PR2TextSource.dll` | 主逻辑。hook 引擎取字的三条路径，把译文替换进去（构建产物） |
+| `PR2Packs\` | 语言包目录。`<语言>.txt` + `locale.ini`，可直接改文本 |
+| `fonts\` | 缝合字体；缺了中文会显示空白 |
 
 ---
 
-## Adding a language
+## 加一种语言
 
-No C++ changes are required:
+不用碰 C++，流程是：
 
-1. Run `start.bat`, open **Translation editor**, click **＋** next to the language
-   dropdown and use an existing language as a template;
-2. Translate and save (written to `src/live/<code>.toml`);
-3. A `presets/<code>.toml` is created automatically from the template language;
-   check or replace donors for the new language;
-4. Build fonts and the language pack, then deploy.
+1. 跑 `start.bat`，在「译文编辑」页点语言下拉旁的「＋」，用现成语言当模板；
+2. 逐条翻译并保存（写进 `src/live/<代码>.toml`）；
+3. 创建语言时会自动生成 `presets/<代码>.toml`（donor 以模板语言的文件为模板），
+   再按语种检查/替换 donor；
+4. 构建字体、语言包并部署。
 
-Full steps with acceptance points: [New language](docs/en/new-language.md).
-Font prerequisites: [New language fonts](docs/en/new-language-fonts.md).
+完整步骤（含每步验收点）见
+[新语言完整流程](docs/新语言完整流程.md)；只需要准备哪些东西见
+[新语言字体配置](docs/新语言字体配置.md)。
 
-Entries do not have to be complete — missing entries fall back to English.
+条目不必写全 —— 没写的自动显示英文。
 
 ---
 
-## Documentation
+## 文档
 
-| Document | Contents |
+| 文档 | 内容 |
 |---|---|
-| [Documentation index](docs/README.md) | Use/build/translate/pending sections; start here |
-| [Build & Install](docs/en/build-and-install.md) | Install page, build/deploy/launch, scripts |
-| [New language](docs/en/new-language.md) | From font export to an in-game language |
-| [Release](docs/en/release.md) | Per-language zips, Noto fonts, GitHub Actions |
-| [New language fonts](docs/en/new-language-fonts.md) | Font/tool prerequisites for a new language |
-| [Fonts & distribution](docs/en/fonts-and-distribution.md) | Stitching, donor licenses, redistribution limits |
-| [Injector](docs/en/injection.md) | Runtime, three hook paths, source layout, build |
-| [Architecture](docs/en/architecture.md) | Layers, file contracts, refactor record, boundaries |
-| [Translations & packs](docs/en/translation-and-packs.md) | TOML format, validation, adding a language |
-| [Glossary](glossary/README.md) | English/Chinese names for goods, ships, ranks, towns |
-| [Pending](docs/en/pending.md) | Steam issues, untested French build, hook offsets |
-| [Speaker tiers](docs/en/speaker-tiers.md) | Which lines identify a speaker, which are guesses (with CSV) |
-| [Translation limits](docs/en/translation-limits.md) | What cannot be fixed, verified coverage, hook trade-offs |
-| [Tone proposals](docs/en/tone-proposal.md) | 41 confident speakers + 668 entries for review |
+| [文档索引](docs/README.zh-CN.md) | 按“使用/开发/翻译/待定”分类，先查这里 |
+| [构建与安装](docs/构建与安装.md) | 安装页、构建/部署/启动、脚本一览 |
+| [新语言完整流程](docs/新语言完整流程.md) | 从导出字体到进游戏，按步骤做 |
+| [发行版](docs/发行版.md) | 按语言出 zip、Noto 字体、GitHub Actions |
+| [新语言字体配置](docs/新语言字体配置.md) | 别人做新语言需要准备哪些字体和工具 |
+| [字体与分发](docs/字体与分发.md) | 缝合原理、donor 许可、禁止分发 |
+| [注入组件](docs/注入组件.md) | 运行时原理、hook 三条路径、源码职责、编译 |
+| [架构与重构](docs/架构与重构.md) | 分层、文件契约、重构记录、已知边界 |
+| [译文与语言包](docs/译文与语言包.md) | toml 格式、校验规则、加一种语言 |
+| [术语对照](glossary/README.md) | 货物/船只/军衔/城镇等专名的英中对照，可扩展到别的语言 |
+| [待定事项](docs/待定.md) | Steam 不生效、法文版未验证、hook 偏移等还没结论的问题 |
+| [说话人分级](docs/说话人分级.md) | 哪些台词能确定说话人、哪些只能猜（附逐条 CSV） |
+| [翻译局限](docs/翻译局限.md) | 哪些问题无法根除、实际验证到几成、要不要 hook |
+| [语体拟改清单](docs/语体拟改清单.md) | 能确定说话人的 41 条 + 待人工的 668 条 |
 
 ---
 
-## Known limitations
+## 已知限制
 
-- **Hook targets are tied to game builds.** The code calls `A2dLib-2.20A.dll`
-  functions at fixed offsets; another build (including GOG French `1.1.2.42`)
-  will likely need new offsets, otherwise nothing takes effect.
-- **A whole Chinese entry disappearing is a tokenization issue, not a tag issue.**
-  The engine splits text on spaces; an unbroken CJK string that is too wide is
-  dropped as a whole. Verify entry by entry in-game.
-- **Fonts are per language.** Development uses stitched fonts in
-  `build\fonts\<lang>\`; releases use full Noto. Deployment copies to
-  `fonts\<lang>\` in the game directory and never overwrites the originals.
-  New rare characters trigger a re-stitch; missing glyphs render as blanks.
+- **hook 目标与游戏版本绑定。** 代码按固定偏移取 `A2dLib-2.20A.dll` 的函数，
+  换游戏版本（包括 GOG 的法语版 `1.1.2.42`）很可能需要改偏移，否则整体不生效。
+- **中文条目整条不显示是分词问题，不是标签问题。** 引擎按空格切词，
+  整串汉字超宽会被整条丢弃，只能逐条在游戏里实测。
+- **字体按语言分开。** 开发用缝合版 `build\fonts\<语言>\`，发行用完整 Noto；
+  部署时复制到游戏 `fonts\<语言>\`，不覆盖根目录原版。译文新增生僻字时，
+  构建会自动重缝，缺字就会显示空白。
 
 ---
 
-## License
+## 许可
 
-See [LICENSE](LICENSE).
+见 [LICENSE](LICENSE).
 
-## Language status
+## 语言完成度
 
-| Language | Entries | Status |
+| 语言 | 条目 | 状态 |
 |---|---|---|
-| Chinese `zh` | 3548 | ✅ Complete (layout and placeholder checks included) |
-| Japanese `ja` | 3548 | ✅ Complete (3370 translations + 178 keep-original) |
-| English/French | 3548 | Reference originals (`src/orig/`), no packs generated |
+| 中文 `zh` | 3548 | ✅ 全部完成（含排版与占位符校验） |
+| 日语 `ja` | 3548 | ✅ 全部完成（3370 条译文 + 178 条「原样保留」） |
+| 英文/法文 | 3548 | 参照原文（`src/orig/`），不生成语言包 |
 
-Japanese "keep original" means 178 entries that should not be translated:
-symbols/numbers, engine IDs (`IDM_CONTEST_…`), key names (`ESC`/`CTRL`/`F10`),
-copyright notices and developer names. The list is in
-`src/live/keep_original.toml`; the compiler forces the English original back.
+日语里的「原样保留」指本来就不该翻译的 178 条：纯符号/数字、引擎编号
+（`IDM_CONTEST_…`）、按键名（`ESC`/`CTRL`/`F10`）、版权声明与制作方名称。
+清单在 `src/live/keep_original.toml`，编译时会强制写回英文原文。
 
-## Path conventions
+## 路径约定
 
-Documentation and scripts do not contain machine-specific absolute paths: the game
-directory is written as `<game directory>`, user directories use variables such as
-`%USERPROFILE%`. `subset_fonts.py` reads original fonts from
-`assets/fonts/original/` by default (gitignored), not from a particular machine.
+仓库里的文档与脚本**不写本机绝对路径**：游戏目录一律写作 `<游戏目录>`，
+用户目录用 `%USERPROFILE%` 之类的环境变量表示。
+`subset_fonts.py` 需要的原版字体默认读仓库内 `assets/fonts/original/`（已在 `.gitignore` 中忽略），
+不再指向某台机器的安装位置。
