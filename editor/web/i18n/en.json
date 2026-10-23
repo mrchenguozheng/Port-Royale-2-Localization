@@ -41,5 +41,6 @@
   "ui.newPrompt": "New UI language code (for example ko):",
   "ui.overwrite": "{lang}.json already exists. Overwrite it?",
   "ui.invalid": "Use 2–16 lowercase letters, digits, - or _.",
-  "ui.noBase": "English UI text is missing."
+  "ui.noBase": "English UI text is missing.",
+  "ui.interface": "Interface"
 }

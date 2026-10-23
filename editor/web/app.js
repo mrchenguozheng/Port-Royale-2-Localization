@@ -257,16 +257,23 @@ async function loadUiLangs() {
   const data = await api("/api/ui/langs");
   uiState.codes = data.codes || ["en"];
   const sel = $("uiLang");
+  const sw = $("uiSwitch");
   sel.textContent = "";
+  sw.textContent = "";
   for (const code of uiState.codes) {
     const opt = document.createElement("option");
     opt.value = code;
     opt.textContent = code;
     sel.appendChild(opt);
+    const opt2 = document.createElement("option");
+    opt2.value = code;
+    opt2.textContent = code;
+    sw.appendChild(opt2);
   }
   const wanted = (window.PR2_I18N && window.PR2_I18N.lang) || "en";
   uiState.lang = uiState.codes.includes(wanted) ? wanted : "en";
   sel.value = uiState.lang;
+  sw.value = uiState.lang;
 }
 
 async function loadUi(code) {
@@ -353,6 +360,11 @@ $("tabUi").addEventListener("click", async () => {
   }
 });
 $("uiLang").addEventListener("change", () => void loadUi($("uiLang").value));
+$("uiSwitch").addEventListener("change", () => {
+  const url = new URL(location.href);
+  url.searchParams.set("ui", $("uiSwitch").value);
+  location.assign(url);
+});
 $("uiSave").addEventListener("click", () => void saveUi());
 $("uiNew").addEventListener("click", () => void newUi());
 
