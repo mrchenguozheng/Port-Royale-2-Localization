@@ -23,8 +23,8 @@
 
 ```bat
 python src\tools\pack\make_release.py --lang zh --lang ja --version v1.0.0
-git tag v1.0.0
-git push origin v1.0.0
+git tag release-v1.0.0
+git push origin release-v1.0.0
 ```
 
 ## 目標
@@ -372,7 +372,7 @@ GitHub Actions では別 job で `PR2Translator-*.zip` をビルドしてアッ�
 ```yaml
 on:
   push:
-    tags: ['v*']
+    tags: ['release-v*']
 
 jobs:
   release:
@@ -385,7 +385,12 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
       - run: pip install fonttools
-      - run: python src/tools/pack/make_release.py --lang ${{ matrix.lang }} --version ${{ github.ref_name }}
+      - name: Derive version
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".Replace("release-", "")
+          "VERSION=$v" >> $env:GITHUB_ENV
+      - run: python src/tools/pack/make_release.py --lang ${{ matrix.lang }} --version $env:VERSION
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*.zip
