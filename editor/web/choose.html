@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choose translation language</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main class="chooser">
+  <h1>PR2 Translation Workbench</h1>
+  <p>Choose the language you want to translate.</p>
+  <div id="choices" class="choices"></div>
+  <p id="error" class="problem error"></p>
+</main>
+<script>
+(async function () {
+  const box = document.getElementById("choices");
+  try {
+    const data = await (await fetch("/api/langs", {cache: "no-cache"})).json();
+    const langs = data.editable || [];
+    if (!langs.length) {
+      document.getElementById("error").textContent = "No editable language found.";
+      return;
+    }
+    for (const code of langs) {
+      const a = document.createElement("a");
+      a.className = "choice";
+      a.href = "/translate/" + encodeURIComponent(code);
+      a.textContent = code;
+      box.appendChild(a);
+    }
+  } catch (err) {
+    document.getElementById("error").textContent = "Failed to load languages: " + err.message;
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="app.title">PR2 Translation Workbench</title>
+<link rel="stylesheet" href="/style.css">
+<script src="/i18n.js"></script>
+</head>
+<body>
+<div class="sticky-top">
+<header class="top">
+  <div class="brand">
+    <span data-i18n="app.title">PR2 Translation Workbench</span>
+    <div class="sub" data-i18n="app.subtitle">Edit the Translation column, then click Save changes.</div>
+  </div>
+  <label class="game-lang"><span data-i18n="lang.label">Translation language</span>
+    <select id="lang"></select>
+  </label>
+  <label class="ui-switch"><span data-i18n="ui.interface">Interface language</span>
+    <select id="uiSwitch"></select>
+  </label>
+  <span id="stats" class="muted"></span>
+  <span class="spacer"></span>
+  <button id="save" data-i18n="action.save" disabled>Save changes</button>
+</header>
+
+<nav class="tabs">
+  <button id="tabGame" class="active" data-i18n="tab.game">Game translation</button>
+  <button id="tabUi" data-i18n="tab.ui">Editor UI text</button>
+</nav>
+
+<section class="toolbar" id="gameToolbar">
+  <span class="hint" data-i18n="app.hint">English is the source. Changes are saved only when you click Save changes.</span>
+  <input id="search" type="search" data-i18n-placeholder="search.placeholder" placeholder="Search id, English or translation…">
+  <button id="doSearch" data-i18n="action.search">Search</button>
+  <button id="clearSearch" data-i18n="action.clear">Clear</button>
+  <span id="message" class="muted"></span>
+</section>
+</div>
+
+<main id="gameMain">
+  <table>
+    <thead>
+      <tr>
+        <th data-i18n="table.id">ID</th>
+        <th><span data-i18n="table.english">English</span><div class="ref-label" data-i18n="table.french">French reference</div></th>
+        <th data-i18n="table.translation">Translation</th>
+        <th data-i18n="table.status">Status</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</main>
+
+<footer class="pager" id="gamePager">
+  <button id="prev" data-i18n="pager.prev">‹ Prev</button>
+  <span id="pageInfo"></span>
+  <button id="next" data-i18n="pager.next">Next ›</button>
+</footer>
+
+<section id="uiPanel" hidden>
+  <h2 data-i18n="ui.title">Editor interface text</h2>
+  <p class="hint" data-i18n="ui.hint">This changes this editor's interface only, not the game text. Keys are fixed; empty values fall back to English.</p>
+  <div class="ui-tools">
+    <label><span data-i18n="ui.language">UI language</span>
+      <select id="uiLang"></select>
+    </label>
+    <button id="uiNew" data-i18n="ui.new">New language</button>
+    <button id="uiSave" data-i18n="ui.save">Save UI text</button>
+    <span id="uiMessage" class="muted"></span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th data-i18n="ui.key">Key</th>
+        <th data-i18n="ui.english">English</th>
+        <th data-i18n="ui.translation">Translation</th>
+      </tr>
+    </thead>
+    <tbody id="uiRows"></tbody>
+  </table>
+</section>
+
+<script src="/app.js"></script>
+</body>
+</html>

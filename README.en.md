@@ -3,7 +3,7 @@
 A localization project for **Port Royale 2**: UI text is replaced through an
 external language pack, and the original `PR2.exe` is never modified.
 
-[中文说明](README.md) · [Documentation index](docs/README.md)
+[中文说明](README.md) · [日本語](README.ja.md) · [Documentation index](docs/README.md)
 
 ---
 
@@ -84,6 +84,8 @@ See [Build & Install](docs/en/build-and-install.md) for button details.
 pr2-localization/
 ├─ start.bat                  development entry: start the workbench
 ├─ apply_patch.bat            normalize → validate → build → deploy
+├─ shared/                   shared storage/validation core
+├─ editor/                   standalone translator workbench (English UI)
 ├─ src/
 │  ├─ live/                   translation source (saved by the editor)
 │  ├─ seed/                   initial text (unlocked entry by entry)
@@ -137,6 +139,8 @@ Entries do not have to be complete — missing entries fall back to English.
 | [Player guide](docs/en/user-guide.md) | Download, extract, launch, uninstall, troubleshooting |
 | [Build & Install](docs/en/build-and-install.md) | Install page, build/deploy/launch, scripts |
 | [New language](docs/en/new-language.md) | From font export to an in-game language |
+| [Language collaboration](docs/en/language-collaboration.md) | Translator/maintainer split and handoff |
+| [Translator workbench](docs/en/translator-workbench.md) | Minimal package with only the translation page |
 | [Release](docs/en/release.md) | Per-language zips, Noto fonts, GitHub Actions |
 | [New language fonts](docs/en/new-language-fonts.md) | Font/tool prerequisites for a new language |
 | [Fonts & distribution](docs/en/fonts-and-distribution.md) | Stitching, donor licenses, redistribution limits |

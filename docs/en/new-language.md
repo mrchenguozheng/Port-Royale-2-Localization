@@ -249,3 +249,7 @@ See also: [New language fonts](new-language-fonts.md) ·
 [Translations & packs](translation-and-packs.md) ·
 [Build & install](build-and-install.md) · [Release](release.md) ·
 [Fonts & distribution](fonts-and-distribution.md).
+
+---
+
+Translator/maintainer handoff: [Language collaboration](language-collaboration.md).

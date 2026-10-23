@@ -331,7 +331,16 @@ Font results are cached in `build\font-cache\noto\` and reused. Force a rebuild:
 python src\tools\pack\make_release.py --lang zh --version v1.0.0 --no-font-cache
 ```
 
-### 3. Verify before publishing
+### 3. Packaging model
+
+Releases currently ship one bundle per language (runtime + pack + fonts) so players
+can extract and play.
+
+A separate Runtime + Language split is kept as a future option; it is not enabled
+yet. Revisit it when the number of languages grows or the runtime needs frequent
+independent updates.
+
+### 4. Verify before publishing
 
 1. Extract into a clean game copy;
 2. Run `PR2LauncherGUI.exe`;
@@ -370,6 +379,33 @@ Neither is part of the default release flow:
 
 Stitched fonts are derivative works: **for personal use only, never put them in a public
 release**. `make_release.py --fonts stitch` is only for private packages.
+
+## Translator workbench
+
+The translator workbench is **not** placed inside `PR2-zh-*.zip` or
+`PR2-ja-*.zip`. It is a separate asset on the same release:
+
+```text
+PR2-zh-v1.0.0.zip
+PR2-ja-v1.0.0.zip
+PR2Translator-v1.0.0.zip
+```
+
+Build it with:
+
+```bat
+python src\tools\pack\make_translator.py --out dist\PR2Translator-v1.0.0
+Compress-Archive -Path dist\PR2Translator-v1.0.0\* ^
+    -DestinationPath dist\PR2Translator-v1.0.0.zip
+```
+
+Why separate:
+
+- the translator package is about 16 MB and bundles Python; players do not need it;
+- game zips stay extract-and-play;
+- the editor can be updated without rebuilding the game packs.
+
+Use a separate GitHub Actions job to build and upload `PR2Translator-*.zip`.
 
 ## GitHub Actions
 

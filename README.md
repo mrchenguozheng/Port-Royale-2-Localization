@@ -2,7 +2,7 @@
 
 《Port Royale 2》的本地化项目：**用外挂语言包替换界面文本，原版 `PR2.exe` 全程不改。**
 
-[English](README.en.md) · [中文文档索引](docs/README.zh-CN.md)
+[English](README.en.md) · [日本語](README.ja.md) · [中文文档索引](docs/README.zh-CN.md)
 
 ---
 
@@ -78,6 +78,8 @@ start.bat
 pr2-localization/
 ├─ start.bat                  开发入口：启动工作台
 ├─ apply_patch.bat            归一化 → 校验 → 编译 → 部署
+├─ shared/                   编辑器与工具共用的存储/校验核心
+├─ editor/                   独立译者工作台（英文翻译页）
 ├─ src/
 │  ├─ live/                  译文维护源（编辑器保存到这里）
 │  ├─ seed/                  初版文本（按条解锁用）
@@ -131,6 +133,8 @@ pr2-localization/
 | [玩家指南](docs/玩家指南.md) | 下载 zip、解压、启动、卸载、常见问题 |
 | [构建与安装](docs/构建与安装.md) | 安装页、构建/部署/启动、脚本一览 |
 | [新语言完整流程](docs/新语言完整流程.md) | 从导出字体到进游戏，按步骤做 |
+| [新语言协作流程](docs/新语言协作流程.md) | 译者能做什么、维护者能做什么 |
+| [译者工作台](docs/译者工作台.md) | 只带翻译页的最小分发包 |
 | [发行版](docs/发行版.md) | 按语言出 zip、Noto 字体、GitHub Actions |
 | [新语言字体配置](docs/新语言字体配置.md) | 别人做新语言需要准备哪些字体和工具 |
 | [字体与分发](docs/字体与分发.md) | 缝合原理、donor 许可、禁止分发 |
