@@ -257,7 +257,8 @@ Severity varies: `差し上げます` and `お受け取りになります` most 
 
 **Current leftovers (2026-10-21)**
 
-- **26 entries** awaiting review; the list is in [Speaker tiers § register to review](speaker-tiers.md);
+- **26 entries** awaiting review; the list is in the `register to review` column of
+  [speaker-audit.csv](../csv/analysis/speaker-audit.csv);
 - typical cases: `0x13601073` (`…a barque` → `バークを差し上げます`),
   `0xf94c02c2` (`you will receive` → `お受け取りになります`),
   `0x171746e9`, `0xfbb36ec1`, `0xfdaf6463` (`差し上げます` in the land-grant texts);
