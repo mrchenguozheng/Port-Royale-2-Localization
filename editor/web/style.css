@@ -11,13 +11,15 @@ body { margin: 0; }
   padding: 10px 16px; background: #1f2937; color: #fff;
 }
 .brand { font-weight: 600; font-size: 16px; }
+.brand .sub { font-weight: 400; font-size: 12px; color: #cbd5e1; margin-top: 2px; }
+.hint { flex: 1; color: #94a3b8; font-size: 12px; }
 .top label { display: flex; gap: 6px; align-items: center; }
 .spacer { flex: 1; }
 .toolbar {
   display: flex; gap: 8px; align-items: center;
   padding: 10px 16px; background: #fff; border-bottom: 1px solid #d8dee9;
 }
-.toolbar input { flex: 1; max-width: 480px; }
+.toolbar input { flex: 1; max-width: 380px; }
 button {
   padding: 5px 10px; border: 1px solid #b8c2d1; border-radius: 4px;
   background: #fff; cursor: pointer;
@@ -43,6 +45,7 @@ tr.error textarea { border-color: #dc2626; background: #fef2f2; }
 .problem.error { color: #b91c1c; }
 .problem.warn { color: #b45309; }
 .muted { color: #94a3b8; }
+.empty { text-align: center; color: #94a3b8; padding: 40px !important; }
 .pager {
   display: flex; justify-content: center; gap: 12px; align-items: center;
   padding: 12px; color: #475569;

@@ -45,6 +45,17 @@ function render() {
   const tbody = $("rows");
   tbody.textContent = "";
   const rows = state.rows;
+  if (!rows.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 4;
+    td.className = "empty";
+    td.textContent = state.total ? "No rows on this page." : "No entries found.";
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    updatePager();
+    return;
+  }
   for (const row of rows) {
     const tr = document.createElement("tr");
     if (state.dirty.has(row.id)) tr.classList.add("dirty");
