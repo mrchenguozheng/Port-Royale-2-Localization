@@ -6,6 +6,10 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; }
+.sticky-top {
+  position: sticky; top: 0; z-index: 30;
+  background: #eef2f7; box-shadow: 0 2px 8px rgba(15, 23, 42, .08);
+}
 .top {
   display: flex; align-items: center; gap: 16px;
   padding: 10px 16px; background: #1f2937; color: #fff;
