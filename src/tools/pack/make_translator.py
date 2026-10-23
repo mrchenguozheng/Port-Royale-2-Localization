@@ -69,17 +69,25 @@ def copy_python_runtime(src, dst):
 def write_start(stage, has_python):
     lines = ["@echo off", "setlocal", 'set "ROOT=%~dp0"']
     if has_python:
-        lines.append('set "PY=%ROOT%python\\python.exe"')
-    else:
-        lines.append('set "PY=python"')
         lines += [
+            'set "PY=%ROOT%python\\python.exe"',
+            'set "PYW=%ROOT%python\\pythonw.exe"',
+            'if not exist "%PYW%" set "PYW=%PY%"',
+        ]
+    else:
+        lines += [
+            'set "PY=python"',
             '"%PY%" -c "import sys; sys.exit(0 if sys.version_info >= (3,11) else 1)" '
             ">nul 2>&1",
             "if errorlevel 1 goto :nopython",
+            'set "PYW=pythonw"',
+            'where pythonw >nul 2>&1 || set "PYW=%PY%"',
         ]
     lines += [
-        f'start "" "%PY%" "%ROOT%editor\\server.py" --data "%ROOT%data" '
-        f'--web-dir "%ROOT%editor\\web" --port 8781',
+        f'start "" "%PYW%" "%ROOT%editor\\server.py" --data "%ROOT%data" '
+        f'--web-dir "%ROOT%editor\\web" --port 8781 --no-open',
+        "ping -n 3 127.0.0.1 >nul",
+        'start "" "http://127.0.0.1:8781/"',
         "endlocal",
         "exit /b 0",
         "",
