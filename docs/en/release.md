@@ -6,6 +6,51 @@
 builds are out of scope; do not deploy these packages to them. Future work is in
 [Pending issues](pending.md).
 
+## Version numbering
+
+For the first public release, use:
+
+```
+v1.0.0
+```
+
+Reasoning:
+
+- zh / ja are complete at 3548 entries each;
+- the support scope is explicit: GOG English `1.1.2.3`;
+- packages, fonts, installation, uninstall and player docs are in place;
+- this is the first complete player-facing release, not an internal prototype.
+
+"Only one game build is supported" does not prevent a 1.0. A 1.0 means:
+
+> Within the declared support scope, gameplay and usage are stable.
+
+It does not mean "all game builds are supported".
+
+| Version | Purpose |
+|---|---|
+| `v0.9.0` | RC if the clean GOG copy has not been fully verified |
+| **`v1.0.0`** | First public release |
+| `v1.0.1` | Bug fixes, docs, small font fixes |
+| `v1.1.0` | New language packs or notable features |
+| `v1.2.0` | Steam / GOG French or other new game builds |
+| `v2.0.0` | Incompatible pack format or runtime contract |
+
+Regenerate before tagging so the package contains the latest notes and runtime:
+
+```bat
+python src\tools\pack\make_release.py --lang zh --lang ja --version v1.0.0
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Do not confuse:
+
+- **release version** `v1.0.0`: the package version shown to players;
+- **runtime version** `PR2_RUNTIME_VERSION=1`: used for language pack compatibility.
+
+They are separate.
+
 ## Goals
 
 Players download a language pack, extract it into the game directory, and it is ready to
