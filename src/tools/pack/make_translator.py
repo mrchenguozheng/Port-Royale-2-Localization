@@ -83,9 +83,8 @@ def write_start(stage, has_python):
         "echo URL: http://127.0.0.1:8781/",
         "echo Keep this window open. Press Ctrl+C or close it to stop.",
         "echo.",
-        'start "" /b "%ROOT%open_browser.bat"',
         f'"%PY%" "%ROOT%editor\\server.py" --data "%ROOT%data" '
-        f'--web-dir "%ROOT%editor\\web" --port 8781 --no-open',
+        f'--web-dir "%ROOT%editor\\web" --port 8781',
         "endlocal",
         "exit /b 0",
         "",
@@ -105,16 +104,6 @@ def write_start(stage, has_python):
     with open(os.path.join(stage, "start.bat"), "w",
               encoding="ascii", newline="\r\n") as fh:
         fh.write("\n".join(lines))
-
-    opener = [
-        "@echo off",
-        "ping -n 3 127.0.0.1 >nul",
-        'start "" "http://127.0.0.1:8781/"',
-        "",
-    ]
-    with open(os.path.join(stage, "open_browser.bat"), "w",
-              encoding="ascii", newline="\r\n") as fh:
-        fh.write("\n".join(opener))
 
 
 def write_readme(stage, languages, has_python):
