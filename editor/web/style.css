@@ -1,0 +1,49 @@
+:root {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  color: #1d2433;
+  background: #f4f6f9;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.top {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 16px; background: #1f2937; color: #fff;
+}
+.brand { font-weight: 600; font-size: 16px; }
+.top label { display: flex; gap: 6px; align-items: center; }
+.spacer { flex: 1; }
+.toolbar {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 16px; background: #fff; border-bottom: 1px solid #d8dee9;
+}
+.toolbar input { flex: 1; max-width: 480px; }
+button {
+  padding: 5px 10px; border: 1px solid #b8c2d1; border-radius: 4px;
+  background: #fff; cursor: pointer;
+}
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+main { padding: 0 16px 16px; }
+table { width: 100%; border-collapse: collapse; background: #fff; }
+th, td { border-bottom: 1px solid #e2e8f0; padding: 8px; vertical-align: top; }
+th { text-align: left; font-size: 12px; color: #64748b; background: #f8fafc; }
+td.id { font-family: Consolas, monospace; font-size: 12px; color: #64748b; white-space: nowrap; }
+td.en { width: 34%; color: #334155; }
+td.tr { width: 38%; }
+td.status { width: 20%; font-size: 12px; }
+textarea {
+  width: 100%; min-height: 62px; resize: vertical; padding: 6px;
+  border: 1px solid #cbd5e1; border-radius: 4px; font: inherit;
+}
+textarea:focus { outline: 2px solid #93c5fd; border-color: #2563eb; }
+tr.dirty textarea { border-color: #f59e0b; background: #fffbeb; }
+tr.error textarea { border-color: #dc2626; background: #fef2f2; }
+.problem { display: block; margin-top: 3px; }
+.problem.error { color: #b91c1c; }
+.problem.warn { color: #b45309; }
+.muted { color: #94a3b8; }
+.pager {
+  display: flex; justify-content: center; gap: 12px; align-items: center;
+  padding: 12px; color: #475569;
+}

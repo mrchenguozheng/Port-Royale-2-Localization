@@ -37,19 +37,21 @@ The `--python-dir` directory must contain `python.exe`.
 PR2Translator-ja/
 ├─ start.bat
 ├─ README.txt
-├─ src/
-│  ├─ editor/
-│  │  ├─ server.py
-│  │  └─ dist/             prebuilt frontend
-│  ├─ tools/               translation, validation, terminology
-│  ├─ live/ja.toml         current language
-│  ├─ orig/                English reference
-│  ├─ seed/                initial text
-│  └─ find_python.bat
-└─ glossary/               terminology
+├─ server.py              standalone stdlib server
+├─ web/                   English UI
+├─ data/
+│  ├─ live/ja.toml        current language
+│  └─ orig/               English reference
+└─ python/                bundled by default
 ```
 
-No `build/`, injector, fonts, `PR2Packs/` or install page.
+No `build/`, injector, fonts, `PR2Packs/`, glossary or install page.
+
+Source lives in `editor/` and can be launched separately:
+
+```bat
+editor\start.bat
+```
 
 ## Translator usage
 
@@ -59,9 +61,9 @@ No `build/`, injector, fonts, `PR2Packs/` or install page.
 4. Translate and save;
 5. Close the console window to stop the service.
 
-Only the translation editor is shown. Build/deploy/launch endpoints return 403.
+The workbench has no install, build or launch entry points.
 
-> The workbench chrome is currently Chinese; it is separate from the translation
+> The workbench chrome is currently **English**; it is separate from the translation
 > target language. The target only selects which `live/<lang>.toml` is loaded.
 
 ## Return the result
@@ -69,7 +71,7 @@ Only the translation editor is shown. Build/deploy/launch endpoints return 403.
 The translator returns:
 
 ```
-src/live/ja.toml
+data/live/ja.toml
 ```
 
 The maintainer then:

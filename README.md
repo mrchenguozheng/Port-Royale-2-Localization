@@ -78,6 +78,7 @@ start.bat
 pr2-localization/
 ├─ start.bat                  开发入口：启动工作台
 ├─ apply_patch.bat            归一化 → 校验 → 编译 → 部署
+├─ editor/                   独立译者工作台（英文翻译页）
 ├─ src/
 │  ├─ live/                  译文维护源（编辑器保存到这里）
 │  ├─ seed/                  初版文本（按条解锁用）

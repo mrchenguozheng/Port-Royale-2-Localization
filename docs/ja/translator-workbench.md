@@ -37,19 +37,22 @@ python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja ^
 PR2Translator-ja/
 ├─ start.bat
 ├─ README.txt
-├─ src/
-│  ├─ editor/
-│  │  ├─ server.py
-│  │  └─ dist/             prebuilt frontend
-│  ├─ tools/               translation, validation, terminology
-│  ├─ live/ja.toml         current language
-│  ├─ orig/                English reference
-│  ├─ seed/                initial text
-│  └─ find_python.bat
-└─ glossary/               terminology
+├─ server.py              標準ライブラリのみの独立サーバー
+├─ web/                   英語 UI
+├─ data/
+│  ├─ live/ja.toml        現在の言語
+│  └─ orig/               英語原文
+└─ python/                既定で同梱
 ```
 
-`build/`、インジェクタ、フォント、`PR2Packs/`、インストールページは含まれません。
+`build/`、インジェクタ、フォント、`PR2Packs/`、用語集、インストールページは
+含まれません。
+
+ソースは `editor/` にあり、単独で起動できます：
+
+```bat
+editor\start.bat
+```
 
 ## 翻訳者の使い方
 
@@ -59,15 +62,14 @@ PR2Translator-ja/
 4. 翻訳して保存する；
 5. コンソールウィンドウを閉じてサービスを停止する。
 
-表示されるのは翻訳エディタだけです。ビルド／デプロイ／起動の各エンドポイントは 403 を
-返します。
+ワークベンチにはインストール・ビルド・起動の入口はありません。
 
 ## 成果物の返送
 
 翻訳者が返送するファイル：
 
 ```
-src/live/ja.toml
+data/live/ja.toml
 ```
 
 その後、メンテナーが次を行います：

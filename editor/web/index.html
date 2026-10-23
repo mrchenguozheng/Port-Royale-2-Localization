@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PR2 Translation Workbench</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">PR2 Translation Workbench</div>
+  <label>Language
+    <select id="lang"></select>
+  </label>
+  <span id="stats" class="muted"></span>
+  <span class="spacer"></span>
+  <button id="save" disabled>Save changes</button>
+</header>
+
+<section class="toolbar">
+  <input id="search" type="search" placeholder="Search id, English or translation…">
+  <button id="doSearch">Search</button>
+  <button id="clearSearch">Clear</button>
+  <span id="message" class="muted"></span>
+</section>
+
+<main>
+  <table>
+    <thead>
+      <tr><th>ID</th><th>English</th><th>Translation</th><th>Status</th></tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+</main>
+
+<footer class="pager">
+  <button id="prev">‹ Prev</button>
+  <span id="pageInfo"></span>
+  <button id="next">Next ›</button>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

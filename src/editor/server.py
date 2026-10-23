@@ -1721,11 +1721,15 @@ def main():
                     help="译者模式：只开放翻译页，禁用构建/部署/启动")
     ap.add_argument("--translator-lang", default="zh",
                     help="译者模式下默认打开的语言代码")
+    ap.add_argument("--web-dir", default=None,
+                    help="前端目录；默认使用 src/editor/dist")
     a = ap.parse_args()
 
-    global TRANSLATOR, TRANSLATOR_LANG
+    global TRANSLATOR, TRANSLATOR_LANG, DIST
     TRANSLATOR = a.translator
     TRANSLATOR_LANG = (a.translator_lang or "zh").strip() or "zh"
+    if a.web_dir:
+        DIST = os.path.abspath(a.web_dir)
 
     if not os.path.isdir(DIST):
         _say("注意：找不到前端产物 %s" % DIST)
