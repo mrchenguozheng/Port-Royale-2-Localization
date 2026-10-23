@@ -154,3 +154,7 @@ python src\tools\pack\make_release.py --lang ko --version v1.1.0
 - `ui/ko.ini` が存在する；
 - フォントの方針が決まっている；
 - 対応するゲームビルドが GOG 英語版であることが明記されている。
+
+---
+
+最小構成で渡す場合は[翻訳者ワークベンチ](translator-workbench.md)を参照。

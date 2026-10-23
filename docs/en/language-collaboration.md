@@ -154,3 +154,7 @@ When reporting a problem, include:
 - `ui/ko.ini` exists;
 - font plan decided;
 - supported game build is explicitly GOG English.
+
+---
+
+For a minimal handoff environment, see [Translator workbench](translator-workbench.md).

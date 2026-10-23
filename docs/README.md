@@ -32,6 +32,7 @@ Chinese-only for now.
 | [Translations & packs](en/translation-and-packs.md) | TOML format, `hash = text`, editor workflow |
 | [New language](en/new-language.md) | Add a language from scratch |
 | [Language collaboration](en/language-collaboration.md) | Translator/maintainer split, handoff and verification |
+| [Translator workbench](en/translator-workbench.md) | Minimal package with only the translation page |
 
 ## Translation notes
 

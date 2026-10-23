@@ -31,6 +31,7 @@
 | [翻訳と言語パック](ja/translation-and-packs.md) | TOML 形式、`hash = text`、エディタの流れ |
 | [新言語の追加](ja/new-language.md) | ゼロから言語を追加する手順 |
 | [言語追加の協力フロー](ja/language-collaboration.md) | 翻訳者とメンテナーの分担・受け渡し・検証 |
+| [翻訳者ワークベンチ](ja/translator-workbench.md) | 翻訳ページだけを入れた最小パッケージ |
 
 ## 翻訳メモ
 
