@@ -77,7 +77,7 @@ def write_start(stage, lang, has_python):
         ]
     lines += [
         f'start "" "%PY%" "%ROOT%editor\\server.py" --data "%ROOT%data" '
-        f'--web-dir "%ROOT%editor\\web" --lang {lang} --port 8781',
+        f'--web-dir "%ROOT%editor\\web" --port 8781',
         "endlocal",
         "exit /b 0",
         "",

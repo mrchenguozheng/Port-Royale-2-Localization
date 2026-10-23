@@ -74,7 +74,9 @@ One editor instance can open every `data/live/*.toml` language:
 
 - switch with the top **Translation language** selector;
 - the URL becomes `/translate/<lang>`;
-- no restart per language.
+- no restart per language;
+- the last selected language is remembered on startup;
+- with no saved choice, the default is used instead of always `ja`.
 
 The reference column shows English with the French reference below it:
 

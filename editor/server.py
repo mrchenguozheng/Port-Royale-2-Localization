@@ -31,7 +31,8 @@ from shared.core import (  # noqa: E402
 DATA = os.path.join(HERE, "data")
 WEB = os.path.join(HERE, "web")
 UI_DIR = os.path.join(WEB, "i18n")
-LANG = "ja"          # default language; requests may select any editable one
+LANG = ""            # selected default; requests may use any editable language
+STATE = os.path.join(HERE, ".translator-state.json")
 PORT = 8781
 UI_RE = re.compile(r"^[a-z0-9_-]{1,32}$")
 
@@ -49,6 +50,26 @@ def send(handler, code, body, ctype="application/json; charset=utf-8"):
 
 def editable_langs():
     return lang_codes(DATA)
+
+
+def prefs_load():
+    try:
+        with open(STATE, "r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return {}
+
+
+def prefs_save(**changes):
+    data = prefs_load()
+    data.update(changes)
+    try:
+        with open(STATE, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(data, fh, ensure_ascii=False)
+            fh.write("\n")
+    except OSError:
+        pass
+    return data
 
 
 def resolve_lang(value):
@@ -123,6 +144,8 @@ class Handler(BaseHTTPRequestHandler):
             return send(self, 400, {"error": str(exc)})
 
     def static(self, path):
+        if not LANG and path in ("/", "/start", "/install", "/translate", "/translate/"):
+            path = "/choose.html"
         if path in ("/", "/start", "/install"):
             return self.redirect("/translate/" + LANG)
         if path == "/translate":
@@ -162,7 +185,7 @@ class Handler(BaseHTTPRequestHandler):
             codes = editable_langs()
             return send(self, 200, {"editable": codes,
                                     "all": [EN] + codes, "base": EN,
-                                    "default": LANG})
+                                    "default": LANG or ""})
         if path == "/api/count":
             lang = resolve_lang((query.get("lang") or [LANG])[0])
             if not lang:
@@ -220,6 +243,12 @@ class Handler(BaseHTTPRequestHandler):
                                  (hid, "; ".join(x["text"] for x in errors))})
             return send(self, 200, {"ok": True,
                                     "changed": save_live(DATA, lang, updates)})
+        if path == "/api/prefs":
+            lang = resolve_lang(body.get("lang"))
+            if not lang:
+                return send(self, 400, {"error": "unknown language"})
+            prefs_save(lang=lang)
+            return send(self, 200, {"ok": True, "lang": lang})
         if path == "/api/ui":
             code = str(body.get("lang") or "en")
             base = ui_load("en")["base"]
@@ -241,14 +270,24 @@ def main():
     DATA = os.path.abspath(args.data)
     WEB = os.path.abspath(args.web_dir)
     UI_DIR = os.path.join(WEB, "i18n")
-    LANG = args.lang or ((lang_codes(DATA) or ["ja"])[0])
+    codes = lang_codes(DATA)
+    saved = str(prefs_load().get("lang") or "")
+    if args.lang and args.lang in codes:
+        LANG = args.lang
+    elif saved in codes:
+        LANG = saved
+    elif len(codes) == 1:
+        LANG = codes[0]
+    else:
+        LANG = ""
     PORT = args.port
     if not os.path.isfile(os.path.join(WEB, "index.html")):
         raise SystemExit("missing web/index.html in %s" % WEB)
-    if not os.path.isfile(os.path.join(DATA, "live", LANG + ".toml")):
+    if LANG and not os.path.isfile(os.path.join(DATA, "live", LANG + ".toml")):
         raise SystemExit("missing live/%s.toml in %s" % (LANG, DATA))
     httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    url = "http://127.0.0.1:%d/translate/%s" % (PORT, LANG)
+    url = ("http://127.0.0.1:%d/translate/%s" % (PORT, LANG)
+           if LANG else "http://127.0.0.1:%d/" % PORT)
     print("PR2 Translator: %s" % url)
     if not args.no_open:
         threading.Timer(0.3, lambda: webbrowser.open(url)).start()

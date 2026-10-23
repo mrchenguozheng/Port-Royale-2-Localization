@@ -159,9 +159,11 @@ async function loadLanguages() {
     return false;
   }
   const m = location.pathname.match(/^\/translate\/([^/]+)/);
-  const wanted = m && langs.includes(m[1]) ? m[1] : langs[0];
+  const preferred = (data.default && langs.includes(data.default)) ? data.default : langs[0];
+  const wanted = m && langs.includes(m[1]) ? m[1] : preferred;
   sel.value = wanted;
   state.lang = wanted;
+  void api("/api/prefs", {lang: wanted}).catch(() => {});
   return true;
 }
 
@@ -236,6 +238,7 @@ async function switchLanguage() {
   state.offset = 0;
   state.dirty.clear();
   history.replaceState(null, "", "/translate/" + state.lang + location.search);
+  void api("/api/prefs", {lang: state.lang}).catch(() => {});
   await loadPage();
 }
 
