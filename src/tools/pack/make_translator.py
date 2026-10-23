@@ -79,9 +79,7 @@ def write_start(stage, has_python):
         ]
     lines += [
         "echo.",
-        "echo PR2 Translator Workbench",
-        "echo URL: http://127.0.0.1:8781/",
-        "echo Keep this window open. Press Ctrl+C or close it to stop.",
+        "echo Starting PR2 Translator Workbench...",
         "echo.",
         f'"%PY%" "%ROOT%editor\\server.py" --data "%ROOT%data" '
         f'--web-dir "%ROOT%editor\\web" --port 8781',
