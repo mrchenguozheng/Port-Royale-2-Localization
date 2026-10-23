@@ -337,7 +337,7 @@ async function newUi() {
   const data = await api("/api/ui?lang=en");
   uiState.lang = clean;
   uiState.base = data.base || {};
-  uiState.values = {};
+  uiState.values = {...uiState.base};
   if (!uiState.codes.includes(clean)) {
     uiState.codes.push(clean);
     const opt = document.createElement("option");

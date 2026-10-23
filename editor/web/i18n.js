@@ -2,7 +2,7 @@
  *
  * English is the only shipped UI for now. Add i18n/<code>.json to extend it;
  * open the page with ?ui=<code> (or set window.__PR2_UI_LANG__ before this
- * script) to select it. Missing files fall back to English.
+ * script) to select it. Missing or empty values fall back to English.
  */
 (function () {
   "use strict";
@@ -11,10 +11,18 @@
   const requested = (window.__PR2_UI_LANG__ || params.get("ui") || "en")
     .toLowerCase().replace(/[^a-z0-9_-]/g, "") || "en";
   const messages = Object.create(null);
+  const base = Object.create(null);
+
+  function textOf(key) {
+    const value = messages[key];
+    if (typeof value === "string" && value.trim()) return value;
+    const fallback = base[key];
+    if (typeof fallback === "string" && fallback.trim()) return fallback;
+    return key;
+  }
 
   function t(key, vars) {
-    let text = messages[key];
-    if (text === undefined) return key;
+    let text = textOf(key);
     if (vars) {
       for (const [name, value] of Object.entries(vars)) {
         text = text.split("{" + name + "}").join(String(value));
@@ -48,17 +56,24 @@
   window.t = t;
   window.applyI18n = apply;
 
-  window.I18N_READY = load(requested)
-    .catch(() => (requested === "en" ? null : load("en")))
-    .then((data) => {
-      if (!data) throw new Error("no UI translation");
-      Object.assign(messages, data);
-      document.documentElement.lang = requested;
-      apply(document);
-      return requested;
-    })
-    .catch((err) => {
-      console.warn("i18n:", err);
-      return requested;
+  const english = load("en").catch((err) => {
+    console.warn("i18n: no English base:", err);
+    return {};
+  });
+  const selected = requested === "en" ? Promise.resolve(null)
+    : load(requested).catch((err) => {
+      console.warn("i18n: falling back to English:", err);
+      return null;
     });
+
+  window.I18N_READY = Promise.all([english, selected]).then(([en, chosen]) => {
+    if (en && typeof en === "object") Object.assign(base, en);
+    if (chosen && typeof chosen === "object") {
+      for (const [key, value] of Object.entries(chosen)) {
+        if (typeof value === "string" && value.trim()) messages[key] = value;
+      }
+    }
+    document.documentElement.lang = requested;
+    apply(document);
+  });
 })();
