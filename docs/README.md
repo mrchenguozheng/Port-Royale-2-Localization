@@ -1,54 +1,56 @@
-# 文档索引
+# Documentation Index
 
-这不是项目介绍，而是“遇到问题该翻哪一份”。先看当前状态，再看历史/规范类文档。
+This is not the project introduction — it answers "which document do I need?".
+English translations cover the core workflow; specialist analysis documents remain
+Chinese-only for now.
 
-## 使用与发行
+[中文文档索引](README.zh-CN.md) · [Project README](../README.md)
 
-| 文档 | 什么时候看 |
+## Use and release
+
+| Document | When to read |
 |---|---|
-| [发行版](发行版.md) | 打 zip、发行包结构、字体许可、GitHub Release |
-| [构建与安装](构建与安装.md) | 安装页按钮、构建注入器、部署、启动 |
-| [字体与分发](字体与分发.md) | Noto / 缝合字体能不能分发 |
-| [新语言字体配置](新语言字体配置.md) | 新语言需要准备哪些字体和工具 |
+| [Release](en/release.md) | Per-language zips, package layout, font licenses, GitHub Releases |
+| [Build & Install](en/build-and-install.md) | Workbench, install wizard, build/deploy/launch, scripts |
+| [Fonts & distribution](en/fonts-and-distribution.md) | Whether Noto / stitched fonts may be redistributed |
+| [New language fonts](en/new-language-fonts.md) | Fonts and tools required for a new language |
 
-## 开发与原理
+## Development
 
-| 文档 | 什么时候看 |
+| Document | When to read |
 |---|---|
-| [架构与重构](架构与重构.md) | 分层、文件契约、重构记录、已知边界 |
-| [注入组件](注入组件.md) | DLL 如何 hook 取字、启动器如何注入 |
-| [译文与语言包](译文与语言包.md) | 语言包格式、`hash = 译文`、编辑器工作流 |
-| [新语言完整流程](新语言完整流程.md) | 从零加一种语言，按步骤做 |
-| [开发依赖](开发依赖.md) | Python、fontTools、Visual Studio 等 |
-| [翻译局限](翻译局限.md) | 哪些文本改不了、宽度/字体限制 |
+| [Architecture](en/architecture.md) | Layers, file contracts, refactor record, remaining boundaries |
+| [Injector](en/injection.md) | How the DLL hooks text lookups and how the launcher injects it |
+| [Translations & packs](en/translation-and-packs.md) | TOML format, `hash = text`, editor workflow |
+| [New language](en/new-language.md) | Add a language from scratch |
 
-## 翻译规范
+## Translation notes
 
-| 文档 | 内容 |
+| Document | Contents |
 |---|---|
-| [说话人分级](说话人分级.md) | 角色语气分级 |
-| [语体拟改清单](语体拟改清单.md) | 待统一语体的条目 |
-| [中文分词方案](中文分词方案.md) | 中文断词/空格处理 |
-| [语音清单](语音清单.md) / [语音映射](语音映射.md) | 语音资源与映射 |
-| [中文文本改动对比](中文文本改动对比.md) | 历史改动对比，供查证 |
+| [Speaker tiers](en/speaker-tiers.md) | Which lines identify a speaker, which are guesses |
+| [Tone proposals](en/tone-proposal.md) | 41 confident speakers plus entries for review |
+| [Translation limits](en/translation-limits.md) | What cannot be fixed, verified coverage, hook trade-offs |
+| [Pending](en/pending.md) | Steam, untested French build, hook offsets |
 
-## CSV 数据
+## Specialist / Chinese-only
 
-分析、审校、语音等数据统一放在 [csv/](csv/README.md)，不混在文档根目录。
+These are detailed analysis documents kept in Chinese:
 
-## 待定与历史
-
-| 文档 | 内容 |
+| Document | Contents |
 |---|---|
-| [待定](待定.md) | Steam 版、字体覆盖等未完成事项 |
+| [语音清单](语音清单.md) / [语音映射](语音映射.md) | Voice inventory and hash mapping |
+| [中文分词方案](中文分词方案.md) | Chinese tokenization and spacing |
+| [中文文本改动对比](中文文本改动对比.md) | Historical Chinese text diffs |
+| [CSV data](csv/README.md) | Analysis, voice, review and generated CSV files |
 
-## 当前唯一的契约
+## Current contracts
 
-- 游戏语言：`PR2Packs/locale.ini` 的 `language=`
-- 语言包显示名/界面语言/最低运行时：`PR2Packs/<语言>.txt` 开头
-  `# pack-meta alias=…` / `gui=…` / `min_runtime=…`
-- 字体：`fonts/<语言>/` 四个 TTF，不覆盖 `fonts/` 根目录原版
-- 启动器界面翻译：`ui/<语言>.ini`
-- 运行时版本：`src/injector/pr2_version.h`；发行包根目录 `RUNTIME-VERSION`
+- Game language: `PR2Packs/locale.ini` → `language=`
+- Pack display name / GUI language / minimum runtime: `PR2Packs/<lang>.txt`
+  header (`# pack-meta alias=…`, `gui=…`, `min_runtime=…`)
+- Fonts: four TTF files in `fonts/<lang>/`; never overwrite the originals in `fonts/`
+- Launcher UI translations: `ui/<lang>.ini`
+- Runtime version: `src/injector/pr2_version.h`; `RUNTIME-VERSION` in release zips
 
-旧的 `launcher.ini`、`lang/aliases.ini` 已移除；旧语言包不再兼容。
+See [Architecture](en/architecture.md) for the full contract.
