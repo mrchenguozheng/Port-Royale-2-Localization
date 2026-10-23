@@ -67,7 +67,7 @@ def load_lang(name):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--asr", default=os.path.join(ROOT, ".tmp", "asr"))
-    ap.add_argument("--out", default=os.path.join(ROOT, "docs", "voice-hash-map.csv"))
+    ap.add_argument("--out", default=os.path.join(ROOT, "docs", "csv", "voice", "voice-hash-map.csv"))
     ap.add_argument("--min-score", type=float, default=0.45)
     ap.add_argument("--durations", default=os.path.join(ROOT, ".tmp", "voice_dur.json"))
     args = ap.parse_args()

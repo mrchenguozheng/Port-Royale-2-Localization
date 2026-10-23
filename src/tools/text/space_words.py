@@ -228,7 +228,7 @@ def main():
                      "spaces": new.count(" ") - t.count(" "), "zh": t, "new": new})
 
     rows.sort(key=lambda r: -r["before_px"])
-    out = args.out or os.path.join(ROOT, "docs", "space-words-%s.csv" % args.lang)
+    out = args.out or os.path.join(ROOT, "docs", "csv", "generated", "space-words-%s.csv" % args.lang)
     with io.open(out, "w", encoding="utf-8-sig", newline="") as fh:
         wr = csv.DictWriter(fh, fieldnames=["hash", "before_px", "after_px", "spaces", "zh", "new"])
         wr.writeheader()
