@@ -7,32 +7,20 @@ external language pack, and the original `PR2.exe` is never modified.
 
 ---
 
-## Read this first: support and test status
+## Read this first: support scope
 
-**Only the GOG English build has been patched and tested in-game.** Other builds:
+**This project supports only the GOG English build `1.1.2.3`, used to run other
+language packs on top of the English build.**
 
-| Build | Patched? | Result |
-|---|---|---|
-| **GOG English** `1.1.2.3` | ✅ Yes | ✅ **Tested** — UI text, language switching and CJK fonts work |
-| **GOG French** `1.1.2.42` | ❌ No | ⚠️ **Untested** (string table extracted only as a reference) |
-| **Steam English** | ✅ Injection tried | ❌ **Tested, did not take effect** — see below |
+| Game build | Status |
+|---|---|
+| **GOG English `1.1.2.3`** | ✅ **Only supported build**, tested in-game |
+| GOG French `1.1.2.42` | ❌ Unsupported (reference only; possible future work) |
+| Steam English | ❌ Unsupported (injection did not take effect under CEG; possible future work) |
+| Other builds | ❌ Unsupported |
 
-### Why Steam does not work
-
-The Steam `PR2.exe` is protected by Valve CEG. Changing even one byte makes it
-fail at startup with `Application load error 3:0000065432`. This project therefore
-uses runtime injection: the launcher injects a DLL into the game process, and the
-DLL takes over the engine's text lookups without touching the exe.
-
-In theory CEG should not interfere, but in practice the language pack did not take
-effect in the Steam build. Open questions:
-
-- whether CEG self-checks before the injection point;
-- whether `A2dLib-2.20A.dll` lives elsewhere in the Steam build;
-- whether the fixed hook offsets (taken from the GOG build) match the Steam build.
-
-**Verify on the GOG English build before trying Steam.**
-The investigation plan is in [Pending issues](docs/en/pending.md).
+Do not deploy to, or report failures on, unsupported builds. Details and future
+work are in [Pending issues](docs/en/pending.md).
 
 ---
 

@@ -1,5 +1,11 @@
 # Release
 
+## Supported game build
+
+**Only GOG English `1.1.2.3` is supported.** GOG French, Steam English and other
+builds are out of scope; do not deploy these packages to them. Future work is in
+[Pending issues](pending.md).
+
 ## Goals
 
 Players download a language pack, extract it into the game directory, and it is ready to

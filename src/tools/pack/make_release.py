@@ -101,6 +101,8 @@ def write_readme(lang, stage, mode):
     }[mode]
     text = """Port Royale 2 本地化 - %s
 
+支持游戏版本：GOG 英文 1.1.2.3（仅此版本）。其他版本请勿使用。
+
 安装（解压即用）：
   1. 把本压缩包里的全部文件解压到游戏根目录（和 PR2.exe 同一层）。
   2. 双击 PR2LauncherGUI.exe，选语言后点「以所选语言启动」。

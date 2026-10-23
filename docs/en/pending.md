@@ -1,5 +1,8 @@
 # Pending Items
 
+> **Current support scope: GOG English `1.1.2.3` only.** The items below are
+> unsupported builds or future directions, not part of the current support scope.
+
 Questions that have no conclusion yet, or where we know how to investigate but haven't. Ordered by "can we act now": earlier items are **known how, just need execution**; later ones **have a direction but no conclusion**.
 
 ---

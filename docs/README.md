@@ -6,6 +6,8 @@ Chinese-only for now.
 
 [中文文档索引](README.zh-CN.md) · [Project README](../README.en.md)
 
+> **Supported game build: GOG English `1.1.2.3` only.** Other builds are out of scope.
+
 ## Use and release
 
 | Document | When to read |

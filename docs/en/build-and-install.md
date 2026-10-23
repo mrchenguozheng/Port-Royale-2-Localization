@@ -104,9 +104,11 @@ The workbench identifies known builds by the SHA-256 of `PR2.exe`:
 
 | Version | Notes |
 |---|---|
-| GOG English 1.1.2.3 | Verified working |
-| GOG French 1.1.2.42 | Used only as a translation reference |
-| Steam English 1.1.2.3 | Has CEG; injection not verified |
+| GOG English 1.1.2.3 | ✅ Only supported build, tested |
+| GOG French 1.1.2.42 | ❌ Unsupported; translation reference only |
+| Steam English 1.1.2.3 | ❌ Unsupported; injection did not work under CEG |
+
+Unsupported builds are detected for identification only; do not deploy to them.
 
 Unknown versions can also be remembered, they simply have no name. Version names and hash constants live in
 `src/tools/install/pr2ctl/base.py`.
