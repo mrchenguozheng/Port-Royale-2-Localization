@@ -68,6 +68,16 @@ The workbench has no install, build or launch entry points.
 > The workbench chrome is currently **English**; it is separate from the translation
 > target language. The target only selects which `live/<lang>.toml` is loaded.
 
+## Editor interface text
+
+**Editor UI text** changes this editor's own buttons, labels and hints, not the
+game translation.
+
+- `Interface language` switches the workbench UI;
+- create a language such as `ko`;
+- keys are read-only; empty values fall back to English;
+- game text stays under **Game translation**.
+
 ## Return the result
 
 The translator returns:
