@@ -233,6 +233,129 @@ async function switchLanguage() {
   await loadPage();
 }
 
+
+const uiState = {codes: [], lang: "en", base: {}, values: {}};
+
+function setUiMessage(text, error) {
+  const el = $("uiMessage");
+  el.textContent = text || "";
+  el.className = error ? "problem error" : "muted";
+}
+
+function setTab(name) {
+  const ui = name === "ui";
+  $("tabGame").classList.toggle("active", !ui);
+  $("tabUi").classList.toggle("active", ui);
+  $("gameToolbar").hidden = ui;
+  $("gameMain").hidden = ui;
+  $("gamePager").hidden = ui;
+  $("uiPanel").hidden = !ui;
+  $("save").hidden = ui;
+}
+
+async function loadUiLangs() {
+  const data = await api("/api/ui/langs");
+  uiState.codes = data.codes || ["en"];
+  const sel = $("uiLang");
+  sel.textContent = "";
+  for (const code of uiState.codes) {
+    const opt = document.createElement("option");
+    opt.value = code;
+    opt.textContent = code;
+    sel.appendChild(opt);
+  }
+  const wanted = (window.PR2_I18N && window.PR2_I18N.lang) || "en";
+  uiState.lang = uiState.codes.includes(wanted) ? wanted : "en";
+  sel.value = uiState.lang;
+}
+
+async function loadUi(code) {
+  const data = await api("/api/ui?lang=" + encodeURIComponent(code));
+  uiState.lang = code;
+  uiState.base = data.base || {};
+  uiState.values = data.values || {};
+  $("uiLang").value = code;
+  renderUi();
+  setUiMessage("");
+}
+
+function renderUi() {
+  const tbody = $("uiRows");
+  tbody.textContent = "";
+  for (const key of Object.keys(uiState.base)) {
+    const tr = document.createElement("tr");
+    const keyCell = document.createElement("td");
+    keyCell.textContent = key;
+    const enCell = document.createElement("td");
+    enCell.textContent = uiState.base[key];
+    const trCell = document.createElement("td");
+    const input = document.createElement("input");
+    input.value = uiState.values[key] ?? "";
+    input.placeholder = uiState.base[key];
+    input.dataset.key = key;
+    input.addEventListener("input", () => {
+      uiState.values[key] = input.value;
+    });
+    trCell.appendChild(input);
+    tr.append(keyCell, enCell, trCell);
+    tbody.appendChild(tr);
+  }
+}
+
+async function saveUi() {
+  const values = {};
+  for (const input of $("uiRows").querySelectorAll("input[data-key]")) {
+    values[input.dataset.key] = input.value;
+  }
+  try {
+    await api("/api/ui", {lang: uiState.lang, values});
+    setUiMessage(t("ui.saved", {lang: uiState.lang}));
+    if (uiState.lang === (window.PR2_I18N && window.PR2_I18N.lang)) {
+      setTimeout(() => location.reload(), 500);
+    }
+  } catch (err) {
+    setUiMessage(t("message.saveFailed", {error: err.message}), true);
+  }
+}
+
+async function newUi() {
+  const code = prompt(t("ui.newPrompt"), "");
+  if (code === null) return;
+  const clean = code.trim().toLowerCase();
+  if (!/^[a-z0-9_-]{2,16}$/.test(clean)) {
+    setUiMessage(t("ui.invalid"), true);
+    return;
+  }
+  if (uiState.codes.includes(clean) && !confirm(t("ui.overwrite", {lang: clean}))) return;
+  const data = await api("/api/ui?lang=en");
+  uiState.lang = clean;
+  uiState.base = data.base || {};
+  uiState.values = {};
+  if (!uiState.codes.includes(clean)) {
+    uiState.codes.push(clean);
+    const opt = document.createElement("option");
+    opt.value = clean;
+    opt.textContent = clean;
+    $("uiLang").appendChild(opt);
+  }
+  $("uiLang").value = clean;
+  renderUi();
+  setUiMessage(t("ui.newPrompt"));
+}
+
+$("tabGame").addEventListener("click", () => setTab("game"));
+$("tabUi").addEventListener("click", async () => {
+  setTab("ui");
+  try {
+    await loadUi(uiState.lang || "en");
+  } catch (err) {
+    setUiMessage(t("message.loadFailed", {error: err.message}), true);
+  }
+});
+$("uiLang").addEventListener("change", () => void loadUi($("uiLang").value));
+$("uiSave").addEventListener("click", () => void saveUi());
+$("uiNew").addEventListener("click", () => void newUi());
+
 $("lang").addEventListener("change", () => void switchLanguage());
 $("save").addEventListener("click", () => void save());
 $("prev").addEventListener("click", async () => {
@@ -256,6 +379,7 @@ $("search").addEventListener("keydown", (e) => {
   try {
     if (window.I18N_READY) await window.I18N_READY;
     if (!(await loadLanguages())) return;
+    await loadUiLangs();
     await loadPage();
   } catch (err) {
     setMessage(t("message.loadFailed", {error: err.message}), true);

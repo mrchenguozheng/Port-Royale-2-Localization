@@ -37,8 +37,10 @@ The `--python-dir` directory must contain `python.exe`.
 PR2Translator-ja/
 ├─ start.bat
 ├─ README.txt
-├─ server.py              standalone stdlib server
-├─ web/                   English UI
+├─ editor/
+│  ├─ server.py           standalone stdlib server
+│  └─ web/                English UI
+├─ shared/core/           shared storage and validation
 ├─ data/
 │  ├─ live/ja.toml        current language
 │  └─ orig/               English reference

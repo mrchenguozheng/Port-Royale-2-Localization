@@ -21,7 +21,12 @@
   <button id="save" data-i18n="action.save" disabled>Save changes</button>
 </header>
 
-<section class="toolbar">
+<nav class="tabs">
+  <button id="tabGame" class="active" data-i18n="tab.game">Game translation</button>
+  <button id="tabUi" data-i18n="tab.ui">UI text</button>
+</nav>
+
+<section class="toolbar" id="gameToolbar">
   <span class="hint" data-i18n="app.hint">English is the source. Changes are saved only when you click Save changes.</span>
   <input id="search" type="search" data-i18n-placeholder="search.placeholder" placeholder="Search id, English or translation…">
   <button id="doSearch" data-i18n="action.search">Search</button>
@@ -29,7 +34,7 @@
   <span id="message" class="muted"></span>
 </section>
 
-<main>
+<main id="gameMain">
   <table>
     <thead>
       <tr>
@@ -43,11 +48,34 @@
   </table>
 </main>
 
-<footer class="pager">
+<footer class="pager" id="gamePager">
   <button id="prev" data-i18n="pager.prev">‹ Prev</button>
   <span id="pageInfo"></span>
   <button id="next" data-i18n="pager.next">Next ›</button>
 </footer>
+
+<section id="uiPanel" hidden>
+  <h2 data-i18n="ui.title">Workbench UI text</h2>
+  <p class="hint" data-i18n="ui.hint">Keys are fixed. Empty values fall back to English.</p>
+  <div class="ui-tools">
+    <label><span data-i18n="ui.language">UI language</span>
+      <select id="uiLang"></select>
+    </label>
+    <button id="uiNew" data-i18n="ui.new">New language</button>
+    <button id="uiSave" data-i18n="ui.save">Save UI text</button>
+    <span id="uiMessage" class="muted"></span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th data-i18n="ui.key">Key</th>
+        <th data-i18n="ui.english">English</th>
+        <th data-i18n="ui.translation">Translation</th>
+      </tr>
+    </thead>
+    <tbody id="uiRows"></tbody>
+  </table>
+</section>
 
 <script src="/app.js"></script>
 </body>

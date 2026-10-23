@@ -37,8 +37,10 @@ python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja ^
 PR2Translator-ja/
 ├─ start.bat
 ├─ README.txt
-├─ server.py              標準ライブラリのみの独立サーバー
-├─ web/                   英語 UI
+├─ editor/
+│  ├─ server.py           標準ライブラリのみの独立サーバー
+│  └─ web/                英語 UI
+├─ shared/core/           共用の保存・検証
 ├─ data/
 │  ├─ live/ja.toml        現在の言語
 │  └─ orig/               英語原文

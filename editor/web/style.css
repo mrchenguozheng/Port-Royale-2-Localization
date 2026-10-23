@@ -50,3 +50,20 @@ tr.error textarea { border-color: #dc2626; background: #fef2f2; }
   display: flex; justify-content: center; gap: 12px; align-items: center;
   padding: 12px; color: #475569;
 }
+
+.tabs {
+  display: flex; gap: 4px; padding: 8px 16px 0; background: #eef2f7;
+  border-bottom: 1px solid #d8dee9;
+}
+.tabs button {
+  border: 1px solid transparent; border-bottom: 0; border-radius: 5px 5px 0 0;
+  background: transparent; color: #475569; padding: 7px 14px;
+}
+.tabs button.active { background: #fff; border-color: #d8dee9; color: #1d2433; font-weight: 600; }
+#uiPanel { padding: 16px; }
+#uiPanel h2 { margin: 0 0 4px; font-size: 18px; }
+.ui-tools { display: flex; gap: 10px; align-items: center; margin: 8px 0 12px; }
+.ui-tools label { display: flex; gap: 6px; align-items: center; }
+#uiRows td:first-child { font-family: Consolas, monospace; font-size: 12px; color: #64748b; white-space: nowrap; }
+#uiRows td:nth-child(2) { color: #334155; width: 38%; }
+#uiRows input { width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font: inherit; }

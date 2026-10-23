@@ -26,5 +26,20 @@
   "pager.range": "{start}–{end} of {total}",
   "pager.empty": "0 entries",
   "stats": "{count} entries · {lang}",
-  "message.results": "{count} result(s)"
+  "message.results": "{count} result(s)",
+  "tab.game": "Game translation",
+  "tab.ui": "UI text",
+  "ui.title": "Workbench UI text",
+  "ui.hint": "Keys are fixed. Empty values fall back to English.",
+  "ui.language": "UI language",
+  "ui.new": "New language",
+  "ui.save": "Save UI text",
+  "ui.key": "Key",
+  "ui.english": "English",
+  "ui.translation": "Translation",
+  "ui.saved": "Saved UI text for {lang}.",
+  "ui.newPrompt": "New UI language code (for example ko):",
+  "ui.overwrite": "{lang}.json already exists. Overwrite it?",
+  "ui.invalid": "Use 2–16 lowercase letters, digits, - or _.",
+  "ui.noBase": "English UI text is missing."
 }

@@ -76,8 +76,8 @@ def write_start(stage, lang, has_python):
             "if errorlevel 1 goto :nopython",
         ]
     lines += [
-        f'start "" "%PY%" "%ROOT%server.py" --data "%ROOT%data" '
-        f'--web-dir "%ROOT%web" --lang {lang} --port 8781',
+        f'start "" "%PY%" "%ROOT%editor\\server.py" --data "%ROOT%data" '
+        f'--web-dir "%ROOT%editor\\web" --lang {lang} --port 8781',
         "endlocal",
         "exit /b 0",
         "",
@@ -112,8 +112,9 @@ Translate and proofread only. No build, injector, fonts or game launcher.
 5. Close the console window to stop.
 
 Files:
-  server.py          local translation server
-  web/               English workbench UI
+  editor/server.py   local translation server
+  editor/web/        English workbench UI
+  shared/core/       shared translation storage/validation
   data/live/%s.toml  translation file
   data/orig/         English reference
   %s
@@ -140,9 +141,13 @@ def make(lang, out, python_dir=None, system_python=False):
         shutil.rmtree(stage)
     os.makedirs(stage)
 
+    os.makedirs(os.path.join(stage, "editor"))
     shutil.copy2(os.path.join(EDITOR, "server.py"),
-                 os.path.join(stage, "server.py"))
-    copy_tree(os.path.join(EDITOR, "web"), os.path.join(stage, "web"))
+                 os.path.join(stage, "editor", "server.py"))
+    copy_tree(os.path.join(EDITOR, "web"),
+              os.path.join(stage, "editor", "web"))
+    copy_tree(os.path.join(ROOT, "shared"),
+              os.path.join(stage, "shared"))
 
     os.makedirs(os.path.join(stage, "data", "live"))
     os.makedirs(os.path.join(stage, "data", "orig"))

@@ -2,10 +2,12 @@
 # coding: utf-8
 """Standalone translator editor for Port Royale 2.
 
-Only the translation page is served. No build, deploy, font or launcher code is
-imported; this server uses the Python standard library only.
+The editor depends only on:
+- editor/ (this server + web assets)
+- shared/core/ (storage and placeholder checks)
+- data/ (live/<lang>.toml and orig/en.gog_1.1.2.3.toml)
 
-    python editor\\server.py --data editor\\data --lang ja
+No build, injector, font or launcher code is imported.
 """
 import argparse
 import json
@@ -13,141 +15,25 @@ import os
 import re
 import sys
 import threading
-import tomllib
 import urllib.parse
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+from shared.core import (  # noqa: E402
+    EN, check_text, lang_codes, load_orig, ordered_ids, rows, save_live,
+)
+
 DATA = os.path.join(HERE, "data")
 WEB = os.path.join(HERE, "web")
+UI_DIR = os.path.join(WEB, "i18n")
 LANG = "ja"
 PORT = 8781
-
-EN = "en.gog_1.1.2.3"
-RE_SCRIPT = re.compile(r"@[A-Za-z]\$[A-Za-z_][A-Za-z_0-9]*\$")
-RE_POS = re.compile(r"%\d+")
-RE_PAD = re.compile(r"%(0?\d+)%(?!\d)")
-RE_FONT = re.compile(r"<f:[^>]*>")
-RE_TAG = re.compile(r"<[^>]*>")
-RE_PLACEHOLDER = re.compile(r"^0x[0-9a-f]{8} \| ", re.I)
-
-
-def load_toml(path):
-    with open(path, "rb") as fh:
-        return tomllib.load(fh)
-
-
-def live_path(lang):
-    return os.path.join(DATA, "live", lang + ".toml")
-
-
-def orig_path():
-    p = os.path.join(DATA, "orig", EN + ".toml")
-    if not os.path.isfile(p):
-        p = os.path.join(DATA, "orig", "en.toml")
-    return p
-
-
-def load_live(lang):
-    p = live_path(lang)
-    return load_toml(p) if os.path.isfile(p) else {}
-
-
-def load_orig():
-    p = orig_path()
-    return load_toml(p) if os.path.isfile(p) else {}
-
-
-def lang_codes():
-    d = os.path.join(DATA, "live")
-    if not os.path.isdir(d):
-        return []
-    return sorted(x[:-5] for x in os.listdir(d)
-                  if x.endswith(".toml") and not x.startswith("_")
-                  and x != "keep_original.toml")
-
-
-def ordered_ids():
-    live = load_live(LANG)
-    orig = load_orig()
-    ids = list(orig.keys())
-    ids += [x for x in live.keys() if x not in orig]
-    return ids
-
-
-def rows():
-    live = load_live(LANG)
-    orig = load_orig()
-    out = []
-    for hid in ordered_ids():
-        out.append({
-            "id": hid,
-            EN: orig.get(hid, ""),
-            LANG: live.get(hid, ""),
-        })
-    return out
-
-
-def tokens(text):
-    text = RE_FONT.sub("", text)
-    text = RE_TAG.sub("", text)
-    text = RE_PAD.sub(r"%\1", text)
-    return set(RE_SCRIPT.findall(text)) | set(RE_POS.findall(text))
-
-
-def tag_counts(text):
-    text = RE_FONT.sub("", text)
-    return {t: text.count(t) for t in set(RE_TAG.findall(text))}
-
-
-def check_text(hid, text, english):
-    out = []
-    if not text:
-        return [{"level": "warn", "text": "Empty; the game will show English."}]
-    if RE_PLACEHOLDER.match(text):
-        return [{"level": "warn", "text": "Untranslated placeholder."}]
-    a, b = tokens(english), tokens(text)
-    missing, extra = a - b, b - a
-    if missing:
-        out.append({"level": "warn",
-                    "text": "Missing placeholder(s): " + " ".join(sorted(missing))})
-    if extra:
-        out.append({"level": "error",
-                    "text": "Extra placeholder(s): " + " ".join(sorted(extra))})
-    ta, tb = tag_counts(english), tag_counts(text)
-    for tag in sorted(set(ta) | set(tb)):
-        if tb.get(tag, 0) > ta.get(tag, 0):
-            out.append({"level": "error", "text": "Extra tag: " + tag})
-        elif tb.get(tag, 0) < ta.get(tag, 0):
-            out.append({"level": "warn", "text": "Missing tag: " + tag})
-    return out
-
-
-def save_rows(updates):
-    live = load_live(LANG)
-    orig = load_orig()
-    by_lower = {k.lower(): k for k in live}
-    changed = 0
-    for row in updates:
-        hid = str(row.get("id") or "")
-        key = by_lower.get(hid.lower())
-        if not key:
-            continue
-        text = str(row.get("text") or "")
-        if live[key] != text:
-            live[key] = text
-            changed += 1
-    ids = list(orig.keys()) + [x for x in live.keys() if x not in orig]
-    lines = []
-    for hid in ids:
-        if hid in live:
-            lines.append("%s = %s\n" % (
-                json.dumps(hid, ensure_ascii=False),
-                json.dumps(live[hid], ensure_ascii=False)))
-    with open(live_path(LANG), "w", encoding="utf-8", newline="\n") as fh:
-        fh.writelines(lines)
-    return changed
+UI_RE = re.compile(r"^[a-z0-9_-]{1,32}$")
 
 
 def send(handler, code, body, ctype="application/json; charset=utf-8"):
@@ -161,8 +47,45 @@ def send(handler, code, body, ctype="application/json; charset=utf-8"):
     handler.wfile.write(data)
 
 
+def ui_codes():
+    if not os.path.isdir(UI_DIR):
+        return ["en"]
+    codes = sorted(x[:-5] for x in os.listdir(UI_DIR)
+                   if x.endswith(".json") and UI_RE.match(x[:-5]))
+    return codes or ["en"]
+
+
+def _json(path, default):
+    if not os.path.isfile(path):
+        return default
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def ui_load(code):
+    base = _json(os.path.join(UI_DIR, "en.json"), {})
+    values = dict(base) if code == "en" else _json(
+        os.path.join(UI_DIR, code + ".json"), {})
+    return {"lang": code, "base": base, "values": values,
+            "codes": ui_codes()}
+
+
+def ui_save(code, values, base):
+    if not UI_RE.match(code):
+        raise ValueError("invalid UI language code")
+    if not isinstance(values, dict):
+        raise ValueError("values must be an object")
+    clean = {key: str(values.get(key, base.get(key, ""))) for key in base}
+    os.makedirs(UI_DIR, exist_ok=True)
+    path = os.path.join(UI_DIR, code + ".json")
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(clean, fh, ensure_ascii=False, indent=2)
+        fh.write("\n")
+    return clean
+
+
 class Handler(BaseHTTPRequestHandler):
-    server_version = "PR2Translator/1"
+    server_version = "PR2Translator/2"
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
@@ -183,8 +106,8 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlsplit(self.path)
         path = urllib.parse.unquote(parsed.path)
         try:
-            n = int(self.headers.get("Content-Length") or 0)
-            raw = self.rfile.read(n) if n else b"{}"
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length) if length else b"{}"
             body = json.loads(raw.decode("utf-8"))
             return self.api_post(path, body)
         except Exception as exc:
@@ -227,21 +150,21 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/health":
             return send(self, 200, {"ok": True, "lang": LANG})
         if path == "/api/langs":
-            langs = lang_codes()
-            return send(self, 200, {
-                "editable": langs, "all": [EN] + langs, "base": EN})
+            codes = lang_codes(DATA)
+            return send(self, 200, {"editable": codes,
+                                    "all": [EN] + codes, "base": EN})
         if path == "/api/count":
             lang = (query.get("lang") or [LANG])[0]
             if lang != LANG:
                 return send(self, 400, {"error": "unknown language"})
-            return send(self, 200, {"count": len(ordered_ids())})
+            return send(self, 200, {"count": len(ordered_ids(DATA, LANG))})
         if path == "/api/entries":
             lang = (query.get("lang") or [LANG])[0]
             if lang != LANG:
                 return send(self, 400, {"error": "unknown language"})
-            off = int((query.get("offset") or ["0"])[0])
-            lim = int((query.get("limit") or ["100"])[0])
-            return send(self, 200, rows()[max(0, off):max(0, off) + max(0, lim)])
+            offset = max(0, int((query.get("offset") or ["0"])[0]))
+            limit = max(0, int((query.get("limit") or ["100"])[0]))
+            return send(self, 200, rows(DATA, LANG)[offset:offset + limit])
         if path == "/api/search":
             lang = (query.get("lang") or [LANG])[0]
             if lang != LANG:
@@ -250,35 +173,49 @@ class Handler(BaseHTTPRequestHandler):
             if not q:
                 return send(self, 200, [])
             return send(self, 200, [
-                r for r in rows()
-                if q in r["id"].lower() or q in r[EN].lower() or q in r[LANG].lower()
+                row for row in rows(DATA, LANG)
+                if q in row["id"].lower()
+                or q in row[EN].lower()
+                or q in row[LANG].lower()
             ])
+        if path == "/api/ui/langs":
+            return send(self, 200, {"codes": ui_codes()})
+        if path == "/api/ui":
+            code = (query.get("lang") or ["en"])[0]
+            if not UI_RE.match(code):
+                return send(self, 400, {"error": "invalid language code"})
+            return send(self, 200, ui_load(code))
         return send(self, 404, {"error": "unknown api"})
 
     def api_post(self, path, body):
         if path == "/api/check":
             hid = str(body.get("id") or "")
             text = str(body.get("text") or "")
-            en = load_orig().get(hid, "")
-            return send(self, 200, check_text(hid, text, en))
+            return send(self, 200, check_text(text, load_orig(DATA).get(hid, "")))
         if path == "/api/patch":
             updates = body.get("rows") or []
             for row in updates:
                 hid = str(row.get("id") or "")
                 text = str(row.get("text") or "")
-                en = load_orig().get(hid, "")
-                errs = [x for x in check_text(hid, text, en)
-                        if x["level"] == "error"]
-                if errs:
+                errors = [x for x in check_text(text, load_orig(DATA).get(hid, ""))
+                          if x["level"] == "error"]
+                if errors:
                     return send(self, 400, {
                         "error": "Placeholder/tag check failed for %s: %s" %
-                                 (hid, "; ".join(x["text"] for x in errs))})
-            return send(self, 200, {"ok": True, "changed": save_rows(updates)})
+                                 (hid, "; ".join(x["text"] for x in errors))})
+            return send(self, 200, {"ok": True,
+                                    "changed": save_live(DATA, LANG, updates)})
+        if path == "/api/ui":
+            code = str(body.get("lang") or "en")
+            base = ui_load("en")["base"]
+            saved = ui_save(code, body.get("values") or {}, base)
+            return send(self, 200, {"ok": True, "lang": code,
+                                    "values": saved, "codes": ui_codes()})
         return send(self, 404, {"error": "unknown api"})
 
 
 def main():
-    global DATA, WEB, LANG, PORT
+    global DATA, WEB, UI_DIR, LANG, PORT
     ap = argparse.ArgumentParser(description="PR2 translator workbench")
     ap.add_argument("--data", default=DATA)
     ap.add_argument("--web-dir", default=WEB)
@@ -288,12 +225,13 @@ def main():
     args = ap.parse_args()
     DATA = os.path.abspath(args.data)
     WEB = os.path.abspath(args.web_dir)
-    LANG = args.lang or ((lang_codes() or ["ja"])[0])
+    UI_DIR = os.path.join(WEB, "i18n")
+    LANG = args.lang or ((lang_codes(DATA) or ["ja"])[0])
     PORT = args.port
     if not os.path.isfile(os.path.join(WEB, "index.html")):
         raise SystemExit("missing web/index.html in %s" % WEB)
-    if not os.path.isfile(live_path(LANG)):
-        raise SystemExit("missing %s" % live_path(LANG))
+    if not os.path.isfile(os.path.join(DATA, "live", LANG + ".toml")):
+        raise SystemExit("missing live/%s.toml in %s" % (LANG, DATA))
     httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     url = "http://127.0.0.1:%d/translate/%s" % (PORT, LANG)
     print("PR2 Translator: %s" % url)

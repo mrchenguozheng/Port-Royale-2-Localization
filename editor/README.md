@@ -34,10 +34,8 @@ The translator package is built with:
 python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja
 ```
 
-It copies `editor/server.py`, `editor/web`, the selected language file and the
-English reference, plus a Python runtime by default.
-
-## API
+It copies `editor/`, `shared/core/`, the selected language file and the English
+reference, plus a Python runtime by default.
 
 ## UI language
 
@@ -51,7 +49,8 @@ To add another UI language:
 3. open `/translate/<lang>?ui=<code>`.
 
 Missing files or keys fall back to English. The game language (`--lang`) and the
-workbench UI language (`?ui=`) are independent.
+workbench UI language (`?ui=`) are independent. The **UI text** tab edits the same
+JSON files directly; keys are read-only.
 
 ## API
 
@@ -63,5 +62,8 @@ The UI uses only:
 - `GET /api/search`
 - `POST /api/check`
 - `POST /api/patch`
+- `GET /api/ui/langs`
+- `GET /api/ui?lang=<code>`
+- `POST /api/ui`
 
 Listening is fixed to `127.0.0.1`.

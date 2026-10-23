@@ -84,6 +84,7 @@ See [Build & Install](docs/en/build-and-install.md) for button details.
 pr2-localization/
 ├─ start.bat                  development entry: start the workbench
 ├─ apply_patch.bat            normalize → validate → build → deploy
+├─ shared/                   shared storage/validation core
 ├─ editor/                   standalone translator workbench (English UI)
 ├─ src/
 │  ├─ live/                   translation source (saved by the editor)

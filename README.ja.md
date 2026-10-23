@@ -86,6 +86,7 @@ start.bat
 pr2-localization/
 ├─ start.bat                  開発用エントリ: ワークベンチを起動
 ├─ apply_patch.bat            正規化 → 検証 → ビルド → 配備
+├─ shared/                   共用の保存・検証コア
 ├─ editor/                   独立翻訳者ワークベンチ（英語 UI）
 ├─ src/
 │  ├─ live/                   翻訳のソース（エディタが保存）
