@@ -9,23 +9,24 @@ Python サービスです。
 リポジトリのルートで：
 
 ```bat
-python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja
+python src\tools\pack\make_translator.py
 ```
 
+既定の出力は `dist\PR2Translator` で、すべての編集可能な言語を含みます。
 既定では現在の Python ランタイムを同梱するため、翻訳者は Python を
 インストールする必要がありません。
 
 カスタム Python を使う場合：
 
 ```bat
-python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja ^
+python src\tools\pack\make_translator.py ^
     --python-dir C:\Python311
 ```
 
 Python を同梱しない場合：
 
 ```bat
-python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja ^
+python src\tools\pack\make_translator.py ^
     --system-python
 ```
 
@@ -34,7 +35,7 @@ python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja ^
 ## パッケージの内容
 
 ```
-PR2Translator-ja/
+PR2Translator/
 ├─ start.bat
 ├─ README.txt
 ├─ editor/
@@ -42,8 +43,8 @@ PR2Translator-ja/
 │  └─ web/                英語 UI
 ├─ shared/core/           共用の保存・検証
 ├─ data/
-│  ├─ live/ja.toml        現在の言語
-│  └─ orig/               英語原文
+│  ├─ live/*.toml         切り替え可能な言語
+│  └─ orig/               英語・フランス語の参考
 └─ python/                既定で同梱
 ```
 

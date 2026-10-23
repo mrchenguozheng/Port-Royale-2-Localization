@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """Build a standalone translator workbench.
 
-    python src\\tools\\pack\\make_translator.py --lang ja --out dist\\PR2Translator-ja
+    python src\\tools\\pack\\make_translator.py
+
+默认输出 dist\\PR2Translator；包内包含所有可编辑语言。
 
 The package contains only:
 - editor/server.py and editor/web (English UI);
@@ -178,14 +180,24 @@ def make(lang, out, python_dir=None, system_python=False):
 
 def main():
     ap = argparse.ArgumentParser(description="Build a standalone translator workbench")
-    ap.add_argument("--lang", required=True)
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--lang", default="",
+                    help="language used to validate the source (default: first available)")
+    ap.add_argument("--out", default=os.path.join(ROOT, "dist", "PR2Translator"))
     ap.add_argument("--python-dir", default=None,
                     help="Python runtime to copy (default: current interpreter)")
     ap.add_argument("--system-python", action="store_true",
                     help="do not bundle Python")
     args = ap.parse_args()
-    make(args.lang, args.out, args.python_dir, args.system_python)
+    lang = args.lang
+    if not lang:
+        live_dir = os.path.join(SRC, "live")
+        codes = sorted(x[:-5] for x in os.listdir(live_dir)
+                       if x.endswith(".toml") and not x.startswith("_")
+                       and x != "keep_original.toml")
+        if not codes:
+            raise SystemExit("no editable language in src/live")
+        lang = codes[0]
+    make(lang, args.out, args.python_dir, args.system_python)
     return 0
 
 

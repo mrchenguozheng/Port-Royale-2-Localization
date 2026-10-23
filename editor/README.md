@@ -12,7 +12,7 @@ start.bat
 or:
 
 ```bat
-python editor\server.py --data src --web-dir editor\web --lang ja
+python editor\server.py --data src --web-dir editor\web
 ```
 
 `--data` points at a directory with:
@@ -31,7 +31,7 @@ For the repository, `src` already has `src/live` and `src/orig`, so
 The translator package is built with:
 
 ```bat
-python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja
+python src\tools\pack\make_translator.py
 ```
 
 It copies `editor/`, `shared/core/`, the selected language file and the English

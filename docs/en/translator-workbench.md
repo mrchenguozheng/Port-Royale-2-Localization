@@ -9,23 +9,24 @@ service that exposes only the translation page.
 From the repository root:
 
 ```bat
-python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja
+python src\tools\pack\make_translator.py
 ```
 
+Default output is `dist\PR2Translator` and contains every editable language.
 The current Python runtime is bundled by default, so the translator does **not**
 need to install Python.
 
 Custom runtime:
 
 ```bat
-python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja ^
+python src\tools\pack\make_translator.py ^
     --python-dir C:\Python311
 ```
 
 No bundled runtime:
 
 ```bat
-python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja ^
+python src\tools\pack\make_translator.py ^
     --system-python
 ```
 
@@ -34,7 +35,7 @@ The `--python-dir` directory must contain `python.exe`.
 ## Contents
 
 ```
-PR2Translator-ja/
+PR2Translator/
 ├─ start.bat
 ├─ README.txt
 ├─ editor/
@@ -42,8 +43,8 @@ PR2Translator-ja/
 │  └─ web/                English UI
 ├─ shared/core/           shared storage and validation
 ├─ data/
-│  ├─ live/ja.toml        current language
-│  └─ orig/               English reference
+│  ├─ live/*.toml         switchable languages
+│  └─ orig/               English and French references
 └─ python/                bundled by default
 ```
 
