@@ -1,5 +1,6 @@
 const PAGE = 100;
 const EN = "en.gog_1.1.2.3";
+const t = (key, vars) => (window.t ? window.t(key, vars) : key);
 
 const state = {
   lang: "",
@@ -50,7 +51,7 @@ function render() {
     const td = document.createElement("td");
     td.colSpan = 4;
     td.className = "empty";
-    td.textContent = state.total ? "No rows on this page." : "No entries found.";
+    td.textContent = t(state.total ? "message.emptyPage" : "message.empty");
     tr.appendChild(td);
     tbody.appendChild(tr);
     updatePager();
@@ -121,7 +122,7 @@ async function checkRow(row, ta, cell) {
       cell.appendChild(span);
     }
   } catch (err) {
-    setMessage("Validation failed: " + err.message, true);
+    setMessage(t("message.validationFailed", {error: err.message}), true);
   }
 }
 
@@ -130,11 +131,11 @@ function updatePager() {
   const start = state.offset + 1;
   const end = state.offset + shown;
   $("pageInfo").textContent = state.total
-    ? (start + "–" + end + " of " + state.total)
-    : "0 entries";
+    ? t("pager.range", {start, end, total: state.total})
+    : t("pager.empty");
   $("prev").disabled = state.offset <= 0;
   $("next").disabled = state.offset + shown >= state.total;
-  $("stats").textContent = state.total + " entries · " + state.lang;
+  $("stats").textContent = t("stats", {count: state.total, lang: state.lang});
 }
 
 async function loadLanguages() {
@@ -149,7 +150,7 @@ async function loadLanguages() {
     sel.appendChild(opt);
   }
   if (!langs.length) {
-    setMessage("No editable language found.", true);
+    setMessage(t("message.noLanguage"), true);
     return false;
   }
   const m = location.pathname.match(/^\/translate\/([^/]+)/);
@@ -176,7 +177,7 @@ async function loadPage() {
 async function doSearch() {
   const q = $("search").value.trim();
   if (!q) { await clearSearch(); return; }
-  if (state.dirty.size && !confirm("You have unsaved changes. Search anyway?")) return;
+  if (state.dirty.size && !confirm(t("confirm.search"))) return;
   const rows = await api("/api/search?q=" + encodeURIComponent(q) +
                          "&lang=" + encodeURIComponent(state.lang));
   state.search = q;
@@ -188,8 +189,8 @@ async function doSearch() {
   render();
   $("prev").disabled = true;
   $("next").disabled = true;
-  $("pageInfo").textContent = state.total + " result(s)";
-  setMessage("Search: " + q);
+  $("pageInfo").textContent = t("message.results", {count: state.total});
+  setMessage(t("message.search", {query: q}));
 }
 
 async function clearSearch() {
@@ -214,15 +215,15 @@ async function save() {
       if (original) original[state.lang] = row.text;
     }
     render();
-    setMessage("Saved " + (res.changed ?? rows.length) + " row(s).");
+    setMessage(t("message.saved", {count: res.changed ?? rows.length}));
   } catch (err) {
-    setMessage("Save failed: " + err.message, true);
+    setMessage(t("message.saveFailed", {error: err.message}), true);
     $("save").disabled = state.dirty.size === 0;
   }
 }
 
 async function switchLanguage() {
-  if (state.dirty.size && !confirm("You have unsaved changes. Switch language anyway?")) {
+  if (state.dirty.size && !confirm(t("confirm.language"))) {
     $("lang").value = state.lang;
     return;
   }
@@ -253,9 +254,10 @@ $("search").addEventListener("keydown", (e) => {
 
 (async () => {
   try {
+    if (window.I18N_READY) await window.I18N_READY;
     if (!(await loadLanguages())) return;
     await loadPage();
   } catch (err) {
-    setMessage("Failed to load: " + err.message, true);
+    setMessage(t("message.loadFailed", {error: err.message}), true);
   }
 })();

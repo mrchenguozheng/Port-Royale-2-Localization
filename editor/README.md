@@ -39,6 +39,22 @@ English reference, plus a Python runtime by default.
 
 ## API
 
+## UI language
+
+The shipped UI is English. Strings live in `web/i18n/en.json`; static labels use
+`data-i18n` keys and dynamic messages call `t("key")`.
+
+To add another UI language:
+
+1. Copy `web/i18n/en.json` to `web/i18n/<code>.json`;
+2. Translate the values, keep the keys;
+3. open `/translate/<lang>?ui=<code>`.
+
+Missing files or keys fall back to English. The game language (`--lang`) and the
+workbench UI language (`?ui=`) are independent.
+
+## API
+
 The UI uses only:
 
 - `GET /api/langs`

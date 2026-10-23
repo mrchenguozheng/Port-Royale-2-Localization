@@ -207,6 +207,7 @@ class Handler(BaseHTTPRequestHandler):
             ".html": "text/html; charset=utf-8",
             ".css": "text/css; charset=utf-8",
             ".js": "application/javascript; charset=utf-8",
+            ".json": "application/json; charset=utf-8",
         }.get(os.path.splitext(full)[1].lower(), "application/octet-stream")
         with open(full, "rb") as fh:
             data = fh.read()

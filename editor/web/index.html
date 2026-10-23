@@ -3,41 +3,50 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PR2 Translation Workbench</title>
+<title data-i18n="app.title">PR2 Translation Workbench</title>
 <link rel="stylesheet" href="/style.css">
+<script src="/i18n.js"></script>
 </head>
 <body>
 <header class="top">
-  <div class="brand">PR2 Translation Workbench<div class="sub">Edit the Translation column, then click Save changes.</div></div>
-  <label>Language
+  <div class="brand">
+    <span data-i18n="app.title">PR2 Translation Workbench</span>
+    <div class="sub" data-i18n="app.subtitle">Edit the Translation column, then click Save changes.</div>
+  </div>
+  <label><span data-i18n="lang.label">Language</span>
     <select id="lang"></select>
   </label>
   <span id="stats" class="muted"></span>
   <span class="spacer"></span>
-  <button id="save" disabled>Save changes</button>
+  <button id="save" data-i18n="action.save" disabled>Save changes</button>
 </header>
 
 <section class="toolbar">
-  <span class="hint">English is the source. Changes are saved only when you click Save changes.</span>
-  <input id="search" type="search" placeholder="Search id, English or translation…">
-  <button id="doSearch">Search</button>
-  <button id="clearSearch">Clear</button>
+  <span class="hint" data-i18n="app.hint">English is the source. Changes are saved only when you click Save changes.</span>
+  <input id="search" type="search" data-i18n-placeholder="search.placeholder" placeholder="Search id, English or translation…">
+  <button id="doSearch" data-i18n="action.search">Search</button>
+  <button id="clearSearch" data-i18n="action.clear">Clear</button>
   <span id="message" class="muted"></span>
 </section>
 
 <main>
   <table>
     <thead>
-      <tr><th>ID</th><th>English</th><th>Translation</th><th>Status</th></tr>
+      <tr>
+        <th data-i18n="table.id">ID</th>
+        <th data-i18n="table.english">English</th>
+        <th data-i18n="table.translation">Translation</th>
+        <th data-i18n="table.status">Status</th>
+      </tr>
     </thead>
     <tbody id="rows"></tbody>
   </table>
 </main>
 
 <footer class="pager">
-  <button id="prev">‹ Prev</button>
+  <button id="prev" data-i18n="pager.prev">‹ Prev</button>
   <span id="pageInfo"></span>
-  <button id="next">Next ›</button>
+  <button id="next" data-i18n="pager.next">Next ›</button>
 </footer>
 
 <script src="/app.js"></script>
