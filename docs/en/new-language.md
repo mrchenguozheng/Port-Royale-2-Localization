@@ -43,7 +43,7 @@ corresponding button directly.
 `assets/fonts/original/` is not in the repository, so export it first:
 
 ```bash
-python src/tools/font/extract_fonts.py --game-dir "C:\Games\Port Royale 2 GOG" --out assets/fonts/original
+python src/tools/font/extract_fonts.py --game-dir "<game directory>" --out assets/fonts/original
 ```
 
 **Check**: four files appear in the directory:
@@ -199,7 +199,7 @@ Install page, **Install & Launch**:
 Or from the command line:
 
 ```bash
-python src/tools/pack/apply_patch.py --langs de --game-dir "C:\Games\Port Royale 2 GOG"
+python src/tools/pack/apply_patch.py --langs de --game-dir "<game directory>"
 ```
 
 **Check**: the log shows that `PR2Packs\de.txt` was copied, the fonts were copied to

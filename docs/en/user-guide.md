@@ -30,7 +30,7 @@ One zip is one language; download several if you want several languages.
 Extract **all files** next to `PR2.exe`:
 
 ```
-C:\Games\Port Royale 2 GOG\
+<game directory>\
 ├─ PR2.exe
 ├─ PR2Launcher.exe
 ├─ PR2LauncherGUI.exe
