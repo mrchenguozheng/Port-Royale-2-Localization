@@ -20,7 +20,7 @@
 
 | Problem | Old rule | Current rule |
 |---|---|---|
-| Treating "mentions a relative" as "the speaker is a relative" | Any occurrence of `my wife` / `my daughter` was classified as Tier A, so narration such as `While you are looting the town, a young woman comes running up…` was also counted as a relative | Changed to the Tier B "Family/lovers" category, which only indicates an **inferable** relationship; a separate `person` column indicates the grammatical person |
+| Treating "mentions a relative" as "the speaker is a relative" | Any occurrence of `my wife` / `my daughter` was classified as Tier A, so narration such as `While you are looting the town, a young woman comes running up…` was also counted as a relative | Changed to the "Family/lovers" category in Tier B, which only indicates an **inferable** relationship; a separate `person` column indicates the grammatical person |
 | The signature rule matched body text | A full-text search for `viceroy of %1` classified the event notice `The viceroy of %1 has moved to %2. Governor…` as a "letter signature" | The rule looks for a signature only within the **last 90 characters** and requires the text to be long enough |
 | The CSV had a stale Japanese column | A `ja` column was mixed in and was not updated after wording changes (it still showed `総督代理`) | Removed the Japanese column and replaced it with two columns, English and French (French is another authoritative text) |
 | No verifiable basis | Only a one-line Chinese explanation | Added `rule` (A1/A2/A3/N1/N2/B/C) and `person` (first person/third person/imperative/none) |
