@@ -249,19 +249,72 @@ fonts from the root directory.
 
 ## Packaging
 
-First build the injector (`PR2Launcher.exe`, `PR2TextSource.dll`), then:
+### 1. Build the runtime
 
-```bash
-python src/tools/pack/make_release.py --lang zh --version v1.0.0
-python src/tools/pack/make_release.py --lang ja --version v1.0.0
+Requires Visual Studio with the C++ desktop workload:
+
+```bat
+cd C:\path\to\pr2-localization
+src\build_injector.bat
+```
+
+Outputs:
+
+```
+build\PR2Launcher.exe
+build\PR2LauncherGUI.exe
+build\PR2TextSource.dll
+build\ui\zh.ini / en.ini / ja.ini
+```
+
+Skip this step when only translations changed.
+
+### 2. Package language packs and fonts
+
+```bat
+python src\tools\pack\make_release.py --lang zh --lang ja --version v1.0.0
+```
+
+One language at a time is also fine:
+
+```bat
+python src\tools\pack\make_release.py --lang zh --version v1.0.0
 ```
 
 Output:
 
 ```
-dist/PR2-zh-v1.0.0.zip
-dist/PR2-ja-v1.0.0.zip
+dist\PR2-zh-v1.0.0.zip
+dist\PR2-ja-v1.0.0.zip
 ```
+
+`make_release.py` automatically:
+
+- compiles the language packs;
+- builds Noto fonts (default `--fonts noto`);
+- copies the runtime, `ui/`, `PR2Packs/` and fonts;
+- writes `RUNTIME-VERSION` and the supported-build note;
+- packs `README.txt`, `OFL.txt`, `NOTO-SOURCES.txt`.
+
+First-time VF instancing needs:
+
+```bat
+python -m pip install fonttools
+```
+
+Font results are cached in `build\font-cache\noto\` and reused. Force a rebuild:
+
+```bat
+python src\tools\pack\make_release.py --lang zh --version v1.0.0 --no-font-cache
+```
+
+### 3. Verify before publishing
+
+1. Extract into a clean game copy;
+2. Run `PR2LauncherGUI.exe`;
+3. Select a language and launch;
+4. Check UI text, fonts and the original launch;
+5. Confirm `README.txt` says the supported build is **GOG English 1.1.2.3**.
 
 To generate only the Noto fonts without running stitching:
 
