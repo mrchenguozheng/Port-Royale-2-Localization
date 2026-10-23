@@ -2,7 +2,7 @@
   "app.title": "PR2 Translation Workbench",
   "app.subtitle": "Edit the Translation column, then click Save changes.",
   "app.hint": "English is the source. Changes are saved only when you click Save changes.",
-  "lang.label": "Language",
+  "lang.label": "Translation language",
   "action.save": "Save changes",
   "action.search": "Search",
   "action.clear": "Clear",
@@ -31,7 +31,7 @@
   "tab.ui": "UI text",
   "ui.title": "Workbench UI text",
   "ui.hint": "Keys are fixed. Empty values fall back to English.",
-  "ui.language": "UI language",
+  "ui.language": "Interface language",
   "ui.new": "New language",
   "ui.save": "Save UI text",
   "ui.key": "Key",
@@ -42,5 +42,5 @@
   "ui.overwrite": "{lang}.json already exists. Overwrite it?",
   "ui.invalid": "Use 2–16 lowercase letters, digits, - or _.",
   "ui.noBase": "English UI text is missing.",
-  "ui.interface": "Interface"
+  "ui.interface": "Interface language"
 }
