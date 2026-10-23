@@ -12,11 +12,21 @@ From the repository root:
 python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja
 ```
 
-To bundle a Python runtime so the translator does not need to install Python:
+The current Python runtime is bundled by default, so the translator does **not**
+need to install Python.
+
+Custom runtime:
 
 ```bat
 python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja ^
     --python-dir C:\Python311
+```
+
+No bundled runtime:
+
+```bat
+python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja ^
+    --system-python
 ```
 
 The `--python-dir` directory must contain `python.exe`.
@@ -51,6 +61,9 @@ No `build/`, injector, fonts, `PR2Packs/` or install page.
 
 Only the translation editor is shown. Build/deploy/launch endpoints return 403.
 
+> The workbench chrome is currently Chinese; it is separate from the translation
+> target language. The target only selects which `live/<lang>.toml` is loaded.
+
 ## Return the result
 
 The translator returns:
@@ -70,6 +83,6 @@ The maintainer then:
 ## Notes
 
 - The workbench listens only on `127.0.0.1`;
-- Python 3.11+ is required unless a runtime is bundled;
+- Python is bundled by default; only `--system-python` requires Python 3.11+;
 - Git is not required;
 - Other languages' translation files are not included.

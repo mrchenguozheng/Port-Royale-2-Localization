@@ -12,11 +12,21 @@ Python サービスです。
 python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja
 ```
 
-Python ランタイムを同梱し、翻訳者が Python をインストールしなくて済むようにするには：
+既定では現在の Python ランタイムを同梱するため、翻訳者は Python を
+インストールする必要がありません。
+
+カスタム Python を使う場合：
 
 ```bat
 python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja ^
     --python-dir C:\Python311
+```
+
+Python を同梱しない場合：
+
+```bat
+python src\tools\pack\make_translator.py --lang ja --out dist\PR2Translator-ja ^
+    --system-python
 ```
 
 `--python-dir` に指定するディレクトリには `python.exe` が含まれている必要があります。
