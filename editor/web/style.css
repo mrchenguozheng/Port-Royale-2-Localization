@@ -35,8 +35,10 @@ main { padding: 0 16px 16px; }
 table { width: 100%; border-collapse: collapse; background: #fff; }
 th, td { border-bottom: 1px solid #e2e8f0; padding: 8px; vertical-align: top; }
 th { text-align: left; font-size: 12px; color: #64748b; background: #f8fafc; }
+.ref-label { font-size: 10px; font-weight: 400; color: #94a3b8; }
 td.id { font-family: Consolas, monospace; font-size: 12px; color: #64748b; white-space: nowrap; }
 td.en { width: 34%; color: #334155; }
+.en .fr { margin-top: 5px; color: #94a3b8; font-size: 12px; }
 td.tr { width: 38%; }
 td.status { width: 20%; font-size: 12px; }
 textarea {

@@ -151,9 +151,15 @@ def make(lang, out, python_dir=None, system_python=False):
 
     os.makedirs(os.path.join(stage, "data", "live"))
     os.makedirs(os.path.join(stage, "data", "orig"))
-    shutil.copy2(live, os.path.join(stage, "data", "live", lang + ".toml"))
-    shutil.copy2(orig, os.path.join(stage, "data", "orig",
-                                    "en.gog_1.1.2.3.toml"))
+    for name in os.listdir(os.path.join(SRC, "live")):
+        if name.endswith(".toml") and not name.startswith("_") \
+                and name != "keep_original.toml":
+            shutil.copy2(os.path.join(SRC, "live", name),
+                         os.path.join(stage, "data", "live", name))
+    for name in os.listdir(os.path.join(SRC, "orig")):
+        if name.endswith(".toml"):
+            shutil.copy2(os.path.join(SRC, "orig", name),
+                         os.path.join(stage, "data", "orig", name))
 
     has_python = False
     if not system_python:

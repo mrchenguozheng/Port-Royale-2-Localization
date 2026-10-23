@@ -5,6 +5,7 @@ import os
 import tomllib
 
 EN = "en.gog_1.1.2.3"
+FR = "fr.gog_1.1.2.42"
 
 
 def load_toml(path):
@@ -16,8 +17,12 @@ def live_path(data_root, lang):
     return os.path.join(data_root, "live", lang + ".toml")
 
 
+def reference_path(data_root, code):
+    return os.path.join(data_root, "orig", code + ".toml")
+
+
 def orig_path(data_root):
-    path = os.path.join(data_root, "orig", EN + ".toml")
+    path = reference_path(data_root, EN)
     if not os.path.isfile(path):
         path = os.path.join(data_root, "orig", "en.toml")
     return path
@@ -53,8 +58,11 @@ def ordered_ids(data_root, lang):
 def rows(data_root, lang):
     live = load_live(data_root, lang)
     orig = load_orig(data_root)
+    fr_path = reference_path(data_root, FR)
+    fr = load_toml(fr_path) if os.path.isfile(fr_path) else {}
     return [
-        {"id": hid, EN: orig.get(hid, ""), lang: live.get(hid, "")}
+        {"id": hid, EN: orig.get(hid, ""), FR: fr.get(hid, ""),
+         lang: live.get(hid, "")}
         for hid in ordered_ids(data_root, lang)
     ]
 

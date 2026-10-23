@@ -66,6 +66,23 @@ editor\start.bat
 
 ワークベンチにはインストール・ビルド・起動の入口はありません。
 
+## 複数言語
+
+1 つのエディタで `data/live/*.toml` の複数言語を開けます：
+
+- 上部の **Translation language** で切り替え；
+- URL は `/translate/<lang>` に変わります；
+- 言語ごとに再起動する必要はありません。
+
+参考列は英語の下にフランス語を表示します：
+
+```text
+English
+French reference
+```
+
+フランス語は参照専用です。
+
 ## エディタ UI の文言
 
 **Editor UI text** は、このエディタ自身のボタン・ラベル・ヒントだけを変更します。

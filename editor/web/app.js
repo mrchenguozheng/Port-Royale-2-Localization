@@ -1,5 +1,6 @@
 const PAGE = 100;
 const EN = "en.gog_1.1.2.3";
+const FR = "fr.gog_1.1.2.42";
 const t = (key, vars) => (window.t ? window.t(key, vars) : key);
 
 const state = {
@@ -68,6 +69,10 @@ function render() {
     const en = document.createElement("td");
     en.className = "en";
     en.textContent = row[EN] || "";
+    const fr = document.createElement("div");
+    fr.className = "fr";
+    fr.textContent = row[FR] || "";
+    en.appendChild(fr);
 
     const trCell = document.createElement("td");
     trCell.className = "tr";
@@ -230,6 +235,7 @@ async function switchLanguage() {
   state.lang = $("lang").value;
   state.offset = 0;
   state.dirty.clear();
+  history.replaceState(null, "", "/translate/" + state.lang + location.search);
   await loadPage();
 }
 

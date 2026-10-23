@@ -25,13 +25,13 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from shared.core import (  # noqa: E402
-    EN, check_text, lang_codes, load_orig, ordered_ids, rows, save_live,
+    EN, FR, check_text, lang_codes, load_orig, ordered_ids, rows, save_live,
 )
 
 DATA = os.path.join(HERE, "data")
 WEB = os.path.join(HERE, "web")
 UI_DIR = os.path.join(WEB, "i18n")
-LANG = "ja"
+LANG = "ja"          # default language; requests may select any editable one
 PORT = 8781
 UI_RE = re.compile(r"^[a-z0-9_-]{1,32}$")
 
@@ -45,6 +45,15 @@ def send(handler, code, body, ctype="application/json; charset=utf-8"):
     handler.send_header("Content-Length", str(len(data)))
     handler.end_headers()
     handler.wfile.write(data)
+
+
+def editable_langs():
+    return lang_codes(DATA)
+
+
+def resolve_lang(value):
+    code = str(value or "").strip()
+    return code if code in editable_langs() else None
 
 
 def ui_codes():
@@ -150,33 +159,36 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/health":
             return send(self, 200, {"ok": True, "lang": LANG})
         if path == "/api/langs":
-            codes = lang_codes(DATA)
+            codes = editable_langs()
             return send(self, 200, {"editable": codes,
-                                    "all": [EN] + codes, "base": EN})
+                                    "all": [EN] + codes, "base": EN,
+                                    "default": LANG})
         if path == "/api/count":
-            lang = (query.get("lang") or [LANG])[0]
-            if lang != LANG:
+            lang = resolve_lang((query.get("lang") or [LANG])[0])
+            if not lang:
                 return send(self, 400, {"error": "unknown language"})
-            return send(self, 200, {"count": len(ordered_ids(DATA, LANG))})
+            return send(self, 200, {"count": len(ordered_ids(DATA, lang)),
+                                    "lang": lang})
         if path == "/api/entries":
-            lang = (query.get("lang") or [LANG])[0]
-            if lang != LANG:
+            lang = resolve_lang((query.get("lang") or [LANG])[0])
+            if not lang:
                 return send(self, 400, {"error": "unknown language"})
             offset = max(0, int((query.get("offset") or ["0"])[0]))
             limit = max(0, int((query.get("limit") or ["100"])[0]))
-            return send(self, 200, rows(DATA, LANG)[offset:offset + limit])
+            return send(self, 200, rows(DATA, lang)[offset:offset + limit])
         if path == "/api/search":
-            lang = (query.get("lang") or [LANG])[0]
-            if lang != LANG:
+            lang = resolve_lang((query.get("lang") or [LANG])[0])
+            if not lang:
                 return send(self, 400, {"error": "unknown language"})
             q = (query.get("q") or [""])[0].strip().lower()
             if not q:
                 return send(self, 200, [])
             return send(self, 200, [
-                row for row in rows(DATA, LANG)
+                row for row in rows(DATA, lang)
                 if q in row["id"].lower()
                 or q in row[EN].lower()
-                or q in row[LANG].lower()
+                or q in row[FR].lower()
+                or q in row[lang].lower()
             ])
         if path == "/api/ui/langs":
             return send(self, 200, {"codes": ui_codes()})
@@ -193,6 +205,9 @@ class Handler(BaseHTTPRequestHandler):
             text = str(body.get("text") or "")
             return send(self, 200, check_text(text, load_orig(DATA).get(hid, "")))
         if path == "/api/patch":
+            lang = resolve_lang(body.get("lang"))
+            if not lang:
+                return send(self, 400, {"error": "unknown language"})
             updates = body.get("rows") or []
             for row in updates:
                 hid = str(row.get("id") or "")
@@ -204,7 +219,7 @@ class Handler(BaseHTTPRequestHandler):
                         "error": "Placeholder/tag check failed for %s: %s" %
                                  (hid, "; ".join(x["text"] for x in errors))})
             return send(self, 200, {"ok": True,
-                                    "changed": save_live(DATA, LANG, updates)})
+                                    "changed": save_live(DATA, lang, updates)})
         if path == "/api/ui":
             code = str(body.get("lang") or "en")
             base = ui_load("en")["base"]

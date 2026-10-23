@@ -68,6 +68,23 @@ The workbench has no install, build or launch entry points.
 > The workbench chrome is currently **English**; it is separate from the translation
 > target language. The target only selects which `live/<lang>.toml` is loaded.
 
+## Multiple languages
+
+One editor instance can open every `data/live/*.toml` language:
+
+- switch with the top **Translation language** selector;
+- the URL becomes `/translate/<lang>`;
+- no restart per language.
+
+The reference column shows English with the French reference below it:
+
+```text
+English
+French reference
+```
+
+French is read-only.
+
 ## Editor interface text
 
 **Editor UI text** changes this editor's own buttons, labels and hints, not the

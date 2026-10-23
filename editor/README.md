@@ -52,6 +52,14 @@ Missing files or keys fall back to English. The game language (`--lang`) and the
 workbench UI language (`?ui=`) are independent. The **UI text** tab edits the same
 JSON files directly; keys are read-only.
 
+## Multiple languages and references
+
+One server can serve every `data/live/*.toml`; switch with the top
+**Translation language** selector. The URL becomes `/translate/<lang>`.
+
+The reference cell shows English, with the French reference below it. French is
+read-only.
+
 ## API
 
 The UI uses only:
