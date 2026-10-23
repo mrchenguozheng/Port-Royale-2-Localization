@@ -331,7 +331,16 @@ Font results are cached in `build\font-cache\noto\` and reused. Force a rebuild:
 python src\tools\pack\make_release.py --lang zh --version v1.0.0 --no-font-cache
 ```
 
-### 3. Verify before publishing
+### 3. Packaging model
+
+Releases currently ship one bundle per language (runtime + pack + fonts) so players
+can extract and play.
+
+A separate Runtime + Language split is kept as a future option; it is not enabled
+yet. Revisit it when the number of languages grows or the runtime needs frequent
+independent updates.
+
+### 4. Verify before publishing
 
 1. Extract into a clean game copy;
 2. Run `PR2LauncherGUI.exe`;
