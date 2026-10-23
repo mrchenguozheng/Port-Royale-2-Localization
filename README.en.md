@@ -137,6 +137,7 @@ Entries do not have to be complete — missing entries fall back to English.
 | [Player guide](docs/en/user-guide.md) | Download, extract, launch, uninstall, troubleshooting |
 | [Build & Install](docs/en/build-and-install.md) | Install page, build/deploy/launch, scripts |
 | [New language](docs/en/new-language.md) | From font export to an in-game language |
+| [Language collaboration](docs/en/language-collaboration.md) | Translator/maintainer split and handoff |
 | [Release](docs/en/release.md) | Per-language zips, Noto fonts, GitHub Actions |
 | [New language fonts](docs/en/new-language-fonts.md) | Font/tool prerequisites for a new language |
 | [Fonts & distribution](docs/en/fonts-and-distribution.md) | Stitching, donor licenses, redistribution limits |

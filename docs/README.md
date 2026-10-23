@@ -31,6 +31,7 @@ Chinese-only for now.
 | [Injector](en/injection.md) | How the DLL hooks text lookups and how the launcher injects it |
 | [Translations & packs](en/translation-and-packs.md) | TOML format, `hash = text`, editor workflow |
 | [New language](en/new-language.md) | Add a language from scratch |
+| [Language collaboration](en/language-collaboration.md) | Translator/maintainer split, handoff and verification |
 
 ## Translation notes
 

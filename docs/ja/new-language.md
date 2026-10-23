@@ -247,3 +247,7 @@ python src/tools/pack/apply_patch.py --langs de --game-dir "<game directory>"
 [翻訳と言語パック](translation-and-packs.md) ·
 [ビルドとインストール](build-and-install.md) · [リリース](release.md) ·
 [フォントと配布](fonts-and-distribution.md)。
+
+---
+
+翻訳者とメンテナーの分担は[言語追加の協力フロー](language-collaboration.md)を参照。
