@@ -7,7 +7,7 @@
 
 The package contains only:
 - editor/server.py and editor/web (English UI);
-- data/live/<lang>.toml and the English reference;
+- data/live/*.toml and the English/French references;
 - a bundled Python runtime by default.
 
 No build, injector, fonts, PR2Packs or install page.
@@ -66,7 +66,7 @@ def copy_python_runtime(src, dst):
         raise SystemExit("bundled Python failed: %s" % (r.stderr or r.stdout))
 
 
-def write_start(stage, lang, has_python):
+def write_start(stage, has_python):
     lines = ["@echo off", "setlocal", 'set "ROOT=%~dp0"']
     if has_python:
         lines.append('set "PY=%ROOT%python\\python.exe"')
@@ -101,9 +101,9 @@ def write_start(stage, lang, has_python):
         fh.write("\n".join(lines))
 
 
-def write_readme(stage, lang, has_python):
-    text = """PR2 Translator Workbench - %s
-==============================
+def write_readme(stage, languages, has_python):
+    text = """PR2 Translator Workbench
+========================
 
 Translate and proofread only. No build, injector, fonts or game launcher.
 
@@ -117,25 +117,28 @@ Files:
   editor/server.py   local translation server
   editor/web/        English workbench UI
   shared/core/       shared translation storage/validation
-  data/live/%s.toml  translation file
-  data/orig/         English reference
+  data/live/*.toml   translation files (%s)
+  data/orig/         English and French references
   %s
 
 The workbench listens on 127.0.0.1 only.
-Return data/live/%s.toml to the maintainer for building and release.
-""" % (lang, lang,
+Return the edited data/live/<lang>.toml to the maintainer.
+""" % (languages,
        "python/            bundled Python (no install needed)" if has_python
-       else "Python 3.11+      required on PATH", lang)
+       else "Python 3.11+      required on PATH")
     with open(os.path.join(stage, "README.txt"), "w",
               encoding="utf-8", newline="\n") as fh:
         fh.write(text)
 
 
-def make(lang, out, python_dir=None, system_python=False):
-    live = os.path.join(SRC, "live", lang + ".toml")
+def make(out, python_dir=None, system_python=False):
+    live_dir = os.path.join(SRC, "live")
+    codes = sorted(x[:-5] for x in os.listdir(live_dir)
+                   if x.endswith(".toml") and not x.startswith("_")
+                   and x != "keep_original.toml")
+    if not codes:
+        raise SystemExit("no editable language in %s" % live_dir)
     orig = os.path.join(SRC, "orig", "en.gog_1.1.2.3.toml")
-    if not os.path.isfile(live):
-        raise SystemExit("missing %s" % live)
     if not os.path.isfile(orig):
         raise SystemExit("missing %s" % orig)
     stage = os.path.abspath(out)
@@ -169,10 +172,10 @@ def make(lang, out, python_dir=None, system_python=False):
         copy_python_runtime(src, os.path.join(stage, "python"))
         has_python = True
 
-    write_start(stage, lang, has_python)
-    write_readme(stage, lang, has_python)
+    write_start(stage, has_python)
+    write_readme(stage, ", ".join(codes), has_python)
     print("built translator workbench: %s" % stage)
-    print("  language: %s" % lang)
+    print("  languages: %s" % ", ".join(codes))
     print("  start: %s\\start.bat" % stage)
     print("  python: %s" % ("bundled" if has_python else "system 3.11+"))
     return stage
@@ -180,24 +183,13 @@ def make(lang, out, python_dir=None, system_python=False):
 
 def main():
     ap = argparse.ArgumentParser(description="Build a standalone translator workbench")
-    ap.add_argument("--lang", default="",
-                    help="language used to validate the source (default: first available)")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist", "PR2Translator"))
     ap.add_argument("--python-dir", default=None,
                     help="Python runtime to copy (default: current interpreter)")
     ap.add_argument("--system-python", action="store_true",
                     help="do not bundle Python")
     args = ap.parse_args()
-    lang = args.lang
-    if not lang:
-        live_dir = os.path.join(SRC, "live")
-        codes = sorted(x[:-5] for x in os.listdir(live_dir)
-                       if x.endswith(".toml") and not x.startswith("_")
-                       and x != "keep_original.toml")
-        if not codes:
-            raise SystemExit("no editable language in src/live")
-        lang = codes[0]
-    make(lang, args.out, args.python_dir, args.system_python)
+    make(args.out, args.python_dir, args.system_python)
     return 0
 
 
