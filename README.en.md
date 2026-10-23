@@ -3,7 +3,7 @@
 A localization project for **Port Royale 2**: UI text is replaced through an
 external language pack, and the original `PR2.exe` is never modified.
 
-[中文说明](README.md) · [Documentation index](docs/README.md)
+[中文说明](README.md) · [日本語](README.ja.md) · [Documentation index](docs/README.md)
 
 ---
 

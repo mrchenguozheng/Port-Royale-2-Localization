@@ -2,7 +2,7 @@
 
 《Port Royale 2》的本地化项目：**用外挂语言包替换界面文本，原版 `PR2.exe` 全程不改。**
 
-[English](README.en.md) · [中文文档索引](docs/README.zh-CN.md)
+[English](README.en.md) · [日本語](README.ja.md) · [中文文档索引](docs/README.zh-CN.md)
 
 ---
 

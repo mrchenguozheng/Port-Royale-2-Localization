@@ -1,6 +1,6 @@
 # 文档索引
 
-[English](README.md) · [中文索引](README.zh-CN.md) · [项目 README](../README.md)
+[English](README.md) · [日本語](README.ja.md) · [中文索引](README.zh-CN.md) · [项目 README](../README.md)
 
 > **当前只支持 GOG 英文版 `1.1.2.3`。** 其他版本不在支持范围内。
 

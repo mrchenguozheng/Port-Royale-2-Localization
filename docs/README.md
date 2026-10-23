@@ -4,7 +4,7 @@ This is not the project introduction — it answers "which document do I need?".
 English translations cover the core workflow; specialist analysis documents remain
 Chinese-only for now.
 
-[中文文档索引](README.zh-CN.md) · [Project README](../README.en.md)
+[中文文档索引](README.zh-CN.md) · [日本語](README.ja.md) · [Project README](../README.en.md)
 
 > **Supported game build: GOG English `1.1.2.3` only.** Other builds are out of scope.
 
