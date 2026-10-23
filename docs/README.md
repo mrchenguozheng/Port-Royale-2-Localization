@@ -4,7 +4,7 @@ This is not the project introduction — it answers "which document do I need?".
 English translations cover the core workflow; specialist analysis documents remain
 Chinese-only for now.
 
-[中文文档索引](README.zh-CN.md) · [Project README](../README.md)
+[中文文档索引](README.zh-CN.md) · [Project README](../README.en.md)
 
 ## Use and release
 

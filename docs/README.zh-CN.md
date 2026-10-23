@@ -1,6 +1,6 @@
 # 文档索引
 
-[English](README.md) · [中文索引](README.zh-CN.md)
+[English](README.md) · [中文索引](README.zh-CN.md) · [项目 README](../README.md)
 
 这不是项目介绍，而是“遇到问题该翻哪一份”。先看当前状态，再看历史/规范类文档。
 

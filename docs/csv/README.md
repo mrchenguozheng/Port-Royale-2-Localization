@@ -3,7 +3,7 @@
 CSV files are analysis and review artifacts, not runtime game data.
 `docs/` root contains documentation only; data is grouped by purpose here.
 
-[中文索引](README.zh-CN.md) · [Documentation index](../README.md)
+[中文索引](README.zh-CN.md) · [Project README](../../README.en.md) · [Documentation index](../README.md)
 
 ## analysis/
 
