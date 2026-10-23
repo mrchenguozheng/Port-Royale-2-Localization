@@ -338,6 +338,33 @@ python src/tools/font/make_noto_fonts.py --lang zh --out dist/PR2-zh-v1.0.0/font
 
 合成フォントは派生著作物です。**個人利用のみとし、公開リリースには絶対に含めないでください。** `make_release.py --fonts stitch` は私的なパッケージ専用です。
 
+## 翻訳者ワークベンチ
+
+翻訳者ワークベンチは `PR2-zh-*.zip` / `PR2-ja-*.zip` には**入れません**。
+同じリリースの独立した添付ファイルにします：
+
+```text
+PR2-zh-v1.0.0.zip
+PR2-ja-v1.0.0.zip
+PR2Translator-v1.0.0.zip
+```
+
+ビルド：
+
+```bat
+python src\tools\pack\make_translator.py --out dist\PR2Translator-v1.0.0
+Compress-Archive -Path dist\PR2Translator-v1.0.0\* ^
+    -DestinationPath dist\PR2Translator-v1.0.0.zip
+```
+
+理由：
+
+- 翻訳者パッケージは約 16 MB で Python を同梱するため、プレイヤーには不要；
+- ゲーム zip は「解凍して起動」のまま；
+- エディタだけを更新でき、ゲームパックを再ビルドしなくて済む。
+
+GitHub Actions では別 job で `PR2Translator-*.zip` をビルドしてアップロードします。
+
 ## GitHub Actions
 
 タグをトリガーとして実行され、1 言語につき 1 パッケージを生成します:
