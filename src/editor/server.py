@@ -84,10 +84,6 @@ SERVER = None
 #: 启动时刻与前端产物的时间，用来在页面上判断「后端是不是旧的」。
 STARTED = time.time()
 
-#: 译者分发包：只开放翻译页，构建/部署/启动接口全部拒绝。
-TRANSLATOR = False
-TRANSLATOR_LANG = "zh"
-
 
 # ---------------------------------------------------------------- 校验
 
@@ -268,17 +264,6 @@ class Handler(BaseHTTPRequestHandler):
             ctype += "; charset=utf-8"
         with open(path, "rb") as f:
             data = f.read()
-        if TRANSLATOR and os.path.basename(path) == "index.html":
-            script = (
-                b"<script>window.__PR2_TRANSLATOR__=true;"
-                b"document.addEventListener('DOMContentLoaded',function(){"
-                b"var t=document.querySelector('.tab[data-view=\"start\"]');"
-                b"if(t)t.style.display='none';"
-                b"var e=document.querySelector('.tab[data-view=\"editor\"]');"
-                b"if(e)e.click();});</script>"
-            )
-            data = data.replace(b"</head>", script + b"</head>", 1) \
-                       if b"</head>" in data else data + script
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
@@ -294,8 +279,6 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlsplit(self.path)
         path = urllib.parse.unquote(parsed.path)
         try:
-            if TRANSLATOR and path.startswith("/api/start/"):
-                return self.send_error_json(403, "translator mode: build/deploy disabled")
             if path.startswith("/api/"):
                 _say("GET  %s" % path)
                 return self.get_api(path, urllib.parse.parse_qs(parsed.query))
@@ -308,8 +291,6 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlsplit(self.path)
         path = urllib.parse.unquote(parsed.path)
         try:
-            if TRANSLATOR and path.startswith("/api/start/"):
-                return self.send_error_json(403, "translator mode: build/deploy disabled")
             if not path.startswith("/api/"):
                 return self.send_error_json(404, "not found")
             return self.post_api(path)
@@ -328,11 +309,6 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def get_static(self, path):
-        if TRANSLATOR:
-            if path in ("/", "/start", "/install"):
-                return self.redirect("/translate/%s" % TRANSLATOR_LANG)
-            if path == "/translate":
-                return self.redirect("/translate/%s" % TRANSLATOR_LANG)
         if path in ("/start",):
             return self.redirect("/install")
         if path == "/":
@@ -434,10 +410,6 @@ def main():
                     help="自动打开的页面，默认 /（安装页用 /start）")
     ap.add_argument("--restart", action="store_true",
                     help="若已有编辑器在跑，先停掉它再用新代码启动")
-    ap.add_argument("--translator", action="store_true",
-                    help="译者模式：只开放翻译页，禁用构建/部署/启动")
-    ap.add_argument("--translator-lang", default="zh",
-                    help="译者模式下默认打开的语言代码")
     ap.add_argument("--web-dir", default=None,
                     help="前端目录；默认使用 src/editor/dist")
     ap.add_argument("--data", default=None,
@@ -446,9 +418,7 @@ def main():
                     help="字体 presets 目录；默认 src\\data\\fontstitch\\presets")
     a = ap.parse_args()
 
-    global TRANSLATOR, TRANSLATOR_LANG, DIST
-    TRANSLATOR = a.translator
-    TRANSLATOR_LANG = (a.translator_lang or "zh").strip() or "zh"
+    global DIST
     if a.web_dir:
         DIST = os.path.abspath(a.web_dir)
     if a.data:

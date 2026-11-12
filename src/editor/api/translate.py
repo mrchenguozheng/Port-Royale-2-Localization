@@ -28,11 +28,7 @@ from api import langs as LG     # noqa: E402
 
 ORDER_FILE = os.path.join(os.path.dirname(HERE), "data", "table-order.txt")
 _ORDER = None
-PH_MEAN = {
-    "@T$": "Town", "@N$": "Person", "@n$": "Country", "@D$": "Date",
-    "@I$": "Integer", "@a$": "Quantity", "@G$": "Goods", "@g$": "Amount",
-    "@S$": "Ship type", "@l$": "Location", "@C$": "Fleet", "@P$": "Pirate",
-}
+_ATTN_CACHE = {}
 TAG_MEAN = [
     ("<n:", "Paragraph spacing"), ("<n>", "Line break"), ("<c>", "Color: start"),
     ("<o:", "Color value"), ("<r>", "Red text"), ("<t>", "Tab"),

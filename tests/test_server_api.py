@@ -30,6 +30,7 @@ GET_URLS = [
     "/api/font-status",
     "/api/langs",
     "/api/count?lang=zh",
+    "/api/count?filter=attention&lang=zh",
     "/api/list?lang=zh",
     "/api/entries?offset=0&limit=1&filter=all&lang=zh",
     "/api/entry-info?lang=zh&id=0xc46f793a",

@@ -104,12 +104,12 @@ After the split:
 
 | File | Lines | Responsibility |
 |---|---|---|
-| `src/editor/server.py` | 573 | constants, `health_info`/`server_instances`, 4 meta routes, `Handler`, startup and CLI |
-| `src/editor/api/store.py` | 141 | entry read/write and mtime-based caches |
+| `src/editor/server.py` | 509 | constants, `health_info`/`server_instances`, 4 meta routes, `Handler`, startup and CLI |
+| `src/editor/api/store.py` | 116 | entry read/write and mtime-based caches |
 | `src/editor/api/request.py` | 25 | `Req`: query/body of one request plus the two send exits |
-| `src/editor/api/translate.py` | 565 | translation domain: validation, context, rule trace, placeholders, filters, save/patch (16 routes) |
-| `src/editor/api/langs.py` | 359 | language domain: list/progress/new language, placeholder meanings, term exceptions (9 routes) |
-| `src/editor/api/install.py` | 380 | install domain: game dirs, build/deploy/start jobs, fonts (17 routes) |
+| `src/editor/api/translate.py` | 540 | translation domain: validation, context, rule trace, placeholders, filters, single-row write/patch (14 routes) |
+| `src/editor/api/langs.py` | 334 | language domain: list/progress/new language, placeholder meanings, term exceptions (7 routes) |
+| `src/editor/api/install.py` | 366 | install domain: game dirs, build/deploy/start jobs, fonts (16 routes) |
 
 - Routing becomes table-driven: each module exports `ROUTES = {(method, path): func}`
   and the server merges them into `ROUTER`; `get_api`/`post_api` only look up the
@@ -134,10 +134,19 @@ After the split:
   `/api/patch` (multi-row, existing file order, per-row placeholder checks), and
   `save_all`'s whole-table order check only matters to a caller that holds all 3548
   entries. The route and `save_all` were removed together, route count 42→41;
+- After the standalone translator package was removed, `server.py`'s
+  `TRANSLATOR`/`TRANSLATOR_LANG` constants, its three `if TRANSLATOR` branches,
+  `--translator`/`--translator-lang` and the matching `global` assignment had no
+  consumer left and were deleted (server 539→509);
+- The cleanup also restored `_ATTN_CACHE = {}` in `api/translate.py`: an earlier
+  server-constant cleanup dropped its definition, so `filter=attention` would 500;
+  the unused `PH_MEAN` table was removed at the same time;
+- The 41-route contract for agents is a separate document:
+  [Editor API contract](agent-api.md);
 - The stage-1 `--data` / `--presets-dir` flags remain, and tests run POST against a
   temporary data root.
 
-Status: done. `tests/test_server_api.py` 5 tests (20 GET routes all 200, POST writes
+Status: done. `tests/test_server_api.py` 5 tests (21 GET routes all 200, POST writes
 to the temporary root, real repository file SHAs unchanged); `check.py` 46 tests;
 `engine_text --check` reports "一致" for both zh and ja; pack SHAs match the
 pre-refactoring baseline (zh `2B209420…920F`, ja `17517FB6…FAB`).
