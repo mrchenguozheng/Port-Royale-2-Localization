@@ -728,7 +728,7 @@ async function saveSeed() {
     await api('/api/seed', { lang: S.lang, id: seedId, text: ta.value });
     ta.setAttribute('readonly', '');
     ($('seedSave') as HTMLButtonElement).disabled = true;
-    $('seedLockInfo').textContent = '译文已保存，已重新锁定。工作文本未变。';
+    $('seedLockInfo').textContent = '译文已保存，已重新锁定。引擎文本未变。';
   } catch (err) {
     toast('保存失败：' + (err as Error).message);
   }
