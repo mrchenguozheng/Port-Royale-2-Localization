@@ -203,6 +203,27 @@ src/editor/dist/
 # astro 生成的类型与缓存，每次 build 都会重写。
 src/editor/.astro/
 
-# 注意：仓库现在**没有**第三方 Python 依赖，编辑器后端是纯标准库，
-# 所以不再有 venv，也不再需要它进 .gitignore。上面的 .venv 那一行
-# 是通用 Python 模板留下的，留着无妨。
+# 仓库根的虚拟环境：首次运行由 venv_ensure() 自动创建，
+# 里面装 requirements.txt 里的依赖，不进仓库。
+.venv/
+
+HANDOFF.md
+pip-*/
+test_*.toml
+
+# 从 pr2_loca.cpr 导出的原版字体（纯拉丁，仅作对照，体积大，不进仓库）
+assets/fonts/original/
+# 缝合后的字体是衍生作品（游戏原版字体 + 商业 donor），仅限本地使用，
+# 禁止分发/上传/打包；build/ 本身已忽略，这里再显式标一次。
+build/fonts/
+
+# 本地临时文件（pip 依赖、调试脚本）
+.tmp/
+
+# 分词实验用的额外 venv
+.venv-spacy/
+.venv-hanlp/
+
+# 字体 donor 的个人配置（每个语言一份，路径可能含本机信息），只提交 example
+src/tools/font/fontstitch/presets/
+src/tools/font/fontstitch/presets.toml

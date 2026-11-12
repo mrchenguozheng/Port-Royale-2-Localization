@@ -1,4 +1,4 @@
-﻿// pr2_text_source.cpp -- 引擎取字的接管方（PR2TextSource.dll）
+// pr2_text_source.cpp -- 引擎取字的接管方（PR2TextSource.dll）
 //
 // 职责：接管引擎取字的三条路径，把 PR2Packs\<语言>.txt 里的译文送进去。
 //   1. IAT hook CStringManager::Add —— 引擎注册主串表
@@ -407,6 +407,184 @@ static int PatchIATIn(HMODULE hMod, const char* dllName, const char* funcName, v
 template<typename T>
 void* pmf_to_ptr(T pmf) { void* p; memcpy(&p, &pmf, sizeof(p)); return p; }
 
+// ============ 字体路径记录（只记录，不修改） ============
+// 游戏读字体可能走 fopen / CreateFileA/W；这里只把命中 fonts\ 或 .ttf 的
+// 路径写进 PR2FontPaths.log，用来确认它到底从哪个目录取字体。
+static HANDLE g_fontLog = INVALID_HANDLE_VALUE;
+
+static void font_log_path(const char* path) {
+    if (!path || !*path) return;
+    static int logAll = -1;
+    if (logAll < 0) {
+        char all[8];
+        logAll = GetEnvironmentVariableA("PR2_FONT_LOG_ALL", all, sizeof(all)) > 0;
+    }
+    if (!logAll && !strstr(path, "fonts") && !strstr(path, "fonts\\") &&
+        !strstr(path, ".ttf") && !strstr(path, ".TTF")) return;
+    if (g_fontLog == INVALID_HANDLE_VALUE) return;
+    char line[1200];
+    int n = _snprintf(line, sizeof(line) - 2, "%s\r\n", path);
+    if (n <= 0) return;
+    DWORD wrote = 0;
+    WriteFile(g_fontLog, line, (DWORD)strlen(line), &wrote, NULL);
+}
+
+static void open_font_log(void) {
+    char path[MAX_PATH];
+    if (!GetModuleFileNameA(NULL, path, MAX_PATH)) return;
+    char* p = strrchr(path, '\\');
+    if (p) strcpy(p + 1, "PR2FontPaths.log");
+    g_fontLog = CreateFileA(path, GENERIC_WRITE,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (g_fontLog != INVALID_HANDLE_VALUE) {
+        const char* hdr = "font path log (read-only hook)\r\n";
+        DWORD wrote = 0;
+        WriteFile(g_fontLog, hdr, (DWORD)strlen(hdr), &wrote, NULL);
+    }
+}
+
+/* 可选：把 fonts\X.TTF 重定向到 fonts\<语言>\X.TTF。
+ * 只在 PR2_FONT_DIR 设置时启用，默认不影响任何路径。 */
+static const char* font_dir_env(void) {
+    static char dir[64];
+    static int init = 0;
+    if (!init) {
+        init = 1;
+        if (GetEnvironmentVariableA("PR2_FONT_DIR", dir, sizeof(dir)) == 0) {
+            dir[0] = '\0';
+        }
+    }
+    return dir[0] ? dir : NULL;
+}
+
+static int redirect_font_path(const char* in, char* out, size_t cap) {
+    const char* dir = font_dir_env();
+    if (!dir || !in) return 0;
+    const char* p = in;
+    for (; *p; p++) {
+        if ((p[0] == 'f' || p[0] == 'F') && _strnicmp(p, "fonts", 5) == 0 &&
+            (p[5] == '\\' || p[5] == '/')) break;
+    }
+    if (!*p) return 0;
+    const char* rest = p + 6;
+    size_t dl = strlen(dir);
+    if (_strnicmp(rest, dir, dl) == 0 && (rest[dl] == '\\' || rest[dl] == '/')) {
+        return 0;
+    }
+    const char* ext = strrchr(rest, '.');
+    int isTtf = ext && _stricmp(ext, ".ttf") == 0;
+    if (!isTtf && !strstr(rest, "*.*")) return 0;
+    snprintf(out, cap, "%.*s%.5s%c%s%c%s",
+             (int)(p - in), in, p, p[5], dir, p[5], rest);
+    return 1;
+}
+
+typedef FILE* (__cdecl *FopenFn)(const char*, const char*);
+static FopenFn g_realFopen = NULL;
+
+static FILE* __cdecl MyFopen(const char* path, const char* mode) {
+    char red[1024];
+    const char* use = path;
+    if (redirect_font_path(path, red, sizeof(red))) use = red;
+    font_log_path(use);
+    return g_realFopen(use, mode);
+}
+
+typedef HANDLE (WINAPI *CreateFileAFn)(LPCSTR, DWORD, DWORD,
+    LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
+static CreateFileAFn g_realCreateFileA = NULL;
+
+static HANDLE WINAPI MyCreateFileA(LPCSTR name, DWORD access, DWORD share,
+    LPSECURITY_ATTRIBUTES sa, DWORD create, DWORD flags, HANDLE tmpl) {
+    char red[1024];
+    const char* use = name;
+    if (redirect_font_path(name, red, sizeof(red))) use = red;
+    font_log_path(use);
+    return g_realCreateFileA(use, access, share, sa, create, flags, tmpl);
+}
+
+typedef HANDLE (WINAPI *FindFirstFileAFn)(LPCSTR, LPWIN32_FIND_DATAA);
+static FindFirstFileAFn g_realFindFirstFileA = NULL;
+
+static HANDLE WINAPI MyFindFirstFileA(LPCSTR name, LPWIN32_FIND_DATAA data) {
+    char red[1024];
+    const char* use = name;
+    if (redirect_font_path(name, red, sizeof(red))) use = red;
+    font_log_path(use);
+    return g_realFindFirstFileA(use, data);
+}
+
+typedef BOOL (WINAPI *GetFileAttributesExAFn)(LPCSTR, GET_FILEEX_INFO_LEVELS, LPVOID);
+static GetFileAttributesExAFn g_realGetFileAttributesExA = NULL;
+
+static BOOL WINAPI MyGetFileAttributesExA(LPCSTR name, GET_FILEEX_INFO_LEVELS level, LPVOID info) {
+    char red[1024];
+    const char* use = name;
+    if (redirect_font_path(name, red, sizeof(red))) use = red;
+    font_log_path(use);
+    return g_realGetFileAttributesExA(use, level, info);
+}
+
+typedef HANDLE (WINAPI *CreateFileWFn)(LPCWSTR, DWORD, DWORD,
+    LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE);
+static CreateFileWFn g_realCreateFileW = NULL;
+
+static HANDLE WINAPI MyCreateFileW(LPCWSTR name, DWORD access, DWORD share,
+    LPSECURITY_ATTRIBUTES sa, DWORD create, DWORD flags, HANDLE tmpl) {
+    WCHAR wred[1024];
+    LPCWSTR use = name;
+    if (name) {
+        char buf[1024], red[1024];
+        int n = WideCharToMultiByte(CP_UTF8, 0, name, -1, buf, sizeof(buf), NULL, NULL);
+        if (n > 0) {
+            const char* target = buf;
+            if (redirect_font_path(buf, red, sizeof(red))) target = red;
+            font_log_path(target);
+            if (target != buf) {
+                if (MultiByteToWideChar(CP_UTF8, 0, target, -1, wred,
+                                        (int)(sizeof(wred) / sizeof(WCHAR))) > 0) {
+                    use = wred;
+                }
+            }
+        }
+    }
+    return g_realCreateFileW(use, access, share, sa, create, flags, tmpl);
+}
+
+static int font_log_enabled(void) {
+    static int enabled = -1;
+    if (enabled < 0) {
+        char v[8];
+        enabled = GetEnvironmentVariableA("PR2_FONT_LOG", v, sizeof(v)) > 0
+               || GetEnvironmentVariableA("PR2_FONT_LOG_ALL", v, sizeof(v)) > 0;
+    }
+    return enabled;
+}
+
+static void InstallFontLogHooks(void) {
+    if (!font_log_enabled() && !font_dir_env()) return;
+    if (font_log_enabled() && g_fontLog == INVALID_HANDLE_VALUE) open_font_log();
+    HMODULE mods[256]; DWORD cb = 0;
+    if (!EnumProcessModules(GetCurrentProcess(), mods, sizeof(mods), &cb)) return;
+    DWORD nm = cb / sizeof(HMODULE);
+    if (nm > 256) nm = 256;
+    for (DWORD k = 0; k < nm; k++) {
+        HMODULE m = mods[k];
+        PatchIATIn(m, "msvcr71.dll", "fopen", (void*)MyFopen, (void**)&g_realFopen);
+        PatchIATIn(m, "msvcr70.dll", "fopen", (void*)MyFopen, (void**)&g_realFopen);
+        PatchIATIn(m, "msvcrt.dll", "fopen", (void*)MyFopen, (void**)&g_realFopen);
+        PatchIATIn(m, "KERNEL32.dll", "CreateFileA",
+                   (void*)MyCreateFileA, (void**)&g_realCreateFileA);
+        PatchIATIn(m, "KERNEL32.dll", "CreateFileW",
+                   (void*)MyCreateFileW, (void**)&g_realCreateFileW);
+        PatchIATIn(m, "KERNEL32.dll", "FindFirstFileA",
+                   (void*)MyFindFirstFileA, (void**)&g_realFindFirstFileA);
+        PatchIATIn(m, "KERNEL32.dll", "GetFileAttributesExA",
+                   (void*)MyGetFileAttributesExA, (void**)&g_realGetFileAttributesExA);
+    }
+}
+
 // ============ CScreenStrings::ResolveByHash hook ============
 // A2dLib thunk @0x1DC5 -> real body @0x25C70.
 //   bool __thiscall ResolveByHash(int hashKey, std::wstring& out)
@@ -532,6 +710,7 @@ static void InstallResolveHook(void) {
 
 static void InstallHook(void) {
     if (g_realAdd) return;
+    InstallFontLogHooks();                       // 只记录字体路径
     LoadEditFile();                              // PR2Packs\ language pack
     if (EditLoaded()) {
         char b[160];

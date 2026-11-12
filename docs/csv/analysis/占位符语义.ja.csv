@@ -1,0 +1,46 @@
+﻿hash,参数,当前连接符,建议,依据,英文,中文
+0xca6f7276,2-3,・,,上下文不足,Have you heard that we have finally learned where pirate %1 has his hideout? %2 %3 is looking for a brave hero to destro,海賊 %1 の隠れ家がついに分かったと聞きましたか？ %2・%3 はそれを 壊す勇敢な英雄を 探しています。 やってみませんか？
+0xd390afe5,1-2,・,,上下文不足,%1 %2,%1・%2
+0xd3d6481a,2-3, ,,上下文不足,%1/%2 %3,%1/%2 %3
+0xd7d22330,1-2,・,・,头衔 + 名 + 姓, Governor %1 %2 of the town of %3 has been dismissed.,%3 の町の総督 %1・%2 が解任されました。
+0xd7d22331,3-4,・,,上下文不足,<n>The viceroy of %1 has moved to %2. Governor %3 %4 has been dismissed.,<n>%1 の副王が %2 へ移りました。 総督 %3・%4 は解任されました。
+0xdbcac2b1,2-3,・,,上下文不足,"%1,<n>%2 %3",%1 、<n>%2・%3
+0xde7022fd,1-2, , ,等级 + 全名,"%1 %2 has destroyed the hideout of the pirate %3. Unfortunately, several ships have escaped. They will probably set up a",%1 %2 が海賊 %3 の隠れ家を 破壊しました。 あいにく数隻の船が 逃げ延びています。 おそらく新しい隠れ家を 構えるでしょう。
+0xde7022fe,1-2, , ,等级 + 全名,%1 %2 has destroyed the hideout of the pirate %3. None of the ships managed to escape.,%1 %2 が海賊 %3 の隠れ家を 破壊しました。 逃げ延びた船は 一隻も ありません。
+0xe23f403a,1-2, , ,等级 + 名（%3 才是姓）,%1 %2 %3 tries his luck in the English town of %4.,%1 %2・%3 はイングランドの町 %4 で運試しを しています。
+0xe23f403b,1-2, , ,等级 + 名（%3 才是姓）,%1 %2 %3 tries his luck in the French town of %4.,%1 %2・%3 はフランスの町 %4 で運試しを しています。
+0xe23f403c,1-2, , ,等级 + 名（%3 才是姓）,%1 %2 %3 tries his luck in the Dutch town of %4.,%1 %2・%3 はオランダの町 %4 で運試しを しています。
+0xe23f403d,1-2, , ,等级 + 名（%3 才是姓）,%1 %2 %3 tries his luck in the Spanish town of %4.,%1 %2・%3 はスペインの町 %4 で運試しを しています。
+0xe2cb2041,1-2,・,,上下文不足,%1 %2,%1・%2
+0xe329d4c5,1-2, , ,等级 + 全名,%1 %2  +  %3 %4  +  %5 %6  =  %7,%1 %2  +  %3 %4  +  %5 %6  =  %7
+0xe329d4c5,3-4, ,,上下文不足,%1 %2  +  %3 %4  +  %5 %6  =  %7,%1 %2  +  %3 %4  +  %5 %6  =  %7
+0xe329d4c5,5-6, ,,上下文不足,%1 %2  +  %3 %4  +  %5 %6  =  %7,%1 %2  +  %3 %4  +  %5 %6  =  %7
+0xe7270933,1-2,  ,,上下文不足,<gs:TEXTFLUSS_KEINEHOEHE>%1  %2,<gs:TEXTFLUSS_KEINEHOEHE>%1  %2
+0xe78a6f65,1-2,・,,上下文不足,%1 %2,%1・%2
+0xfc7ddb7d,1-2,・,,上下文不足,%1 %2,%1・%2
+0xfe6eb6fe,1-2,・,,上下文不足,%1 %2,%1・%2
+0xffdc2433,1-2,  ,,上下文不足,<c>%1  %2,<c>%1  %2
+0x08b186ef,2-3,   ,,上下文不足,<r>%1<n>%2   %3,<r>%1<n>%2   %3
+0x08d29537,1-2,・,,上下文不足,%1 %2,%1・%2
+0x0fea19b1,1-2,・,,上下文不足,"Today, %1 %2 captured the town of %4 for %3. %5 now has %6 towns in the New World, while %7 has only %8 towns.",本日、 %1・%2 が %3 のために %4 の町を 占領しました。 %5 は新世界に %6 の町を 持ち、 %7 は %8 の町しか 持っていません。
+0x0fea19b2,1-2,・,,上下文不足,"Today, %1 %2 captured the town of %4 for %3. %5 now has %6 towns in the New World, while %7 is only represented by a sin",本日、 %1・%2 が %3 のために %4 の町を 占領しました。 %5 は新世界に %6 の町を 持つことに なり、 %7 は新世界に ただ一つの町しか 持たなくなっています。
+0x11874def,1-2,・,,上下文不足,%1 %2,%1・%2
+0x13009885,1-2,・,,上下文不足,%1 %2,%1・%2
+0x16656b80,1-2, ,,上下文不足,%1 %2<g:scripts/intext_herz_800x600.screen>,%1 %2<g:scripts/intext_herz_800x600.screen>
+0x170f1419,1-2, , ,等级 + 全名,%1 %2 has broken through the town's harbor defenses and looted the town.,%1 %2 が町の港の防備を 突破して略奪しました。
+0x1813d72e,2-1,,,上下文不足,%1. %2,%2%1日
+0x18c8a515,1-2, , ,等级 + 全名,%1 %2 receives the town of %3 from the English viceroy.,%1 %2 がイングランド副王から %3 の町を 受け取りました。
+0x18c8a516,1-2, , ,等级 + 全名,%1 %2 receives the town of %3 from the French viceroy.,%1 %2 がフランス副王から %3 の町を 受け取りました。
+0x18c8a517,1-2, , ,等级 + 全名,%1 %2 receives the town of %3 from the Dutch viceroy.,%1 %2 がオランダ副王から %3 の町を 受け取りました。
+0x18c8a518,1-2, , ,等级 + 全名,%1 %2 receives the town of %3 from the Spanish viceroy.,%1 %2 がスペイン副王から %3 の町を 受け取りました。
+0x1ac38a65,2-1,,,上下文不足,%1. %2. %3,%3年%2%1日
+0x200d4e11,1-2, , ,等级 + 名（%3 才是姓）,%1 %2 %3,%1 %2・%3
+0x22caa09f,2-1,,,上下文不足,%1. %2 %3,%3年%2%1日
+0x2875b307,1-2, , ,等级 + 全名,%1 %2 has destroyed a convoy belonging to the pirate %3.,%1 %2 が海賊 %3 の船団を 撃破しました。
+0x28b1f98d,1-2, , ,等级 + 全名,%1 %2 You also have a permit to erect buildings and establish businesses in %3 and you already own a warehouse in the to,%1 %2 また %3 で建物を 建て事業を 興す許可を 持ち、 町にはすでに倉庫が あります。<n><n>若く経験が 浅いため、 階級は 甲板見習いに とどまっています。 ですからまだ多くの船団を 指揮したり、 他の町で 建築許可を 追加
+0x2d0cff4f,1-2, , ,等级 + 全名,%1 %2 has broken through the town's land defenses and looted the town.,%1 %2 が町の陸の防備を 突破して略奪しました。
+0x2ef8f665,3-4,,,上下文不足,"Welcome to %1,<n><n>I'd like to give you some words of advice to enable you to find your way in the region around %2 mor",%1 へようこそ。<n><n>%2 周辺を 早く知り、 わが国のこの町と 他の町の発展を 助けられるよう、 いくつか助言しておきます。<n>総督の町の基本は ご存じでしょう。 ヨーロッパへ 輸出する植民地物資を 絶えず供給する必要が ありま
+0x319f6d80,1-2, , ,等级 + 全名,%1 %2 has attacked the town but could not breach the defenses.,%1 %2 が町を 攻撃しましたが、 防備を 破れませんでした。
+0x338a357f,1-2, , ,等级 + 全名,%1 %2 buys a permit to construct buildings in %3.,%1 %2 が %3 で建築許可を 買いました。
+0x34d0f9eb,2-1,,,上下文不足,%1.%2.%3,%3年%2%1日
+0x3998d524,1-2, ,,上下文不足,<gs:TEXTFLUSS_KEINEHOEHE>%1 %2,<gs:TEXTFLUSS_KEINEHOEHE>%1 %2

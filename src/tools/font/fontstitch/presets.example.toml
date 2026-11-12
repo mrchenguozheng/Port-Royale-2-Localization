@@ -1,0 +1,48 @@
+# 字体 donor 示例（复制成 presets/<语言>.toml 后按语种改）
+# 结构与其他语言一致：[[pair]] 主 donor，[[supplement]] 缺口补充，[fallback] 兜底。
+
+[[pair]]
+id = "arial"
+game = "Arial"
+game_file = "ARIAL.TTF"
+donor = "微软雅黑"
+donor_file = "%WINDIR%\\Fonts\\msyh.ttc"
+donor_index = 0
+note = "2048 UPM 与 Arial 一致，正文/UI 最清晰"
+
+[[pair]]
+id = "elgreco"
+game = "ElGreco"
+game_file = "ELGRECO_.TTF"
+donor = "钟齐志莽行书"
+donor_file = "%LOCALAPPDATA%\\Microsoft\\Windows\\Fonts\\ZhiMangXing-Regular.ttf"
+note = "连笔花体 + 毛笔行书，配装饰标题"
+
+[[pair]]
+id = "tiepolo-black"
+game = "Tiepolo-Black"
+game_file = "Tiepolo_black.ttf"
+donor = "思源宋体 Heavy"
+donor_file = "%WINDIR%\\Fonts\\Source Han Serif SC Heavy (TrueType).ttf"
+note = "字重最匹配；思源 Heavy 是子集，生僻字可能缺"
+
+[[pair]]
+id = "tiepolo-bold"
+game = "Tiepolo-Bold"
+game_file = "Tiepolo_bold.ttf"
+donor = "华文中宋"
+donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
+note = "覆盖最全，最稳"
+
+[[supplement]]
+game_file = "ELGRECO_.TTF"
+donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
+note = "行书缺字用宋体补"
+
+[[supplement]]
+game_file = "Tiepolo_black.ttf"
+donor_file = "%WINDIR%\\Fonts\\STZHONGS.TTF"
+note = "思源 Heavy 缺字用宋体补"
+
+[fallback]
+donor_file = "%WINDIR%\\Fonts\\NotoSansJP-VF.ttf"

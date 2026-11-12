@@ -15,7 +15,7 @@ for %%i in ("%ROOT%") do set "ROOT=%%~fi"
 call "%ROOT%\src\find_python.bat"
 if not defined PY goto :nopython
 
-start "" %PY% "%~dp0server.py"
+start "" %PY% "%~dp0server.py" --restart
 endlocal
 exit /b 0
 

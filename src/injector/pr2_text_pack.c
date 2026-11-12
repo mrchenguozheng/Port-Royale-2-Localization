@@ -37,6 +37,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "pr2_locale.h"
+
 /* ED_MAX: 每条译文的 UTF-16 单元数上限（不含结尾 '\0'）。
  * 实测全量 3548 条里最长的是 1061，有两倍余量。**不要下调**。
  * ED_LINES: 语言包条数上限。3548 条占 ED_LINES 的 21.6%，
@@ -127,36 +129,6 @@ static void AddEdit(unsigned h, const char* utf8) {
     g_editN++;
 }
 
-/* ---------------- tiny INI reader ---------------- */
-static char* IniGet(char* buf, const char* key) {
-    char*  line = buf;
-    size_t klen = strlen(key);
-    while (line && *line) {
-        char* eol = strpbrk(line, "\r\n");
-        char* s = line;
-        if (eol) *eol = 0;
-        while (*s == ' ' || *s == '\t') s++;
-        if (*s != '#' && *s != ';' && strncmp(s, key, klen) == 0) {
-            char* v = s + klen;
-            while (*v == ' ' || *v == '\t') v++;
-            if (*v == '=') {
-                v++;
-                while (*v == ' ' || *v == '\t') v++;
-                return v;
-            }
-        }
-        line = eol ? eol + 1 : NULL;
-    }
-    return NULL;
-}
-
-static void TrimCopy(char* dst, size_t cap, const char* src) {
-    char* e;
-    lstrcpynA(dst, src, (int)cap);
-    e = strpbrk(dst, " \t\r\n");
-    if (e) *e = 0;
-}
-
 /* ---------------- parse "hash = text" file ---------------- */
 static void LoadOverrideFile(const char* path) {
     HANDLE h;
@@ -211,6 +183,19 @@ static void LoadOverrideFile(const char* path) {
     HeapFree(GetProcessHeap(), 0, buf);
 }
 
+/* 去首尾空白后复制（语言代码很短，够用）。 */
+static void TrimCopy(char* dst, size_t cap, const char* src) {
+    const char* p = src;
+    while (*p == ' ' || *p == '\t') p++;
+    const char* e = p + strlen(p);
+    while (e > p && (e[-1] == ' ' || e[-1] == '\t' ||
+                     e[-1] == '\r' || e[-1] == '\n')) e--;
+    size_t n = (size_t)(e - p);
+    if (n >= cap) n = cap ? cap - 1 : 0;
+    if (n) memcpy(dst, p, n);
+    if (cap) dst[n] = 0;
+}
+
 /* 读locale.ini 定语言，然后载入对应的语言包。
  *
  * 语言代码的优先级：
@@ -228,12 +213,7 @@ static void LoadOverrideFile(const char* path) {
 void LoadEditFile(void) {
     char   exe[MAX_PATH];
     char*  q;
-    char   ini[MAX_PATH];
     char   fp[MAX_PATH];
-    HANDLE hf;
-    DWORD  sz, rd = 0;
-    char*  ibuf;
-    char*  v;
 
     if (!GetModuleFileNameA(NULL, exe, MAX_PATH)) return;
     q = strrchr(exe, '\\');
@@ -242,8 +222,6 @@ void LoadEditFile(void) {
 
     lstrcpynA(g_locDir, exe, MAX_PATH);
     lstrcatA(g_locDir, "\\PR2Packs");
-    lstrcpynA(ini, g_locDir, MAX_PATH);
-    lstrcatA(ini, "\\locale.ini");
 
     /* Fallback when neither the env var nor locale.ini names a language.
      * This must name a file that really exists in PR2Packs\ -- an older
@@ -268,22 +246,9 @@ void LoadEditFile(void) {
 
     /* 2. locale.ini -- only when step 1 did not decide. */
     if (!g_envLang) {
-        hf = CreateFileA(ini, GENERIC_READ, FILE_SHARE_READ, NULL,
-                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hf != INVALID_HANDLE_VALUE) {
-            sz = GetFileSize(hf, NULL);
-            if (sz > 0 && sz < 65536) {
-                ibuf = (char*)HeapAlloc(GetProcessHeap(), 0, sz + 8);
-                if (ibuf) {
-                    if (ReadFile(hf, ibuf, sz, &rd, NULL)) {
-                        ibuf[rd] = 0;
-                        v = IniGet(ibuf, "language");
-                        if (v && *v) TrimCopy(g_locale, LOC_MAX, v);
-                    }
-                    HeapFree(GetProcessHeap(), 0, ibuf);
-                }
-            }
-            CloseHandle(hf);
+        char code[LOC_MAX];
+        if (pr2_read_locale_language(exe, code, sizeof(code))) {
+            TrimCopy(g_locale, LOC_MAX, code);
         }
     }
 

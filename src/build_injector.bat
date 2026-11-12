@@ -104,10 +104,19 @@ cl /nologo /MT /Ox /W3 /utf-8 /wd4819 /D_CRT_SECURE_NO_WARNINGS ^
 if errorlevel 1 goto :fail
 
 echo.
+echo [build] Compiling PR2LauncherGUI.exe ...
+cl /nologo /MT /Ox /W3 /utf-8 /wd4819 /D_CRT_SECURE_NO_WARNINGS ^
+   pr2_launcher_gui.cpp ^
+   /Fe:PR2LauncherGUI.exe /link /OUT:PR2LauncherGUI.exe /SUBSYSTEM:WINDOWS user32.lib gdi32.lib
+if errorlevel 1 goto :fail
+
+echo.
 REM cl runs with cwd = src\injector, so the output lands there.
 REM Move it to the repo-root build\ folder, next to PR2Packs\.
 move /Y "%SRC%PR2TextSource.dll" "%ROOT%PR2TextSource.dll" >nul
 move /Y "%SRC%PR2Launcher.exe" "%ROOT%PR2Launcher.exe" >nul
+move /Y "%SRC%PR2LauncherGUI.exe" "%ROOT%PR2LauncherGUI.exe" >nul
+if exist "%SRC%ui" xcopy /E /I /Y "%SRC%ui" "%ROOT%ui" >nul
 del /Q "%SRC%*.obj" >nul 2>&1
 
 echo.

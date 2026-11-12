@@ -11,8 +11,14 @@
  *                  不带这个参数时行为与从前完全一样。
  */
 #include <windows.h>
+#include <wincrypt.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "pr2_fonts.h"
+#include "pr2_locale.h"
+#include "pr2_version.h"
+#pragma comment(lib, "advapi32.lib")
 
 /* 源文件是 UTF-8（cl 用 /utf-8 编译），所以 printf 送出去的是 UTF-8 字节。
  * 控制台默认代码页是 936，直接 printf 会显示成乱码，必须先切到 UTF-8。 */
@@ -28,6 +34,151 @@ static void SiblingPath(char* out, const char* self, const char* name) {
     if (p) strcpy(p + 1, name);
     else strcpy(tmp, name);
     strcpy(out, tmp);
+}
+
+static void DirOf(const char* path, char* out) {
+    strcpy(out, path);
+    char* p = strrchr(out, '\\');
+    if (p) *p = '\0';
+    else strcpy(out, ".");
+}
+
+/* 把 fonts\<语言>\*.ttf 复制到 fonts\ 根目录，供游戏按固定文件名加载。
+ * 发行包只放子目录；启动器在 CreateProcess 之前做这一步。 */
+static int CopyFontSet(const char* self, const char* lang) {
+    char root[MAX_PATH], langDir[MAX_PATH], pattern[MAX_PATH], dstDir[MAX_PATH];
+    DirOf(self, root);
+    snprintf(langDir, sizeof(langDir), "%s\\fonts\\%s", root, lang);
+    if (GetFileAttributesA(langDir) == INVALID_FILE_ATTRIBUTES) return 0;
+    snprintf(dstDir, sizeof(dstDir), "%s\\fonts", root);
+
+    snprintf(pattern, sizeof(pattern), "%s\\*.ttf", langDir);
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+
+    int copied = 0;
+    do {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        char src[MAX_PATH], dst[MAX_PATH];
+        snprintf(src, sizeof(src), "%s\\%s", langDir, fd.cFileName);
+        snprintf(dst, sizeof(dst), "%s\\%s", dstDir, fd.cFileName);
+        if (CopyFileA(src, dst, FALSE)) {
+            copied++;
+        } else {
+            printf("[PR2Launch] 字体复制失败: %s (错误 %lu)\n", src, GetLastError());
+        }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    if (copied) {
+        printf("[PR2Launch] 已切换字体: fonts\\%s\\ (%d 个 TTF)\n", lang, copied);
+    }
+    return copied;
+}
+
+/* 原版字体备份：只在第一次替换前做一次，且只认已知的原版大小。
+ * 这样即使用户已经用 Noto 覆盖过根目录，也不会把 Noto 误存成原版。 */
+static const DWORD ORIG_FONT_SIZES[4] = {
+    296712, 65680, 52876, 53120
+};
+static const char* ORIG_FONT_HASHES[4] = {
+    "1906a771ed879a5de75a3ff552fbad533827fe7b39e18319ce9d9ae134c346c7",
+    "f3715e59051796963fc6569d85c16b9abfd6eaf949bcc8a9578c1fe0a423acf9",
+    "267f1a2de1c1e738202ca31008c587e045d25268c93662d8fd80b79615d314e7",
+    "fd10e52dd5040de4fc00e09919b5e5e360039360deff5bfc2219ffa61061c465"
+};
+
+static int FileSha256(const char* path, char out[65]) {
+    HANDLE f = CreateFileA(path, GENERIC_READ,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (f == INVALID_HANDLE_VALUE) return 0;
+    HCRYPTPROV prov = 0;
+    HCRYPTHASH hash = 0;
+    BYTE digest[32];
+    DWORD dlen = sizeof(digest);
+    int ok = 0;
+    if (CryptAcquireContextA(&prov, NULL, NULL, PROV_RSA_AES, CRYPT_VERIFYCONTEXT)) {
+        if (CryptCreateHash(prov, CALG_SHA_256, 0, 0, &hash)) {
+            BYTE buf[65536];
+            DWORD got = 0;
+            while (ReadFile(f, buf, sizeof(buf), &got, NULL) && got > 0) {
+                if (!CryptHashData(hash, buf, got, 0)) break;
+            }
+            if (CryptGetHashParam(hash, HP_HASHVAL, digest, &dlen, 0)) {
+                for (DWORD i = 0; i < dlen; i++) sprintf(out + i * 2, "%02x", digest[i]);
+                out[dlen * 2] = 0;
+                ok = 1;
+            }
+            CryptDestroyHash(hash);
+        }
+        CryptReleaseContext(prov, 0);
+    }
+    CloseHandle(f);
+    return ok;
+}
+
+static DWORD FileSizeOf(const char* path) {
+    WIN32_FILE_ATTRIBUTE_DATA d;
+    if (!GetFileAttributesExA(path, GetFileExInfoStandard, &d)) return 0xFFFFFFFF;
+    if (d.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) return 0xFFFFFFFF;
+    return d.nFileSizeLow;
+}
+
+static int LooksLikeOriginalFonts(const char* root) {
+    for (int i = 0; i < PR2_FONT_COUNT; i++) {
+        char p[MAX_PATH], hex[65];
+        snprintf(p, sizeof(p), "%s\\fonts\\%s", root, PR2_FONT_NAMES[i]);
+        if (FileSizeOf(p) != ORIG_FONT_SIZES[i]) return 0;
+        if (!FileSha256(p, hex) || _stricmp(hex, ORIG_FONT_HASHES[i]) != 0) {
+            printf("[PR2Launch] 字体大小像原版但 SHA-256 不匹配，跳过备份: %s\n",
+                   PR2_FONT_NAMES[i]);
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static void BackupOriginalFonts(const char* self) {
+    char root[MAX_PATH], bak[MAX_PATH];
+    DirOf(self, root);
+    snprintf(bak, sizeof(bak), "%s\\fonts\\_original", root);
+    if (GetFileAttributesA(bak) != INVALID_FILE_ATTRIBUTES) return;
+    if (!LooksLikeOriginalFonts(root)) {
+        printf("[PR2Launch] fonts 根目录不是原版字体，跳过原版备份\n");
+        return;
+    }
+    CreateDirectoryA(bak, NULL);
+    int n = 0;
+    for (int i = 0; i < PR2_FONT_COUNT; i++) {
+        char src[MAX_PATH], dst[MAX_PATH];
+        snprintf(src, sizeof(src), "%s\\fonts\\%s", root, PR2_FONT_NAMES[i]);
+        snprintf(dst, sizeof(dst), "%s\\%s", bak, PR2_FONT_NAMES[i]);
+        if (CopyFileA(src, dst, FALSE)) n++;
+    }
+    if (n == 4) printf("[PR2Launch] 已备份原版字体: fonts\\_original\\\n");
+    else printf("[PR2Launch] 原版字体备份不完整（%d/4）\n", n);
+}
+
+static int RestoreOriginalFonts(const char* self) {
+    char root[MAX_PATH], bak[MAX_PATH];
+    DirOf(self, root);
+    snprintf(bak, sizeof(bak), "%s\\fonts\\_original", root);
+    if (GetFileAttributesA(bak) == INVALID_FILE_ATTRIBUTES) return 0;
+    int n = 0;
+    for (int i = 0; i < PR2_FONT_COUNT; i++) {
+        char src[MAX_PATH], dst[MAX_PATH], hex[65];
+        snprintf(src, sizeof(src), "%s\\%s", bak, PR2_FONT_NAMES[i]);
+        snprintf(dst, sizeof(dst), "%s\\fonts\\%s", root, PR2_FONT_NAMES[i]);
+        if (!FileSha256(src, hex) || _stricmp(hex, ORIG_FONT_HASHES[i]) != 0) {
+            printf("[PR2Launch] 原版备份哈希不匹配，拒绝恢复: %s\n",
+                   PR2_FONT_NAMES[i]);
+            continue;
+        }
+        if (CopyFileA(src, dst, FALSE)) n++;
+    }
+    if (n) printf("[PR2Launch] 已恢复原版字体 (%d/4)\n", n);
+    return n;
 }
 
 /* 语言代码只允许字母数字、连字符和下划线，且不能是 "." 或 ".." —— 它要
@@ -57,6 +208,7 @@ int main(int argc, char** argv) {
     char self[MAX_PATH];
     int  i;
     const char* lang = NULL;
+    int vanilla = 0;
 
     UseUtf8Console();
     GetModuleFileNameA(NULL, self, MAX_PATH);
@@ -66,12 +218,15 @@ int main(int argc, char** argv) {
     for (i = 1; i < argc; i++) {
         if (strncmp(argv[i], "--lang=", 7) == 0) {
             lang = argv[i] + 7;
+        } else if (strcmp(argv[i], "--vanilla") == 0) {
+            vanilla = 1;
+
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            printf("[PR2Launch] 用法: %s [--lang=<代码>]\n", "PR2Launcher.exe");
-            printf("[PR2Launch]   --lang  这一次启动用哪个语言包，\n");
-            printf("[PR2Launch]           覆盖 PR2Packs\\locale.ini 的 language=。\n");
-            printf("[PR2Launch]           不带这个参数就用 locale.ini 里的语言。\n");
-            return 0;
+            printf("[PR2Launch] 用法: %s [--lang=<代码>] [--vanilla]\n", "PR2Launcher.exe");
+            printf("[PR2Launch]   --lang     这一次启动用哪个语言包，\n");
+            printf("[PR2Launch]              优先于 PR2Packs\\locale.ini 的 language=，不写文件。\n");
+            printf("[PR2Launch]   --vanilla  恢复原版字体后直接启动 PR2.exe，不注入。\n");
+                        return 0;
         }
     }
     if (lang && !ValidLangCode(lang)) {
@@ -90,9 +245,66 @@ int main(int argc, char** argv) {
         printf("[PR2Launch] 同目录下找不到 PR2.exe: %s\n", exePath);
         return 1;
     }
+
+    BackupOriginalFonts(self);
+
+    if (vanilla) {
+        RestoreOriginalFonts(self);
+        STARTUPINFOA vsi = {0}; vsi.cb = sizeof(vsi);
+        PROCESS_INFORMATION vpi = {0};
+        char vdir[MAX_PATH];
+        DirOf(self, vdir);
+        if (!CreateProcessA(exePath, NULL, NULL, NULL, FALSE, 0, NULL, vdir,
+                            &vsi, &vpi)) {
+            printf("[PR2Launch] 启动原版 PR2.exe 失败 (错误 %lu)\n", GetLastError());
+            return 1;
+        }
+        CloseHandle(vpi.hThread);
+        CloseHandle(vpi.hProcess);
+        printf("[PR2Launch] 已恢复原版字体，启动原版 PR2.exe（未注入）\n");
+        return 0;
+    }
+
     if (GetFileAttributesA(dllPath) == INVALID_FILE_ATTRIBUTES) {
         printf("[PR2Launch] 同目录下找不到 PR2TextSource.dll: %s\n", dllPath);
         return 1;
+    }
+
+    /* 字体不覆盖根目录：原版字体留在 fonts\，本地化字体在 fonts\<语言>\。
+     * 通过 PR2_FONT_DIR 让 DLL 把 fonts\X.TTF 重定向到 fonts\<语言>\X.TTF。 */
+    char gameDir[MAX_PATH];
+    DirOf(self, gameDir);
+    {
+        char localeLang[64];
+        const char* fontLang = lang;
+        if (!fontLang && pr2_read_locale_language(gameDir, localeLang, sizeof(localeLang))) {
+            fontLang = localeLang;
+        }
+        if (fontLang && ValidLangCode(fontLang) &&
+            !pr2_pack_runtime_ok(gameDir, fontLang)) {
+            printf("[PR2Launch] 语言包 %s 需要运行时 v%d，当前 v%d，拒绝启动\n",
+                   fontLang, pr2_pack_min_runtime(gameDir, fontLang),
+                   PR2_RUNTIME_VERSION);
+            return 1;
+        }
+        char langDir[MAX_PATH];
+        if (fontLang && ValidLangCode(fontLang)) {
+            snprintf(langDir, sizeof(langDir), "%s\\fonts\\%s", gameDir, fontLang);
+        } else {
+            langDir[0] = 0;
+        }
+        if (langDir[0] &&
+            GetFileAttributesA(langDir) != INVALID_FILE_ATTRIBUTES &&
+            pr2_language_fonts_complete(gameDir, fontLang)) {
+            SetEnvironmentVariableA("PR2_FONT_DIR", fontLang);
+            printf("[PR2Launch] 字体使用 fonts\\%s\\（不覆盖原版）\n", fontLang);
+        } else {
+            SetEnvironmentVariableA("PR2_FONT_DIR", NULL);
+            if (langDir[0] && GetFileAttributesA(langDir) != INVALID_FILE_ATTRIBUTES) {
+                printf("[PR2Launch] fonts\\%s\\ 字体不完整，回退到原版根目录字体\n",
+                       fontLang);
+            }
+        }
     }
 
     /* 传给子进程：下面 CreateProcessA 的环境参数是 NULL，意思是
@@ -100,12 +312,13 @@ int main(int argc, char** argv) {
      * LoadEditFile() 里读它，读不到就退回 locale.ini。 */
     if (lang) {
         SetEnvironmentVariableA("PR2_PACK_LANG", lang);
-        printf("[PR2Launch] 本次使用语言包: %s.txt (覆盖 locale.ini)\n", lang);
+        printf("[PR2Launch] 本次使用语言包: %s.txt (优先于 locale.ini，本次启动生效)\n", lang);
     }
 
     STARTUPINFOA si = {0}; si.cb = sizeof(si);
     PROCESS_INFORMATION pi = {0};
-    if (!CreateProcessA(exePath, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi)) {
+    if (!CreateProcessA(exePath, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED,
+                        NULL, gameDir, &si, &pi)) {
         printf("[PR2Launch] 启动 PR2.exe 失败 (错误 %lu)\n", GetLastError());
         return 1;
     }
