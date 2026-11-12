@@ -92,8 +92,7 @@ src/translations/
 ├─ zh.toml                Chinese translation (the only hand-edited layer, no layout spaces)
 └─ ja.toml                Japanese translation (the only hand-edited layer, no layout spaces)
 src/data/
-├─ placeholder_roles/     placeholder semantics rules (hand-maintained, not generated)
-└─ keep_original.toml     "keep as-is" list (optional; built-in entries are used when absent)
+└─ placeholder_roles/     placeholder semantics rules (hand-maintained, not generated)
 src/orig/
 ├─ en.gog_1.1.2.3.toml    English original, the baseline (id order follows it)
 ├─ fr.gog_1.1.2.42.toml   French original

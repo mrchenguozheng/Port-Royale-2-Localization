@@ -705,16 +705,16 @@ async function openSeed(id: string) {
     ta.setAttribute('readonly', '');
     ($('seedSave') as HTMLButtonElement).disabled = true;
     $('seedLockInfo').textContent =
-      '初版默认锁定。解锁后只能改这一条，保存或关闭后重新锁定。';
+      '已保存译文默认锁定。解锁后只能改这一条，保存或关闭后重新锁定。';
     ($('seedModal') as any).show?.();
     ta.focus();
   } catch (err) {
-    toast('读取初版失败：' + (err as Error).message);
+    toast('读取已保存译文失败：' + (err as Error).message);
   }
 }
 
 async function unlockSeed() {
-  if (!window.confirm('只解锁这一条的初版，且仅本次修改有效。继续？')) return;
+  if (!window.confirm('只解锁这一条的已保存译文，且仅本次修改有效。继续？')) return;
   const ta = $('seedText') as HTMLTextAreaElement;
   ta.removeAttribute('readonly');
   ($('seedSave') as HTMLButtonElement).disabled = false;
@@ -728,7 +728,7 @@ async function saveSeed() {
     await api('/api/seed', { lang: S.lang, id: seedId, text: ta.value });
     ta.setAttribute('readonly', '');
     ($('seedSave') as HTMLButtonElement).disabled = true;
-    $('seedLockInfo').textContent = '初版已保存，已重新锁定。工作文本未变。';
+    $('seedLockInfo').textContent = '译文已保存，已重新锁定。工作文本未变。';
   } catch (err) {
     toast('保存失败：' + (err as Error).message);
   }
@@ -851,7 +851,7 @@ async function loadEntryInfo(id: string) {
       if (sb && ed) sb.classList.toggle('diff', norm(ed.textContent || '') !== norm(sd.text));
     } catch {
       const body = document.querySelector('.seed-inline .seed-body');
-      if (body) body.textContent = '（没有初版）';
+      if (body) body.textContent = '（没有已保存译文）';
     }
 
     const extraSp = r.extra_spaces || 0;
@@ -920,14 +920,14 @@ function rowOf(e: Entry): HTMLElement {
 
   const compare = el('div', 'compare');
 
-  // 左栏：初版、原文 A、原文 B；右栏：译文编辑
+  // 左栏：已保存译文、原文 A、原文 B；右栏：译文编辑
   const left = el('div', 'col-src');
 
   const seedBox = el('div', 'seed-inline ref-block');
   const seedHead = el('div', 'ref-head');
-  seedHead.appendChild(el('span', 'ref-label', '初版'));
+  seedHead.appendChild(el('span', 'ref-label', '已保存译文'));
   const seedCopy = el('button', 'mini seed-edit', '复制到译文');
-  seedCopy.title = '用初版覆盖编辑框（可撤销）';
+  seedCopy.title = '用已保存译文覆盖编辑框（可撤销）';
   seedCopy.addEventListener('click', () => void copySeed(e.id));
   seedHead.appendChild(seedCopy);
   const seedEdit = el('button', 'mini seed-edit', '解锁编辑');

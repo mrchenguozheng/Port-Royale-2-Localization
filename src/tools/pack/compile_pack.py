@@ -91,23 +91,11 @@ RE_PIPE_BREAK = re.compile(r"(?<!<)\s*\|\s*(?!>)")
 
 
 #: 必须原样保留英文的条目：法律声明、内部编号、纯符号/数字。
-#: 清单在 src\data\keep_original.toml（可选；不存在时只用下面的内置条目），
-#: 编译时强制写英文原文。
-KEEP_ORIGINAL = {}
-
-
-def load_keep_original():
-    """读 keep_original.toml，返回 {id: 分组名}。"""
-    import tomllib
-    path = os.path.join(SRC, "data", "keep_original.toml")
-    if not os.path.isfile(path):
-        return {"0xfc512ea5": "版权声明"}
-    data = tomllib.load(open(path, "rb"))
-    out = {}
-    for group, val in data.items():
-        for k in (val.get("ids") or []):
-            out[k.lower()] = group
-    return out
+#: 编译时强制写英文原文，译文写成什么都会被覆盖并打警告。
+#: 以后要加条目（其它第三方声明、商标行）直接往这里加 hash。
+KEEP_ORIGINAL = {
+    "0xfc512ea5": "版权声明",
+}
 
 
 def to_engine(txt):
@@ -200,7 +188,6 @@ def build(lang, out_dir, strict):
     errors, warnings = [], []
 
     os.makedirs(out_dir, exist_ok=True)
-    KEEP_ORIGINAL.update(load_keep_original())
     path = os.path.join(out_dir, "%s.txt" % lang)
     lines = []
     meta = load_pack_meta(lang)

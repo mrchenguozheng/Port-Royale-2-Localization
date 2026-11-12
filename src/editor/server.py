@@ -555,13 +555,13 @@ def context_of(hid, lang):
 
     cat = "通用文本"
     try:
-        ko = C.load_keep_original()
+        ko = C.KEEP_ORIGINAL
     except Exception:
         ko = {}
     group = ko.get(hid) or ko.get(hid.lower())
     if group:
         cat = "原样保留：%s" % group
-        reasons.append("在 keep_original 清单里，编译时强制输出英文原文")
+        reasons.append("在 KEEP_ORIGINAL 清单里，编译时强制输出英文原文")
     elif not zh:
         cat = "空译文"
         reasons.append("这条还没有译文，游戏里会显示英文")
@@ -1177,7 +1177,7 @@ class Handler(BaseHTTPRequestHandler):
             lang = (query.get("lang") or ["zh"])[0]
             data = rule_hits(hid, lang)
             if data is None:
-                return self.send_json({"detail": "没有初版或条目"}, 404)
+                return self.send_json({"detail": "没有译文或条目"}, 404)
             return self.send_json(data)
 
 
@@ -1186,7 +1186,7 @@ class Handler(BaseHTTPRequestHandler):
             lang = (query.get("lang") or ["zh"])[0]
             stages = rule_trace(hid, lang)
             if stages is None:
-                return self.send_json({"detail": "没有初版或条目"}, 404)
+                return self.send_json({"detail": "没有译文或条目"}, 404)
             return self.send_json({"id": hid, "stages": stages})
 
         if path == "/api/seed":

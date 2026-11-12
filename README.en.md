@@ -182,10 +182,11 @@ See [LICENSE](LICENSE).
 | Japanese `ja` | 3548 | ✅ Complete (3370 translations + 178 keep-original) |
 | English/French | 3548 | Reference originals (`src/orig/`), no packs generated |
 
-Japanese "keep original" means 178 entries that should not be translated:
-symbols/numbers, engine IDs (`IDM_CONTEST_…`), key names (`ESC`/`CTRL`/`F10`),
-copyright notices and developer names. The list is in
-`src/data/keep_original.toml`; the compiler forces the English original back.
+Japanese "keep original" means the 178 entries that should not be translated and stay
+identical to the English: symbols/numbers, engine IDs (`IDM_CONTEST_…`), key names
+(`ESC`/`CTRL`/`F10`), copyright notices and developer names. Only the entries in the
+`KEEP_ORIGINAL` table of `compile_pack.py` (currently the copyright notice) are forced
+back to English at compile time.
 
 ## Path conventions
 
