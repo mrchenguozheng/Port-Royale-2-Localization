@@ -165,7 +165,8 @@ apply_patch.bat --dry-run       :: print the plan only
 
 It does the following in order:
 
-1. Normalize translations (optional `--dep` adds the missing spaces);
+1. Normalize punctuation (punctuation only; layout spaces are added at compile time by the
+   lang_rules spec and never written back to translations);
 2. Validate line breaks/placeholders with `check_breaks --strict`;
 3. Compile language packs (font stitching included by default);
 4. Deploy to the game directory;
@@ -222,7 +223,9 @@ Python entry points in `src\tools\`:
 | `pack/new_lang.py` | Creates a new language |
 | `font/subset_fonts.py` | Stitches fonts |
 | `font/make_noto_fonts.py` | Noto fonts for releases |
-| `text/engine_text.py` | Builds the engine text from translations (`build/engine_text/`) |
+| `text/engine_text.py` | Builds the engine text from translations (`build/engine_text/`, spec-driven) |
+| `text/lang_rules/spec.py` | Three-part interface: `Punctuation` / `Segmenter` / `Spacing` |
+| `text/zh_pipeline.py` | Chinese pre-tokenization: conjunctions, names, digits/dash/`<n><n>` spaces |
 | `text/zh_space.py` | Chinese tokenization and character-budget spacing (spaCy / jieba / mechanical fallback) |
 
 The Chinese tokenizer is an **optional** dependency; the build works without it:

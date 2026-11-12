@@ -13,9 +13,12 @@ r"""engine_text.py —— 译文层 → 引擎层（构建期产物）。
 
 语言分派
 --------
-    zh     标点全角化 + 连词后空格 + 人名空格 + 按词补空格
-    ja     标点规范化 + 助词后空格
-    其他   原样返回（用空格分词的语言不需要加工）
+    spec = lang_rules.get_spec(lang)   # 标点 / 分词器 / 补空格，见 lang_rules/spec.py
+    zh     标点全角化 + 连词后空格 + 人名空格 + 按词补空格（Spacing mode=group）
+    ja     助词后空格 + 标点规范化（Spacing mode=particle）
+    其他   原样返回（Spacing mode=none，用空格分词的语言不需要加工）
+
+新语言只写一个 lang_rules/<代码>.py 声明 spec()，本模块不需要改。
 
 补空格「按词成组」的标准是**字数预算**，不是像素 —— 控件宽度没有在游戏里
 实测过，用字体算出来的 px 只是推测，不能当判据。
@@ -48,17 +51,15 @@ def _order_of(path):
 
 
 def build(lang, doc, order=None):
-    """{id: 译文} → {id: 引擎文本}。不写文件。"""
+    """{id: 译文} → {id: 引擎文本}。不写文件。
+
+    只认 spec，不认语言：三段式接口统一走 lang_rules.spec.build_texts。
+    """
+    from text import lang_rules
+    from text.lang_rules import spec as specs
     order = list(order or doc)
-    if lang == "zh":
-        from text import apply_zh_rules as ZH
-        _order, out, _stats, _seg = ZH.generate_doc(doc, order)
-        return out
-    if lang == "ja":
-        from text import apply_ja_rules as JA
-        return JA.generate_from(doc, order)
-    # 词间已有空格的语言（en/fr 参考、以及以后加的语言）不需要加工
-    return {h: (doc.get(h) or "") for h in order}
+    out, _stats, _seg = specs.build_texts(lang_rules.get_spec(lang), doc, order)
+    return out
 
 
 def write(lang, out, order=None):

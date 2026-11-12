@@ -2,18 +2,20 @@
 # -*- coding: utf-8 -*-
 """normalize_text.py —— 统一译文的空格：全角标点、占位符、换行标签。
 
-规则已经不在这里了：每种语言一份，放在 src\\tools\\lang_rules\\ 下：
+规则已经不在这里了：每种语言一份，放在 src\\tools\\text\\lang_rules\\ 下：
 
     lang_rules/zh.py   中文的标点表、半角→全角映射、占位符规则
-    lang_rules/ja.py   日文的（外加助词空格）
+    lang_rules/ja.py   日文的
 
 本文件只负责：选语言、读 toml、逐条调用该语言的 normalize()、写回。
 
+注意：这里只改**标点**，不补排版空格。补空格（按词成组 / 助词后加一格）
+是构建期的事，见 lang_rules/spec.py 的 Spacing；所以 --particles 已移除。
+
 用法
 ----
-    python src\\tools\\normalize_text.py --lang zh --dry-run
-    python src\\tools\\normalize_text.py --lang zh
-    python src\\tools\\normalize_text.py --lang ja --particles
+    python src\\tools\\text\\normalize_text.py --lang zh --dry-run
+    python src\\tools\\text\\normalize_text.py --lang zh
 """
 
 import argparse
@@ -43,8 +45,14 @@ def main():
     ap.add_argument("--force", action="store_true",
                     help="没有专用规则的语言，改用中文规则")
     ap.add_argument("--particles", action="store_true",
-                    help="日语：在句子中间的助词后补空格")
+                    help="（已移除）助词空格属构建期，见 engine_text.py")
     a = ap.parse_args()
+
+    if a.particles:
+        raise SystemExit(
+            "--particles 已移除：助词空格是构建期的补空格策略"
+            "（lang_rules/spec.py，Spacing mode=\"particle\"），不写回译文层。\n"
+            "请用：python src/tools/text/engine_text.py --lang ja")
 
     rules = lang_rules.get(a.lang)
     if rules is None:
@@ -66,8 +74,6 @@ def main():
         if not rules.CJK_RX.search(doc[k]):
             continue                       # 还没译的条目保持与原文逐字一致
         opts = {"date_format": k in base.DATE_FORMAT_IDS}
-        if a.lang == "ja":
-            opts["particles"] = a.particles
         new = rules.normalize(doc[k], **opts)
         if new != doc[k]:
             changed += 1

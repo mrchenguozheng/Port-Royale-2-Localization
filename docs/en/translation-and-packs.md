@@ -49,23 +49,41 @@ If you edit `build\PR2Packs\*.txt` directly, it will be overwritten on the next 
 - to see the layout result of one language alone: `python src\tools\text\engine_text.py --lang zh`;
 - the old manual review workflow (`zh_review.py`, review markers, page banner, reviewed checkboxes) has been removed entirely.
 
-## Rules split per language
+## Rules split per language: a three-part interface
 
-Punctuation/spacing rules are no longer piled into `normalize_text.py`; there is one file per language:
+Punctuation/spacing rules are no longer piled into one `normalize()` per language. Each language
+declares a `LangSpec` made of three parts (implemented in `lang_rules/spec.py`):
+
+| Part | Responsibility | Chinese | Japanese |
+|---|---|---|---|
+| `Punctuation` | pure function, punctuation only: full-width, space after punctuation, placeholder, `<n>` | `zh.normalize` | `ja.normalize_punct` |
+| `Segmenter` | tokenizer. `prepare(texts)` batch-prepares (Chinese hands all runs over once), `tag(text)` gives POS (particles) | spaCy → jieba → none | janome → fugashi → none |
+| `Spacing` | declarative space strategy: `mode=none / group / particle` | `group`, ≤ 10 chars per group | `particle`, one space after particles |
 
 ```
-src/tools/text/lang_rules/
-├─ base.py   shared machinery: space after punctuation, spaces around placeholders, removing spaces around <n>
-├─ zh.py     Chinese: full-width punctuation table, half-width→full-width map (, → ，), normalize()
-└─ ja.py     Japanese: its own punctuation table (, → 、), particle spacing, normalize(particles=)
+src/tools/text/
+├─ lang_rules/
+│  ├─ __init__.py  REGISTRY + get() + get_spec() (languages without a spec pass through unchanged)
+│  ├─ spec.py      Punctuation / Segmenter / Spacing / LangSpec + the executor build_texts()
+│  ├─ base.py      shared machinery: space after punctuation, spaces around placeholders, <n>
+│  ├─ zh.py        Chinese: punctuation tables + ZhSegmenter + ZhGroupSpacing (spec())
+│  └─ ja.py        Japanese: punctuation tables + JaSegmenter + JaParticleSpacing (spec())
+├─ zh_space.py     Chinese tokenizer wrapper + word grouping (used by Spacing mode=group)
+└─ zh_pipeline.py  Chinese pre-tokenization steps: conjunctions, names, digits/dash/<n><n> spaces
 ```
 
-- `normalize_text.py` is now only a CLI: pick the language → read the toml → call `lang_rules.<language>.normalize()` → write back;
-- to add a language: put `<code>.py` in `lang_rules/`, providing `LANG / PUNCT / ASCII / CJK_RX / normalize()`,
-  then register it in `REGISTRY` in `lang_rules/__init__.py`;
+- `engine_text.build()` only knows specs: `lang_rules.get_spec(lang)` → three parts in order; there is
+  **no** `if lang == "zh" / elif "ja" / else` dispatch any more;
+- `normalize_text.py` is only a CLI and only applies punctuation (`Punctuation.normalize`);
+- to add a language: put `<code>.py` in `lang_rules/`, providing `LANG / PUNCT / ASCII / CJK_RX / normalize()`
+  plus a `spec()` declaring the three parts, then register it in `REGISTRY`. `engine_text.py` and
+  `apply_*_rules.py` do not change. A language whose words are already space-separated declares
+  `spacing=spec.NoSpacing()`, which is the old "pass through" path;
 - languages without dedicated rules can still apply the Chinese rules with `--force`;
 - although `・`(U+30FB) and `ー`(U+30FC) fall inside the kana block, they are **not treated as body text** and are never
-  split apart (otherwise `%2・%3` and `迭戈・莫扎雷拉` would gain spaces).
+  split apart (otherwise `%2・%3` and `迭戈・莫扎雷拉` would gain spaces);
+- **no right-to-left languages**: there is no game source code, so the drawing direction cannot be changed;
+  `Spacing` only has `none / group / particle`, with no direction field.
 
 ## Directory structure
 
@@ -204,7 +222,9 @@ How the decision is made (chosen automatically):
    "noun/pronoun/numeral + particle", skipping fixed expressions such as `について` `として` `によって` `という`;
 2. if neither is available, fall back to a regex (kanji/katakana + particle + kanji/katakana).
 
-Toggle: `python src\tools\text\normalize_text.py --lang ja --particles`.
+Toggle: particle spacing is a build-time strategy (`Spacing(mode="particle")`); run
+`python src\tools\text\engine_text.py --lang ja`. `normalize_text.py --particles` has been removed
+(that script only fixes punctuation and never writes layout spaces into the translation layer).
 
 **Other**
 
@@ -461,8 +481,9 @@ python src/tools/text/apply_ja_rules.py             # writes build/engine_text/j
 python src/tools/text/apply_ja_rules.py --check     # compare only, writes nothing
 ```
 
-The rules come from `lang_rules/ja.py`: punctuation normalization, spaces on both sides of placeholders, spaces after
-particles (morphological analysis when janome/fugashi is installed, regex fallback otherwise).
+The rules come from the spec declared in `lang_rules/ja.py`: punctuation (`Punctuation`), a morphological
+tokenizer (`Segmenter`), particle spacing (`Spacing mode=particle`, morphological analysis when
+janome/fugashi is installed, regex fallback otherwise).
 The output goes to `build/engine_text/ja.toml` and is **never** written back to the translation layer.
 
 ### Placeholder counts must match one by one

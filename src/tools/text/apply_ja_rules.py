@@ -29,7 +29,8 @@ CLEAN = os.path.join(ROOT, "src", "translations", "ja.toml")
 OUT = os.path.join(ROOT, "build", "engine_text", "ja.toml")
 
 sys.path.insert(0, HERE)
-from text.lang_rules import ja as JA  # noqa: E402
+from text.lang_rules import spec as specs  # noqa: E402
+from text import lang_rules  # noqa: E402
 
 HEADER = [
     "# 构建产物：由 src/translations/ja.toml 经 apply_ja_rules.py 生成，不进仓库。",
@@ -42,10 +43,11 @@ def esc(text):
 
 
 def generate_from(clean, order):
-    """纯函数：{id: 译文} + 顺序 → {id: 引擎文本}。"""
-    out = {}
-    for hid in order:
-        out[hid] = JA.normalize(clean[hid], particles=True)
+    """纯函数：{id: 译文} + 顺序 → {id: 引擎文本}。
+
+    走 lang_rules 的三段式接口（标点 / 分词器 / 补空格），与 engine_text 同一条路。
+    """
+    out, _stats, _seg = specs.build_texts(lang_rules.get_spec("ja"), clean, list(order))
     return out
 
 

@@ -19,6 +19,7 @@ from text import apply_ja_rules as JA  # noqa: E402
 from text import engine_text as ET  # noqa: E402
 from text import zh_space  # noqa: E402
 import lang_rules  # noqa: E402
+from text.lang_rules import spec as specs  # noqa: E402
 
 TRANS = os.path.join(ROOT, "src", "translations")
 
@@ -98,6 +99,36 @@ class TestZhSpace(unittest.TestCase):
         self.assertIn(" ", out)
         self.assertNotIn("  ", out)
         self.assertEqual(zh_space.fallback_wrap("短句"), "短句")
+
+
+class TestSpecInterface(unittest.TestCase):
+    """三段式接口：语言只声明 spec，engine_text 不认语言。"""
+
+    def test_zh_spec_parts(self):
+        sp = lang_rules.get_spec("zh")
+        self.assertEqual((sp.code, sp.spacing.mode), ("zh", "group"))
+        self.assertIn(sp.segmenter.name, ("spacy", "jieba", "none"))
+        self.assertEqual(sp.punct.normalize("你好,世界!"), "你好， 世界！")
+
+    def test_ja_spec_parts(self):
+        sp = lang_rules.get_spec("ja")
+        self.assertEqual((sp.code, sp.spacing.mode), ("ja", "particle"))
+        self.assertIn(sp.segmenter.name, ("janome", "fugashi", "none"))
+        # 助词空格属于补空格策略，标点接口本身不补
+        self.assertEqual(sp.punct.normalize("テスト。"), "テスト。")
+
+    def test_unknown_language_passes_through(self):
+        sp = lang_rules.get_spec("en")
+        self.assertIsNone(sp.punct)
+        self.assertEqual(sp.spacing.mode, "none")
+        doc = {"0x1": "Hello  world"}
+        out, _stats, _seg = specs.build_texts(sp, doc, ["0x1"])
+        self.assertEqual(out, doc)
+
+    def test_build_texts_matches_engine_text(self):
+        doc = {"0x1": "你好,世界。"}
+        out, _stats, _seg = specs.build_texts(lang_rules.get_spec("zh"), doc, ["0x1"])
+        self.assertEqual(out, ET.build("zh", doc, ["0x1"]))
 
 
 class TestEngineText(unittest.TestCase):
