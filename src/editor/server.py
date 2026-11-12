@@ -63,18 +63,11 @@ if TOOLS not in sys.path:
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-# 检验规则只有一份，在 shared\core\validate.py。
-from shared.core.validate import check_text  # noqa: E402
-
-import translate as T          # noqa: E402
-from pack import compile_pack as C       # noqa: E402
-import terms_check             # noqa: E402
-from text import zh_pipeline as ZH_GEN  # noqa: E402
-from text import lang_rules  # noqa: E402
-from text import toml_io as TI  # noqa: E402
 from install import pr2ctl as P  # noqa: E402
+import translate as T  # noqa: E402
 from api import store as ST  # noqa: E402
-from api.store import load_all, rows_of, save_all, patch_all  # noqa: E402
+from api.request import Req  # noqa: E402
+from api import translate as TR, langs as LG, install as IN  # noqa: E402
 
 
 #: 真实端口，由 main() 在启动前填上。工具窗口靠 /api/health 判断
@@ -97,19 +90,6 @@ TRANSLATOR_LANG = "zh"
 
 
 # ---------------------------------------------------------------- 校验
-
-def check_one(entry, lang, text):
-    """校验一条译文，返回 [{level, text}]。
-
-    规则与消息都在 shared\\core\\validate.py —— 编译脚本、这个编辑器、
-    独立译者工作台共用同一份。以前这里借 compile_pack 的实现，再自己
-    补一段标签比对，三处对 %02 补零与紧邻占位符的处理并不一致。
-
-    level 分 error / warn：error 大概率出乱码，warn 需要人工确认。
-    """
-    en = entry.get(T.BASE_LANG, "") or ""
-    return check_text(text, en, lang="zh")
-
 
 # ---------------------------------------------------------------- 安装页
 
@@ -159,300 +139,17 @@ def server_instances():
     return {"current": CURRENT_PORT, "instances": [x for x in found if x]}
 
 
-def rule_trace(hid, lang):
-    """逐阶段还原这条译文经过的格式化规则（译文层 → 补空格前）。
-
-    译文层（src/translations/）是唯一手改层；补空格等排版是**构建期**由
-    src/tools/text/engine_text.py 做的，产物在 build/engine_text/，编辑器里
-    不重复算一遍（那要起一次分词器，界面会卡）。
-    """
-    rows = load_all()
-    doc = {r["id"]: (r.get(lang) or "") for r in rows}
-    cur = doc.get(hid)
-    if cur is None:
-        return None
-    rules = lang_rules.get(lang)
-    stages = [{"key": "text", "label": "译文（手改层）", "text": cur}]
-
-    if lang == "zh":
-        norm = rules.normalize(cur)
-        stages.append({"key": "punct", "label": "标点规范化", "text": norm})
-        conj = ZH_GEN.fix_conj(norm)
-        stages.append({"key": "conj", "label": "连词后空格", "text": conj})
-        given, surn, extras, towns = ZH_GEN.build_names(doc)
-        parts = ZH_GEN.TAG.split(conj)
-        res = []
-        for i, part in enumerate(parts):
-            if i % 2 == 1 or not part:
-                res.append(part)
-                continue
-            spans = ZH_GEN.find_names(part, given, surn, extras + towns)
-            res.append(ZH_GEN.pad_names(part, spans, towns) if spans else part)
-        stages.append({"key": "names", "label": "人名/城镇名空格（补空格前）",
-                       "text": "".join(res)})
-    else:
-        stages.append({"key": "punct", "label": "规范化",
-                       "text": rules.normalize(cur)})
-    return stages
-
-
-def known_dirs():
-    """settings 里记住过的游戏目录，按最近使用排序。"""
-    st = P.load_settings()
-    cur = st.get("current") or ""
-    out = []
-    for sha, entry in (st.get("dirs") or {}).items():
-        d = entry.get("dir") or ""
-        valid = bool(d) and P.is_game_dir(d)
-        label = entry.get("label") or (P.version_label(sha) if valid else "")
-        out.append({
-            "sha": sha,
-            "dir": d,
-            "label": label,
-            "last_used": entry.get("last_used") or "",
-            "current": sha == cur,
-            "valid": valid,
-        })
-    out.sort(key=lambda x: x.get("last_used") or "", reverse=True)
-    return out
-
-
-def start_dir():
-    """当前游戏目录。current 存的是 PR2.exe 的 SHA，不是路径。"""
-    st = P.load_settings()
-    cur = st.get("current") or ""
-    entry = (st.get("dirs") or {}).get(cur)
-    if entry and entry.get("dir"):
-        return entry["dir"]
-    return cur if os.path.isdir(cur) else (st.get("last_dir") or "")
-
-
-def start_status():
-    d = start_dir()
-    info = {"dir": d, "valid": False, "langs": P.available_langs()}
-    if d and P.is_game_dir(d):
-        sha, build = P.identify_dir(d)
-        info.update({
-            "valid": True,
-            "version": P.version_label(sha),
-            "sha": sha,
-            "patches": [{"name": n, "exists": True} for n, _p, _d in P.patch_items(d)],
-            "packs": P.installed_langs(d),
-            "locale": P.read_ini_language(os.path.join(d, P.PACK_DIR, "locale.ini")),
-        })
-    return info
-
-
-class _StartEvents:
-    """把 core 的事件流写进 START_JOB。"""
-
-    def put(self, ev):
-        kind, payload = ev if isinstance(ev, tuple) else ("line", str(ev))
-        with START_LOCK:
-            if kind == "line":
-                START_JOB["lines"].append(payload)
-                if len(START_JOB["lines"]) > 500:
-                    del START_JOB["lines"][:-500]
-            elif kind.endswith("_ok"):
-                START_JOB["ok"] = True
-            elif kind.endswith("_failed"):
-                START_JOB["ok"] = False
-
-
-def start_run(kind, fn):
-    with START_LOCK:
-        if START_JOB["running"]:
-            return {"ok": False, "error": "已有任务在运行"}
-        START_JOB.update(running=True, lines=[], done=False, ok=False,
-                         kind=kind, error="")
-    ev = _StartEvents()
-
-    def worker():
-        try:
-            fn(ev)
-        except Exception as exc:
-            with START_LOCK:
-                START_JOB["error"] = str(exc)
-                START_JOB["ok"] = False
-        finally:
-            with START_LOCK:
-                START_JOB["running"] = False
-                START_JOB["done"] = True
-
-    threading.Thread(target=worker, daemon=True).start()
-    return {"ok": True, "kind": kind}
-
-
 # ---------------------------------------------------------------- 筛选
 
 _ATTN_CACHE = {}
-
-
-def attention_ids(lang):
-    """有问题的条目：占位符/标签错误、空译文、术语不一致。
-
-    check_one 是纯正则，但 3500 条也不便宜，按译文文件 mtime 缓存。
-    """
-    try:
-        files = [T.lang_path(lang),
-                 os.path.join(os.path.dirname(SRC), "glossary", "terms.toml")]
-        key = (lang, tuple(os.path.getmtime(f) for f in files if os.path.isfile(f)))
-    except OSError:
-        key = (lang, 0)
-    if key in _ATTN_CACHE:
-        return _ATTN_CACHE[key]
-
-    rows = load_all()
-    bad = []
-    for r in rows:
-        text = r.get(lang, "") or ""
-        probs = check_one(r, lang, text)
-        if any(p.get("level") in ("error", "warn") for p in probs):
-            bad.append(r["id"])
-    try:
-        groups, ignore = terms_check.load_terms()
-        if groups:
-            en = {r["id"]: r.get(T.BASE_LANG, "") for r in rows}
-            doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in ignore}
-            for x in terms_check.check_lang(lang, groups, en, doc):
-                if x["id"] not in bad:
-                    bad.append(x["id"])
-    except Exception:
-        pass
-    _ATTN_CACHE[key] = bad
-    return bad
-
 
 
 MEANINGS = os.path.join(os.path.dirname(SRC), "glossary", "placeholder_meanings.toml")
 _MEAN_CACHE = {"key": None, "data": {}}
 
 
-def load_meaning_overrides():
-    try:
-        key = os.path.getmtime(MEANINGS)
-    except OSError:
-        return {}
-    if _MEAN_CACHE["key"] != key:
-        try:
-            with open(MEANINGS, "rb") as fh:
-                _MEAN_CACHE.update(key=key, data=tomllib.load(fh))
-        except Exception:
-            _MEAN_CACHE.update(key=key, data={})
-    return _MEAN_CACHE["data"]
-
-
-def meaning_for(lang, hid):
-    return (load_meaning_overrides().get(lang) or {}).get(hid.lower(), {})
-
-
-def save_meaning(lang, hid, token, meaning):
-    data = {}
-    if os.path.isfile(MEANINGS):
-        try:
-            data = tomllib.load(open(MEANINGS, "rb"))
-        except Exception:
-            data = {}
-    by_lang = dict(data.get(lang) or {})
-    key = hid.lower()
-    cur = dict(by_lang.get(key) or {})
-    if meaning is None:
-        cur.pop(token, None)
-    else:
-        cur[token] = meaning        # 允许空字符串
-    if cur:
-        by_lang[key] = cur
-    else:
-        by_lang.pop(key, None)
-    if by_lang:
-        data[lang] = by_lang
-    else:
-        data.pop(lang, None)
-
-    lines = ["# 按语言 + hash 的占位符含义覆盖（编辑器里手动修改）。", ""]
-    for lg in sorted(data):
-        for h in sorted(data[lg]):
-            lines.append('["%s"."%s"]' % (lg, h))
-            for tok in sorted(data[lg][h]):
-                val = data[lg][h][tok].replace("\\", "\\\\").replace('"', '\\"')
-                lines.append('"%s" = "%s"' % (tok.replace('"', '\\"'), val))
-            lines.append("")
-    with open(MEANINGS, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write("\n".join(lines))
-    return meaning_for(lang, hid)
-
-
 HASH_RULES = os.path.join(os.path.dirname(SRC), "glossary", "hash_rules.toml")
 _HASH_CACHE = {"key": None, "data": {}}
-
-
-def load_hash_rules():
-    """按 hash 的例外规则，目前只有 skip_terms（不检查这些术语）。"""
-    try:
-        key = os.path.getmtime(HASH_RULES)
-    except OSError:
-        return {}
-    if _HASH_CACHE["key"] != key:
-        try:
-            with open(HASH_RULES, "rb") as fh:
-                data = tomllib.load(fh)
-        except Exception:
-            data = {}
-        _HASH_CACHE.update(key=key, data=data)
-    return _HASH_CACHE["data"]
-
-
-def hash_rule(hid):
-    return load_hash_rules().get(hid.lower(), {})
-
-
-def filter_term_issues(issues):
-    out = []
-    for x in issues:
-        skip = hash_rule(x.get("id", "")).get("skip_terms", [])
-        if x.get("term") in skip:
-            continue
-        out.append(x)
-    return out
-
-
-def save_hash_rule(hid, term, skip):
-    data = {}
-    if os.path.isfile(HASH_RULES):
-        try:
-            data = tomllib.load(open(HASH_RULES, "rb"))
-        except Exception:
-            data = {}
-    key = hid.lower()
-    cur = dict(data.get(key) or {})
-    terms = list(cur.get("skip_terms") or [])
-    if skip and term not in terms:
-        terms.append(term)
-    if not skip and term in terms:
-        terms.remove(term)
-    if terms:
-        cur["skip_terms"] = terms
-        data[key] = cur
-    else:
-        data.pop(key, None)
-    lines = ["# 按 hash 的术语例外：skip_terms 里的术语在这条不检查。", ""]
-    for k in sorted(data):
-        lines.append('["%s"]' % k)
-        vals = ", ".join('"%s"' % v.replace('"', '\\"') for v in data[k].get("skip_terms", []))
-        lines.append("skip_terms = [%s]" % vals)
-        lines.append("")
-    io_open = open
-    with io_open(HASH_RULES, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write("\n".join(lines))
-    return data.get(key, {})
-
-def filter_ids(kind, lang):
-    rows = load_all()
-    if kind == "attention":
-        keep = set(attention_ids(lang))
-        return [r["id"] for r in rows if r["id"] in keep]
-    return [r["id"] for r in rows]
-
 
 
 # ---------------------------------------------------------------- 语境推断
@@ -473,148 +170,54 @@ TAG_MEAN = [
 ]
 
 
-def table_order():
-    global _ORDER
-    if _ORDER is None:
-        try:
-            with open(ORDER_FILE, encoding="utf-8") as fh:
-                _ORDER = [l.strip() for l in fh if l.strip()]
-        except OSError:
-            _ORDER = []
-    return _ORDER
-
-
 ARG_RX = re.compile(r"@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]")
-
-
-def placeholder_counts(text):
-    from collections import Counter
-    return Counter(ARG_RX.findall(text or ""))
-
-
-def placeholder_problems(hid, lang, text):
-    """返回 [(token, 原文数, 译文数)]，只列数量不一致的。"""
-    c = context_of(hid, lang)
-    if c is None:
-        return []
-    en = placeholder_counts(c.get("en") or "")
-    zh = placeholder_counts(text)
-    out = []
-    for tok in set(en) | set(zh):
-        if en[tok] != zh[tok]:
-            out.append((tok, en[tok], zh[tok]))
-    out.sort()
-    return out
-
-
-def placeholders_of(text):
-    """按出现顺序列出占位符（去重）。
-
-    这里用的是 ARG_RX 而不是 shared\\core\\validate.tokens：面板要把
-    「同一个占位符出现几次」也显示出来，tokens 是集合、会丢掉次数；
-    而且它会额外认 %s / %d 这类 printf 式写法 —— tokens 只认 %N，
-    那种写法在游戏里是字面量，不算占位符。
-    """
-    out = []
-    for m in ARG_RX.finditer(text):
-        tok = m.group(0)
-        if tok in out:
-            continue
-        out.append(tok)
-    return out
-
-
-def context_of(hid, lang):
-    rows = {r["id"]: r for r in load_all()}
-    row = rows.get(hid)
-    if row is None:
-        return None
-    en = row.get(T.BASE_LANG, "") or ""
-    zh = row.get(lang, "") or ""
-    reasons = []
-
-    # %N 没有固定名字，按英文上下文给个保守说明。
-    es = en.strip()
-    role_hint = {}
-    if es.startswith("%1 %2 %3"):
-        role_hint = {"%1": "Rank/Title", "%2": "Given name", "%3": "Surname"}
-    elif es.startswith("%1 %2 "):
-        role_hint = {"%1": "Rank/Title", "%2": "Full name"}
-    elif re.search(r"\b(Governor|Captain|Viceroy|King|Queen|Prince|Princess|"
-                   r"Lord|Sir|Mr|Mrs|Ms|Dr|Admiral|General|Colonel|Major|"
-                   r"Lieutenant)\s+%1 %2", en):
-        role_hint = {"%1": "Given name", "%2": "Surname"}
-
-    overrides = meaning_for(lang, hid)
-    ph = []
-    for tok in placeholders_of(en):
-        # 默认不给标签：占位符本身就是英文变量名，需要时在编辑器里手动补含义。
-        ph.append({"token": tok, "meaning": overrides.get(tok, "")})
-
-    tags = []
-    for tok, mean in TAG_MEAN:
-        if tok in en and mean not in tags:
-            tags.append(mean)
-
-    cat = "通用文本"
-    try:
-        ko = C.KEEP_ORIGINAL
-    except Exception:
-        ko = {}
-    group = ko.get(hid) or ko.get(hid.lower())
-    if group:
-        cat = "原样保留：%s" % group
-        reasons.append("在 KEEP_ORIGINAL 清单里，编译时强制输出英文原文")
-    elif not zh:
-        cat = "空译文"
-        reasons.append("这条还没有译文，游戏里会显示英文")
-    elif not re.sub(r"<[^>]*>|@[A-Za-z]\$[^$]*\$|%[0-9A-Za-z]+", "", en).strip():
-        cat = "格式串（只有占位符/标签）"
-        reasons.append("去掉标签和占位符后没有正文")
-    elif re.search(r"(?i)\b(producer|manager|director|qa|ascaron|programming|music|sound)\b", en) and len(en) < 60:
-        cat = "职员表条目"
-        reasons.append("匹配到制作名单/职位用语")
-    elif ph and re.search(r"(?i)(until|before|destroy|deliver|supply|build|bring|escort|attack|capture)", en):
-        cat = "任务目标/委托"
-        reasons.append("含占位符，且出现 until/before/destroy/deliver 这类任务用语")
-    elif "?" in en or "!" in en:
-        cat = "对话/口气句"
-        reasons.append("含问号或感叹号")
-    elif len(en) <= 24 and not re.search(r"[.。!?]", en):
-        cat = "界面标签/短标题"
-        reasons.append("很短且没有句末标点，常见于按钮、标题、列表项")
-    elif "<n><n>" in en or len(en) > 200:
-        cat = "长文本（帮助/编年史/教程）"
-        reasons.append("多段或篇幅长，通常出现在帮助、编年史、教程窗口")
-    if tags:
-        reasons.append("含格式标记：" + "、".join(tags))
-
-    ids = table_order()
-    try:
-        idx = ids.index(hid)
-    except ValueError:
-        idx = -1
-    neigh = []
-    if idx >= 0:
-        for j in range(max(0, idx - 3), min(len(ids), idx + 4)):
-            if j == idx:
-                continue
-            r = rows.get(ids[j])
-            if not r:
-                continue
-            neigh.append({"id": r["id"],
-                          "en": (r.get(T.BASE_LANG, "") or "")[:120],
-                          "zh": (r.get(lang, "") or "")[:120]})
-
-    return {"id": hid, "category": cat, "reasons": reasons,
-            "placeholders": ph, "tags": tags, "en": en, "zh": zh,
-            "neighbors": neigh}
 
 
 # ---------------------------------------------------------------- 数据
 
 # 读缓存、整表写回、补丁写回都在 api\store.py；这里只剩「换根」。
 # 换根之后必须清掉 store 的缓存，否则拿到的还是旧文件的内容。
+
+
+# ---------------------------------------------------------------- 元信息
+
+def get_health(req):
+    query = req.query
+    body = req.body
+    return req.send_json(health_info())
+
+
+
+def get_server_instances(req):
+    query = req.query
+    body = req.body
+    return req.send_json(server_instances())
+
+
+
+def post_server_stop(req):
+    query = req.query
+    body = req.body
+    try:
+        port = int(body.get("port") or 0)
+    except (TypeError, ValueError):
+        return req.send_json({"ok": False, "error": "端口不对"})
+    if port in (0, CURRENT_PORT):
+        return req.send_json({"ok": False, "error": "不能停当前服务"})
+    ok = P.editor_shutdown(port)
+    return req.send_json({"ok": ok, "port": port})
+
+
+
+def post_shutdown(req):
+    query = req.query
+    body = req.body
+    req.send_json({"ok": True})
+    # 稍等一点，先让这条响应写回客户端，再收摊。
+    threading.Timer(0.2, stop_server).start()
+    return None
+
+
 
 
 def set_data_root(path, presets_dir=None):
@@ -625,182 +228,27 @@ def set_data_root(path, presets_dir=None):
     单独指定（它不在 src\ 的同一层）。换根之后所有按 mtime 的缓存都要清，
     否则拿到的还是旧文件的内容。
     """
-    global DATA_ROOT, MEANINGS, HASH_RULES
+    global DATA_ROOT
     DATA_ROOT = os.path.abspath(path)
     T.set_src(DATA_ROOT)
-    MEANINGS = os.path.join(os.path.dirname(DATA_ROOT),
-                            "glossary", "placeholder_meanings.toml")
-    HASH_RULES = os.path.join(os.path.dirname(DATA_ROOT),
-                              "glossary", "hash_rules.toml")
-    _MEAN_CACHE.update(key=None, data={})
-    _HASH_CACHE.update(key=None, data={})
     ST._ALL_CACHE.update(key=None, rows=None)
+    LG.set_root(DATA_ROOT)
     if presets_dir:
-        sf = _font_module()
-        sf.PRESETS_DIR = os.path.abspath(presets_dir)
-
-
-#: 语言代码就是文件名，也只允许这些字符 —— 它要拼进路径。
-RE_LANG_CODE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,15}$")
-
-
-def lang_status(code):
-    """这个语言代码现在能不能用。返回一份给界面直接显示的自述。
-
-    为什么要单独有这一步：新建语言是**写文件**，而".toml 已经在那儿"
-    在界面上完全看不出来（下拉里只列已记录的语言）。让输入框一边打字
-    一边问服务端，用户当场就能看到「这个名字已被占用」，而不是点下去
-    才发现。真正写盘那一步还有一道独占创建的保险（见 new_lang）。
-    """
-    code = (code or "").strip()
-    if not code:
-        return {"code": code, "ok": False, "reason": "先填一个语言代码"}
-    if not RE_LANG_CODE.match(code):
-        return {"code": code, "ok": False, "exists": False,
-                "reason": "只能字母开头，含字母 / 数字 / - / _，最长 16 个字符"}
-    if code.lower() in T.REFERENCE_LANGS:
-        return {"code": code, "ok": False, "exists": True, "reference": True,
-                "reason": "%s 是只读参考语言，不能当新语言的代码" % code}
-
-    path = T.lang_path(code)
-    if os.path.exists(path):
-        return {"code": code, "ok": False, "exists": True, "reference": False,
-                "path": path,
-                "reason": "%s 已经存在（%s.toml），不会覆盖" % (code, code)}
-    return {"code": code, "ok": True, "exists": False, "reference": False}
-
-
-def new_lang(code, src):
-    """以 src 为模板，复制出一份新语言。返回 {"code", "from"}。
-
-    为什么是「复制一份」而不是「建一张空表」：条目数必须与基准表（en.gog_1.1.2.3）
-    完全一致（合并与校验都按位置对齐，少一条都会让后面的 hash 错位）。
-    空表在第一次保存时就会被判成「少 3548 条」；拿一个现成语言当模板，
-    天然就是完整的一张表 —— 而且它自带参照，用户只要把右边逐条改掉。
-
-    只做复制：不替用户决定新语言的译文。模板选 zh 就是「以中文为底」，
-    选 en 就是「从英文原文起译」，两种都合理。
-    """
-    code = (code or "").strip()
-    src = (src or "").strip()
-
-    st = lang_status(code)
-    if not st["ok"]:
-        raise ValueError(st["reason"])
-    if not src:
-        raise ValueError("没有选择模板语言")
-
-    src_path = T.lang_path(src)
-    if not os.path.isfile(src_path):
-        raise ValueError("模板语言不存在：%s" % src)
-    dst = T.lang_path(code)
-
-    with open(src_path, "rb") as f:
-        data = f.read()
-
-    # 模板本身得是一张完整的表：id 顺序与基准表一致才敢复制。
-    # 复制一份对不齐的表，等于把错误原样传给新语言，而且更晚才发现。
-    import tomllib
-    doc = tomllib.loads(data.decode("utf-8"))
-    rows = [k for k in doc if k != "ctx"]
-    with open(T.lang_path(T.BASE_LANG), "rb") as f:
-        base = tomllib.load(f)
-    order = [k for k in base if k != "ctx"]
-
-    # 模板与基准表对不齐时（版本不同、多几条少几条），按基准表的 id 重新排：
-    # 多出来的 id 丢掉，缺的 id 用基准语言补齐，保证新语言仍是一张完整的表。
-    aligned = rows == order
-    dropped = filled = 0
-    if not aligned:
-        src_map = {k: v for k, v in doc.items() if k != "ctx"}
-        dropped = len(set(src_map) - set(order))
-        filled = len(set(order) - set(src_map))
-        lines = ["# 由模板 %s 自动对齐到 %s 生成。" % (src, T.BASE_LANG), ""]
-        for hid in order:
-            val = src_map.get(hid)
-            if val is None:
-                val = base.get(hid, "")
-                filled += 0
-            val = str(val).replace("\\", "\\\\").replace('"', '\\"')
-            lines.append('"%s" = "%s"' % (hid, val))
-        data = ("\n".join(lines) + "\n").encode("utf-8")
-
-    # 【关键】独占创建，不用「先 exists() 再 replace」：那两步之间有窗口，
-    # 期间别人（另一个编辑器窗口、或用户自己刚放进去的文件）建了同名文件，
-    # replace 会把它**静默覆盖**掉。O_EXCL 让内核来保证「只能新建」。
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
-    try:
-        fd = os.open(dst, flags)
-    except FileExistsError:
-        raise ValueError("语言 %s 已经存在（%s.toml），没有覆盖" % (code, code))
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-    except Exception:
-        # 写了一半就失败：别留一个残缺的语言文件
-        try:
-            os.remove(dst)
-        except OSError:
-            pass
-        raise
-
-    result = {"code": code, "from": src, "aligned": aligned,
-              "dropped": dropped, "filled": filled}
-    try:
-        result["presets"] = _font_module().add_language_presets(code, src)
-    except Exception as exc:
-        result["presets_error"] = str(exc)
-    return result
-
-
-# ---------------------------------------------------------------- 字体前置状态
-
-def _font_module():
-    """按需把 src/tools/font 加进 sys.path，返回 subset_fonts 模块。"""
-    fdir = os.path.join(TOOLS, "font")
-    if fdir not in sys.path:
-        sys.path.insert(0, fdir)
-    import subset_fonts
-    return subset_fonts
-
-
-def font_status():
-    """安装页「第一次用」卡片的字体状态（按语言）。"""
-    sf = _font_module()
-    langs = sf.list_presets()
-    base_missing = [n for n in sf.FONTS
-                    if not os.path.isfile(os.path.join(sf.DEFAULT_SRC, n))]
-    rows = []
-    problems = []
-    for lang in langs:
-        donors, _fallback = sf.load_preset(lang)
-        donor_rows = [{"path": sf._resolve(d), "exists": os.path.isfile(sf._resolve(d))}
-                      for d, _idx in donors]
-        built = sum(1 for n in sf.FONTS
-                    if os.path.isfile(os.path.join(sf.DEFAULT_OUT, lang, n)))
-        rows.append({"lang": lang, "donors": donor_rows,
-                     "built": built, "total": len(sf.FONTS)})
-        miss = [d for d in donor_rows if not d["exists"]]
-        if miss:
-            problems.append("%s 缺 %d 个 donor" % (lang, len(miss)))
-    if base_missing:
-        problems.append("缺 %d 个原版字体（需要从游戏导出）" % len(base_missing))
-    if not sf._fonttools():
-        problems.append("缺 fontTools")
-    if not langs:
-        problems.append("没有 presets/<语言>.toml（可从 presets.example.toml 复制）")
-    return {
-        "ok": not problems,
-        "fonttools": bool(sf._fonttools()),
-        "base": {"dir": sf.DEFAULT_SRC, "missing": base_missing,
-                 "total": len(sf.FONTS)},
-        "languages": rows,
-        "problems": problems,
-        "presets_dir": sf.PRESETS_DIR,
-    }
+        IN.set_presets_dir(presets_dir)
 
 
 # ---------------------------------------------------------------- HTTP
+
+ROUTER = {}
+for _m in (TR, LG, IN):
+    ROUTER.update(_m.ROUTES)
+ROUTER.update({
+    ("GET", "/api/health"): get_health,
+    ("GET", "/api/server/instances"): get_server_instances,
+    ("POST", "/api/server/stop"): post_server_stop,
+    ("POST", "/api/shutdown"): post_shutdown,
+})
+
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "PR2Editor/2"
@@ -940,474 +388,17 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_file(full)
 
     def get_api(self, path, query):
-        if path == "/api/start/running":
-            procs = P.game_processes()
-            return self.send_json({"running": bool(procs), "procs": procs})
-
-        if path == "/api/health":
-            return self.send_json(health_info())
-
-        if path == "/api/font-status":
-            return self.send_json(font_status())
-
-        if path == "/api/server/instances":
-            return self.send_json(server_instances())
-
-        if path == "/api/langs":
-            return self.send_json({"editable": T.target_langs(),
-                                   "all": T.all_langs(),
-                                   "base": T.BASE_LANG})
-
-        if path == "/api/lang-summary":
-            lang = (query.get("lang") or ["zh"])[0]
-            rows = load_all()
-            base = getattr(T, "BASE_LANG", "en.gog_1.1.2.3")
-            total = len(rows)
-            todo = sum(1 for r in rows
-                       if not r.get(lang) or r.get(lang) == r.get(base))
-            return self.send_json({"lang": lang, "total": total,
-                                   "todo": todo, "done": total - todo})
-
-        if path == "/api/lang-exists":
-            # 输入框一边打字一边问：这个名字能不能用、是不是已经有一份了。
-            return self.send_json(lang_status((query.get("code") or [""])[0]))
-
-        if path == "/api/start/status":
-            return self.send_json(start_status())
-
-        if path == "/api/start/dirs":
-            return self.send_json({"dirs": known_dirs()})
-
-        if path == "/api/start/job":
-            with START_LOCK:
-                return self.send_json(dict(START_JOB))
-
-        if path == "/api/context-batch":
-            ids = [x for x in (query.get("ids") or [""])[0].split(",") if x]
-            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
-            out = {}
-            for hid in ids[:200]:
-                c = context_of(hid, lang)
-                if c:
-                    out[hid] = c
-            return self.send_json(out)
-
-        if path == "/api/placeholder-meanings":
-            hid = (query.get("id") or [""])[0]
-            lang = (query.get("lang") or ["zh"])[0]
-            return self.send_json({"id": hid, "lang": lang,
-                                   "meanings": meaning_for(lang, hid)})
-
-        if path == "/api/rule-hits":
-            hid = (query.get("id") or [""])[0]
-            lang = (query.get("lang") or ["zh"])[0]
-            data = rule_hits(hid, lang)
-            if data is None:
-                return self.send_json({"detail": "没有译文或条目"}, 404)
-            return self.send_json(data)
-
-
-        if path == "/api/rule-trace":
-            hid = (query.get("id") or [""])[0]
-            lang = (query.get("lang") or ["zh"])[0]
-            stages = rule_trace(hid, lang)
-            if stages is None:
-                return self.send_json({"detail": "没有译文或条目"}, 404)
-            return self.send_json({"id": hid, "stages": stages})
-
-        if path == "/api/seed":
-            hid = (query.get("id") or [""])[0]
-            lang = (query.get("lang") or ["zh"])[0]
-            doc = {r["id"]: (r.get(lang) or "") for r in load_all()}
-            if hid not in doc:
-                return self.send_json({"detail": "译文里没有这一条"}, 404)
-            return self.send_json({"text": doc[hid]})
-
-        if path == "/api/hash-rules":
-            hid = (query.get("id") or [""])[0]
-            return self.send_json({"id": hid, "rules": hash_rule(hid)})
-
-        if path == "/api/entry-info":
-            hid = (query.get("id") or [""])[0]
-            lang = (query.get("lang") or ["zh"])[0]
-            c = context_of(hid, lang)
-            if c is None:
-                return self.send_json({"detail": "no such entry"}, 404)
-            zh = c.get("zh") or ""
-            en = c.get("en") or ""
-            spaces = [i for i, ch in enumerate(zh) if ch == " "]
-            en_ph = placeholders_of(en)
-            zh_ph = placeholders_of(zh)
-            missing = [t for t in en_ph if t not in zh_ph]
-            extra = [t for t in zh_ph if t not in en_ph]
-            # 译文层只有一份，而且就是「干净文本」：这里的空格全部是译者自己
-            # 写的。引擎补的空格是构建期产物（build/engine_text/），不进这一层，
-            # 所以「额外补的空格」在这个接口里恒为 0。
-            clean_spaces = len(spaces)
-            en_c = placeholder_counts(en)
-            zh_c = placeholder_counts(zh)
-            counts = [{"token": t, "en": en_c[t], "zh": zh_c[t]}
-                      for t in sorted(set(en_c) | set(zh_c))]
-            return self.send_json({
-                "placeholders": c.get("placeholders") or [],
-                "counts": counts,
-                "mismatch": [x["token"] for x in counts if x["en"] != x["zh"]],
-                "tags": c.get("tags") or [],
-                "missing": missing,
-                "extra": extra,
-                "used": zh_ph,
-                "spaces": len(spaces),
-                "clean_spaces": clean_spaces,
-                "extra_spaces": 0,
-                "length": len(zh),
-                "en_len": len(en),
-            })
-
-        if path == "/api/context":
-            hid = (query.get("id") or [""])[0]
-            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
-            ctx = context_of(hid, lang)
-            if ctx is None:
-                return self.send_error_json(404, "没有这个 id：%s" % hid)
-            return self.send_json(ctx)
-
-        if path == "/api/list":
-            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
-            rows = load_all()
-            return self.send_json([
-                {"id": r["id"],
-                 "en": (r.get(T.BASE_LANG, "") or "")[:60],
-                 "zh": (r.get(lang, "") or "")[:60]}
-                for r in rows])
-
-        if path == "/api/ids":
-            q = (query.get("q") or [""])[0].strip().lower()
-            if q.startswith("0x"):
-                q = q[2:]
-            try:
-                limit = int((query.get("limit") or ["20"])[0])
-            except ValueError:
-                limit = 20
-            rows = load_all()
-            hits = [r for r in rows if q in r["id"].lower()] if q else []
-            return self.send_json({
-                "ids": [{"id": r["id"],
-                         "en": (r.get(T.BASE_LANG, "") or "")[:80],
-                         "zh": (r.get((query.get("lang") or ["zh"])[0], "") or "")[:60]}
-                        for r in hits[:limit]],
-                "count": len(hits),
-            })
-
-        if path == "/api/find":
-            hid = (query.get("id") or [""])[0]
-            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
-            ids = filter_ids("all", lang)
-            try:
-                idx = ids.index(hid)
-            except ValueError:
-                idx = -1
-            return self.send_json({"id": hid, "index": idx, "count": len(ids)})
-
-        if path == "/api/count":
-            # 只报条数与 id 顺序，不带正文：首屏拿到它就能把滚动条画对。
-            kind = (query.get("filter") or ["all"])[0]
-            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
-            ids = filter_ids(kind, lang)
-            return self.send_json({"count": len(ids), "ids": ids,
-                                   "filter": kind, "lang": lang})
-
-        if path == "/api/terms":
-            # 术语一致性：术语表（glossary\terms.toml）当规则用。
-            # 返回 {id: ["术语：Frigate 应为「巡防舰」", …]}，前端标在行上。
-            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
-            groups, ignore = terms_check.load_terms()
-            if not groups:
-                return self.send_json({"count": 0, "issues": {},
-                                       "note": "没有术语表"})
-            rows = load_all()
-            en = {r["id"]: r.get(T.BASE_LANG, "") for r in rows}
-            doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in ignore}
-            issues = filter_term_issues(terms_check.check_lang(lang, groups, en, doc))
-            out = {}
-            for x in issues:
-                out.setdefault(x["id"], []).append(
-                    "%s：应为「%s」" % (x["term"], x["expected"]))
-            return self.send_json({"count": len(issues), "issues": out,
-                                   "lang": lang})
-
-        if path == "/api/entries":
-            offset = int((query.get("offset") or ["0"])[0])
-            limit = int((query.get("limit") or ["0"])[0])
-            kind = (query.get("filter") or ["all"])[0]
-            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
-            rows = load_all()
-            if kind != "all":
-                keep = set(filter_ids(kind, lang))
-                rows = [r for r in rows if r["id"] in keep]
-            if limit <= 0:
-                return self.send_json(rows)
-            if offset < 0:
-                offset = 0
-            return self.send_json(rows[offset:offset + limit])
-
-        if path == "/api/search":
-            # 搜索必须走服务端：正文本来就没全量在前端，前端过滤等于
-            # 又要先把 320 KB 全拉下来，分段加载就白做了。
-            q = (query.get("q") or [""])[0].strip().lower()
-            if not q:
-                return self.send_json([])
-            rows = load_all()
-            langs = T.all_langs()
-            out = []
-            kind = (query.get("filter") or ["all"])[0]
-            lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
-            keep = None if kind == "all" else set(filter_ids(kind, lang))
-            for e in rows:
-                if keep is not None and e["id"] not in keep:
-                    continue
-                if q in e["id"].lower():
-                    out.append(e)
-                    continue
-                for k in langs:
-                    if q in (e.get(k) or "").lower():
-                        out.append(e)
-                        break
-            return self.send_json(out)
-
-        return self.send_error_json(404, "unknown api: %s" % path)
-
-    # ---- POST
+        fn = ROUTER.get(("GET", path))
+        if fn is None:
+            return self.send_error_json(404, "unknown api: %s" % path)
+        return fn(Req(self, query=query))
 
     def post_api(self, path):
         body = self.read_json()
-
-        if path == "/api/font/export":
-            game = (body.get("dir") or "").strip()
-            if not game:
-                return self.send_json({"ok": False, "error": "先填写游戏目录"})
-            out = os.path.join(os.path.dirname(SRC), "assets", "fonts", "original")
-            script = os.path.join(TOOLS, "font", "extract_fonts.py")
-            proc = subprocess.run(
-                [sys.executable, script, "--game-dir", game, "--out", out],
-                cwd=os.path.dirname(SRC), capture_output=True,
-                text=True, encoding="utf-8", errors="replace")
-            output = (proc.stdout or "") + (proc.stderr or "")
-            return self.send_json({"ok": proc.returncode == 0,
-                                   "output": output,
-                                   "status": font_status()})
-
-        if path == "/api/font/stitch":
-            sf = _font_module()
-            lines = []
-            langs = body.get("langs") or None
-            ok, msg = sf.ensure_fonts(langs=langs,
-                                      force=bool(body.get("force", True)),
-                                      log=lines.append)
-            return self.send_json({"ok": ok, "message": msg, "log": lines,
-                                   "status": font_status()})
-
-        if path == "/api/server/stop":
-            try:
-                port = int(body.get("port") or 0)
-            except (TypeError, ValueError):
-                return self.send_json({"ok": False, "error": "端口不对"})
-            if port in (0, CURRENT_PORT):
-                return self.send_json({"ok": False, "error": "不能停当前服务"})
-            ok = P.editor_shutdown(port)
-            return self.send_json({"ok": ok, "port": port})
-
-        if path == "/api/start/pick":
-            try:
-                out = subprocess.run(
-                    ["powershell", "-NoProfile", "-STA", "-Command",
-                     "Add-Type -AssemblyName System.Windows.Forms; "
-                     "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
-                     "$d.Description = '选择 Port Royale 2 游戏目录'; "
-                     "$d.ShowNewFolderButton = $false; "
-                     "if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) "
-                     "{ Write-Output $d.SelectedPath }"],
-                    capture_output=True, text=True, timeout=180,
-                    creationflags=0x08000000)
-                chosen = (out.stdout or "").strip().splitlines()
-                chosen = chosen[-1].strip() if chosen else ""
-            except Exception as exc:
-                return self.send_json({"ok": False, "error": "打开目录选择框失败：%s" % exc})
-            if not chosen:
-                return self.send_json({"ok": False, "error": "已取消"})
-            return self.send_json({"ok": True, "path": chosen})
-
-        if path == "/api/start/use":
-            sha = (body.get("sha") or "").strip()
-            st = P.load_settings()
-            entry = (st.get("dirs") or {}).get(sha)
-            if not entry:
-                return self.send_json({"ok": False, "error": "没有这个目录"})
-            st["current"] = sha
-            st["last_dir"] = entry.get("dir") or st.get("last_dir", "")
-            P.save_settings(st)
-            return self.send_json({"ok": True, **start_status()})
-
-        if path == "/api/start/forget":
-            sha = (body.get("sha") or "").strip()
-            st = P.load_settings()
-            dirs = st.get("dirs") or {}
-            entry = dirs.pop(sha, None)
-            if not entry:
-                return self.send_json({"ok": False, "error": "没有这个目录"})
-            if st.get("current") == sha:
-                st["current"] = ""
-                st["last_dir"] = ""
-            P.save_settings(st)
-            return self.send_json({"ok": True, "dirs": known_dirs()})
-
-        if path == "/api/start/dir":
-            d = (body.get("path") or "").strip()
-            if not P.is_game_dir(d):
-                return self.send_json({"ok": False,
-                                       "error": "该目录里没有 %s" % P.GAME_EXE})
-            st = P.load_settings()
-            sha, _build = P.identify_dir(d)
-            st.setdefault("dirs", {})[sha] = {
-                "dir": d,
-                "label": P.version_label(sha),
-                "last_used": time.strftime("%Y-%m-%d %H:%M:%S"),
-            }
-            st["current"] = sha
-            st["last_dir"] = d
-            P.save_settings(st)
-            return self.send_json({"ok": True, **start_status()})
-
-        if path == "/api/start/build-injector":
-            return self.send_json(start_run("injector", lambda ev: P.build_injector(ev)))
-
-        if path == "/api/start/build":
-            langs = [x for x in (body.get("langs") or []) if x in P.available_langs()]
-            if not langs:
-                return self.send_json({"ok": False, "error": "没有勾选语言"})
-            return self.send_json(start_run("build", lambda ev: P.run_build(langs, ev)))
-
-        if path == "/api/start/deploy":
-            langs = [x for x in (body.get("langs") or []) if x in P.available_langs()]
-            d = start_dir()
-            if not d or not P.is_game_dir(d):
-                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
-            return self.send_json(start_run(
-                "deploy", lambda ev: P.run_deploy(d, langs or None, ev)))
-
-        if path == "/api/start/lang":
-            d = start_dir()
-            if not d or not P.is_game_dir(d):
-                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
-            code = (body.get("lang") or "").strip()
-            if code not in P.available_langs():
-                return self.send_json({"ok": False, "error": "没有这个语言包：%s" % code})
-            ok, code = P.set_game_language(d, code)
-            return self.send_json({"ok": ok, "lang": code, **start_status()})
-
-        if path == "/api/start/kill":
-            ok, msg = P.kill_game()
-            return self.send_json({"ok": ok, "message": msg,
-                                   "procs": P.game_processes()})
-
-        if path == "/api/start/launch":
-            d = start_dir()
-            if not d or not P.is_game_dir(d):
-                return self.send_json({"ok": False, "error": "还没有选择游戏目录"})
-            lang = body.get("lang") or P.game_language(d) or None
-            if body.get("vanilla"):
-                ok, msg = P.launch_vanilla(d)
-            else:
-                ok, msg = P.launch_game(d, lang)
-            return self.send_json({"ok": ok, "message": msg})
-
-
-        if path == "/api/check":
-            text = body.get("text", "")
-            lang = body.get("lang", "zh")
-            hid = body.get("id", "")
-            row = next((r for r in load_all() if r["id"] == hid), None)
-            return self.send_json([] if row is None else check_one(row, lang, text))
-
-        if path == "/api/save":
-            lang = body.get("lang", "")
-            return self.send_json({"ok": True,
-                                   "written": save_all(lang, rows_of(body))})
-
-        if path == "/api/placeholder-meaning":
-            lang = (body.get("lang") or "zh").strip() or "zh"
-            hid = (body.get("id") or "").strip().lower()
-            token = (body.get("token") or "").strip()
-            meaning = body.get("meaning", None)
-            if meaning is not None:
-                meaning = str(meaning)
-            if not hid or not token:
-                return self.send_json({"ok": False, "error": "缺少 id 或占位符"})
-            save_meaning(lang, hid, token, meaning)
-            return self.send_json({"ok": True,
-                                   "meanings": meaning_for(lang, hid)})
-
-        if path == "/api/seed":
-            lang = body.get("lang", "zh")
-            hid = body.get("id", "")
-            text = body.get("text", "")
-            seed = T.lang_path(lang)
-            if not os.path.isfile(seed):
-                return self.send_json({"detail": "没有译文文件"}, 404)
-            cur = tomllib.load(open(seed, "rb"))
-            if hid not in cur:
-                return self.send_json({"detail": "译文里没有这一条"}, 404)
-            order = list(cur)
-            cur[hid] = text
-            TI.write_doc_atomic(seed, cur, order, TI.head_lines(seed))
-            return self.send_json({"ok": True, "text": text})
-
-        if path == "/api/hash-rule":
-            hid = (body.get("id") or "").strip()
-            term = (body.get("term") or "").strip()
-            if not hid or not term:
-                return self.send_json({"ok": False, "error": "缺少 id 或术语"})
-            rules = save_hash_rule(hid, term, bool(body.get("skip")))
-            return self.send_json({"ok": True, "rules": rules})
-
-
-        if path == "/api/placeholder-meanings":
-            lang = (body.get("lang") or "zh").strip() or "zh"
-            hid = (body.get("id") or "").strip().lower()
-            meanings = body.get("meanings") or {}
-            if not hid or not isinstance(meanings, dict):
-                return self.send_json({"ok": False, "error": "参数不对"})
-            for tok, mean in meanings.items():
-                save_meaning(lang, hid, str(tok), str(mean))
-            return self.send_json({"ok": True,
-                                   "meanings": meaning_for(lang, hid)})
-
-        if path == "/api/patch":
-            lang = body.get("lang", "")
-            rows = rows_of(body)
-            bad = []
-            for row in rows:
-                for tok, want, got in placeholder_problems(
-                        row.get("id", ""), lang, row.get("text", "")):
-                    bad.append("%s 的 %s（原文 %d 个，译文 %d 个）"
-                               % (row.get("id", ""), tok, want, got))
-            if bad:
-                return self.send_error_json(
-                    400, "占位符数量不符，未保存：\n" + "\n".join(bad[:10]))
-            written, changed = patch_all(lang, rows)
-            return self.send_json({"ok": True, "written": written,
-                                   "changed": changed})
-
-        if path == "/api/newlang":
-            made = new_lang(body.get("code", ""), body.get("from", ""))
-            return self.send_json({"ok": True, **made})
-
-        if path == "/api/shutdown":
-            self.send_json({"ok": True})
-            # 稍等一点，先让这条响应写回客户端，再收摊。
-            threading.Timer(0.2, stop_server).start()
-            return None
-
-        return self.send_error_json(404, "unknown api: %s" % path)
+        fn = ROUTER.get(("POST", path))
+        if fn is None:
+            return self.send_error_json(404, "unknown api: %s" % path)
+        return fn(Req(self, body=body))
 
 
 
