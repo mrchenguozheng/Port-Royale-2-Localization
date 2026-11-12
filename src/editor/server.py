@@ -73,6 +73,8 @@ from text import zh_pipeline as ZH_GEN  # noqa: E402
 from text import lang_rules  # noqa: E402
 from text import toml_io as TI  # noqa: E402
 from install import pr2ctl as P  # noqa: E402
+from api import store as ST  # noqa: E402
+from api.store import load_all, rows_of, save_all, patch_all  # noqa: E402
 
 
 #: 真实端口，由 main() 在启动前填上。工具窗口靠 /api/health 判断
@@ -611,47 +613,8 @@ def context_of(hid, lang):
 
 # ---------------------------------------------------------------- 数据
 
-_ALL_CACHE = {"key": None, "rows": None}
-
-
-def _all_key():
-    parts = []
-    for lang in T.all_langs():
-        p = T.lang_path(lang)
-        try:
-            st = os.stat(p)
-            parts.append((lang, st.st_mtime_ns, st.st_size))
-        except OSError:
-            parts.append((lang, 0, 0))
-    return tuple(parts)
-
-
-def load_all():
-    """读全部语言，按 id 合并成前端要的形态。
-
-    走 translate.load_toml —— 它已经在做合并，且强制条目数与顺序与
-    基准表（en.gog_1.1.2.3）一致。这条是硬要求：多一条会让后面全部错位。
-    """
-    key = _all_key()
-    if _ALL_CACHE["key"] == key:
-        return _ALL_CACHE["rows"]
-
-    doc = T.load_toml()
-    langs = T.all_langs()
-    # 参考语言缺的 id（版本差异）：给前端一个显式标记，
-    # 否则「空字符串」和「这一版根本没这条」看起来一模一样。
-    lack = {k: set(v) for k, v in (doc.get("missing") or {}).items()}
-    rows = []
-    for e in T.entries(doc):
-        r = {"id": e.get("id", ""), "ctx": e.get("ctx", "") or ""}
-        for k in langs:
-            r[k] = e.get(k, "") or ""
-        gone = [k for k, ids in lack.items() if e.get("id", "") in ids]
-        if gone:
-            r["missing"] = gone
-        rows.append(r)
-    _ALL_CACHE.update(key=key, rows=rows)
-    return rows
+# 读缓存、整表写回、补丁写回都在 api\store.py；这里只剩「换根」。
+# 换根之后必须清掉 store 的缓存，否则拿到的还是旧文件的内容。
 
 
 def set_data_root(path, presets_dir=None):
@@ -671,89 +634,10 @@ def set_data_root(path, presets_dir=None):
                               "glossary", "hash_rules.toml")
     _MEAN_CACHE.update(key=None, data={})
     _HASH_CACHE.update(key=None, data={})
-    _ALL_CACHE.update(key=None, rows=None)
+    ST._ALL_CACHE.update(key=None, rows=None)
     if presets_dir:
         sf = _font_module()
         sf.PRESETS_DIR = os.path.abspath(presets_dir)
-
-
-def rows_of(body):
-    """从请求体里取 rows，并保持 (id, text) 的形状。
-
-    以前这层是 pydantic 做的；现在只有这一处要校验，手写更直接 ——
-    也顺手把「id 不是字符串」「text 是 null」这类脏数据挡在外面。
-    """
-    rows = body.get("rows")
-    if not isinstance(rows, list):
-        raise ValueError("rows 必须是数组")
-    out = []
-    for r in rows:
-        if not isinstance(r, dict) or not isinstance(r.get("id"), str):
-            raise ValueError("rows 里的每一项都要有字符串 id")
-        text = r.get("text", "")
-        out.append({"id": r["id"], "text": "" if text is None else str(text)})
-    return out
-
-
-def save_all(lang, rows):
-    r"""把译文写回 translations\<lang>.toml（整表写，要求顺序完整）。
-
-    写之前核对 id 与基准：条目数或顺序不对时宁可拒绝写，也不能写出一个
-    会让后面全部错位的文件。
-    """
-    if lang in T.REFERENCE_LANGS:
-        raise ValueError("%s 是只读参考原文，不能写入" % lang)
-
-    path = T.lang_path(lang)
-    order = [e.get("id", "") for e in T.entries(T.load_toml())]
-
-    given = [r["id"] for r in rows]
-    if len(given) != len(order):
-        raise ValueError("条目数不对：收到 %d 条，基准 %s.toml 有 %d 条"
-                         % (len(given), T.BASE_LANG, len(order)))
-    for i, (a, b) in enumerate(zip(given, order)):
-        if a != b:
-            raise ValueError("第 %d 条 id 不符：收到 %s，应为 %s" % (i, a, b))
-
-    texts = {r["id"]: r["text"] for r in rows}
-    TI.write_doc_atomic(path, texts, order, TI.head_lines(path))
-    return len(rows)
-
-
-def patch_all(lang, rows):
-    """只写改动过的条目，其余原样保留。
-
-    分段加载之后前端只见过几十条，顺序也不保证，所以**不能**按
-    「前端说什么就是什么」整表写回去 —— 那样会把没加载过的条目
-    全清空。这里只改传上来的那几个，其余从现有文件里原样读出来。
-
-    顺序以**现有文件**为准（基准 id 顺序不能变，多一条会让后面
-    全部错位），所以传上来的 id 只用来查值。
-    """
-    if lang in T.REFERENCE_LANGS:
-        raise ValueError("%s 是只读参考原文，不能写入" % lang)
-
-    path = T.lang_path(lang)
-    try:
-        with open(path, "rb") as f:
-            cur = tomllib.load(f)
-    except FileNotFoundError:
-        cur = {}
-
-    base = load_all()                    # 含 id 顺序与 ctx
-    order = [r["id"] for r in base]
-
-    upd = {r["id"]: r["text"] for r in rows}
-    unknown = [i for i in upd if i not in cur and i not in order]
-    if unknown:
-        raise ValueError("有 id 不在文件里：%s" % "、".join(unknown[:3]))
-
-    texts = {}
-    for rid in order:
-        text = upd.get(rid)
-        texts[rid] = cur.get(rid, "") if text is None else text
-    TI.write_doc_atomic(path, texts, order, TI.head_lines(path))
-    return len(order), len(upd)
 
 
 #: 语言代码就是文件名，也只允许这些字符 —— 它要拼进路径。
