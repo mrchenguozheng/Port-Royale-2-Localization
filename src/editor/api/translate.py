@@ -23,7 +23,7 @@ from pack import compile_pack as C  # noqa: E402
 from text import lang_rules     # noqa: E402
 from text import toml_io as TI  # noqa: E402
 from text import zh_pipeline as ZH_GEN  # noqa: E402
-from api.store import load_all, rows_of, save_all, patch_all  # noqa: E402
+from api.store import load_all, rows_of, patch_all  # noqa: E402
 from api import langs as LG     # noqa: E402
 
 ORDER_FILE = os.path.join(os.path.dirname(HERE), "data", "table-order.txt")
@@ -488,14 +488,6 @@ def post_check(req):
     return req.send_json([] if row is None else check_one(row, lang, text))
 
 
-def post_save(req):
-    query = req.query
-    body = req.body
-    lang = body.get("lang", "")
-    return req.send_json({"ok": True,
-                           "written": save_all(lang, rows_of(body))})
-
-
 def post_seed(req):
     query = req.query
     body = req.body
@@ -547,7 +539,6 @@ ROUTES = {
     ("GET", "/api/entries"): get_entries,
     ("GET", "/api/search"): get_search,
     ("POST", "/api/check"): post_check,
-    ("POST", "/api/save"): post_save,
     ("POST", "/api/seed"): post_seed,
     ("POST", "/api/patch"): post_patch,
 }

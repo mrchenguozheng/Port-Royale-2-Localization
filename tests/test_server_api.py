@@ -196,23 +196,6 @@ class TestServerApi(unittest.TestCase):
         self.assertEqual(diff, [hid])
         self.assertFalse(os.path.exists(self._zh_path() + ".tmp"))
 
-    def test_save_full_roundtrip(self):
-        doc = self._zh()
-        rows = [{"id": k, "text": doc[k]} for k in doc]
-        status, body = self._post("/api/save", {"lang": "zh", "rows": rows})
-        self.assertEqual(status, 200, body)
-        self.assertEqual(body["written"], len(doc))
-        self.assertEqual(self._zh(), doc)
-
-    def test_save_rejects_bad_order(self):
-        before = _digest(self._zh_path())
-        doc = self._zh()
-        rows = [{"id": k, "text": doc[k]} for k in reversed(list(doc))]
-        status, body = self._post("/api/save", {"lang": "zh", "rows": rows})
-        self.assertEqual(status, 400)
-        self.assertIn("detail", body)
-        self.assertEqual(_digest(self._zh_path()), before)
-
     def test_seed_writes_temp_file(self):
         before = self._zh()
         hid = next(iter(before))

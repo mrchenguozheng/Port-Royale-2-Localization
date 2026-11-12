@@ -130,10 +130,14 @@ After the split:
   `GET`/`POST /api/placeholder-meanings` had no caller; and `POST /api/font/stitch`
   duplicates the CLI path (`subset_fonts.py`), while the install page only uses
   `font-status` / `font/export`. All three were removed, route count 45→42;
+- With a single product, `POST /api/save` has no user either: the frontend only uses
+  `/api/patch` (multi-row, existing file order, per-row placeholder checks), and
+  `save_all`'s whole-table order check only matters to a caller that holds all 3548
+  entries. The route and `save_all` were removed together, route count 42→41;
 - The stage-1 `--data` / `--presets-dir` flags remain, and tests run POST against a
   temporary data root.
 
-Status: done. `tests/test_server_api.py` 7 tests (20 GET routes all 200, POST writes
+Status: done. `tests/test_server_api.py` 5 tests (20 GET routes all 200, POST writes
 to the temporary root, real repository file SHAs unchanged); `check.py` 46 tests;
 `engine_text --check` reports "一致" for both zh and ja; pack SHAs match the
 pre-refactoring baseline (zh `2B209420…920F`, ja `17517FB6…FAB`).

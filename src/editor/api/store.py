@@ -80,31 +80,6 @@ def rows_of(body):
     return out
 
 
-def save_all(lang, rows):
-    r"""把译文写回 translations\<lang>.toml（整表写，要求顺序完整）。
-
-    写之前核对 id 与基准：条目数或顺序不对时宁可拒绝写，也不能写出一个
-    会让后面全部错位的文件。
-    """
-    if lang in T.REFERENCE_LANGS:
-        raise ValueError("%s 是只读参考原文，不能写入" % lang)
-
-    path = T.lang_path(lang)
-    order = [e.get("id", "") for e in T.entries(T.load_toml())]
-
-    given = [r["id"] for r in rows]
-    if len(given) != len(order):
-        raise ValueError("条目数不对：收到 %d 条，基准 %s.toml 有 %d 条"
-                         % (len(given), T.BASE_LANG, len(order)))
-    for i, (a, b) in enumerate(zip(given, order)):
-        if a != b:
-            raise ValueError("第 %d 条 id 不符：收到 %s，应为 %s" % (i, a, b))
-
-    texts = {r["id"]: r["text"] for r in rows}
-    TI.write_doc_atomic(path, texts, order, TI.head_lines(path))
-    return len(rows)
-
-
 def patch_all(lang, rows):
     """只写改动过的条目，其余原样保留。
 
