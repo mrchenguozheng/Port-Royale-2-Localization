@@ -14,6 +14,7 @@ import os
 import re
 
 from text import zh_space
+from text.lang_rules import base
 
 TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -166,7 +167,7 @@ def _is_han(ch):
     return ch and "\u4e00" <= ch <= "\u9fff"
 
 
-SPLIT_RX = re.compile(r"(<n><n>|<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z])")
+SPLIT_RX = re.compile("(<n><n>|<[^>]*>|" + base.VAR.pattern + ")")
 
 
 def space_tokens(text):

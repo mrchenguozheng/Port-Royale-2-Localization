@@ -26,6 +26,12 @@ write its output back into the translation layer.
 
 The machinery still lives in `base.py`: `make_fmt` / `fix_ascii_punct` / `fix_vars` / `clean_n`.
 
+The placeholder regex has exactly one language-wide source, `base.VAR`: Chinese's
+`zh_space.TAG` and `zh_pipeline.SPLIT_RX` are assembled from it (each adds a `<...>`
+alternative). Japanese's `ja.SPLIT_RX` is deliberately wider (`%[0-9A-Za-z]+`,
+`@X$…$`) and stays separate. The validation contract in `shared/core/validate.py` is
+independent and is not derived from `base.VAR`.
+
 ### Segmenter
 
 ```python

@@ -34,10 +34,13 @@ import os
 import re
 import subprocess
 
+from text.lang_rules import base
+
 TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT = os.path.dirname(os.path.dirname(TOOLS))
 
-TAG = re.compile(r"(<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z])")
+#: 标签/占位符：占位符部分与校验用的 base.VAR 同源，避免两处各写一份。
+TAG = re.compile("(<[^>]*>|" + base.VAR.pattern + ")")
 CJK_RUN = re.compile(r"[\u4e00-\u9fff]+")
 NAME = re.compile(r"[\u4e00-\u9fff]+(?:·[\u4e00-\u9fff]+)+")
 
