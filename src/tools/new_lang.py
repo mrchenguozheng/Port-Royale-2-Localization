@@ -39,7 +39,12 @@ SRC = os.path.dirname(HERE)                     # 仓库的 src\
 ROOT = os.path.dirname(SRC)                     # 仓库根
 sys.path.insert(0, HERE)
 
-REF_JSON = os.path.join(ROOT, "editor", "data", "editor-data.json")
+#: 原始数据（英法原文 + 字体信息）。它在 .workbuddy\ 下 —— 那目录放的是
+#: 「不进仓库、但要从游戏里提取出来的东西」，跟仓库自带的 references\ 分开。
+#: 以前这里写的是 ROOT\editor\data\，那是旧 Electron 编辑器的布局，
+#: 编辑器换成 Web 版之后路径就断了 —— 脚本会一直说「找不到原始数据」，
+#: 明明文件就在仓库里。
+REF_JSON = os.path.join(ROOT, ".workbuddy", "editor", "data", "editor-data.json")
 ZH_TXT = os.path.join(ROOT, "build", "PR2Packs", "zh.txt")
 STRINGS = os.path.join(SRC, "translations")
 #: 基准语言：id 顺序以它为准，且 write-toml 拒写它
