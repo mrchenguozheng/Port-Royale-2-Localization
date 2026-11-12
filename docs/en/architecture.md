@@ -122,10 +122,13 @@ After the split:
 - Known dead route: the `GET /api/rule-hits` branch called `rule_hits()`, which never
   existed in the repository (it could only return 500, and the frontend `app.ts`
   never called it), so it was removed with the split; route count 47→46;
+- Same kind of cleanup: the frontend "context inference" dialog (`openCtx`) was never
+  wired up; inline context only uses `/api/context-batch`. The dialog and
+  `GET /api/context` were removed together, route count 46→45;
 - The stage-1 `--data` / `--presets-dir` flags remain, and tests run POST against a
   temporary data root.
 
-Status: done. `tests/test_server_api.py` 7 tests (22 GET routes all 200, POST writes
+Status: done. `tests/test_server_api.py` 7 tests (21 GET routes all 200, POST writes
 to the temporary root, real repository file SHAs unchanged); `check.py` 46 tests;
 `engine_text --check` reports "一致" for both zh and ja; pack SHAs match the
 pre-refactoring baseline (zh `2B209420…920F`, ja `17517FB6…FAB`).

@@ -33,7 +33,6 @@ GET_URLS = [
     "/api/list?lang=zh",
     "/api/entries?offset=0&limit=1&filter=all&lang=zh",
     "/api/entry-info?lang=zh&id=0xc46f793a",
-    "/api/context?lang=zh&id=0xc46f793a",
     "/api/rule-trace?lang=zh&id=0xc46f793a",
     "/api/placeholder-meanings?lang=zh&id=0xc46f793a",
     "/api/seed?lang=zh&id=0xc46f793a",

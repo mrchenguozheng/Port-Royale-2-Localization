@@ -354,17 +354,6 @@ def get_entry_info(req):
     })
 
 
-def get_context(req):
-    query = req.query
-    body = req.body
-    hid = (query.get("id") or [""])[0]
-    lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
-    ctx = context_of(hid, lang)
-    if ctx is None:
-        return req.send_error_json(404, "没有这个 id：%s" % hid)
-    return req.send_json(ctx)
-
-
 def get_list(req):
     query = req.query
     body = req.body
@@ -550,7 +539,6 @@ ROUTES = {
     ("GET", "/api/rule-trace"): get_rule_trace,
     ("GET", "/api/seed"): get_seed,
     ("GET", "/api/entry-info"): get_entry_info,
-    ("GET", "/api/context"): get_context,
     ("GET", "/api/list"): get_list,
     ("GET", "/api/ids"): get_ids,
     ("GET", "/api/find"): get_find,
