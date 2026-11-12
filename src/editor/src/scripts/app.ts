@@ -869,33 +869,6 @@ function zhEditor(): HTMLElement | null {
   return document.querySelector('.cell-zh .edit') as HTMLElement | null;
 }
 
-function insertAtCaret(text: string) {
-  const ed = zhEditor();
-  if (!ed) return;
-  ed.focus();
-  const sel = window.getSelection();
-  if (sel && sel.rangeCount && ed.contains(sel.anchorNode)) {
-    const range = sel.getRangeAt(0);
-    range.deleteContents();
-    range.insertNode(document.createTextNode(text));
-    range.collapse(false);
-    sel.removeAllRanges();
-    sel.addRange(range);
-  } else {
-    ed.appendChild(document.createTextNode(text));
-  }
-  ed.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-function removeToken(tok: string) {
-  const ed = zhEditor();
-  if (!ed) return;
-  const text = ed.textContent || '';
-  ed.textContent = text.split(tok).join('');
-  ed.dispatchEvent(new Event('input', { bubbles: true }));
-  ed.focus();
-}
-
 function rowOf(e: Entry): HTMLElement {
   const row = el('div', 'row');
   row.dataset.id = e.id;
@@ -973,13 +946,6 @@ function rowOf(e: Entry): HTMLElement {
 function textOf(e: Entry): string {
   const ed = S.edits.get(e.id);
   return ed === undefined ? ((e[S.lang] as string) || '') : ed;
-}
-
-function line(tag: string, body: HTMLElement): HTMLElement {
-  const d = el('div', 'line');
-  d.appendChild(el('div', 'tag', tag));
-  d.appendChild(body);
-  return d;
 }
 
 /* 译文格：contenteditable，空格直接渲染成带底色的 span。
@@ -1747,59 +1713,10 @@ $('jumpHash').addEventListener('keydown', (ev) => {
 
 // ── 语境推断 ────────────────────────────────────────────
 
-async function openCtx(id: string) {
-  const modal = $('ctxModal');
-  const body = $('ctxBody');
-  body.textContent = '正在分析…';
-  modal.hidden = false;
-  try {
-    const c = await api<{
-      id: string; category: string; reasons: string[];
-      placeholders: { token: string; meaning: string }[];
-      tags: string[]; en: string; zh: string;
-      neighbors: { id: string; en: string; zh: string }[];
-    }>(`/api/context?id=${encodeURIComponent(id)}&lang=${encodeURIComponent(S.lang)}`);
-
-    body.innerHTML = '';
-    const line = (label: string, value: string) => {
-      const d = el('div', 'ctx-line');
-      d.appendChild(el('span', 'ctx-label', label));
-      d.appendChild(el('span', 'ctx-value', value || '（无）'));
-      body.appendChild(d);
-    };
-    line('ID', c.id);
-    line('推断用途', c.category);
-    line('依据', c.reasons.join('；') || '（无）');
-    if (c.placeholders.length) {
-      line('占位符', c.placeholders.map((p) => `${p.token} → ${p.meaning}`).join('；'));
-    }
-    if (c.tags.length) line('格式标记', c.tags.join('、'));
-    line('原文', c.en);
-    line('当前译文', c.zh);
-
-    if (c.neighbors.length) {
-      body.appendChild(el('div', 'ctx-head', '表格中相邻的条目（同屏/同功能的可能性高）'));
-      for (const n of c.neighbors) {
-        const d = el('div', 'ctx-neigh');
-        d.appendChild(el('span', 'ctx-id', n.id));
-        d.appendChild(el('span', 'ctx-neigh-en', n.en));
-        if (n.zh) d.appendChild(el('span', 'ctx-neigh-zh', n.zh));
-        body.appendChild(d);
-      }
-    }
-  } catch (err) {
-    toast('读取失败：' + (err as Error).message);
-  }
-}
-
 $('ruleClose').addEventListener('click', () => { ($('ruleModal') as any).hide?.(); });
 $('seedUnlock').addEventListener('click', () => void unlockSeed());
 $('seedSave').addEventListener('click', () => void saveSeed());
 $('seedClose').addEventListener('click', closeSeed);
-$('ctxClose').addEventListener('click', () => { $('ctxModal').hidden = true; });
-$('ctxModal').addEventListener('click', (ev) => {
-  if (ev.target === $('ctxModal')) $('ctxModal').hidden = true;
-});
 
 function showBootError(msg: string) {
   const box = document.getElementById('loading');
