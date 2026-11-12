@@ -45,9 +45,9 @@ ARG_RX = re.compile(r"@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]")
 def check_one(entry, lang, text):
     """校验一条译文，返回 [{level, text}]。
 
-    规则与消息都在 shared\\core\\validate.py —— 编译脚本、这个编辑器、
-    独立译者工作台共用同一份。以前这里借 compile_pack 的实现，再自己
-    补一段标签比对，三处对 %02 补零与紧邻占位符的处理并不一致。
+    规则与消息都在 shared\\core\\validate.py —— 编译脚本和这个编辑器共用同一份。
+    以前这里借 compile_pack 的实现，再自己补一段标签比对，三处对 %02 补零与
+    紧邻占位符的处理并不一致。
 
     level 分 error / warn：error 大概率出乱码，warn 需要人工确认。
     """

@@ -157,4 +157,6 @@ When reporting a problem, include:
 
 ---
 
-For a minimal handoff environment, see [Translator workbench](translator-workbench.md).
+There is no separate translator package: human and agent translations both edit
+`src/translations/<lang>.toml` directly, or go through the `src/editor` HTTP API.
+The editor is a maintainer console only.

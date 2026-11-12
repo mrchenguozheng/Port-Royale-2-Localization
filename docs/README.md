@@ -35,7 +35,6 @@ document set was removed on purpose; the Japanese *game* translation
 | [Language rule interface](en/language-rules-interface.md) | Three parts: punctuation / segmenter / spacing; a new language is one file |
 | [New language](en/new-language.md) | Add a language from scratch |
 | [Language collaboration](en/language-collaboration.md) | Translator/maintainer split, handoff and verification |
-| [Translator workbench](en/translator-workbench.md) | Minimal package with only the translation page |
 
 ## Translation notes
 

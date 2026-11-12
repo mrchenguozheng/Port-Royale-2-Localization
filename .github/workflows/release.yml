@@ -56,11 +56,6 @@ jobs:
           python src\tools\pack\make_release.py --lang zh --version $env:VERSION
           python src\tools\pack\make_release.py --lang ja --version $env:VERSION
 
-      - name: Build translator workbench
-        run: |
-          python src\tools\pack\make_translator.py --out "dist\PR2Translator-$env:VERSION"
-          Compress-Archive -Path "dist\PR2Translator-$env:VERSION\*" -DestinationPath "dist\PR2Translator-$env:VERSION.zip"
-
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -69,4 +64,3 @@ jobs:
           files: |
             dist/PR2-zh-${{ env.VERSION }}.zip
             dist/PR2-ja-${{ env.VERSION }}.zip
-            dist/PR2Translator-${{ env.VERSION }}.zip
