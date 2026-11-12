@@ -19,11 +19,11 @@ python editor\server.py --data src --web-dir editor\web
 
 ```
 data/
-├─ live/<lang>.toml
+├─ translations/<lang>.toml
 └─ orig/en.gog_1.1.2.3.toml
 ```
 
-For the repository, `src` already has `src/live` and `src/orig`, so
+For the repository, `src` already has `src/translations` and `src/orig`, so
 `--data src` works.
 
 ## Standalone package
@@ -54,7 +54,7 @@ JSON files directly; keys are read-only.
 
 ## Multiple languages and references
 
-One server can serve every `data/live/*.toml`; switch with the top
+One server can serve every `data/translations/*.toml`; switch with the top
 **Translation language** selector. The URL becomes `/translate/<lang>`.
 
 The reference cell shows English, with the French reference below it. French is

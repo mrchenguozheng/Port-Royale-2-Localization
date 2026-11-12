@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """progress.py —— 看翻译进度：已译 / 原样保留 / 还没动。
 
-「原样保留」来自 `src\\translations\\keep_original.toml`，那些条目本来就不该翻
+「原样保留」来自 `src\\data\\keep_original.toml`，那些条目本来就不该翻
 （纯符号、数字、引擎编号、版权声明）。把它们算进「已处理」，进度才不会永远卡在
 99%。
 
@@ -26,7 +26,7 @@ ROOT = os.path.dirname(os.path.dirname(TOOLS))
 
 
 def load_keep():
-    path = os.path.join(ROOT, "src", "live", "keep_original.toml")
+    path = os.path.join(ROOT, "src", "data", "keep_original.toml")
     if not os.path.isfile(path):
         return set()
     data = tomllib.load(open(path, "rb"))

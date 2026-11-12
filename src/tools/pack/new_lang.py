@@ -6,7 +6,7 @@
 
 **加一种语言就是复制 en.gog_1.1.2.3.toml 再逐条改译文**，所以本脚本只做这一件事：
 
-    src/orig/en.gog_1.1.2.3.toml  ->  src/live/<代码>.toml
+    src/orig/en.gog_1.1.2.3.toml  ->  src/translations/<代码>.toml
 
 复制出来的每一行右边都是英文原文，也就是「未译」状态。逐条把右边改成
 译文即可；没改的那些游戏里就显示英文。
@@ -24,7 +24,7 @@
 
 不带参数时走这条路，从 `editor/data/editor-data.json` 重新生成
 en / fr / zh 三份文件。只在初次建立或**换游戏版本**（英法原文变了）时用。
-日常改译文直接编辑 `src/live/<语言>.toml`，不要跑它
+日常改译文直接编辑 `src/translations/<语言>.toml`，不要跑它
 —— 它会用旧数据覆盖你的改动。
 """
 
@@ -43,7 +43,7 @@ sys.path.insert(0, HERE)
 
 REF_JSON = os.path.join(ROOT, "editor", "data", "editor-data.json")
 ZH_TXT = os.path.join(ROOT, "build", "PR2Packs", "zh.txt")
-STRINGS = os.path.join(SRC, "live")
+STRINGS = os.path.join(SRC, "translations")
 #: 只读参考（英/法/中文文本源）在 src\references\
 REFS = os.path.join(SRC, "orig")
 #: 基准语言：id 顺序以它为准，且 write-toml 拒写它

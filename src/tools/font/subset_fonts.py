@@ -38,7 +38,7 @@ TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, TOOLS)
 SRC_DIR = os.path.dirname(TOOLS)                       # 仓库的 src\
 ROOT = os.path.dirname(SRC_DIR)                       # 仓库根
-STRINGS = os.path.join(SRC_DIR, "live")
+STRINGS = os.path.join(SRC_DIR, "translations")
 
 DEFAULT_SRC = os.path.join(ROOT, "assets", "fonts", "original")
 DEFAULT_OUT = os.path.join(ROOT, "build", "fonts")

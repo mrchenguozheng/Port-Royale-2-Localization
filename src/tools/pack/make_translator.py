@@ -7,7 +7,7 @@
 
 The package contains only:
 - editor/server.py and editor/web (English UI);
-- data/live/*.toml and the English/French references;
+- data/translations/*.toml and the English/French references;
 - a bundled Python runtime by default.
 
 No build, injector, fonts, PR2Packs or install page.
@@ -120,12 +120,12 @@ Files:
   editor/server.py   local translation server
   editor/web/        English workbench UI
   shared/core/       shared translation storage/validation
-  data/live/*.toml   translation files (%s)
+  data/translations/*.toml   translation files (%s)
   data/orig/         English and French references
   %s
 
 The workbench listens on 127.0.0.1 only.
-Return the edited data/live/<lang>.toml to the maintainer.
+Return the edited data/translations/<lang>.toml to the maintainer.
 """ % (languages,
        "python/            bundled Python (no install needed)" if has_python
        else "Python 3.11+      required on PATH")
@@ -135,10 +135,9 @@ Return the edited data/live/<lang>.toml to the maintainer.
 
 
 def make(out, python_dir=None, system_python=False):
-    live_dir = os.path.join(SRC, "live")
+    live_dir = os.path.join(SRC, "translations")
     codes = sorted(x[:-5] for x in os.listdir(live_dir)
-                   if x.endswith(".toml") and not x.startswith("_")
-                   and x != "keep_original.toml")
+                   if x.endswith(".toml") and not x.startswith("_"))
     if not codes:
         raise SystemExit("no editable language in %s" % live_dir)
     orig = os.path.join(SRC, "orig", "en.gog_1.1.2.3.toml")
@@ -157,13 +156,12 @@ def make(out, python_dir=None, system_python=False):
     copy_tree(os.path.join(ROOT, "shared"),
               os.path.join(stage, "shared"))
 
-    os.makedirs(os.path.join(stage, "data", "live"))
+    os.makedirs(os.path.join(stage, "data", "translations"))
     os.makedirs(os.path.join(stage, "data", "orig"))
-    for name in os.listdir(os.path.join(SRC, "live")):
-        if name.endswith(".toml") and not name.startswith("_") \
-                and name != "keep_original.toml":
-            shutil.copy2(os.path.join(SRC, "live", name),
-                         os.path.join(stage, "data", "live", name))
+    for name in os.listdir(os.path.join(SRC, "translations")):
+        if name.endswith(".toml") and not name.startswith("_"):
+            shutil.copy2(os.path.join(SRC, "translations", name),
+                         os.path.join(stage, "data", "translations", name))
     for name in os.listdir(os.path.join(SRC, "orig")):
         if name.endswith(".toml"):
             shutil.copy2(os.path.join(SRC, "orig", name),

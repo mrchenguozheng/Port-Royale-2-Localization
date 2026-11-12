@@ -5,7 +5,7 @@
 依次跑：
 1. 跨模块引用检查（lint_imports.py）
 2. 规则单元测试（tests/）
-3. （已移除：live 可手改，不再要求等于规则输出）
+3. （已移除：译文层只有一份，不再做「生成物 vs 手改文本」一致性检查）
 
     python src/tools/check.py
 """

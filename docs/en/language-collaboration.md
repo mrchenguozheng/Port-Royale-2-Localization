@@ -12,7 +12,7 @@ applies to other languages.
 |---|---|---|
 | Translation, proofreading, terminology, tone | ✅ | Can help |
 | In-game verification | ✅ | ✅ |
-| `src/live/<code>.toml` | ✅ | Can do |
+| `src/translations/<code>.toml` | ✅ | Can do |
 | `src/packs/<code>.toml` | Not needed | ✅ |
 | `ui/<code>.ini` | ✅ | Can do |
 | Font mapping / Noto KR | Not needed | ✅ |
@@ -38,7 +38,7 @@ In **Translation editor**:
 
 1. Create/select `ko` in the language dropdown (or use the language scaffolded by
    the maintainer);
-2. Translate and save (written to `src/live/ko.toml`);
+2. Translate and save (written to `src/translations/ko.toml`);
 3. Untranslated entries fall back to English; the whole file does not have to be
    finished at once.
 
@@ -47,7 +47,7 @@ In **Translation editor**:
 The maintainer provides:
 
 ```
-src/live/ko.toml
+src/translations/ko.toml
 ui/ko.ini
 ```
 
@@ -73,7 +73,7 @@ python src\tools\pack\new_lang.py --new-lang ko --from en
 Creates:
 
 ```
-src/live/ko.toml
+src/translations/ko.toml
 src/tools/font/fontstitch/presets/ko.toml
 ```
 

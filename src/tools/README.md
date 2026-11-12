@@ -7,7 +7,7 @@ src/tools/
 ├─ pack/       编译、部署、新建语言
 ├─ text/       归一化、中文/日文规则、分词
 ├─ font/       字体缝合与导出
-├─ analysis/   说话人、语气、宽度等分析
+├─ analysis/   说话人、语气等分析
 ├─ install/    pr2ctl 构建/部署/启动
 ├─ data/       人名、地名、分词词典
 ├─ translate.py / glossary.py / terms_check.py / placeholder_roles.py   共享核心
@@ -22,7 +22,7 @@ src/tools/
 | `pack/apply_patch.py` | 归一化 → 校验 → 编译 → 部署，一条命令跑完（`apply_patch.bat` 调它） |
 | `check.py` | 跑全部静态检查与单测（`check.bat` 调它） |
 | `pack/new_lang.py` | 命令行新建语言（编辑器里也能建） |
-| `pack/compile_pack.py` | 把 `src/live/*.toml` 编译成 `build/PR2Packs/*.txt` |
+| `pack/compile_pack.py` | 把 `src/translations/*.toml` 排版后编译成 `build/PR2Packs/*.txt`，引擎文本落在 `build/engine_text/*.toml` |
 | `pack/check_breaks.py` | 编译后校验换行/占位符 |
 
 ## 文本规则
@@ -30,9 +30,10 @@ src/tools/
 | 脚本 | 作用 |
 |---|---|
 | `text/normalize_text.py` | 按语言规则归一化标点、空格 |
-| `text/apply_zh_rules.py` / `text/apply_ja_rules.py` | 中文/日文规则管线（空格、名字、断行） |
-| `text/lang_rules/` | 各语言规则模块 |
-| `text/segment_zh.py` / `text/zh_dep_space.py` / `text/space_words.py` | 中文分词与空格实验 |
+| `text/engine_text.py` | 译文 → 引擎文本（排版规则总入口，产物写 `build/engine_text/`） |
+| `text/apply_zh_rules.py` / `text/apply_ja_rules.py` | 中文/日文排版管线（标点、名字、按词补空格） |
+| `text/zh_space.py` | 中文分词与按字数成组补空格（spaCy → jieba → 机械兜底） |
+| `text/segment_zh.py` / `text/zh_dep_space.py` | 分词子进程入口、弃用空格对照小工具 |
 | `data/zh_names.txt` / `data/zh_towns.txt` / `data/zh_userdict.txt` | 人名、地名、分词词典 |
 
 ## 翻译与术语
@@ -68,7 +69,6 @@ python src/tools/font/subset_fonts.py --check
 | `install/pr2ctl/` | 构建/部署/启动的共享实现 |
 | `install/server_status.py` | 探测本机编辑器实例 |
 | `analysis/progress.py` | 进度显示 |
-| `analysis/width_check.py` | 用字体宽度粗查译文是否超宽 |
 | `lint_imports.py` | 跨模块引用检查 |
 
 ## 数据文件

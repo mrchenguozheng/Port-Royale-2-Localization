@@ -92,12 +92,11 @@ On the **Translation Editor** page:
 This generates:
 
 ```
-src/live/de.toml
+src/translations/de.toml
 ```
 
-(New languages currently only create the `live` file automatically; the initial
-`seed` version is not generated, so copy one by hand from the template language to
-`src/seed/de.toml` if you need it.)
+(A new language creates only this translation file; there is no extra "initial version"
+layer. To start from the template language's text, pick it as the template when creating.)
 
 **Check**: `de` appears in the language dropdown and the list can be paged.
 
@@ -146,7 +145,7 @@ donor.
 ## 6. Translate
 
 Edit entries one by one in the editor, then press `Ctrl+S` or click **Save**. Saving
-writes directly to `src/live/de.toml`.
+writes directly to `src/translations/de.toml`.
 
 **Check**: the translation is still there after refreshing the page; the counters at
 the bottom are correct.

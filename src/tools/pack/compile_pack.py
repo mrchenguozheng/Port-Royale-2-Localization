@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-r"""src/tools/pack/compile_pack.py — 把 src\live\<语言>.toml 编译成引擎语言包
+r"""src/tools/pack/compile_pack.py — 把 src\translations\<语言>.toml 编译成引擎语言包
 
     python src/tools/pack/compile_pack.py                        # 编 zh（默认）
     python src/tools/pack/compile_pack.py --lang de --out <输出目录>
@@ -8,14 +8,18 @@ r"""src/tools/pack/compile_pack.py — 把 src\live\<语言>.toml 编译成引�
 只做一件事：**占位符校验**。译文里的 %1 / @D$EndDate$ 必须与原文
 一一对应，种类、数量、写法全都要对；顺序可以按中文语序调。
 
+编译前先在内存里套一遍排版规则（`src/tools/text/engine_text.py`），并把结果
+写到 build\engine_text\<语言>.toml 供人查看。译文层（src\translations\）是
+唯一手改层，引擎文本是构建产物，不进仓库。
+
 src\orig\ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
 合并层（translate.load_toml）本身就是从这两个文件读出 en / fr 的，
 拿它们校验自己永远相等，报不出任何东西。
 
-【不做的事】不检查行宽。行宽上限因界面而异，没有全局值，
-靠一套粗略字宽推出来的数字只会误导人。而中文不像英文那样天然用空格分界，
-引擎会把一长串汉字连同标点当成一个超宽单词，整条**丢弃（不显示）**，
-所以过宽的译文必须人工在游戏里验收。
+【不做的事】不检查行宽。控件到底多宽**没有在游戏里实测过**，
+拿字体算出来的像素只会误导人（这条结论见 docs/翻译局限.md）。
+中文这类不用空格分词的语言，引擎会把一长串汉字当成一个超宽单词，
+整条**丢弃（不显示）**，所以过宽的译文必须人工在游戏里验收。
 """
 
 import argparse
@@ -87,15 +91,15 @@ RE_PIPE_BREAK = re.compile(r"(?<!<)\s*\|\s*(?!>)")
 
 
 #: 必须原样保留英文的条目：法律声明、内部编号、纯符号/数字。
-#: 清单在 src\live\keep_original.toml，编译时强制写英文原文。
+#: 清单在 src\data\keep_original.toml（可选；不存在时只用下面的内置条目），
+#: 编译时强制写英文原文。
 KEEP_ORIGINAL = {}
 
 
 def load_keep_original():
     """读 keep_original.toml，返回 {id: 分组名}。"""
     import tomllib
-    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "live", "keep_original.toml")
+    path = os.path.join(SRC, "data", "keep_original.toml")
     if not os.path.isfile(path):
         return {"0xfc512ea5": "版权声明"}
     data = tomllib.load(open(path, "rb"))
@@ -142,7 +146,7 @@ def _load_merged():
 
 
 def _default_lang():
-    """--lang 不给时的默认语言：src\\live 下第一个可编辑语言。"""
+    """--lang 不给时的默认语言：src\\translations 下第一个可编辑语言。"""
     import translate as T
     langs = T.target_langs()
     if not langs:
@@ -180,6 +184,19 @@ def build(lang, out_dir, strict):
     field = lang
     doc = _load_merged()
 
+    # 译文层 → 引擎层：排版规则在构建期套一遍，结果只写到 build/ 里。
+    # 这就是「引擎文本是构建产物」的落点（旧的 src/live 已并入这里）—— 仓库里不再有第二份成品文本。
+    from text import engine_text as ET
+    plain, order = {}, []
+    for s in doc.get("s", []):
+        h = s.get("id", "").lower()
+        if s.get(field):
+            plain[h] = s.get(field)
+            order.append(h)
+    engine = ET.build(field, plain, order)
+    engine_path = ET.write(field, engine, order)
+    print("引擎文本 %d 条 → %s" % (len(engine), engine_path))
+
     errors, warnings = [], []
 
     os.makedirs(out_dir, exist_ok=True)
@@ -195,7 +212,7 @@ def build(lang, out_dir, strict):
 
     for s in doc.get("s", []):
         h = s.get("id", "").lower()
-        txt = s.get(field)
+        txt = engine.get(h)
         if not txt:
             continue
         if h in KEEP_ORIGINAL:
@@ -211,7 +228,7 @@ def build(lang, out_dir, strict):
         # 【坑】hash 必须写成**大写**（0x30A45770），与既有语言包一致。
         # patch.js 的合并逻辑按大写规范化 hash，产物若写成小写，
         # 用户手改过的条目就识别不出来，合并会静默失效（测试 test_patch.js
-        # 会抓到）。小写 id 只存在于 src/live\*.toml 里作为内部键。
+        # 会抓到）。小写 id 只存在于 src\translations\*.toml 里作为内部键。
         lines.append("%s = %s\n" % (h.upper().replace("0X", "0x"),
                                     to_engine(txt)))
         n += 1
@@ -220,13 +237,13 @@ def build(lang, out_dir, strict):
 
     # 一条都没编出来就**不写文件**：写一个 0 条的语言包毫无用处，
     # 装进游戏目录等于没汉化，而调用方只看「文件在不在」。
-    # 成因通常是 src\live\<语言>.toml 压根不存在 ——
+    # 成因通常是 src\translations\<语言>.toml 压根不存在 ——
     # 合并层只为实际存在的语言建字段。
     if n == 0:
         print("错误：没有编出任何条目，未生成 %s" % path)
         print("      找不到 %s\\%s.toml，或它里面没有条目。"
-              % (os.path.join(SRC, "live"), lang))
-        print("      加一种语言：python src\\tools\\new_lang.py"
+              % (os.path.join(SRC, "translations"), lang))
+        print("      加一种语言：python src\\tools\\pack\\new_lang.py"
               " --new-lang %s" % lang)
         return 1
 
@@ -253,8 +270,8 @@ def build(lang, out_dir, strict):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="把 src/live\\<语言>.toml 编译成引擎语言包")
-    ap.add_argument("--lang", default="", help="语言代码，默认 src\\live 下第一个可编辑语言")
+    ap = argparse.ArgumentParser(description="把 src/translations\\<语言>.toml 编译成引擎语言包")
+    ap.add_argument("--lang", default="", help="语言代码，默认 src\\translations 下第一个可编辑语言")
     ap.add_argument("--out", default=DEFAULT_OUT, help="输出目录")
     ap.add_argument("--strict", action="store_true", help="有错误时返回非零")
     ap.add_argument("--no-fonts", action="store_true",

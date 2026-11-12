@@ -32,16 +32,12 @@ We add spaces according to those rules, but residual risks remain:
   and these are exactly the kind most likely to appear in narrow buttons or lists;
 - tags and `<n>` line-break positions can only follow the original text; they must not be added or removed at will.
 
-A rough width check with the game font (`src/tools/analysis/width_check.py`, using "translation width ÷ English width" in the same font as a proxy metric):
-
-| Language | Comparable entries | Median width ratio | ≥1.5× | ≥2.0× | Single token ≥200px |
-|---|---|---|---|---|---|
-| Japanese | 3,421 | 0.85 | 171 | 10 | 415 |
-| Chinese | 3,421 | 0.64 | 11 | 2 | 688 |
-
-Conclusion: **overall, Chinese and Japanese are not wider than English** (median 0.85 / 0.64). The real risk is concentrated in
-**short labels, proper nouns, and units** (such as `%1 (%2 kn)` → `%1 （ %2 ノット）`).
-Per entry, see [宽度粗查-ja.csv](../csv/analysis/宽度粗查-ja.csv) and [宽度粗查-zh.csv](../csv/analysis/宽度粗查-zh.csv).
+**There are no pixel-based criteria here.** There used to be a font-metrics tool
+(`width_check.py`) and a "rough width check" CSV claiming "Chinese is narrower than English, Japanese about the same" —
+that was derived from font metrics, and **the actual widget width in the game has never been measured**.
+The numbers are not trustworthy, and the tool and CSVs have been deleted together.
+What we do now: group words by a **character budget** (10 Han characters per group by default, see "Inter-word spacing" below),
+which needs no knowledge of widget width; real width risk can only be seen in game.
 
 ### 1.3 Meaning: corroborated only between English and French, and still misread sometimes
 
@@ -60,7 +56,7 @@ Per entry, see [宽度粗查-ja.csv](../csv/analysis/宽度粗查-ja.csv) and [�
 | Placeholders / `<n>` / tag sequences | **100%** (3,548 entries) | `compile_pack`, `check_breaks`, 0 errors |
 | Font glyph coverage | Full | `subset_fonts` uses fontstitch to re-stitch automatically based on the characters used (currently 2,922 characters) |
 | Tone consistency (within the same template) | 180 families | Template-family comparison, 0 families mixed |
-| Width risk | Full (proxy metric) | `width_check.py`, not real widget widths |
+| Layout (line length after spacing) | Full | `engine_text.py` groups by a character budget, not pixels |
 | **In-game rendering** | **333 / 3,548 = 9.4%** | `ResolveByHash`/`Add` logs from the injected DLL (`_logs_1843/*.log`) |
 | Dialogue coherence | Cannot be verified | Requires the engine's dialogue order, which is not in the language pack |
 
@@ -83,24 +79,11 @@ The remaining 90% of the text has only passed static validation and has never be
 - **This still cannot count as full verification**: the injection logs contain only 333 / 3,548 hashes (9.4%) that were actually requested,
   so "no blanks seen" only covers the screens actually played.
 
-**Short labels we recommend spot-checking** (all 11 Chinese entries with a width ratio ≥1.5, the ones most likely to land in narrow widgets):
-
-| hash | English | Chinese | Width ratio |
-|---|---|---|---|
-| `0x24646e0d` | Brig | 双桅横帆船 | 2.65 |
-| `0xff0dd628` | `%1 (%2 kn)` | `%1 （ %2 结点）` | 2.04 |
-| `0x1ac38a65` | `%1. %2. %3` | `%3年%2%1日` | 1.99 |
-| `0xfc517063` | Piet | 皮耶特 | 1.63 |
-| `0xfc517067` | Dirk | 迪尔克 | 1.58 |
-| `0xfc5171bf` | Luis | 路易斯 | 1.58 |
-| `0xc77f4c7c` | Biloxi | 比洛克西 | 1.54 |
-| `0xfc51a0f3` | Elvira | 埃尔维拉 | 1.53 |
-| `0xd3e8c706` | `%1: Fire` | `%1 ： 起火` | 1.52 |
-| `0xcf572275` | Ruiz | 鲁伊斯 | 1.51 |
-| `0xfc51a0f6` | Olivia | 奥利维亚 | 1.50 |
-
-Most of these are ship types and Western personal names; their widgets are usually wide, so they are "worth a look", not "certainly a problem".
-The same rule applies to Japanese (median width ratio 0.85; those at ≥1.5× are mostly katakana personal names), and we have not received similar in-game feedback for it yet.
+**Short labels we recommend spot-checking**: ship types, Western personal names, and units are inherently longer than English
+(`Brig` → 双桅横帆船, `%1 (%2 kn)` → `%1 （ %2 结点）`); their widgets are usually wide,
+so they are "worth a look", not "certainly a problem". Which entries to check is decided by what you meet in game —
+we no longer provide a pixel-filtered list. The same applies to Japanese (mostly katakana names and ship types);
+no similar in-game feedback yet.
 
 ### Inter-word spacing (Chinese)
 
@@ -108,13 +91,18 @@ After the "layout improvement" above, clipping appeared again (in the right-hand
 Han characters without spaces; the engine can only wrap at spaces, so anything beyond the widget gets clipped. The fix is not more full-width punctuation
 but **inserting spaces word by word**:
 
-- Tool: `src/tools/text/space_words.py`, which by default uses the **spaCy + zh_core_web_sm** tokenizer
-  (actively maintained, handles OOV better than jieba; personal names containing an interpunct are kept in one piece). jieba is only a fallback;
+- Tooling lives in `src/tools/text/zh_space.py`; the tokenizer is **spaCy + zh_core_web_sm** when available
+  (actively maintained, handles OOV better than jieba; personal names containing an interpunct are kept in one piece),
+  then jieba, and only if neither is installed does it fall back to `zh_space.fallback_wrap()`, a **mechanical cut by character count**
+  (it can cut in the middle of a word — degraded path, not the default);
 - spaCy requires Python 3.11 (its dependencies have no wheels for 3.14 yet); point to that interpreter with the environment variable
-  `PR2_SPACY_PYTHON`. For installation, see the `space_words.py` section of [Build and install](build-and-install.md);
-- only entries with a longest Han-character run ≥ 12 and a widest token ≥ 180px are processed; short labels, buttons, and personal names are left alone;
-- words are grouped by target width (default 120px), and spaces are added **only between groups**, so a sentence usually gains just 1–5 spaces;
-- applied to 842 Chinese entries (per-entry before/after widths are in [space-words-zh.csv](../csv/generated/space-words-zh.csv)).
+  `PR2_SPACY_PYTHON`. For installation, see [Build and install](build-and-install.md);
+- grouping uses a **budget of 10 Han characters per group** (`MAX_CHARS`), not pixels: widget widths were never measured in game,
+  and the earlier "120px target" is obsolete (tool and CSVs deleted);
+- only runs longer than 10 Han characters are processed; short labels, buttons, and personal names are left alone;
+- spaces are added **only between groups**, so a sentence usually gains just 1–5 spaces;
+- the result is written to `build/engine_text/zh.toml`; generate it alone with `python src\tools\text\engine_text.py --lang zh`.
+This spacing is a **build-time** step: the committed text in `src/translations/` carries no layout spaces.
 
 It solves the problem of "a long run of Han characters cannot wrap"; it does not solve "the widget itself is too narrow" — that can only be addressed by changing the length of the text.
 
@@ -139,12 +127,12 @@ It solves the problem of "a long run of Han characters cannot wrap"; it does not
 | Placeholder misread | `%1` in `0xfbb36ec1` | Corrected back to match the English and French originals |
 | Signature format | `%1 、 %2 の副王` in `0x03fb5c6a` | Parentheses suggested, but **we decided not to change it in this round** |
 | Uncertain tone | 111 entries in the pirate/tavern category are not this character's lines | No bulk change; only manually confirm the 53 first-person entries |
-| Width risk | 171 Japanese short labels at ≥1.5× width | Not handled entry by entry; see the rough-check CSV |
+| Over-long short labels | ship types, names, units (e.g. `Brig` → 双桅横帆船) | no pixel estimate; check when met in game |
 
 ## 5. Conclusion
 
 - **What can be guaranteed mechanically**: placeholders, tags, fonts, and tone consistency within the same template;
 - **What cannot be guaranteed mechanically**: speaker, widget layout, and semantic details of the source text;
-- **Suggested acceptance**: start from the 9.4% in-game coverage; take a close look at the short labels at ≥1.5× in the "rough width check"
-  and the Grade A / Viceroy entries (6 + 35) in [Tone proposals](tone-proposal.md), and accept the rest as they are;
+- **Suggested acceptance**: start from the 9.4% in-game coverage; take a closer look at ship-type/name/unit short labels as you meet them,
+  and at the Grade A / Viceroy entries (6 + 35) in [Tone proposals](tone-proposal.md), and accept the rest as they are;
 - To make layout verification real, the next step should be extending the DLL to record widget rectangles and measured widths, rather than continuing to edit copy.

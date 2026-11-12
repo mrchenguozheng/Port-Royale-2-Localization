@@ -157,19 +157,22 @@ def server_instances():
 
 
 def rule_trace(hid, lang):
-    """逐阶段还原这条译文经过的格式化规则。"""
-    seed_path = os.path.join(os.path.dirname(SRC), "src", "seed", "%s.toml" % lang)
-    if not os.path.isfile(seed_path):
+    """逐阶段还原这条译文经过的格式化规则（译文层 → 补空格前）。
+
+    译文层（src/translations/）是唯一手改层；补空格等排版是**构建期**由
+    src/tools/text/engine_text.py 做的，产物在 build/engine_text/，编辑器里
+    不重复算一遍（那要起一次分词器，界面会卡）。
+    """
+    rows = load_all()
+    doc = {r["id"]: (r.get(lang) or "") for r in rows}
+    cur = doc.get(hid)
+    if cur is None:
         return None
-    doc = tomllib.load(open(seed_path, "rb"))
-    if hid not in doc:
-        return None
-    seed = doc[hid]
     rules = lang_rules.get(lang)
-    stages = [{"key": "seed", "label": "初版", "text": seed}]
+    stages = [{"key": "text", "label": "译文（手改层）", "text": cur}]
 
     if lang == "zh":
-        norm = rules.normalize(seed)
+        norm = rules.normalize(cur)
         stages.append({"key": "punct", "label": "标点规范化", "text": norm})
         conj = ZH_GEN.fix_conj(norm)
         stages.append({"key": "conj", "label": "连词后空格", "text": conj})
@@ -182,13 +185,11 @@ def rule_trace(hid, lang):
                 continue
             spans = ZH_GEN.find_names(part, given, surn, extras + towns)
             res.append(ZH_GEN.pad_names(part, spans, towns) if spans else part)
-        stages.append({"key": "names", "label": "人名/城镇名空格", "text": "".join(res)})
+        stages.append({"key": "names", "label": "人名/城镇名空格（补空格前）",
+                       "text": "".join(res)})
     else:
         stages.append({"key": "punct", "label": "规范化",
-                       "text": rules.normalize(seed)})
-
-    live = {r["id"]: r.get(lang, "") for r in load_all()}.get(hid, "")
-    stages.append({"key": "live", "label": "当前译文", "text": live})
+                       "text": rules.normalize(cur)})
     return stages
 
 
@@ -1191,18 +1192,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/seed":
             hid = (query.get("id") or [""])[0]
             lang = (query.get("lang") or ["zh"])[0]
-            ref_name = ("zh.toml" if lang == "zh"
-                        else "%s.toml" % lang)
-            ref_path = os.path.join(os.path.dirname(SRC), "src", "seed", ref_name)
-            if not os.path.isfile(ref_path):
-                return self.send_json({"detail": "没有干净文本源"}, 404)
-            try:
-                clean = tomllib.load(open(ref_path, "rb")).get(hid)
-            except Exception as exc:
-                return self.send_json({"detail": str(exc)}, 400)
-            if clean is None:
-                return self.send_json({"detail": "干净文本里没有这一条"}, 404)
-            return self.send_json({"text": clean})
+            doc = {r["id"]: (r.get(lang) or "") for r in load_all()}
+            if hid not in doc:
+                return self.send_json({"detail": "译文里没有这一条"}, 404)
+            return self.send_json({"text": doc[hid]})
 
         if path == "/api/hash-rules":
             hid = (query.get("id") or [""])[0]
@@ -1221,29 +1214,10 @@ class Handler(BaseHTTPRequestHandler):
             zh_ph = placeholders_of(zh)
             missing = [t for t in en_ph if t not in zh_ph]
             extra = [t for t in zh_ph if t not in en_ph]
-            # 「干净文本」的空格数：优先读 references 里的干净文本源。
-            clean_spaces = None
-            ref_name = ("zh.toml" if lang == "zh"
-                        else "%s.toml" % lang)
-            ref_path = os.path.join(os.path.dirname(SRC), "src", "seed", ref_name)
-            if os.path.isfile(ref_path):
-                try:
-                    with open(ref_path, "rb") as fh:
-                        clean = tomllib.load(fh).get(hid)
-                    if isinstance(clean, str):
-                        clean_spaces = clean.count(" ")
-                except Exception:
-                    clean_spaces = None
-            if clean_spaces is None:
-                # 没有干净文本源时退回启发式：只算拉丁字符之间的空格。
-                clean_spaces = 0
-                for i, ch in enumerate(zh):
-                    if ch != " ":
-                        continue
-                    l = zh[i - 1] if i else ""
-                    r = zh[i + 1] if i + 1 < len(zh) else ""
-                    if (l.isascii() and l.isalnum()) or (r.isascii() and r.isalnum()):
-                        clean_spaces += 1
+            # 译文层只有一份，而且就是「干净文本」：这里的空格全部是译者自己
+            # 写的。引擎补的空格是构建期产物（build/engine_text/），不进这一层，
+            # 所以「额外补的空格」在这个接口里恒为 0。
+            clean_spaces = len(spaces)
             en_c = placeholder_counts(en)
             zh_c = placeholder_counts(zh)
             counts = [{"token": t, "en": en_c[t], "zh": zh_c[t]}
@@ -1258,7 +1232,7 @@ class Handler(BaseHTTPRequestHandler):
                 "used": zh_ph,
                 "spaces": len(spaces),
                 "clean_spaces": clean_spaces,
-                "extra_spaces": len(spaces) - clean_spaces,
+                "extra_spaces": 0,
                 "length": len(zh),
                 "en_len": len(en),
             })
@@ -1550,18 +1524,15 @@ class Handler(BaseHTTPRequestHandler):
             lang = body.get("lang", "zh")
             hid = body.get("id", "")
             text = body.get("text", "")
-            seed = os.path.join(os.path.dirname(SRC), "src", "seed", "%s.toml" % lang)
+            seed = T.lang_path(lang)
             if not os.path.isfile(seed):
-                return self.send_json({"detail": "没有初版文件"}, 404)
+                return self.send_json({"detail": "没有译文文件"}, 404)
             cur = tomllib.load(open(seed, "rb"))
             if hid not in cur:
-                return self.send_json({"detail": "初版里没有这一条"}, 404)
-            if lang == "zh":
-                text = ZH_GEN.strip_padding(text)
+                return self.send_json({"detail": "译文里没有这一条"}, 404)
             order = list(cur)
             cur[hid] = text
             with io.open(seed, "w", encoding="utf-8", newline="\n") as fh:
-                fh.write("# 初版译文：可解锁修改；生成工作文本时从这里起步。\n")
                 for rid in order:
                     fh.write('"%s" = "%s"\n' % (rid, toml_escape(cur[rid])))
             return self.send_json({"ok": True, "text": text})

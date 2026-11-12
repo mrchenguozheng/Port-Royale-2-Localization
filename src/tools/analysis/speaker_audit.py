@@ -26,7 +26,7 @@ from collections import Counter
 TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, TOOLS)
 ROOT = os.path.dirname(os.path.dirname(TOOLS))
-TRANS = os.path.join(ROOT, "src", "live")
+TRANS = os.path.join(ROOT, "src", "translations")
 REF = os.path.join(ROOT, "src", "orig")
 DOCS = os.path.join(ROOT, "docs")
 
@@ -142,7 +142,7 @@ def family_key(text, n=3):
 def load():
     en = tomllib.load(open(os.path.join(REF, "en.gog_1.1.2.3.toml"), "rb"))
     fr = tomllib.load(open(os.path.join(REF, "fr.gog_1.1.2.42.toml"), "rb"))
-    keep_doc = tomllib.load(open(os.path.join(TRANS, "keep_original.toml"), "rb"))
+    keep_doc = tomllib.load(open(os.path.join(ROOT, "src", "data", "keep_original.toml"), "rb"))
     keep = {k for v in keep_doc.values() for k in (v.get("ids") or [])}
     return en, fr, keep
 

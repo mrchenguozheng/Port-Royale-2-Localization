@@ -5,9 +5,10 @@
 The editor depends only on:
 - editor/ (this server + web assets)
 - shared/core/ (storage and placeholder checks)
-- data/ (live/<lang>.toml and orig/en.gog_1.1.2.3.toml)
+- data/ (translations/<lang>.toml and orig/en.gog_1.1.2.3.toml)
 
-No build, injector, font or launcher code is imported.
+`data/translations/` is the only hand-edited layer; engine text (spacing,
+punctuation) is generated at build time, not here.
 """
 import argparse
 import json
@@ -25,7 +26,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from shared.core import (  # noqa: E402
-    EN, FR, check_text, lang_codes, load_orig, ordered_ids, rows, save_live,
+    EN, FR, check_text, lang_codes, load_orig, ordered_ids, rows, save_translation,
 )
 
 DATA = os.path.join(HERE, "data")
@@ -221,7 +222,7 @@ class Handler(BaseHTTPRequestHandler):
                         "error": "Placeholder/tag check failed for %s: %s" %
                                  (hid, "; ".join(x["text"] for x in errors))})
             return send(self, 200, {"ok": True,
-                                    "changed": save_live(DATA, lang, updates)})
+                                    "changed": save_translation(DATA, lang, updates)})
         if path == "/api/ui":
             code = str(body.get("lang") or "en")
             base = ui_load("en")["base"]
@@ -248,8 +249,8 @@ def main():
     PORT = args.port
     if not os.path.isfile(os.path.join(WEB, "index.html")):
         raise SystemExit("missing web/index.html in %s" % WEB)
-    if LANG and not os.path.isfile(os.path.join(DATA, "live", LANG + ".toml")):
-        raise SystemExit("missing live/%s.toml in %s" % (LANG, DATA))
+    if LANG and not os.path.isfile(os.path.join(DATA, "translations", LANG + ".toml")):
+        raise SystemExit("missing translations/%s.toml in %s" % (LANG, DATA))
     httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     url = ("http://127.0.0.1:%d/translate/%s" % (PORT, LANG)
            if LANG else "http://127.0.0.1:%d/" % PORT)

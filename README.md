@@ -81,8 +81,8 @@ pr2-localization/
 ├─ shared/                   编辑器与工具共用的存储/校验核心
 ├─ editor/                   独立译者工作台（英文翻译页）
 ├─ src/
-│  ├─ live/                  译文维护源（编辑器保存到这里）
-│  ├─ seed/                  初版文本（按条解锁用）
+│  ├─ translations/          译文唯一手改层（编辑器保存到这里）
+│  ├─ data/                  人工维护的数据（占位符语义、原样保留清单）
 │  ├─ orig/                  原版英文/法文（只读参照）
 │  ├─ editor/                译文编辑器（Astro 前端 + server.py）
 │  ├─ injector/              注入组件源码（C++）
@@ -90,11 +90,11 @@ pr2-localization/
 │     ├─ pack/               编译、部署、新建语言
 │     ├─ text/               归一化、中文/日文规则、分词
 │     ├─ font/               字体缝合与导出（含 fontstitch/）
-│     ├─ analysis/           说话人、语气、宽度等分析
+│     ├─ analysis/           说话人、语气等分析
 │     ├─ install/            pr2ctl 构建/部署/启动实现
 │     └─ data/               人名、地名、分词词典
 ├─ assets/fonts/original/    游戏原版拉丁字体（gitignore，需自己导出）
-├─ build/                    产物：PR2Packs/、fonts/、注入器
+├─ build/                    产物：engine_text/、PR2Packs/、fonts/、注入器
 ├─ docs/                     说明文档
 ├─ glossary/                 术语对照表
 └─ tests/                    规则与 API 单测
@@ -112,7 +112,7 @@ pr2-localization/
 不用碰 C++，流程是：
 
 1. 跑 `start.bat`，在「译文编辑」页点语言下拉旁的「＋」，用现成语言当模板；
-2. 逐条翻译并保存（写进 `src/live/<代码>.toml`）；
+2. 逐条翻译并保存（写进 `src/translations/<代码>.toml`）；
 3. 创建语言时会自动生成 `presets/<代码>.toml`（donor 以模板语言的文件为模板），
    再按语种检查/替换 donor；
 4. 构建字体、语言包并部署。
@@ -175,7 +175,7 @@ pr2-localization/
 
 日语里的「原样保留」指本来就不该翻译的 178 条：纯符号/数字、引擎编号
 （`IDM_CONTEST_…`）、按键名（`ESC`/`CTRL`/`F10`）、版权声明与制作方名称。
-清单在 `src/live/keep_original.toml`，编译时会强制写回英文原文。
+清单在 `src/data/keep_original.toml`，编译时会强制写回英文原文。
 
 ## 路径约定
 

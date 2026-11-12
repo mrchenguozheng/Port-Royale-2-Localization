@@ -1,17 +1,25 @@
 # -*- coding: utf-8 -*-
-"""apply_zh_rules.py —— 从 orig/zh.gog_1.1.2.3.toml 生成 src/live/zh.toml。
+r"""apply_zh_rules.py —— 把 src/translations/zh.toml 加工成引擎能直接用的中文文本。
 
-工作流变了：
-  · 以后**只改** orig/zh.gog_1.1.2.3.toml（不带任何为引擎服务的人为空格）；
-  · 本脚本按规则生成上一层的 zh.toml：
-      1. 标点与占位符：全角化、单标点后空格、成对标点外侧空格；
-      2. 连词：标点后的连词后面补一个空格（不在句末才补）；
-      3. 人名：名・姓两侧按「句首只补后 / 句末不补 / 句中缺哪补哪」补空格；
-  · 再跑 apply_patch / compile_pack 构建。
+产物：build/engine_text/zh.toml（**构建产物，不进仓库**）。
+compile_pack 会在内存里做同样的事，这个文件只是给人看的中间结果；
+删掉它不影响构建，下次编译会重新生成。
+
+流水线（顺序固定，每一步只加空格、不改字）：
+  1. 标点：全角化、单标点后空格、成对标点外侧空格（lang_rules/zh.py: normalize）
+  2. 连词：标点后的连词后面补一个空格（不在句末才补）
+  3. 人名：名・姓两侧按「句首只补后 / 句末不补 / 句中缺哪补哪」补空格
+  4. 数字 / 破折号 / 省略号 / `<n><n>` 两侧补空格（space_tokens）
+  5. 按词成组补空格：分词器优先（spaCy → jieba），
+     两个都没有时才退回 zh_space.fallback_wrap 的按字数机械切
+  6. 连续空格归一
+
+成组标准是**字数预算**，不是像素：控件宽度没有在游戏里实测过，
+用字体算出来的 px 只是推测，不能当判据（见 docs/翻译局限.md）。
 
 用法：
-    python src/tools/text/apply_zh_rules.py            # 生成并写回
-    python src/tools/text/apply_zh_rules.py --dry-run  # 只统计
+    python src/tools/text/apply_zh_rules.py            # 生成并写入 build/engine_text
+    python src/tools/text/apply_zh_rules.py --check    # 与已生成的比较，不写文件
 """
 
 import argparse
@@ -29,12 +37,14 @@ sys.path.insert(0, TOOLS)
 ROOT = os.path.dirname(os.path.dirname(TOOLS))
 sys.path.insert(0, HERE)
 
-from text import lang_rules  # noqa: E402
+from text import lang_rules, zh_space  # noqa: E402
 
-SRC = os.path.join(ROOT, "src", "seed", "zh.toml")
-DST = os.path.join(ROOT, "src", "live", "zh.toml")
+#: 唯一手改的文本层
+SRC = os.path.join(ROOT, "src", "translations", "zh.toml")
+#: 构建产物（build/ 已 gitignore）
+DST = os.path.join(ROOT, "build", "engine_text", "zh.toml")
 
-TAG = re.compile(r"(<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z])")
+TAG = zh_space.TAG
 CONJ = ("因为", "所以", "但是", "如果", "虽然", "然后", "而且", "以及", "因此", "不过",
         "并且", "或者", "还是", "于是", "同时", "此外", "例如", "比如", "由于", "无论",
         "即使", "尽管", "然而", "可是", "因而", "从而", "况且", "何况", "假如", "要是",
@@ -57,6 +67,7 @@ conj_re = re.compile(
 
 
 def fix_conj(text):
+    """标点后的连词补一个空格；「因 此」这类被切开的词粘回去。"""
     text = conj_re.sub(
         lambda m: m.group("pre") + m.group("gap") + m.group("conj") + " " + m.group("next"),
         text)
@@ -67,10 +78,11 @@ def load_list(name):
     path = os.path.join(TOOLS, "data", name)
     out = []
     if os.path.isfile(path):
-        for line in io.open(path, encoding="utf-8"):
-            line = line.strip()
-            if line and not line.startswith("#"):
-                out.append(line)
+        with io.open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    out.append(line)
     return out
 
 
@@ -84,9 +96,7 @@ def build_names(doc):
 
 name_re = None
 
-
 QUOTE_RX = re.compile(r"「[^」]*」|『[^』]*』|《[^》]*》")
-WRAP_PARTICLES = set("的了是在和与而或也就都但并且时后中上下里外为以于对把被将从到着过们吗呢吧啊呀哦嗯")
 _NAME_CACHE = {}
 
 
@@ -179,30 +189,6 @@ def pad_names(text, spans, towns=()):
     return "".join(out)
 
 
-CJK = r"\u4e00-\u9fff"
-FW = "，。！？、：；…「」『』（）［］【】〈〉〔〕“”‘’"
-PLACE = r"(?:@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z])"
-
-
-def strip_padding(text):
-    """把「为引擎补的空格」去掉，回到干净译文（写回文本源时用）。"""
-    if not re.search("[%s]" % CJK, text):
-        return text
-    cjk = "[%s]" % CJK
-    fw = "[%s]" % re.escape(FW)
-    text = re.sub(r"(%s)\s+(?=%s)" % (cjk, cjk), r"\1", text)
-    text = re.sub(r"(%s)\s+(?=%s)" % (cjk, fw), r"\1", text)
-    text = re.sub(r"(%s)\s+(?=%s)" % (fw, cjk), r"\1", text)
-    text = re.sub(r"(%s)\s+(?=%s)" % (cjk, PLACE), r"\1", text)
-    text = re.sub(r"(%s)\s+(?=%s)" % (PLACE, cjk), r"\1", text)
-    text = re.sub(r"(%s)\s+(?=%s)" % (PLACE, fw), r"\1", text)
-    return text.strip()
-
-
-def esc(t):
-    return t.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-
-
 def _is_han(ch):
     return ch and "\u4e00" <= ch <= "\u9fff"
 
@@ -211,7 +197,11 @@ SPLIT_RX = re.compile(r"(<n><n>|<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z
 
 
 def space_tokens(text):
-    """一次扫描：4 位年份、——、…… 补空格，<n><n> 前补空格。"""
+    """数字 / 破折号 / 省略号 / `<n><n>` 两侧补空格（标签与占位符内部不动）。
+
+    这是唯一实现：以前 space_years / space_marks / space_dash / space_ellipsis /
+    space_before_double_break 五个名字指向同一件事，合并成这一个。
+    """
     out = []
     for part in SPLIT_RX.split(text):
         if part == "<n><n>":
@@ -250,76 +240,6 @@ def space_tokens(text):
     return result.strip()
 
 
-def space_years(text):
-    """4 位年份与相邻汉字之间补空格（标签/占位符内部不动）。"""
-    parts = TAG.split(text)
-    for i in range(0, len(parts), 2):
-        seg = parts[i]
-
-        def repl(m):
-            s0 = m.group(0)
-            left = seg[m.start() - 1] if m.start() > 0 else ""
-            right = seg[m.end()] if m.end() < len(seg) else ""
-            pre = " " if _is_han(left) else ""
-            post = " " if _is_han(right) else ""
-            return pre + s0 + post
-
-        parts[i] = re.sub(r"(?<!\d)\d{4}(?!\d)", repl, seg)
-    return "".join(parts)
-
-
-def space_marks(text):
-    """——、…… 前后加空格；<n><n> 前加空格。"""
-    marks = {"——", "……", "<n><n>"}
-
-    def repl(m):
-        mark = m.group(0).strip()
-        before_only = mark == "<n><n>"
-        pre = " " if m.start() > 0 and text[m.start() - 1] not in " \n" else ""
-        post = "" if before_only or m.end() >= len(text) or text[m.end()] in " \n" else " "
-        return pre + mark + post
-
-    return re.sub(r" *—— *| *…… *|<n><n>", repl, text)
-
-
-def space_dash(text):
-    return space_marks(text)
-
-
-def soft_wrap(text, limit=16, step=12):
-    """超长且没有空格的汉字串，按约 12 字简单断开。"""
-    particles = WRAP_PARTICLES
-
-    def split_run(run):
-        out, s0 = [], run
-        while len(s0) > step:
-            cut = step
-            for k in range(step, max(5, step // 2), -1):
-                if s0[k - 1] in particles:
-                    cut = k
-                    break
-            out.append(s0[:cut])
-            s0 = s0[cut:]
-        out.append(s0)
-        return " ".join(out)
-
-    return re.sub(r"[\u4e00-\u9fff]{%d,}" % limit,
-                  lambda m: split_run(m.group(0)), text)
-
-
-def join_words(text):
-    """不该断开的常用词：因此。"""
-    return re.sub(r"因\s+此", "因此", text)
-
-
-def space_ellipsis(text):
-    return space_marks(text)
-
-
-def space_before_double_break(text):
-    return space_tokens(text)
-
-
 def collapse_spaces(text):
     if "  " not in text:
         return text
@@ -328,6 +248,7 @@ def collapse_spaces(text):
 
 CACHE = os.path.join(ROOT, "build", "cache", "zh.generated.json")
 KEY_FILES = [SRC, __file__,
+             os.path.join(HERE, "zh_space.py"),
              os.path.join(HERE, "lang_rules", "zh.py"),
              os.path.join(HERE, "lang_rules", "base.py"),
              os.path.join(TOOLS, "data", "zh_names.txt"),
@@ -345,79 +266,129 @@ def _cache_key():
     return hashlib.sha1(json.dumps(rows).encode()).hexdigest()
 
 
+def _order_of(path):
+    return [m.group(1) for m in
+            (re.match(r'^"([^"]+)"\s*=', ln) for ln in io.open(path, encoding="utf-8"))
+            if m]
+
+
+def _pipeline(names, text):
+    """单条译文走到「分词前后」的中间态（标点、连词、人名、数字/标记空格）。"""
+    a = names["rules"].normalize(text)
+    b = fix_conj(a)
+    parts = TAG.split(b)
+    res = []
+    for i, part in enumerate(parts):
+        if i % 2 == 1 or not part:
+            res.append(part)
+            continue
+        spans = find_names(part, names["given"], names["surn"],
+                           names["extras"] + names["towns"], names["all"])
+        res.append(pad_names(part, spans, names["towns"]) if spans else part)
+    c = space_tokens("".join(res))
+    return a, b, c
+
+
+def generate_doc(doc, order=None):
+    """纯函数：{id: 译文} → {id: 引擎文本}。不读文件、不碰缓存。"""
+    order = list(order or doc)
+    rules = lang_rules.get("zh")
+    given, surn, extras, towns = build_names(doc)
+    names = {"rules": rules, "given": given, "surn": surn,
+             "extras": extras, "towns": towns,
+             "all": frozenset(set(given) | set(surn) | set(extras) | set(towns))}
+
+    # 第一遍：规则到「分词前」。同时收集需要分词的片段，避免逐条起子进程。
+    interim, stats = {}, {"punct": 0, "conj": 0, "name": 0, "space": 0}
+    for h in order:
+        text = doc.get(h) or ""
+        if not text:
+            interim[h] = ""
+            continue
+        a, b, c = _pipeline(names, text)
+        interim[h] = c
+        stats["punct"] += a != text
+        stats["conj"] += b != a
+        stats["name"] += c != b
+
+    runs = zh_space.collect_runs([t for t in interim.values() if t])
+    seg, seg_name = zh_space.segment(runs)
+    if seg is None and runs:
+        print("提示：没有 spaCy/jieba，中文补空格退回按字数机械切"
+              "（会切在词中间，见 zh_space.fallback_wrap）。")
+
+    # 第二遍：补空格
+    out = {}
+    for h in order:
+        c = interim[h]
+        if not c:
+            out[h] = c
+            continue
+        d = (zh_space.fallback_wrap(c) if seg is None
+             else zh_space.spaced(c, seg))
+        out[h] = collapse_spaces(d)
+        stats["space"] += out[h] != c
+
+    missing = getattr(seg, "missing", None) or []
+    if missing:
+        print("提示：%d 个片段没进分词器，只能按单字成组（可能切在词中间）。"
+              % len(missing))
+    return order, out, stats, seg_name
+
+
 def generate(use_cache=True):
-    """按规则生成 {id: 文本}，不写文件。"""
+    """按规则生成 {id: 引擎文本}，不写文件。"""
     if use_cache and not os.environ.get("PR2_NO_CACHE"):
         try:
             with open(CACHE, encoding="utf-8") as fh:
                 cached = json.load(fh)
             if cached.get("key") == _cache_key():
-                return cached["order"], cached["out"], cached["stats"]
+                return (cached["order"], cached["out"], cached["stats"],
+                        cached.get("segmenter", ""))
         except (OSError, ValueError, KeyError):
             pass
 
     doc = tomllib.load(open(SRC, "rb"))
-    order = [m.group(1) for m in
-             (re.match(r'^"([^"]+)"\s*=', ln) for ln in io.open(SRC, encoding="utf-8"))
-             if m]
-
-    zh_rules = lang_rules.get("zh")
-    given, surn, extras, towns = build_names(doc)
-    all_names = frozenset(set(given) | set(surn) | set(extras) | set(towns))
-
-    out, stats = {}, {"punct": 0, "conj": 0, "name": 0}
-    for h in order:
-        text = doc[h]
-        if not text:
-            out[h] = text
-            continue
-        a = zh_rules.normalize(text)
-        b = fix_conj(a)
-        parts = TAG.split(b)
-        res = []
-        for i, part in enumerate(parts):
-            if i % 2 == 1 or not part:
-                res.append(part)
-                continue
-            spans = find_names(part, given, surn, extras + towns, all_names)
-            res.append(pad_names(part, spans, towns) if spans else part)
-        c = collapse_spaces(soft_wrap(space_tokens(fix_conj("".join(res)))))
-        stats["punct"] += a != text
-        stats["conj"] += b != a
-        stats["name"] += c != b
-        out[h] = c
+    order = _order_of(SRC)
+    result = generate_doc(doc, order)
 
     if use_cache and not os.environ.get("PR2_NO_CACHE"):
         try:
             os.makedirs(os.path.dirname(CACHE), exist_ok=True)
             tmp = CACHE + ".tmp"
             with open(tmp, "w", encoding="utf-8") as fh:
-                json.dump({"key": _cache_key(), "order": order,
-                           "out": out, "stats": stats}, fh, ensure_ascii=False)
+                json.dump({"key": _cache_key(), "order": result[0], "out": result[1],
+                           "stats": result[2], "segmenter": result[3]},
+                          fh, ensure_ascii=False)
             os.replace(tmp, CACHE)
         except OSError:
             pass
-    return order, out, stats
+    return result
 
 
 def write(order, out):
-    header = ("# 自动生成：由 src/tools/text/apply_zh_rules.py 从 src/seed/zh.toml 生成。\n"
-              "# 改译文请改 src/seed/zh.toml；改规则请改 src/tools/text/apply_zh_rules.py。\n"
-              "# 手改本文件会让它与「文本源 + 规则」分叉，--check 会报不一致。\n")
+    header = ("# 构建产物：由 src/tools/text/apply_zh_rules.py 从 src/translations/zh.toml 生成。\n"
+              "# 不进仓库，删掉也没关系；改译文请改 src/translations/zh.toml，改规则请改脚本。\n")
+    os.makedirs(os.path.dirname(DST), exist_ok=True)
     io.open(DST, "w", encoding="utf-8", newline="\n").write(
         header + "\n".join('"%s" = "%s"' % (k, esc(out[k])) for k in order) + "\n")
+
+
+def esc(t):
+    return t.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true",
-                    help="只校验生成物是否与文本源+规则一致，不写文件")
+                    help="只校验 build/engine_text/zh.toml 是否与「译文 + 规则」一致，不写文件")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    order, out, stats = generate()
-    print("生成 %d 条｜标点改动 %d｜连词 %d｜人名 %d" % (
-        len(order), stats["punct"], stats["conj"], stats["name"]))
+    order, out, stats, seg_name = generate()
+    print("生成 %d 条｜标点改动 %d｜连词 %d｜人名 %d｜补空格 %d｜分词器 %s" % (
+        len(order), stats["punct"], stats["conj"], stats["name"], stats["space"],
+        seg_name or "无（机械兜底）"))
 
     if args.check:
         old = {}

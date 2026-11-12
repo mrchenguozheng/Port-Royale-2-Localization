@@ -51,21 +51,23 @@ if ROOT not in sys.path:
 # 审计脚本）继续能用 T.tokens / T.tag_profile。
 from shared.core.validate import PH_RE, tag_profile, tokens  # noqa: E402
 
-STRINGS_DIR = os.path.join(SRC, "live")
+STRINGS_DIR = os.path.join(SRC, "translations")
 REFERENCES_DIR = os.path.join(SRC, "orig")
 
-#: 译文主源：live\<语言>.toml，**每条一行**：
+#: 译文**唯一手改层**：translations\<语言>.toml，**每条一行**：
 #:     "0xd2d0a572" = "萧条"
 #: 文件名以语言代码开头，没有块头也没有字段名，所以语言代码与文件里
 #: 的内容是同一个名字，不需要任何映射表。
+#: 引擎文本（补空格、全角标点、`<n>` 之类的排版加工）是**构建产物**，
+#: 由 src\tools\text\engine_text.py 生成到 build\engine_text\<语言>.toml，
+#: 不进仓库 —— 所以这里只读译文层，不存在第二份成品文本。
 #: 只读参考原文放在 orig\ 目录：
 #:     orig\en.gog_1.1.2.3.toml    英文原文（GOG 1.1.2.3 原版表），合并基准
 #:     orig\fr.gog_1.1.2.42.toml   法文原文（GOG 1.1.2.42 原版表）
 #: 文件名里带来源与版本：这两份是**从原版 exe 里原样提取**的，不经过我们的
 #: 导出/整理，所以 `<n>`、行尾空格都保持原样。版本号不同，两边条目数可能
 #: 对不齐（法语 3571 vs 英文 3548），合并时按 id 对齐、多退少空。
-#: 其余 live\*.toml 是可编辑的译文，文件名即语言代码。
-#: 语言列表不写死 —— 加一种语言只需把 <代码>.toml 放进 live\。
+#: 语言列表不写死 —— 加一种语言只需把 <代码>.toml 放进 translations\。
 BASE_LANG = "en.gog_1.1.2.3"
 
 #: 只读参考语言：参与 id 顺序与占位符校验，但不提供译文。
@@ -84,10 +86,8 @@ def target_langs():
     """可编辑的译文语言代码，按文件名排序（不含只读参考）。"""
     if not os.path.isdir(STRINGS_DIR):
         return []
-    # keep_original.toml 是「原样保留」清单，不是语言文件，跳过
     return sorted(f[:-5] for f in os.listdir(STRINGS_DIR)
                   if f.endswith(".toml") and not f.startswith("_")
-                  and f != "keep_original.toml"
                   and f[:-5] not in REFERENCE_LANGS)
 
 
@@ -100,7 +100,7 @@ def all_langs():
 def target_field():
     """status 默认操作的那个译文语言字段名。
 
-    取 src\\live 下第一个可编辑语言；一个译文都没有时报错，
+    取 src\\translations 下第一个可编辑语言；一个译文都没有时报错，
     因为那样「已译 / 待译」根本没有对象。
     """
     langs = target_langs()

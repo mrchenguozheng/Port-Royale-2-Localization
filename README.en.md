@@ -87,8 +87,8 @@ pr2-localization/
 ├─ shared/                   shared storage/validation core
 ├─ editor/                   standalone translator workbench (English UI)
 ├─ src/
-│  ├─ live/                   translation source (saved by the editor)
-│  ├─ seed/                   initial text (unlocked entry by entry)
+│  ├─ translations/           the only hand-edited layer (the editor writes here)
+│  ├─ data/                   hand-maintained data (placeholder roles, keep-original list)
 │  ├─ orig/                   original English/French (read-only reference)
 │  ├─ editor/                 translation editor (Astro frontend + server.py)
 │  ├─ injector/               injector sources (C++)
@@ -96,11 +96,11 @@ pr2-localization/
 │     ├─ pack/                build, deploy, new language
 │     ├─ text/                normalization, CJK rules, tokenization
 │     ├─ font/                font stitching and export (fontstitch/)
-│     ├─ analysis/            speaker, tone, width analysis
+│     ├─ analysis/            speaker and tone analysis
 │     ├─ install/             pr2ctl build/deploy/launch implementation
 │     └─ data/                names, places, tokenizer dictionaries
 ├─ assets/fonts/original/     original Latin fonts (gitignored; export yourself)
-├─ build/                     artifacts: PR2Packs/, fonts/, injector
+├─ build/                     artifacts: engine_text/, PR2Packs/, fonts/, injector
 ├─ docs/                      documentation
 ├─ glossary/                  terminology
 └─ tests/                     rules and API tests
@@ -119,7 +119,7 @@ No C++ changes are required:
 
 1. Run `start.bat`, open **Translation editor**, click **＋** next to the language
    dropdown and use an existing language as a template;
-2. Translate and save (written to `src/live/<code>.toml`);
+2. Translate and save (written to `src/translations/<code>.toml`);
 3. A `presets/<code>.toml` is created automatically from the template language;
    check or replace donors for the new language;
 4. Build fonts and the language pack, then deploy.
@@ -185,7 +185,7 @@ See [LICENSE](LICENSE).
 Japanese "keep original" means 178 entries that should not be translated:
 symbols/numbers, engine IDs (`IDM_CONTEST_…`), key names (`ESC`/`CTRL`/`F10`),
 copyright notices and developer names. The list is in
-`src/live/keep_original.toml`; the compiler forces the English original back.
+`src/data/keep_original.toml`; the compiler forces the English original back.
 
 ## Path conventions
 

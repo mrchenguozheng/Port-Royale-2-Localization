@@ -126,7 +126,7 @@ def main():
         print("\n[计划] deploy -> %s（复制 %s）" % (target, "、".join(langs)))
         return 0
 
-    # 1) 校验 + 编译（live/ 是编辑器直接维护的文本，构建不再改写它）
+    # 1) 校验 + 编译（translations/ 是唯一手改层，构建不再回写它）
     for lang in langs:
         if not args.no_check:
             run("校验换行 %s" % lang,

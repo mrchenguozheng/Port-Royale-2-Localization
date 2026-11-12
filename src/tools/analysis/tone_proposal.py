@@ -4,7 +4,7 @@
 输入：
   docs/csv/analysis/speaker-audit.csv   （说话人分级）
   docs/csv/voice/voice-hash-map.csv  （语音↔hash↔NPC，副王 35 条台词）
-  src/live/ja.toml
+  src/translations/ja.toml
 
 输出：
   docs/语体拟改清单.md
@@ -60,7 +60,7 @@ def style(t):
 def load():
     audit = list(csv.DictReader(io.open(os.path.join(DOCS, "csv", "analysis", "speaker-audit.csv"), encoding="utf-8-sig")))
     voice = list(csv.DictReader(io.open(os.path.join(DOCS, "csv", "voice", "voice-hash-map.csv"), encoding="utf-8-sig")))
-    ja = tomllib.load(open(os.path.join(ROOT, "src", "live", "ja.toml"), "rb"))
+    ja = tomllib.load(open(os.path.join(ROOT, "src", "translations", "ja.toml"), "rb"))
     return audit, voice, ja
 
 

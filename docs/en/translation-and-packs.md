@@ -1,10 +1,18 @@
 # Translations and language packs
 
-The human-maintained source for translations is `src\translations\<language>.toml`;
-`build\PR2Packs\<language>.txt` is its **compiled output**:
+There is **one** hand-edited text: `src\translations\<language>.toml`.
+The layout the engine needs (full-width punctuation, inter-word spaces) is computed
+**at build time** from that translation and lands in `build\engine_text\<language>.toml`,
+which is then compiled into the language pack.
 
 ```
-src/live/zh.toml ──src/tools/pack/compile_pack.py──▶  build/PR2Packs/zh.txt
+src/translations/zh.toml
+        │  src/tools/text/engine_text.py (layout rules)
+        ▼
+build/engine_text/zh.toml
+        │  src/tools/pack/compile_pack.py (placeholder validation)
+        ▼
+build/PR2Packs/zh.txt
 ```
 
 To change a translation, edit `src\translations\`, then recompile the language pack.
@@ -13,24 +21,32 @@ If you edit `build\PR2Packs\*.txt` directly, it will be overwritten on the next 
 ---
 
 
-> **Where `seed/zh.toml` came from**: on 2026-10-21 it was reconstructed from the
-> `zh.toml` of that time by **removing every added space** (none left between
-> Han characters, around punctuation, or on either side of placeholders), while spacing
-> that the original text already carries — em dashes and `<o:…>` — was kept. After the
-> reconstruction `apply_zh_rules.py` was run again, and the resulting `zh.toml` was
-> **byte-for-byte identical** to the deployed version, so it can be used as the text source.
+> **Why spacing is a build step**: inserting spaces at word boundaries only helps the
+> engine wrap lines; it is the difference between "same translation, different delivery form".
+> Keeping it in the repository means maintaining the same text twice, and the two copies
+> drift apart after a single round of hand edits.
+> An earlier version used two layers — `seed/` (clean text) and `live/` (text with the added
+> spaces); they are now merged into **one translation layer plus a build artifact**:
+> `seed/` is today's `translations/`, `live/` is today's `build/engine_text/`.
+>
+> The Chinese in `translations/zh.toml` is **clean text without layout spaces**
+> (none between Han characters, around punctuation, or on either side of placeholders);
+> spacing that the original text already carries — em dashes and `<o:…>` — is kept.
+> It was first reconstructed on 2026-10-21 by stripping the added spaces from the then-current
+> finished text, and re-running the rules on it produced a byte-identical result,
+> so it can be treated as the text source.
 > It is not "the first version that was hand-written entry by entry back then" — that
-> version was never archived separately; if it later turns out that some space was in the
-> original text all along, edit `seed/zh.toml` directly and the rules will regenerate it.
+> version was never archived separately; if it turns out that some space was in the
+> original text all along, edit `src/translations/zh.toml` directly.
 
 
 
-## Generate → edit → build
+## Edit → build
 
-- `src/seed/<language>.toml`: initial translation (locked by default; unlock entry by entry in the editor to change it);
-- `src/live/<language>.toml`: working text maintained directly by the editor; saving writes only here;
-- the build (`apply_patch`) compiles `live/` directly and never regenerates or overwrites it;
-- to regenerate from the initial version, run `apply_zh_rules.py` / `apply_ja_rules.py` manually;
+- `src/translations/<language>.toml`: the only hand-edited layer; the editor saves here;
+- the build (`apply_patch`) applies the layout rules in memory, then compiles the language pack
+  and also writes the engine text to `build/engine_text/<language>.toml` (for inspection, deletable);
+- to see the layout result of one language alone: `python src\tools\text\engine_text.py --lang zh`;
 - the old manual review workflow (`zh_review.py`, review markers, page banner, reviewed checkboxes) has been removed entirely.
 
 ## Rules split per language
@@ -54,13 +70,16 @@ src/tools/text/lang_rules/
 ## Directory structure
 
 ```
-src/live/
-├─ zh.toml                generated: the result after the rules add spaces; do not edit by hand
-└─ ja.toml                Japanese translation (edited directly)
+src/translations/
+├─ zh.toml                Chinese translation (the only hand-edited layer, no layout spaces)
+└─ ja.toml                Japanese translation (the only hand-edited layer, no layout spaces)
+src/data/
+├─ placeholder_roles/     placeholder semantics rules (hand-maintained, not generated)
+└─ keep_original.toml     "keep as-is" list (optional; built-in entries are used when absent)
 src/orig/
 ├─ en.gog_1.1.2.3.toml    English original, the baseline (id order follows it)
 ├─ fr.gog_1.1.2.42.toml   French original
-└─ zh.gog_1.1.2.3.toml    Chinese text source: a clean translation with no added spaces
+└─ zh.gog_1.1.2.3.toml    historical archive of the Chinese text (the earliest finished table)
 ```
 
 `en` / `fr` are **read-only reference originals**; no language pack is generated for them, and
@@ -332,7 +351,7 @@ workflow, see [New language](new-language.md).
 2. **Start the workbench** with `start.bat`, select the new language on the install page →
    "Generate" → "Deploy".
 
-   The language list comes from `src/live/*.toml`; a new language can also be created directly from the translation
+   The language list comes from `src/translations/*.toml`; a new language can also be created directly from the translation
    editing page by clicking ＋.
 
 3. **Switch language** in the "Language" dropdown on the install page, then click "Set as game language" —
@@ -380,7 +399,7 @@ otherwise you get 「见习水手·巴尔塔萨·马尔伯夫」.
 So rules are now recorded per hash:
 
 ```toml
-# src/live/placeholder_roles/zh.toml
+# src/data/placeholder_roles/zh.toml
 ["0x338a357f"]
 rules = [
   { pair = ["1", "2"], sep = " ", note = "等级 + 全名" },
@@ -421,31 +440,30 @@ Above each translation there is an info bar:
   - placeholders cannot be deleted: if deleted they are automatically put back (the count follows the English original);
   - the info bar only shows how many of each placeholder are required (`×2`) and the meaning; the insert/remove buttons are gone;
   - ones present in the translation but not in the original are marked red as "not in original" and can be removed;
-- **Spaces**: only shows how many more there are than in the clean translation (layout spaces added after punctuation),
-  without listing positions;
+- **Spaces**: the translation layer carries no layout spaces (they are generated at build time),
+  so the "N more" count is always 0; only the current count is shown;
 - **Markup**: the meaning of layout tags such as `<n>`.
 
 API: `/api/entry-info?lang=zh&id=<hash>`.
 
-### Clean text source
+### The translation layer is the clean text
 
-Each language under `src/orig/` can have a clean translation **without layout spaces**:
+`src/translations/<language>.toml` **is** the clean translation without layout spaces;
+the added spaces are computed at build time by `engine_text.py` and never enter the repository.
 
-- `zh.gog_1.1.2.3.toml`: Chinese (the source from which `live/zh.toml` is generated);
-- `ja.toml`: Japanese (obtained by stripping layout spaces from `live/ja.toml`).
+`zh.gog_1.1.2.3.toml` under `src/orig/` is the historical archive of the earliest finished table
+and is no longer part of the daily flow; `en` / `fr` remain read-only references.
 
-The "Spaces: N more" in the editor's info bar is derived by comparing the current translation against this clean text.
-
-### Japanese: clean source → rule-generated
+### Japanese: translation → build artifact
 
 ```powershell
-python src/tools/text/apply_ja_rules.py          # compare only; prints the number of differing entries and samples
-python src/tools/text/apply_ja_rules.py --write  # write to live/ja.toml
+python src/tools/text/apply_ja_rules.py             # writes build/engine_text/ja.toml
+python src/tools/text/apply_ja_rules.py --check     # compare only, writes nothing
 ```
 
 The rules come from `lang_rules/ja.py`: punctuation normalization, spaces on both sides of placeholders, spaces after
 particles (morphological analysis when janome/fugashi is installed, regex fallback otherwise).
-By default no file is written, to avoid overwriting manual layout; add `--write` once the differences look acceptable.
+The output goes to `build/engine_text/ja.toml` and is **never** written back to the translation layer.
 
 ### Placeholder counts must match one by one
 
@@ -485,8 +503,8 @@ the editor:
 
 ### Saving takes effect immediately
 
-- clicking save in the editor writes directly to `live/`; there is no separate review step;
-- `orig/` holds only clean text (no layout spaces); all generated output is produced by the rules.
+- clicking save in the editor writes directly to `translations/`; there is no separate review step;
+- `orig/` holds read-only reference originals only; engine text and language packs are produced by the build.
 
 ### Unified check before committing
 
@@ -495,40 +513,39 @@ check.bat                 # or python src/tools/check.py
 ```
 
 Runs in order: cross-module reference check → rule unit tests (`tests/`) → generated-artifact consistency
-(`apply_zh_rules.py --check`).
+(`engine_text.py --check`).
 
-### Division of labor between the three directories
+### Division of labor between the layers
 
 ```
-src/orig/   English and French original references: strictly read-only, never written by any process
-src/seed/   initial translations (machine/AI/human first drafts): locked by default; editable only after unlocking entry by entry in the editor
-src/live/   text maintained directly by the editor: saving writes here, and the build reads only from here
+src/orig/            English and French original references: strictly read-only, never written by any process
+src/translations/    translations: the only hand-edited layer; the editor saves here, tracked in git
+build/engine_text/   engine text: layout rules applied at build time; not tracked, regenerable
+build/PR2Packs/      language packs: build output, overwritten on the next compile
 ```
 
-- editor saves write only to `live/`, and no longer touch `seed/`;
-- the "initial version" text is always shown below the translation box for comparison with the current working text;
-  when the content differs (ignoring spaces), a highlighted vertical bar appears on the left;
-- "Unlock editing" at the top right of the initial-version block opens the initial-version dialog: read-only by default;
-  after clicking "Unlock editing" and confirming, only that one entry can be edited, and it re-locks automatically after
-  saving or closing (the unlocked state is not remembered);
-- "Restore clean original" uses the initial-version text and overwrites the current working text (undoable);
-- `apply_zh_rules.py` can still be run manually to generate `live/zh.toml` from `seed/zh.toml`, but it is not a build step.
+- the editor has this one translation only; there is no "initial version / working text" pair;
+- the "initial version" dialog reads this same translation, and saving writes back to it;
+- "Restore clean original" still uses the read-only originals under `orig/` and overwrites the current
+  translation (undoable);
+- to see a language with the added spaces: `python src\tools\text\engine_text.py --lang zh`,
+  output in `build/engine_text/zh.toml`, deletable.
 
 ### Rule trace (visualization)
 
 The "Rules" button in the info bar opens a dialog that shows this translation stage by stage:
 
 ```
-初版            → 标点规范化 → 连词后空格 → 人名/城镇名空格 → 当前译文
+translation (hand-edited layer) → punctuation normalization → space after conjunctions → person/town-name spacing (before word spacing)
 ```
 
 - each stage highlights only the parts that changed relative to the previous stage;
 - API: `/api/rule-trace?lang=&id=`;
-- currently Chinese shows 4 stages; other languages show 初版 → 规范化 → 当前译文
-  (initial → normalized → current);
+- Chinese shows 4 stages; other languages show translation → normalized;
 - the "match annotations" at the end color-code the characters changed by the rules: orange = punctuation/placeholder
-  spaces, blue = conjunctions, green = person/town names; when the current translation differs from the
-  rule-generated one, it notes that the annotations refer to the generated result.
+  spaces, blue = conjunctions, green = person/town names;
+- word spacing (grouping by word) happens **at build time** and is not recomputed in the editor
+  (that would start a tokenizer and freeze the UI); to see the result, open `build/engine_text/<language>.toml`.
 
 ### Space coloring in the body (L1)
 

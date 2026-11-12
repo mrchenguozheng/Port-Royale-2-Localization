@@ -139,8 +139,8 @@ It lives in the same workbench as the install page; switch with the tabs at the 
 - Paged editing, 100 entries per page by default;
 - Edits are kept across pages; click "Save" to submit them together;
 - The reference column on the right marks "this version has no such entry";
-- ＋ Add language: enter a code and choose a template; this generates `src/live/<code>.toml`,
-  `src/seed/<code>.toml`, and `presets/<code>.toml`;
+- ＋ Add language: enter a code and choose a template; this generates `src/translations/<code>.toml`,
+  `src/translations/<code>.toml`, and `presets/<code>.toml`;
 - For a new language to appear on the install page, reload the workbench.
 
 Language pack metadata (display name, GUI language, minimum runtime) lives in:
@@ -222,7 +222,16 @@ Python entry points in `src\tools\`:
 | `pack/new_lang.py` | Creates a new language |
 | `font/subset_fonts.py` | Stitches fonts |
 | `font/make_noto_fonts.py` | Noto fonts for releases |
-| `text/space_words.py` | Adds spacing for Chinese |
+| `text/engine_text.py` | Builds the engine text from translations (`build/engine_text/`) |
+| `text/zh_space.py` | Chinese tokenization and character-budget spacing (spaCy / jieba / mechanical fallback) |
+
+The Chinese tokenizer is an **optional** dependency; the build works without it:
+
+- `pip install jieba` (installed; pure Python, currently the default);
+- for better segmentation install spaCy + `zh_core_web_sm`, which needs Python 3.11 —
+  point to that interpreter with `PR2_SPACY_PYTHON`;
+- with neither installed, `zh_space` falls back to a mechanical cut by character count
+  (it can cut mid-word, and the terminal warns about it).
 
 ## Service status
 

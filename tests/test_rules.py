@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
-"""规则层的小样本测试：改规则前后跑一遍，防止回归。"""
+"""规则层的小样本测试：改规则前后跑一遍，防止回归。
+
+补空格是「按词成组 + 字数预算」，**不按像素**（控件宽度没在游戏里实测过，
+px 只是推测）。所以这里只测字数预算的行为，不测任何宽度数字。
+"""
 
 import os
 import sys
+import tomllib
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -10,14 +15,20 @@ sys.path.insert(0, os.path.join(ROOT, "src", "tools"))
 sys.path.insert(0, os.path.join(ROOT, "src", "tools", "text"))
 
 from text import apply_zh_rules as ZH  # noqa: E402
+from text import apply_ja_rules as JA  # noqa: E402
+from text import engine_text as ET  # noqa: E402
+from text import zh_space  # noqa: E402
 import lang_rules  # noqa: E402
 
+TRANS = os.path.join(ROOT, "src", "translations")
 
-class TestZhRules(unittest.TestCase):
-    def test_strip_padding_removes_cjk_spaces(self):
-        self.assertEqual(ZH.strip_padding("你好 ， 世界 。"), "你好，世界。")
-        self.assertEqual(ZH.strip_padding("谢谢 @g$TotalPrice$ 。"), "谢谢@g$TotalPrice$。")
 
+def two_chars(run):
+    """假分词器：每两个字一个词，用于测 pack/spaced 而不依赖真分词器。"""
+    return [run[i:i + 2] for i in range(0, len(run), 2)]
+
+
+class TestZhText(unittest.TestCase):
     def test_punctuation_converted(self):
         zh = lang_rules.get("zh")
         self.assertEqual(zh.normalize("你好,世界!"), "你好， 世界！")
@@ -27,28 +38,10 @@ class TestZhRules(unittest.TestCase):
         out = zh.normalize("支付 @g$TotalPrice$ 元")
         self.assertIn("@g$TotalPrice$", out)
 
-    def test_soft_wrap(self):
-        t = "这是一个非常长的没有空格的中文句子用来测试自动断行"
-        out = ZH.soft_wrap(t)
-        self.assertIn(" ", out)
-        self.assertNotIn("  ", out)
-        self.assertEqual(ZH.soft_wrap("短句"), "短句")
-
-    def test_join_words(self):
-        self.assertEqual(ZH.join_words("。 因 此， 只有"), "。 因此， 只有")
-        self.assertEqual(ZH.join_words("因此"), "因此")
-
-    def test_space_ellipsis(self):
-        self.assertEqual(ZH.space_ellipsis("等等…… 我"), "等等 …… 我")
-        self.assertEqual(ZH.space_ellipsis("等等 …… 我"), "等等 …… 我")
-        self.assertEqual(ZH.space_ellipsis("…… 开头"), "…… 开头")
-        self.assertEqual(ZH.space_ellipsis("……"), "……")
-
-    def test_space_dash(self):
-        self.assertEqual(ZH.space_dash("关头—— 就在"), "关头 —— 就在")
-        self.assertEqual(ZH.space_dash("关头 —— 就在"), "关头 —— 就在")
-        self.assertEqual(ZH.space_dash("—— 开头"), "—— 开头")
-        self.assertEqual(ZH.space_dash("范围 1554 — 1618"), "范围 1554 — 1618")
+    def test_fix_conj(self):
+        self.assertEqual(ZH.fix_conj("，因此只有"), "，因此 只有")
+        self.assertEqual(ZH.fix_conj("，因此 只有"), "，因此 只有")
+        self.assertEqual(ZH.fix_conj("因 此"), "因此")
 
     def test_space_tokens(self):
         self.assertEqual(
@@ -57,23 +50,9 @@ class TestZhRules(unittest.TestCase):
         self.assertEqual(ZH.space_tokens("<n><n> 开头"), "<n><n> 开头")
         self.assertEqual(ZH.space_tokens("<o:0xFF131512>年"), "<o:0xFF131512>年")
 
-    def test_space_years(self):
-        self.assertEqual(ZH.space_years("约1554 — 1618年"), "约 1554 — 1618 年")
-        self.assertEqual(ZH.space_years("在1502 年"), "在 1502 年")
-        self.assertEqual(ZH.space_years("超过1000，"), "超过 1000，")
-        self.assertEqual(ZH.space_years("<o:0xFF131512>年"), "<o:0xFF131512>年")
-
-    def test_space_before_double_break(self):
-        self.assertEqual(ZH.space_before_double_break("你好。<n><n>下一段"),
-                         "你好。 <n><n> 下一段")
-        self.assertEqual(ZH.space_before_double_break("你好。 <n><n> 下一段"),
-                         "你好。 <n><n> 下一段")
-        self.assertEqual(ZH.space_before_double_break("<n><n> 开头"),
-                         "<n><n> 开头")
-
     def test_names_with_titles_and_quotes(self):
-        import tomllib
-        doc = tomllib.load(open(os.path.join(ROOT, "src", "seed", "zh.toml"), "rb"))
+        with open(os.path.join(TRANS, "zh.toml"), "rb") as f:
+            doc = tomllib.load(f)
         given, surn, extras, _towns = ZH.build_names(doc)
         spans = ZH.find_names("自伊丽莎白女王时代", given, surn, extras)
         self.assertEqual([("自伊丽莎白女王时代")[a:b] for a, b in spans], ["伊丽莎白女王"])
@@ -91,34 +70,67 @@ class TestZhRules(unittest.TestCase):
         self.assertEqual([("胡安·德·塞普尔维达之类")[a:b] for a, b in spans],
                          ["胡安·德·塞普尔维达"])
 
-    def test_live_long_text_names_have_spaces(self):
-        """长句里的已知人名前后必须已有空格（标点/标题除外）。"""
-        import tomllib
-        doc = tomllib.load(open(os.path.join(ROOT, "src", "seed", "zh.toml"), "rb"))
-        given, surn, extras, _towns = ZH.build_names(doc)
-        live = tomllib.load(open(os.path.join(ROOT, "src", "live", "zh.toml"), "rb"))
-        bad = []
-        for h, v in live.items():
-            if not isinstance(v, str) or len(v) < 30:
-                continue
-            parts = ZH.TAG.split(v)
-            for i, part in enumerate(parts):
-                if i % 2:
-                    continue
-                for start, end in ZH.find_names(part, given, surn, extras):
-                    left = part[start - 1] if start else ""
-                    right = part[end] if end < len(part) else ""
-                    han = lambda c: bool(c) and "\u4e00" <= c <= "\u9fff"
-                    if (han(left) or han(right)):
-                        bad.append((h, part[start:end]))
-        self.assertEqual(bad, [])
 
-    def test_generate_keys_match_live(self):
-        # live 可手改，不再要求和规则输出逐字一致，但键集合必须一致。
-        order, out, _ = ZH.generate()
-        import tomllib
-        cur = tomllib.load(open(os.path.join(ROOT, "src", "live", "zh.toml"), "rb"))
-        self.assertEqual(set(cur), set(order))
+class TestZhSpace(unittest.TestCase):
+    def test_pack_counts_chars(self):
+        self.assertEqual(zh_space.pack(["你好", "世界", "这是"], 5), "你好世界 这是")
+        self.assertEqual(zh_space.pack(["你好", "世界"], 4), "你好世界")
+        # 单个词超预算时自成一组，不会被切碎
+        self.assertEqual(zh_space.pack(["总督府"], 1), "总督府")
+
+    def test_bind_glues_particles(self):
+        self.assertEqual(zh_space.bind(["总督", "的", "府"]), ["总督的", "府"])
+
+    def test_spaced_keeps_tags_and_names(self):
+        self.assertEqual(zh_space.spaced("你好世界", two_chars, 2), "你好 世界")
+        self.assertEqual(zh_space.spaced("你好<n>世界", two_chars, 2), "你好<n>世界")
+        self.assertEqual(zh_space.spaced("胡安·德·塞普尔维达来了", two_chars, 2),
+                         "胡安·德·塞普尔维达来了")
+
+    def test_collect_runs(self):
+        runs = zh_space.collect_runs(["短句", "这是一个足够长的中文句子用来收集"])
+        self.assertEqual(runs, ["这是一个足够长的中文句子用来收集"])
+        self.assertEqual(zh_space.collect_runs(["胡安·德·塞普尔维达到来这里看看"]), [])
+
+    def test_fallback_wrap(self):
+        t = "这是一个非常长的没有空格的中文句子用来测试自动断行"
+        out = zh_space.fallback_wrap(t)
+        self.assertIn(" ", out)
+        self.assertNotIn("  ", out)
+        self.assertEqual(zh_space.fallback_wrap("短句"), "短句")
+
+
+class TestEngineText(unittest.TestCase):
+    def test_build_zh_no_pixel_and_no_double_space(self):
+        doc = {"0x1": "你好,世界。"}
+        out = ET.build("zh", doc, ["0x1"])["0x1"]
+        self.assertNotIn(",", out)
+        self.assertNotIn("  ", out)
+
+    def test_build_ja(self):
+        doc = {"0x1": "これは テストです。"}
+        out = ET.build("ja", doc, ["0x1"])["0x1"]
+        self.assertIsInstance(out, str)
+        self.assertTrue(out)
+
+    def test_build_passthrough(self):
+        doc = {"0x1": "Hello world"}
+        self.assertEqual(ET.build("en", doc, ["0x1"]), doc)
+
+    def test_ja_generate_from_pure(self):
+        ja = lang_rules.get("ja")
+        self.assertEqual(JA.generate_from({"0x1": "テスト。"}, ["0x1"]).get("0x1"),
+                         ja.normalize("テスト。", particles=True))
+
+    def test_zh_keys_preserved(self):
+        doc = {"0x1": "你好", "0x2": "世界"}
+        order, out, _stats, _seg = ZH.generate_doc(doc, list(doc))
+        self.assertEqual(order, ["0x1", "0x2"])
+        self.assertEqual(set(out), set(doc))
+        # 译文层必须是完整的一份（键集与原文对齐由 tests/test_validate.py 之外的人工流程保证）
+        with open(os.path.join(TRANS, "zh.toml"), "rb") as f:
+            cur = tomllib.load(f)
+        self.assertGreater(len(cur), 3000)
 
 
 if __name__ == "__main__":

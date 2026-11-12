@@ -43,7 +43,7 @@ PR2Translator/
 │  └─ web/                English UI
 ├─ shared/core/           shared storage and validation
 ├─ data/
-│  ├─ live/*.toml         switchable languages
+│  ├─ translations/*.toml switchable languages
 │  └─ orig/               English and French references
 └─ python/                bundled by default
 ```
@@ -67,11 +67,11 @@ editor\start.bat
 The workbench has no install, build or launch entry points.
 
 > The workbench chrome is currently **English**; it is separate from the translation
-> target language. The target only selects which `live/<lang>.toml` is loaded.
+> target language. The target only selects which `translations/<lang>.toml` is loaded.
 
 ## Multiple languages
 
-One editor instance can open every `data/live/*.toml` language:
+One editor instance can open every `data/translations/*.toml` language:
 
 - switch with the top **Translation language** selector;
 - the URL becomes `/translate/<lang>`;
@@ -103,7 +103,7 @@ game translation.
 The translator returns:
 
 ```
-data/live/ja.toml
+data/translations/ja.toml
 ```
 
 The maintainer then:

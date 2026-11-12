@@ -4,7 +4,7 @@ This is not the project introduction — it answers "which document do I need?".
 English translations cover the core workflow; specialist analysis documents remain
 Chinese-only for now. **Only these two languages are maintained** — the Japanese
 document set was removed on purpose; the Japanese *game* translation
-(`src/live/ja.toml`) is unaffected.
+(`src/translations/ja.toml`) is unaffected.
 
 [中文文档索引](README.zh-CN.md) · [Project README](../README.en.md)
 
@@ -52,7 +52,7 @@ These are detailed analysis documents kept in Chinese:
 | Document | Contents |
 |---|---|
 | [语音清单](语音清单.md) / [语音映射](语音映射.md) | Voice inventory and hash mapping |
-| [中文分词方案](中文分词方案.md) | Chinese tokenization and spacing |
+| [中文分词方案](中文分词方案.md) | Build-time word spacing: character budget, tokenizer priority, non-goals |
 | [中文文本改动对比](中文文本改动对比.md) | Historical Chinese text diffs |
 | [CSV data](csv/README.md) | Analysis, voice, review and generated CSV files |
 
