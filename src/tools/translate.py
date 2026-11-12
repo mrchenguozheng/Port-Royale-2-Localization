@@ -76,6 +76,19 @@ REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42")
 FR_LANG = "fr.gog_1.1.2.42"
 
 
+def set_src(src):
+    """把数据根指到另一份 src（测试用临时副本），重算派生路径。
+
+    只改路径，不改语言清单与规则：`target_langs()`、`all_langs()` 都是
+    现算的，所以换根之后自然跟着走。
+    """
+    global SRC, ROOT, STRINGS_DIR, REFERENCES_DIR
+    SRC = os.path.abspath(src)
+    ROOT = os.path.dirname(SRC)
+    STRINGS_DIR = os.path.join(SRC, "translations")
+    REFERENCES_DIR = os.path.join(SRC, "orig")
+
+
 def lang_path(code):
     """语言代码 -> 文件路径。只读参考在 orig\\ 目录下。"""
     base = REFERENCES_DIR if code in REFERENCE_LANGS else STRINGS_DIR

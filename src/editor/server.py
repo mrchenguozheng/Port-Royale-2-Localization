@@ -53,6 +53,7 @@ if sys.stderr is None:
     sys.stderr = open(os.devnull, "w", encoding="utf-8", errors="replace")
 
 DIST = os.path.join(HERE, "dist")                            # astro build 的产物
+DATA_ROOT = SRC                                              # 译文/原文的根，可被 --data 覆盖
 DEFAULT_PORT = 8777
 
 # translate / compile_pack 是脚本不是包，直接把 tools\ 加进 sys.path 来 import。
@@ -651,6 +652,29 @@ def load_all():
         rows.append(r)
     _ALL_CACHE.update(key=key, rows=rows)
     return rows
+
+
+def set_data_root(path, presets_dir=None):
+    r"""把数据根（默认仓库 src\）指到别处，主要用于测试隔离。
+
+    这里没有第二份路径表：`translate` 的 SRC\ 是唯一的根，译文、原文都
+    由它派生；`glossary\` 两文件按「根的同级」算；字体 presets 目录可以
+    单独指定（它不在 src\ 的同一层）。换根之后所有按 mtime 的缓存都要清，
+    否则拿到的还是旧文件的内容。
+    """
+    global DATA_ROOT, MEANINGS, HASH_RULES
+    DATA_ROOT = os.path.abspath(path)
+    T.set_src(DATA_ROOT)
+    MEANINGS = os.path.join(os.path.dirname(DATA_ROOT),
+                            "glossary", "placeholder_meanings.toml")
+    HASH_RULES = os.path.join(os.path.dirname(DATA_ROOT),
+                              "glossary", "hash_rules.toml")
+    _MEAN_CACHE.update(key=None, data={})
+    _HASH_CACHE.update(key=None, data={})
+    _ALL_CACHE.update(key=None, rows=None)
+    if presets_dir:
+        sf = _font_module()
+        sf.PRESETS_DIR = os.path.abspath(presets_dir)
 
 
 def rows_of(body):
@@ -1575,6 +1599,10 @@ def main():
                     help="译者模式下默认打开的语言代码")
     ap.add_argument("--web-dir", default=None,
                     help="前端目录；默认使用 src/editor/dist")
+    ap.add_argument("--data", default=None,
+                    help="译文/原文的根目录（默认 src\\）；测试用临时副本")
+    ap.add_argument("--presets-dir", default=None,
+                    help="字体 presets 目录；默认 src\\data\\fontstitch\\presets")
     a = ap.parse_args()
 
     global TRANSLATOR, TRANSLATOR_LANG, DIST
@@ -1582,6 +1610,10 @@ def main():
     TRANSLATOR_LANG = (a.translator_lang or "zh").strip() or "zh"
     if a.web_dir:
         DIST = os.path.abspath(a.web_dir)
+    if a.data:
+        set_data_root(a.data, a.presets_dir)
+    elif a.presets_dir:
+        set_data_root(DATA_ROOT, a.presets_dir)
 
     if not os.path.isdir(DIST):
         _say("注意：找不到前端产物 %s" % DIST)
