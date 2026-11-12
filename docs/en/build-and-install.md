@@ -20,6 +20,39 @@ Close the console window or press Ctrl+C to stop the service.
 > There is also a player-facing GUI for releases, `PR2LauncherGUI.exe`; see
 > [Release](release.md). That is not this development workbench.
 
+## Single-entry quick path (agents / manual feedback)
+
+For a one-line correction, you do not need the full build chain. `quick.py`:
+
+1. Finds candidate hashes by text from a screenshot in Chinese/English/French;
+2. Or edits one row in `src/translations/<lang>.toml` by a known hash;
+3. Calls `compile_pack --no-fonts` to regenerate `build/PR2Packs/<lang>.txt`;
+4. Copies only that `.txt` into the game directory; DLL, launcher and fonts are untouched.
+
+```bat
+REM Find candidates without writing
+python src\tools\pack\quick.py --lang zh --find "text seen in the screenshot"
+
+REM After confirming the hash, edit one row and deploy
+python src\tools\pack\quick.py --lang zh --id 0xc4bde7d1 --text "corrected translation"
+
+REM Edit and build only, without copying into the game
+python src\tools\pack\quick.py --lang zh --id 0xc4bde7d1 --text "corrected translation" --no-deploy
+```
+
+`--find` searches Chinese, English and French. With `--text`, it writes
+automatically only when there is exactly one candidate; otherwise pass `--id`.
+Placeholder/tag validation still uses `shared\core\validate.py`: errors are
+always rejected; warnings are rejected by default, and `--force` overrides
+warnings only.
+
+It deliberately does **not** run the full `check_breaks`, font check, runtime
+copy, or whole-tree SHA verification. Those remain part of the release build.
+The game reads the pack at startup, so restart it after a change.
+
+For structured agent output, add `--json`: search returns `candidates`, a write
+returns `id/pack/pack_sha256/deployed`.
+
 ## Installation wizard
 
 The top of the page holds the five-step wizard under "Install and launch". Pick the target language first:
