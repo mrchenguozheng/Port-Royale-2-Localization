@@ -81,6 +81,23 @@ python src/tools/font/subset_fonts.py --check
 | `analysis/progress.py` | 进度显示 |
 | `lint_imports.py` | 跨模块引用检查 |
 
+## 编辑器服务
+
+`src/editor/server.py` 只留 HTTP 外壳（Handler、4 条元路由、启动与 CLI），其余按域
+放在 `src/editor/api/`，同时被编辑器前端和测试调用：
+
+| 模块 | 作用 |
+|---|---|
+| `api/store.py` | 读全部条目、单条/全量写回、按 mtime 缓存（`save_all`/`patch_all` 走 `text/toml_io.py`） |
+| `api/request.py` | `Req`：把一次请求的 query/body 交给路由函数，函数用 `req.send_json` 回答 |
+| `api/translate.py` | 译文域：校验、语境、规则轨迹、占位符、筛选、保存/补丁 |
+| `api/langs.py` | 语言域：语言列表/进度/新建语言、占位符含义、术语例外 |
+| `api/install.py` | 安装域：游戏目录、构建/部署/启动任务、字体状态 |
+
+各模块导出 `ROUTES = {(方法, 路径): 函数}`，server 合并成 `ROUTER` 后查表分发；
+换数据根只走 `server.set_data_root()`（`--data` / `--presets-dir` 由它落地）。
+HTTP 契约与拆分前一致，GET 清单见 `tests/test_server_api.py` 的 `GET_URLS`。
+
 ## 数据文件
 
 | 文件 | 内容 |

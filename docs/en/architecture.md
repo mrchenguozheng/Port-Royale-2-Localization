@@ -23,6 +23,7 @@ make_noto_fonts.py   Noto fonts → fonts/<lang>/*.TTF (with caching)
 make_release.py      assemble the release package
 apply_patch.py       local build + deploy
 pr2ctl               editor install/deploy backend
+src/editor/server.py editor HTTP service; per-domain modules under api/
 ```
 
 ## File contracts
@@ -94,6 +95,40 @@ Runtime file copying is still handled by `make_release` / `pr2ctl` according to 
 
 Status: done. Language packs write `min_runtime`, and the GUI/launcher refuse to start when the version is too low;
 release packages write `RUNTIME-VERSION`. Integer versions only, no automatic updates.
+
+### Step 5: Editor service split by domain
+
+The old `src/editor/server.py` was one 1424-line file holding data access, validation,
+context inference, language management, build/font/start jobs, and HTTP dispatch.
+After the split:
+
+| File | Lines | Responsibility |
+|---|---|---|
+| `src/editor/server.py` | 573 | constants, `health_info`/`server_instances`, 4 meta routes, `Handler`, startup and CLI |
+| `src/editor/api/store.py` | 141 | entry read/write and mtime-based caches |
+| `src/editor/api/request.py` | 25 | `Req`: query/body of one request plus the two send exits |
+| `src/editor/api/translate.py` | 565 | translation domain: validation, context, rule trace, placeholders, filters, save/patch (16 routes) |
+| `src/editor/api/langs.py` | 359 | language domain: list/progress/new language, placeholder meanings, term exceptions (9 routes) |
+| `src/editor/api/install.py` | 380 | install domain: game dirs, build/deploy/start jobs, fonts (17 routes) |
+
+- Routing becomes table-driven: each module exports `ROUTES = {(method, path): func}`
+  and the server merges them into `ROUTER`; `get_api`/`post_api` only look up the
+  table and call the function with a `Req`, so branch logic leaves the Handler;
+- Changing the data root has one path only: `set_data_root` calls `T.set_src`
+  (translations/source), `ST._ALL_CACHE`, `LG.set_root` (both glossary files and
+  caches), and `IN.set_presets_dir` (font presets); the server keeps no second path table;
+- The contract is unchanged: paths, query parameters, request bodies, returned JSON,
+  status codes, and access logs all stay as they were;
+- Known dead route: the `GET /api/rule-hits` branch called `rule_hits()`, which never
+  existed in the repository (it could only return 500, and the frontend `app.ts`
+  never called it), so it was removed with the split; route count 47→46;
+- The stage-1 `--data` / `--presets-dir` flags remain, and tests run POST against a
+  temporary data root.
+
+Status: done. `tests/test_server_api.py` 7 tests (22 GET routes all 200, POST writes
+to the temporary root, real repository file SHAs unchanged); `check.py` 46 tests;
+`engine_text --check` reports "一致" for both zh and ja; pack SHAs match the
+pre-refactoring baseline (zh `2B209420…920F`, ja `17517FB6…FAB`).
 
 ## Verification gate
 

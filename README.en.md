@@ -90,7 +90,7 @@ pr2-localization/
 │  ├─ translations/           the only hand-edited layer (the editor writes here)
 │  ├─ data/                   hand-maintained data (placeholder roles, keep-original list)
 │  ├─ orig/                   original English/French (read-only reference)
-│  ├─ editor/                 translation editor (Astro frontend + server.py)
+│  ├─ editor/                 translation editor (Astro frontend + server.py, domain modules in api/)
 │  ├─ injector/               injector sources (C++)
 │  └─ tools/
 │     ├─ pack/                build, deploy, new language

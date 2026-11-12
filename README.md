@@ -84,7 +84,7 @@ pr2-localization/
 │  ├─ translations/          译文唯一手改层（编辑器保存到这里）
 │  ├─ data/                  人工维护的数据（占位符语义、原样保留清单）
 │  ├─ orig/                  原版英文/法文（只读参照）
-│  ├─ editor/                译文编辑器（Astro 前端 + server.py）
+│  ├─ editor/                译文编辑器（Astro 前端 + server.py，api/ 按域分模块）
 │  ├─ injector/              注入组件源码（C++）
 │  └─ tools/
 │     ├─ pack/               编译、部署、新建语言
