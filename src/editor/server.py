@@ -43,6 +43,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.dirname(HERE)                                  # 仓库的 src\
 TOOLS = os.path.join(SRC, "tools")
+ROOT = os.path.dirname(SRC)                                  # 仓库根
 
 # pythonw 拉起时 stdout/stderr 是 None；warnings/print 往它们写会抛
 # AttributeError: 'NoneType' object has no attribute 'write'。
@@ -59,6 +60,11 @@ DEFAULT_PORT = 8777
 # 这也让规则只有一份：编辑器与语言包走同一批函数。
 if TOOLS not in sys.path:
     sys.path.insert(0, TOOLS)
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+# 检验规则只有一份，在 shared\core\validate.py。
+from shared.core.validate import check_text  # noqa: E402
 
 import translate as T          # noqa: E402
 from pack import compile_pack as C       # noqa: E402
@@ -92,62 +98,14 @@ TRANSLATOR_LANG = "zh"
 def check_one(entry, lang, text):
     """校验一条译文，返回 [{level, text}]。
 
-    三条规则与 translate.cmd_check 一致：
-      1. 仍是占位文本 = 没翻
-      2. 占位符集合要与原文相同（少=警告，多=错误）
-      3. 标签轮廓要与原文相同，且译文不得新增标签
+    规则与消息都在 shared\\core\\validate.py —— 编译脚本、这个编辑器、
+    独立译者工作台共用同一份。以前这里借 compile_pack 的实现，再自己
+    补一段标签比对，三处对 %02 补零与紧邻占位符的处理并不一致。
 
     level 分 error / warn：error 大概率出乱码，warn 需要人工确认。
     """
-    out = []
-    if not text:
-        out.append({"level": "warn", "text": "这一条是空的（游戏里显示英文）"})
-        return out
-
-    if C.is_placeholder(text):
-        out.append({"level": "warn", "text": "还没翻（仍是占位文本）"})
-        return out
-
     en = entry.get(T.BASE_LANG, "") or ""
-
-    # 占位符：复用 compile_pack 的实现 —— 那里处理了 %2%1 紧邻的情况
-    errors, warnings = [], []
-    C.check_placeholders(entry.get("id", ""), en, text, errors, warnings)
-    for e in errors:
-        out.append({"level": "error", "text": _strip_id(e, entry.get("id", ""))})
-    for w in warnings:
-        out.append({"level": "warn", "text": _strip_id(w, entry.get("id", ""))})
-
-    # 标签轮廓：只比数量与名字（译文可以换颜色）。
-    # 译文**不得新增**排版标签 —— 除了换行：项目里写 " | "，引擎认 <n>，
-    # 两者等价，所以先把 <n> 折成 | 再比。顺带绕开 tag_profile 在
-    # 连续标签（<n><n>）上的一个分词毛病：它会拼出 "n><n" 这种假标签。
-    en_p, zh_p = T.tag_profile(_canon_breaks(en)), T.tag_profile(_canon_breaks(text))
-    if en_p != zh_p:
-        added = sorted({t for t in zh_p if zh_p.count(t) > en_p.count(t)})
-        if added:
-            out.append({"level": "error",
-                        "text": "译文擅自新增标签 %s —— 换行只能用 <n> 或 |"
-                                % " ".join(added)})
-        else:
-            out.append({"level": "warn",
-                        "text": "标签数量比原文少（原文 %s，译文 %s）"
-                                % (" ".join(en_p), " ".join(zh_p))})
-    return out
-
-
-def _strip_id(msg, hid):
-    """去掉 compile_pack 消息开头重复的 id，界面自己会显示 id 列。"""
-    return msg[len(hid):].strip() if msg.startswith(hid) else msg
-
-
-def _canon_breaks(s):
-    """把引擎的 <n> 折回项目里的 |，用于标签比对。
-
-    两种写法在游戏里是同一个东西（换行）；不折平的话，「原文写 |、译文写
-    <n>」会被判成"擅自加标签"，而这种写法正是编译期会生成的。
-    """
-    return re.sub(r"<n>", "|", s or "")
+    return check_text(text, en, lang="zh")
 
 
 # ---------------------------------------------------------------- 安装页
@@ -546,8 +504,15 @@ def placeholder_problems(hid, lang, text):
 
 
 def placeholders_of(text):
+    """按出现顺序列出占位符（去重）。
+
+    这里用的是 ARG_RX 而不是 shared\\core\\validate.tokens：面板要把
+    「同一个占位符出现几次」也显示出来，tokens 是集合、会丢掉次数；
+    而且它会额外认 %s / %d 这类 printf 式写法 —— tokens 只认 %N，
+    那种写法在游戏里是字面量，不算占位符。
+    """
     out = []
-    for m in re.finditer(r"@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]", text):
+    for m in ARG_RX.finditer(text):
         tok = m.group(0)
         if tok in out:
             continue

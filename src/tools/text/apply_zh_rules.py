@@ -401,9 +401,9 @@ def generate(use_cache=True):
 
 
 def write(order, out):
-    header = ("# 自动生成：本文件由 src/tools/text/apply_zh_rules.py\n"
-              "# 从 src/seed/zh.toml 按 标点/连词/人名 规则生成。\n"
-              "# 改译文请改 references 里的文本源；改规则请改 apply_zh_rules.py。\n")
+    header = ("# 自动生成：由 src/tools/text/apply_zh_rules.py 从 src/seed/zh.toml 生成。\n"
+              "# 改译文请改 src/seed/zh.toml；改规则请改 src/tools/text/apply_zh_rules.py。\n"
+              "# 手改本文件会让它与「文本源 + 规则」分叉，--check 会报不一致。\n")
     io.open(DST, "w", encoding="utf-8", newline="\n").write(
         header + "\n".join('"%s" = "%s"' % (k, esc(out[k])) for k in order) + "\n")
 
