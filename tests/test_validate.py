@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """占位符与标签规则的回归测试。
 
-同一套规则原先有四份实现，只有一份处理了「紧邻占位符」与「%02 补零」，
-其余几份会静默误判（把 "%2%1" 读成 "%21"、把 %02 与 %2 判成不一致）。
-这里把两个坑、判定语义以及「调用方必须复用同一份」都钉住。
+同一套规则原先有四份实现，口径互不相同且都不报错：有的把 "%2%1" 读成
+"%21"、有的把 %02 归一成 %2（0 是补零宽度，归一化会把真差异藏掉）、有
+的比对标签时把 <n><n> 吞成一个假名字。这里把这几条语义、判定级别以及
+「调用方必须复用同一份」都钉住。
 """
 
 import os
@@ -22,9 +23,11 @@ class TestTokens(unittest.TestCase):
         # 原文 <c><ts:175>%2<t>…%1：剥标签若删空，会粘成 "%2%1" 并被读成 "%21"
         self.assertEqual(V.tokens("<c><ts:175>%2<t>%1"), {"%1", "%2"})
 
-    def test_zero_padded_normalized(self):
-        self.assertEqual(V.tokens("%02u"), V.tokens("%2u"))
-        self.assertEqual(V.tokens("%002u"), {"%2"})
+    def test_zero_padding_is_literal(self):
+        # %02u 是「2 位补零的存档编号」，0 有含义，不能和 %2u 算同一个
+        self.assertEqual(V.tokens("Autosave %02u"), {"%02"})
+        self.assertNotEqual(V.tokens("%02u"), V.tokens("%2u"))
+        self.assertEqual(V.tokens("%002u"), {"%002"})
 
     def test_font_tag_is_not_placeholder(self):
         self.assertEqual(V.tokens(r"<f:fonts\Tiepolo.res>你好"), set())
@@ -62,6 +65,11 @@ class TestCheckText(unittest.TestCase):
     def test_adjacent_source_ok(self):
         # 原文紧邻、译文分开写：不算不一致
         self.assertEqual(V.check_text("%1 %2", "%2%1", lang="zh"), [])
+
+    def test_zero_padding_mismatch_reported(self):
+        # 原文 Autosave %02u、译文 Autosave %2u：少 %02 是警告、多 %2 是错误
+        out = V.check_text("Autosave %2u", "Autosave %02u", lang="zh")
+        self.assertEqual([x["level"] for x in out], ["warn", "error"])
 
     def test_empty_and_untranslated(self):
         self.assertEqual(V.check_text("", "%1", lang="zh")[0]["level"], "warn")
