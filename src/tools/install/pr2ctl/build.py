@@ -146,7 +146,7 @@ def run_build(langs, events):
                 return
 
         # locale.ini 决定 DLL 读哪个语言包。它是**可写的配置**，不是纯
-        # 模板：GUI 改语言时会直接写 build\PR2Packs\locale.ini（以及游戏
+        # 模板：GUI 改语言时会直接写 build\runtime\PR2Packs\locale.ini（以及游戏
         # 目录那份）。所以这里只在它还不存在时才用 src\locale.ini 兜底
         # 建一份 —— 无条件覆盖会把用户刚选的语言打回 language=zh。
         ini_out = os.path.join(PACK_OUT, "locale.ini")
@@ -177,7 +177,7 @@ def run_build(langs, events):
             events.put(("line", "字体检查跳过：%s" % exc))
 
         # 术语对照表：同样是「跟着译文走」的产物，顺手重生成一份，
-        # 省得改完译文忘了同步。产物在 build\glossary\，不进仓库。
+        # 省得改完译文忘了同步。产物在 build\preview\glossary\，不进仓库。
         try:
             script = os.path.join(HERE, "glossary.py")
             events.put(("line", "生成术语对照…"))

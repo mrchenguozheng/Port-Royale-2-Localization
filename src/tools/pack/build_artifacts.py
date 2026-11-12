@@ -12,7 +12,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 COMPILE = os.path.join(HERE, "compile_pack.py")
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 BUILD = os.path.join(ROOT, "build")
-FONT_DIR = os.path.join(BUILD, "fonts")
+RUNTIME = os.path.join(BUILD, "runtime")
+FONT_DIR = os.path.join(RUNTIME, "fonts")
 
 
 def _line(raw):

@@ -36,7 +36,7 @@ sys.path.insert(0, HERE)
 from install import pr2ctl as B  # noqa: E402
 from build_artifacts import compile_pack  # noqa: E402
 
-PACK_OUT = os.path.join(ROOT, "build", "PR2Packs")
+PACK_OUT = os.path.join(ROOT, "build", "runtime", "PR2Packs")
 
 
 def sha256(path):
@@ -127,8 +127,8 @@ def main():
                         on_line=print) != 0:
             sys.exit("[失败] 编译 %s" % lang)
 
-    # 2) 注入器产物必须已在 build\ 里
-    missing = [n for n in B.FLAT_FILES if not os.path.isfile(os.path.join(ROOT, "build", n))]
+    # 2) 注入器产物必须已在 build\runtime\ 里
+    missing = [n for n in B.FLAT_FILES if not os.path.isfile(os.path.join(B.RUNTIME, n))]
     if missing:
         sys.exit("缺少注入器产物：%s\n先运行 build_injector.bat（需要 Visual Studio）。"
                  % "、".join(missing))
@@ -159,7 +159,7 @@ def main():
         print("   %-24s %s" % ("PR2Packs\\%s.txt" % lang, "一致" if same else "不一致"))
         bad += 0 if same else 1
     for name in B.FLAT_FILES:
-        src = os.path.join(ROOT, "build", name)
+        src = os.path.join(B.RUNTIME, name)
         dst = os.path.join(target, name)
         same = sha256(src) == sha256(dst)
         print("   %-24s %s" % (name, "一致" if same else "不一致"))

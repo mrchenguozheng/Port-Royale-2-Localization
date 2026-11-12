@@ -26,7 +26,7 @@ REM %~dp0 already ends with a backslash, so both dirs need the
 REM explicit separator. Without it SRC becomes "...\srcinjector" and the
 REM move below silently fails with "cannot find the file".
 set "SRC=%~dp0injector\"
-set "ROOT=%~dp0..\build\"
+set "ROOT=%~dp0..\build\runtime\"
 
 where cl >nul 2>&1
 if not errorlevel 1 goto :compile
@@ -112,7 +112,7 @@ if errorlevel 1 goto :fail
 
 echo.
 REM cl runs with cwd = src\injector, so the output lands there.
-REM Move it to the repo-root build\ folder, next to PR2Packs\.
+REM Move it to the repo-root build\runtime\ folder, next to PR2Packs\.
 move /Y "%SRC%PR2TextSource.dll" "%ROOT%PR2TextSource.dll" >nul
 move /Y "%SRC%PR2Launcher.exe" "%ROOT%PR2Launcher.exe" >nul
 move /Y "%SRC%PR2LauncherGUI.exe" "%ROOT%PR2LauncherGUI.exe" >nul

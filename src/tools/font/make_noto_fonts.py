@@ -27,7 +27,7 @@ ROOT = os.path.dirname(SRC)
 
 OUT_NAMES = ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf")
 CACHE_VERSION = 1
-DEFAULT_CACHE = os.path.join(ROOT, "build", "font-cache", "noto")
+DEFAULT_CACHE = os.path.join(ROOT, "build", "cache", "noto")
 
 #: 每个语言用哪套 Noto。静态文件优先，没有就用 VF 实例化。
 LANGS = {

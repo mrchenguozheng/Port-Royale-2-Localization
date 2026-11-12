@@ -29,7 +29,7 @@ src/tools/
 | `pack/apply_patch.py` | 校验 → 编译 → 部署，一条命令跑完（`apply_patch.bat` 调它） |
 | `check.py` | 跑全部静态检查与单测（`check.bat` 调它） |
 | `pack/new_lang.py` | 命令行新建语言（编辑器里也能建） |
-| `pack/compile_pack.py` | 把 `src/translations/*.toml` 排版后编译成 `build/PR2Packs/*.txt`，引擎文本落在 `build/engine_text/*.toml` |
+| `pack/compile_pack.py` | 把 `src/translations/*.toml` 排版后编译成 `build/runtime/PR2Packs/*.txt`，引擎文本落在 `build/preview/engine_text/*.toml` |
 | `pack/check_breaks.py` | 编译后校验换行/占位符 |
 
 ## 文本规则

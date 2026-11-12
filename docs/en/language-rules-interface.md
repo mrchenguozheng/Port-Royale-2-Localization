@@ -141,7 +141,7 @@ your own; the interface does not prescribe grouping internals.
 - `python src\tools\text\engine_text.py --lang zh --check` and `--lang ja --check` must
   print "一致。";
 - both packs recompile to the same SHA-256 as before the refactor
-  (`build/PR2Packs/zh.txt`, `ja.txt`, 3548 entries each);
+  (`build/runtime/PR2Packs/zh.txt`, `ja.txt`, 3548 entries each);
 - `python tests\test_rules.py`, `tests\test_validate.py`, `tests\test_server_api.py` and
   `python src\tools\check.py` all pass.
 

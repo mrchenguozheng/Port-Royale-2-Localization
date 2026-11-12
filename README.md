@@ -93,7 +93,7 @@ pr2-localization/
 │     ├─ install/            pr2ctl 构建/部署/启动实现
 │     └─ data/               人名、地名、分词词典
 ├─ assets/fonts/original/    游戏原版拉丁字体（gitignore，需自己导出）
-├─ build/                    产物：engine_text/、PR2Packs/、fonts/、注入器
+├─ build/                    产物：runtime/（部署根）、preview/（查看）、cache/（缓存）
 ├─ docs/                     说明文档
 ├─ glossary/                 术语对照表
 └─ tests/                    规则与 API 单测
@@ -153,7 +153,7 @@ pr2-localization/
   换游戏版本（包括 GOG 的法语版 `1.1.2.42`）很可能需要改偏移，否则整体不生效。
 - **中文条目整条不显示是分词问题，不是标签问题。** 引擎按空格切词，
   整串汉字超宽会被整条丢弃，只能逐条在游戏里实测。
-- **字体按语言分开。** 开发用缝合版 `build\fonts\<语言>\`，发行用完整 Noto；
+- **字体按语言分开。** 开发用缝合版 `build\runtime\fonts\<语言>\`，发行用完整 Noto；
   部署时复制到游戏 `fonts\<语言>\`，不覆盖根目录原版。译文新增生僻字时，
   构建会自动重缝，缺字就会显示空白。
 

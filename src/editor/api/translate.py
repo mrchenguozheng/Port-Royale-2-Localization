@@ -243,7 +243,7 @@ def rule_trace(hid, lang):
     """逐阶段还原这条译文经过的格式化规则（译文层 → 补空格前）。
 
     译文层（src/translations/）是唯一手改层；补空格等排版是**构建期**由
-    src/tools/text/engine_text.py 做的，产物在 build/engine_text/，编辑器里
+    src/tools/text/engine_text.py 做的，产物在 build/preview/engine_text/，编辑器里
     不重复算一遍（那要起一次分词器，界面会卡）。
     """
     rows = load_all()
@@ -327,7 +327,7 @@ def get_entry_info(req):
     missing = [t for t in en_ph if t not in zh_ph]
     extra = [t for t in zh_ph if t not in en_ph]
     # 译文层只有一份，而且就是「干净文本」：这里的空格全部是译者自己
-    # 写的。引擎补的空格是构建期产物（build/engine_text/），不进这一层，
+    # 写的。引擎补的空格是构建期产物（build/preview/engine_text/），不进这一层，
     # 所以「额外补的空格」在这个接口里恒为 0。
     clean_spaces = len(spaces)
     en_c = placeholder_counts(en)

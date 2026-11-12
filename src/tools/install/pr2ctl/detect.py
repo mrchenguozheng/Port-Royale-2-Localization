@@ -17,7 +17,7 @@ def available_langs():
 
 def missing_outputs(need_pack=True):
     """部署前必须存在的构建产物。"""
-    missing = [n for n in FLAT_FILES if not os.path.isfile(os.path.join(BUILD, n))]
+    missing = [n for n in FLAT_FILES if not os.path.isfile(os.path.join(RUNTIME, n))]
     if need_pack:
         if not os.path.isdir(PACK_OUT):
             missing.append(PACK_DIR + "\\")

@@ -7,7 +7,7 @@
 The release build does **not** stitch fonts by default: it simply replaces the game's four fonts with the complete Noto fonts, and those can be redistributed with the package
 (see [`release.md`](release.md)). What follows describes the optional stitching path.
 
-`build/fonts/<lang>/*.ttf` are derivative works generated with fontstitch:
+`build/runtime/fonts/<lang>/*.ttf` are derivative works generated with fontstitch:
 
 - the base is the game's original Latin font (Ascaron / Port Royale 2);
 - the donors are system or commercial fonts: Microsoft YaHei, STZhongsong,
@@ -22,7 +22,7 @@ committing it to the repository may all violate those licenses.
 
 ## Safeguards Already in Place
 
-- `.gitignore` ignores `assets/fonts/original/` and `build/fonts/`;
+- `.gitignore` ignores `assets/fonts/original/` and `build/runtime/fonts/`;
 - `subset_fonts.py` writes a `不要分发.txt` ("do not distribute") file into the output directory;
 - the deployment script copies only the four `.ttf` files into `fonts/<lang>/` in the game directory and does not carry the notice file into the font directory;
 - the repository commits only the stitching code and the presets, never any font files.
@@ -44,7 +44,7 @@ python src/tools/font/subset_fonts.py --check
 python src/tools/font/subset_fonts.py --all
 ```
 
-Each language is written to `build/fonts/<lang>/`; at deployment time it is copied into
+Each language is written to `build/runtime/fonts/<lang>/`; at deployment time it is copied into
 `fonts/<lang>/` in the game directory, without overwriting the originals in the root directory.
 For the full checklist, see [`new-language-fonts.md`](new-language-fonts.md).
 

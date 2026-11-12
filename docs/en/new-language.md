@@ -167,7 +167,7 @@ de：N 个用字
 字体已处理：de
 ```
 
-and all four TTFs under `build/fonts/de/` have been updated.
+and all four TTFs under `build/runtime/fonts/de/` have been updated.
 
 If glyphs are missing, the log lists `U+XXXX`: switch the donor or add a
 `supplement`, then rerun.

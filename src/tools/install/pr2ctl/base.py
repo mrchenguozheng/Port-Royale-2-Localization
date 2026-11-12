@@ -33,7 +33,8 @@ TOOLS = HERE
 SRC = os.path.dirname(HERE)                              # 仓库的 src\
 ROOT = os.path.dirname(SRC)                              # 仓库根
 BUILD = os.path.join(ROOT, "build")
-PACK_OUT = os.path.join(BUILD, "PR2Packs")
+RUNTIME = os.path.join(BUILD, "runtime")
+PACK_OUT = os.path.join(RUNTIME, "PR2Packs")
 LOCALE_INI = os.path.join(SRC, "locale.ini")
 
 # 直接复制进游戏目录的文件。

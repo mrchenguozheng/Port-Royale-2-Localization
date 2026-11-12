@@ -33,7 +33,7 @@ CSV 是分析和人工审校的附属数据，不是游戏运行需要的文件�
 
 ## 不在这里的 CSV
 
-- `build/glossary/zh.csv`：术语对照的构建产物，可重新生成；
+- `build/preview/glossary/zh.csv`：术语对照的构建产物，可重新生成；
 - `build/hash-index.csv`、`archive/hash-index/hash-index.csv`：hash 索引，属于产物/归档；
 - `src/**/*.csv`：测试或第三方数据。
 

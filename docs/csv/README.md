@@ -33,7 +33,7 @@ CSV files are analysis and review artifacts, not runtime game data.
 
 ## CSV files elsewhere
 
-- `build/glossary/zh.csv`: glossary build artifact, regenerable;
+- `build/preview/glossary/zh.csv`: glossary build artifact, regenerable;
 - `build/hash-index.csv`, `archive/hash-index/hash-index.csv`: generated/archived indexes;
 - `src/**/*.csv`: test or third-party data.
 

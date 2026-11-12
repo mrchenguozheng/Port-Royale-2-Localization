@@ -4,7 +4,7 @@
 
 用途：
     1. 从截图里看到的文本，先在译文/英文/法文里找候选 hash；
-    2. 确认 hash 后，只改这一条，重新生成目标语言的 PR2Packs/<lang>.txt；
+    2. 确认 hash 后，只改这一条，重新生成目标语言的 build/runtime/PR2Packs/<lang>.txt；
     3. 只把这个 .txt 复制进游戏目录，不重编字体、不复制 DLL/启动器。
 
 它不改变 TOML 的格式，也不改变 compile_pack 的排版规则：
@@ -63,7 +63,7 @@ from build_artifacts import compile_pack           # noqa: E402
 from compile_pack import KEEP_ORIGINAL             # noqa: E402
 from install import pr2ctl as B                    # noqa: E402
 
-PACK_OUT = os.path.join(ROOT, "build", "PR2Packs")
+PACK_OUT = os.path.join(ROOT, "build", "runtime", "PR2Packs")
 MAX_TEXT = 300
 MAX_CANDIDATES = 8
 

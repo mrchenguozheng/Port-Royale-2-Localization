@@ -36,7 +36,7 @@ sys.path.insert(0, TOOLS)
 SRC = os.path.dirname(TOOLS)
 ROOT = os.path.dirname(SRC)
 BUILD = os.path.join(ROOT, "build")
-PACK_OUT = os.path.join(BUILD, "PR2Packs")
+RUNTIME = os.path.join(BUILD, "runtime")
 
 LABELS = {"zh": "简体中文", "ja": "日本語"}
 FLAT = ("PR2Launcher.exe", "PR2LauncherGUI.exe", "PR2TextSource.dll")
@@ -57,7 +57,7 @@ def build_pack(lang, stage, log):
 
 def copy_runtime(stage, log):
     for name in FLAT:
-        src = os.path.join(BUILD, name)
+        src = os.path.join(RUNTIME, name)
         if not os.path.isfile(src):
             raise FileNotFoundError("缺 %s，先构建注入器" % src)
         shutil.copy2(src, os.path.join(stage, name))
@@ -75,7 +75,7 @@ def copy_fonts(lang, stage, mode, log, cache=True):
         ok, msg = build_fonts([lang], out_dir=None, mode="stitch", log=log)
         if not ok:
             raise FileNotFoundError(msg)
-        shutil.copytree(os.path.join(BUILD, "fonts", lang), dst, dirs_exist_ok=True)
+        shutil.copytree(os.path.join(RUNTIME, "fonts", lang), dst, dirs_exist_ok=True)
         log("复制缝合字体（仅限私有/自用包）")
         return
 
@@ -198,7 +198,7 @@ def main():
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
     ap.add_argument("--fonts", choices=("noto", "stitch", "none"), default="noto")
     ap.add_argument("--no-font-cache", action="store_true",
-                    help="忽略 build/font-cache 里的 Noto 字体缓存")
+                    help="忽略 build/cache/noto 里的 Noto 字体缓存")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     for lang in args.lang:

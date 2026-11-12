@@ -27,18 +27,18 @@ def _font_lang(target, langs):
 def deploy_steps(target, langs):
     """列出复制要做的事，供进度条按步推进。
 
-    langs 给出时只复制这些语言的语言包 —— build\\PR2Packs 是累积
+    langs 给出时只复制这些语言的语言包 —— build\\runtime\\PR2Packs 是累积
     目录，里面可能还留着上一次构建的其他语言，整目录照搬会把
     locale.ini 根本没指向的语言也塞进游戏。langs 为 None 时整目录复制。
     """
-    steps = [(n, os.path.join(BUILD, n), os.path.join(target, n))
+    steps = [(n, os.path.join(RUNTIME, n), os.path.join(target, n))
              for n in FLAT_FILES]
 
-    # 字体按语言分别生成在 build\fonts\<语言>\；复制到游戏 fonts\<语言>\，
+    # 字体按语言分别生成在 build\runtime\fonts\<语言>\；复制到游戏 fonts\<语言>\，
     # 不覆盖根目录的原版字体。启动器用 PR2_FONT_DIR 做重定向。
     font_lang = _font_lang(target, langs)
     for fl in (langs or ([font_lang] if font_lang else [])):
-        font_dir = os.path.join(BUILD, "fonts", fl)
+        font_dir = os.path.join(RUNTIME, "fonts", fl)
         if not os.path.isdir(font_dir):
             continue
         for name in sorted(os.listdir(font_dir)):
@@ -47,7 +47,7 @@ def deploy_steps(target, langs):
                               os.path.join(font_dir, name),
                               os.path.join(target, "fonts", fl, name)))
 
-    ui_src = os.path.join(BUILD, "ui")
+    ui_src = os.path.join(RUNTIME, "ui")
     if os.path.isdir(ui_src):
         for name in sorted(os.listdir(ui_src)):
             src = os.path.join(ui_src, name)

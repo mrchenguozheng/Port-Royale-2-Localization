@@ -62,7 +62,7 @@ Alternatively, set `PR2_FONTTOOLS_SITE` to point at a site-packages directory wh
 - The donor must have TrueType `glyf` outlines;
 - the donor's UPM must match that of the corresponding game font: Arial 2048, ElGreco/Tiepolo 1000;
 - characters not covered by the primary donor are filled in with `[[supplement]]`;
-- each language is generated separately into `build/fonts/<language>/`, without affecting the others.
+- each language is generated separately into `build/runtime/fonts/<language>/`, without affecting the others.
 
 ## 5. Generating and deploying
 
@@ -80,8 +80,8 @@ python src/tools/font/subset_fonts.py --all --force
 Output:
 
 ```
-build/fonts/zh/ARIAL.TTF ...
-build/fonts/ja/ARIAL.TTF ...
+build/runtime/fonts/zh/ARIAL.TTF ...
+build/runtime/fonts/ja/ARIAL.TTF ...
 ```
 
 When deploying, copy only the font set for the **target language** into the game's `fonts\` directory.

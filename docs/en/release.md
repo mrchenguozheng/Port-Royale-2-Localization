@@ -158,7 +158,7 @@ fontTools needed to instantiate them into static weights.
 Generated results are cached in:
 
 ```
-build/font-cache/noto/
+build/cache/noto/
 ```
 
 The cache key includes the SHA-256 of the source font content, the weight, the target
@@ -284,10 +284,10 @@ src\build_injector.bat
 Outputs:
 
 ```
-build\PR2Launcher.exe
-build\PR2LauncherGUI.exe
-build\PR2TextSource.dll
-build\ui\zh.ini / en.ini / ja.ini
+build\runtime\PR2Launcher.exe
+build\runtime\PR2LauncherGUI.exe
+build\runtime\PR2TextSource.dll
+build\runtime\ui\zh.ini / en.ini / ja.ini
 ```
 
 Skip this step when only translations changed.
@@ -325,7 +325,7 @@ First-time VF instancing needs:
 python -m pip install fonttools
 ```
 
-Font results are cached in `build\font-cache\noto\` and reused. Force a rebuild:
+Font results are cached in `build\cache\noto\` and reused. Force a rebuild:
 
 ```bat
 python src\tools\pack\make_release.py --lang zh --version v1.0.0 --no-font-cache
@@ -411,5 +411,5 @@ jobs:
           files: dist/*.zip
 ```
 
-Prerequisites: the injector has been built and placed in `build/`; the Noto fonts are
+Prerequisites: the injector has been built and placed in `build/runtime/`; the Noto fonts are
 available on the runner (or have been downloaded to a fixed path beforehand).

@@ -62,7 +62,7 @@ def set_game_language(target, code):
     if os.path.isdir(os.path.dirname(game_ini)):
         ok = write_ini_language(game_ini, code)
 
-    build_ini = os.path.join(BUILD, PACK_DIR, "locale.ini")
+    build_ini = os.path.join(PACK_OUT, "locale.ini")
     if os.path.isdir(os.path.dirname(build_ini)):
         write_ini_language(build_ini, code)
     return ok, code

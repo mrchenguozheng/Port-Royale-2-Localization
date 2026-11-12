@@ -101,7 +101,7 @@ but **inserting spaces word by word**:
   and the earlier "120px target" is obsolete (tool and CSVs deleted);
 - only runs longer than 10 Han characters are processed; short labels, buttons, and personal names are left alone;
 - spaces are added **only between groups**, so a sentence usually gains just 1–5 spaces;
-- the result is written to `build/engine_text/zh.toml`; generate it alone with `python src\tools\text\engine_text.py --lang zh`.
+- the result is written to `build/preview/engine_text/zh.toml`; generate it alone with `python src\tools\text\engine_text.py --lang zh`.
 This spacing is a **build-time** step: the committed text in `src/translations/` carries no layout spaces.
 
 It solves the problem of "a long run of Han characters cannot wrap"; it does not solve "the widget itself is too narrow" — that can only be addressed by changing the length of the text.

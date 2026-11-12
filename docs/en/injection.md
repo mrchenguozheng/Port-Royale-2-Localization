@@ -239,7 +239,7 @@ Requires Visual Studio (Desktop development with C++ workload).
 src\build_injector.bat
 ```
 
-The script locates MSVC and the Windows SDK itself; output goes to `build\` at the repo root.
+The script locates MSVC and the Windows SDK itself; output goes to `build\runtime\` at the repo root.
 **The target architecture is x86** — PR2 is a 32-bit process and the hook code relies on 32-bit
 calling conventions.
 

@@ -3,7 +3,7 @@ REM ============================================================
 REM  PR2 Localization - language pack build script
 REM
 REM  Compiles src\translations\<lang>.toml into the pack the DLL
-REM  reads at runtime: build\PR2Packs\<lang>.txt
+REM  reads at runtime: build\runtime\PR2Packs\<lang>.txt
 REM
 REM  Two ways to get a working python.exe:
 REM    1. Run from a shell where python is already on PATH
@@ -20,10 +20,10 @@ set "NOPAUSE="
 for %%a in (%*) do if /i "%%a"=="--no-pause" set "NOPAUSE=1"
 
 set "SRC=%~dp0"
-set "TOOLS=%SRC%tools\"
+set "TOOLS=%SRC%tools\pack\"
 REM No trailing backslash: --out "%OUT%" would then pass the quote
 REM through as part of the path and Python rejects it.
-set "OUT=%SRC%..\build\PR2Packs"
+set "OUT=%SRC%..\build\runtime\PR2Packs"
 
 call "%SRC%find_python.bat"
 
@@ -48,13 +48,14 @@ for %%L in (zh) do (
 
 REM The DLL reads locale.ini from the same folder as the pack to learn
 REM which language to load. It lives in src\ as a plain template and is
-REM copied verbatim -- there is nothing to generate.
+REM copied verbatim -- there is nothing to generate. Keep an existing
+REM runtime copy: it may hold the language the user selected.
 if not exist "%SRC%locale.ini" (
   echo [pack] ERROR: cannot find %SRC%locale.ini
   goto :fail
 )
 if not exist "%OUT%" mkdir "%OUT%"
-copy /Y "%SRC%locale.ini" "%OUT%\locale.ini" >nul
+if not exist "%OUT%\locale.ini" copy /Y "%SRC%locale.ini" "%OUT%\locale.ini" >nul
 if errorlevel 1 (
   echo [pack] ERROR: cannot write %OUT%\locale.ini
   goto :fail
@@ -65,7 +66,7 @@ echo [pack] SUCCESS:
 dir /B "%OUT%"
 echo.
 echo [pack] The pack is read at game start. Launch
-echo [pack] build\PR2Launcher.exe - no rebuild needed.
+echo [pack] build\runtime\PR2Launcher.exe - no rebuild needed.
 call :maybe_pause
 endlocal
 exit /b 0

@@ -5,9 +5,9 @@ r"""engine_text.py —— 译文层 → 引擎层（构建期的唯一入口）�
 ----
     src/translations/<lang>.toml   干净译文，唯一手改层，入库
             ↓ 本模块（标点 / 分词 / 补空格，规则见 lang_rules 的 spec）
-    build/engine_text/<lang>.toml  引擎文本，构建产物，不进仓库
+    build/preview/engine_text/<lang>.toml  引擎文本，构建产物，不进仓库
             ↓ compile_pack
-    build/PR2Packs/<lang>.txt      语言包
+    build/runtime/PR2Packs/<lang>.txt      语言包
 
 只有一份真相源：译文层。引擎层随时可以从头重建，删掉它不影响构建。
 
@@ -25,7 +25,7 @@ r"""engine_text.py —— 译文层 → 引擎层（构建期的唯一入口）�
 
 用法
 ----
-    python src/tools/text/engine_text.py --lang zh          # 生成 build/engine_text/zh.toml
+    python src/tools/text/engine_text.py --lang zh          # 生成 build/preview/engine_text/zh.toml
     python src/tools/text/engine_text.py --lang zh --check  # 只对比
     python src/tools/text/engine_text.py --lang zh --stats  # 额外打印各阶段改动条数
     python src/tools/text/engine_text.py --lang ja --diff   # 对比并逐条打印差异
@@ -40,7 +40,7 @@ TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, TOOLS)
 sys.path.insert(0, HERE)
 ROOT = os.path.dirname(os.path.dirname(TOOLS))
-OUT_DIR = os.path.join(ROOT, "build", "engine_text")
+OUT_DIR = os.path.join(ROOT, "build", "preview", "engine_text")
 
 from text import lang_rules, toml_io  # noqa: E402
 from text.lang_rules import spec as specs  # noqa: E402
@@ -75,7 +75,7 @@ def out_path(lang):
 
 
 def write(lang, out, order=None):
-    """写 build/engine_text/<lang>.toml，返回路径。"""
+    """写 build/preview/engine_text/<lang>.toml，返回路径。"""
     os.makedirs(OUT_DIR, exist_ok=True)
     return toml_io.write_doc(out_path(lang), out, order, header(lang))
 

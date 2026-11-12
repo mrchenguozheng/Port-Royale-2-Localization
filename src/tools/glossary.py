@@ -10,7 +10,7 @@
 
 **生成物不进仓库**：表是从 terms.toml + translations\\ 现算出来的，
 改了译文重新跑一次就同步；提交进 git 只会多一份会过期的副本。
-默认写到 build\\glossary\\（和语言包、字体一样属于产物）。
+默认写到 build\\preview\\glossary\\（和语言包、字体一样属于产物）。
 
 数据从哪来
 ----------
@@ -42,7 +42,7 @@ SRC = os.path.dirname(HERE)
 ROOT = os.path.dirname(SRC)
 GLOSSARY = os.path.join(ROOT, "glossary")
 TERMS = os.path.join(GLOSSARY, "terms.toml")
-OUT_DIR = os.path.join(ROOT, "build", "glossary")
+OUT_DIR = os.path.join(ROOT, "build", "preview", "glossary")
 
 sys.path.insert(0, HERE)
 import translate as T          # 复用语言列表与基准文件，别再抄一份规则
@@ -157,7 +157,7 @@ def main():
     ap.add_argument("--with", dest="extra", action="append", default=[],
                     help="并排对照的其它语言（默认带 src\\orig 里的法文原本）")
     ap.add_argument("--csv", action="store_true", help="同时导出 .csv")
-    ap.add_argument("--out", default=OUT_DIR, help="输出目录（默认 build\\glossary）")
+    ap.add_argument("--out", default=OUT_DIR, help="输出目录（默认 build\\preview\\glossary）")
     args = ap.parse_args()
 
     groups = load_terms()

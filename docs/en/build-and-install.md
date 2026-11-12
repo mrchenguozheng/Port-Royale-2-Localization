@@ -26,7 +26,7 @@ For a one-line correction, you do not need the full build chain. `quick.py`:
 
 1. Finds candidate hashes by text from a screenshot in Chinese/English/French;
 2. Or edits one row in `src/translations/<lang>.toml` by a known hash;
-3. Calls `compile_pack --no-fonts` to regenerate `build/PR2Packs/<lang>.txt`;
+3. Calls `compile_pack --no-fonts` to regenerate `build/runtime/PR2Packs/<lang>.txt`;
 4. Copies only that `.txt` into the game directory; DLL, launcher and fonts are untouched.
 
 ```bat
@@ -152,7 +152,7 @@ Local development uses **fontstitch stitching**:
 
 - Takes the original Latin font in `assets/fonts/original/` as the base;
 - Appends the characters used by the current translation from the donor;
-- One set per language, output to `build/fonts/<language>/`;
+- One set per language, output to `build/runtime/fonts/<language>/`;
 - Re-stitches automatically when new characters appear, with a cache marker `.stitch.json`;
 - A font failure does not fail the language pack build.
 
@@ -224,17 +224,23 @@ Day to day, keep using `compile_pack.py` or `apply_patch.py`; there is no need t
 
 ```
 build\
-├─ PR2TextSource.dll
-├─ PR2Launcher.exe
-├─ PR2LauncherGUI.exe
-├─ PR2Packs\        accumulated language packs
-├─ fonts\<language>\   stitched fonts
-└─ font-cache\      Noto font cache
+├─ runtime\                 copy this directory into the game folder
+│  ├─ PR2TextSource.dll
+│  ├─ PR2Launcher.exe
+│  ├─ PR2LauncherGUI.exe
+│  ├─ ui\
+│  ├─ PR2Packs\             accumulated language packs
+│  └─ fonts\<language>\     stitched fonts
+├─ preview\                 for inspection; never shipped
+│  ├─ engine_text\<language>.toml
+│  └─ glossary\<language>.md
+└─ cache\                   disposable cache
+   └─ noto\                 Noto font cache
 ```
 
-Everything under `build\` is an artifact; you can delete the whole thing and rebuild.
+Everything under `build\` is an artifact; you can delete the whole thing and rebuild. `runtime\` is the only install source; `preview\` and `cache\` never enter a release package.
 
-`build\PR2Packs\locale.ini` is created from the template only when it does not exist, and never overwrites the user's selected language.
+`build\runtime\PR2Packs\locale.ini` is created from the template only when it does not exist, and never overwrites the user's selected language.
 
 ## Common scripts
 
@@ -256,7 +262,7 @@ Python entry points in `src\tools\`:
 | `pack/new_lang.py` | Creates a new language |
 | `font/subset_fonts.py` | Stitches fonts |
 | `font/make_noto_fonts.py` | Noto fonts for releases |
-| `text/engine_text.py` | Builds the engine text from translations (`build/engine_text/`, spec-driven) |
+| `text/engine_text.py` | Builds the engine text from translations (`build/preview/engine_text/`, spec-driven) |
 | `text/lang_rules/spec.py` | Three-part interface: `Punctuation` / `Segmenter` / `Spacing` |
 | `text/zh_pipeline.py` | Chinese pre-tokenization: conjunctions, names, digits/dash/`<n><n>` spaces |
 | `text/zh_space.py` | Chinese tokenization and character-budget spacing (spaCy / jieba / mechanical fallback) |

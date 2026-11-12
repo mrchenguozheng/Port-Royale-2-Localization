@@ -9,7 +9,7 @@ r"""src/tools/pack/compile_pack.py — 把 src\translations\<语言>.toml 编译
 一一对应，种类、数量、写法全都要对；顺序可以按中文语序调。
 
 编译前先在内存里套一遍排版规则（`src/tools/text/engine_text.py`），并把结果
-写到 build\engine_text\<语言>.toml 供人查看。译文层（src\translations\）是
+写到 build\preview\engine_text\<语言>.toml 供人查看。译文层（src\translations\）是
 唯一手改层，引擎文本是构建产物，不进仓库。
 
 src\orig\ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
@@ -35,7 +35,7 @@ SRC = os.path.dirname(TOOLS)                              # 仓库的 src\
 ROOT = os.path.dirname(SRC)                              # 仓库根
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
-DEFAULT_OUT = os.path.join(ROOT, "build", "PR2Packs")
+DEFAULT_OUT = os.path.join(ROOT, "build", "runtime", "PR2Packs")
 
 # 占位符与「占位文本」的判定只有一份，在 shared\core\validate.py。
 from shared.core.validate import has_bare_pipe, is_placeholder, tokens  # noqa: E402

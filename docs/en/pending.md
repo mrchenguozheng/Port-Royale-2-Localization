@@ -58,9 +58,9 @@ For now we can only test entry by entry in-game. A possible mitigation: provide 
 
 ## 5. Font stitching and glyph coverage
 
-The fonts shipped with the game have no Chinese glyphs, so `fonts\*.TTF` must be replaced; currently `src\tools\font\fontstitch` uses the original Latin font as the base and appends the characters used by the translation from a donor font. Each language has its own `build\fonts\<language>\` (four fonts, about 0.7–1.3 MB), independent of the others. The original glyphs, character widths, kerning and name table stay unchanged.
+The fonts shipped with the game have no Chinese glyphs, so `fonts\*.TTF` must be replaced; currently `src\tools\font\fontstitch` uses the original Latin font as the base and appends the characters used by the translation from a donor font. Each language has its own `build\runtime\fonts\<language>\` (four fonts, about 0.7–1.3 MB), independent of the others. The original glyphs, character widths, kerning and name table stay unchanged.
 
-"Compile language pack" compares automatically: if the translation introduces a new character that the font lacks, it re-stitches that language's four fonts; the cache marker is `build\fonts\<language>\.stitch.json`.
+"Compile language pack" compares automatically: if the translation introduces a new character that the font lacks, it re-stitches that language's four fonts; the cache marker is `build\runtime\fonts\<language>\.stitch.json`.
 
 **In-game verification (2026-10-22)**: the main menu displays Chinese correctly, the title font has Chinese glyphs, no anomalies.
 

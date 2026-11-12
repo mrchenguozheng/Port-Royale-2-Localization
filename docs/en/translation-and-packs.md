@@ -2,21 +2,21 @@
 
 There is **one** hand-edited text: `src\translations\<language>.toml`.
 The layout the engine needs (full-width punctuation, inter-word spaces) is computed
-**at build time** from that translation and lands in `build\engine_text\<language>.toml`,
+**at build time** from that translation and lands in `build\preview\engine_text\<language>.toml`,
 which is then compiled into the language pack.
 
 ```
 src/translations/zh.toml
         │  src/tools/text/engine_text.py (layout rules)
         ▼
-build/engine_text/zh.toml
+build/preview/engine_text/zh.toml
         │  src/tools/pack/compile_pack.py (placeholder validation)
         ▼
-build/PR2Packs/zh.txt
+build/runtime/PR2Packs/zh.txt
 ```
 
 To change a translation, edit `src\translations\`, then recompile the language pack.
-If you edit `build\PR2Packs\*.txt` directly, it will be overwritten on the next compile.
+If you edit `build\runtime\PR2Packs\*.txt` directly, it will be overwritten on the next compile.
 
 ---
 
@@ -28,7 +28,7 @@ If you edit `build\PR2Packs\*.txt` directly, it will be overwritten on the next 
 > An earlier version used two layers — initial text (clean text) and working text (text
 > with the added spaces); they are now merged into **one translation layer plus a build
 > artifact**: the initial layer is today's `translations/`, the working layer is today's
-> `build/engine_text/`.
+> `build/preview/engine_text/`.
 >
 > The Chinese in `translations/zh.toml` is **clean text without layout spaces**
 > (none between Han characters, around punctuation, or on either side of placeholders);
@@ -46,7 +46,7 @@ If you edit `build\PR2Packs\*.txt` directly, it will be overwritten on the next 
 
 - `src/translations/<language>.toml`: the only hand-edited layer; the editor saves here;
 - the build (`apply_patch`) applies the layout rules in memory, then compiles the language pack
-  and also writes the engine text to `build/engine_text/<language>.toml` (for inspection, deletable);
+  and also writes the engine text to `build/preview/engine_text/<language>.toml` (for inspection, deletable);
 - to see the layout result of one language alone: `python src\tools\text\engine_text.py --lang zh`;
 - the old manual review workflow (`zh_review.py`, review markers, page banner, reviewed checkboxes) has been removed entirely.
 
@@ -122,7 +122,7 @@ src\build_translation.bat
 
 Compiles the language packs only; equivalent to `python src\tools\pack\compile_pack.py`, except that it also locates Python by itself.
 
-It copies `src\locale.ini` verbatim into `build\PR2Packs\` — that file is a template, not generated output; the DLL relies on it to know which language pack to read, and without it nothing loads at all.
+It copies `src\locale.ini` verbatim into `build\runtime\PR2Packs\` — that file is a template, not generated output; the DLL relies on it to know which language pack to read, and without it nothing loads at all.
 
 If it would compile 0 entries, it **fails with exit code 1 and writes no file** — a 0-entry pack installed into the game means nothing is localized, and callers only check "is the file there", so an empty file is harder to diagnose than an error.
 
@@ -478,14 +478,14 @@ and is no longer part of the daily flow; `en` / `fr` remain read-only references
 ### Japanese: translation → build artifact
 
 ```powershell
-python src/tools/text/engine_text.py --lang ja          # writes build/engine_text/ja.toml
+python src/tools/text/engine_text.py --lang ja          # writes build/preview/engine_text/ja.toml
 python src/tools/text/engine_text.py --lang ja --check  # compare only, writes nothing
 ```
 
 The rules come from the spec declared in `lang_rules/ja.py`: punctuation (`Punctuation`), a morphological
 tokenizer (`Segmenter`), particle spacing (`Spacing mode=particle`, morphological analysis when
 janome/fugashi is installed, regex fallback otherwise).
-The output goes to `build/engine_text/ja.toml` and is **never** written back to the translation layer.
+The output goes to `build/preview/engine_text/ja.toml` and is **never** written back to the translation layer.
 
 ### Placeholder counts must match one by one
 
@@ -542,8 +542,8 @@ Runs in order: cross-module reference check → rule unit tests (`tests/`) → g
 ```
 src/orig/            English and French original references: strictly read-only, never written by any process
 src/translations/    translations: the only hand-edited layer; the editor saves here, tracked in git
-build/engine_text/   engine text: layout rules applied at build time; not tracked, regenerable
-build/PR2Packs/      language packs: build output, overwritten on the next compile
+build/preview/engine_text/   engine text: layout rules applied at build time; not tracked, regenerable
+build/runtime/PR2Packs/      language packs: build output, overwritten on the next compile
 ```
 
 - the editor has this one translation only; there is no "initial version / working text" pair;
@@ -551,7 +551,7 @@ build/PR2Packs/      language packs: build output, overwritten on the next compi
 - "Restore clean original" still uses the read-only originals under `orig/` and overwrites the current
   translation (undoable);
 - to see a language with the added spaces: `python src\tools\text\engine_text.py --lang zh`,
-  output in `build/engine_text/zh.toml`, deletable.
+  output in `build/preview/engine_text/zh.toml`, deletable.
 
 ### Rule trace (visualization)
 
@@ -567,7 +567,7 @@ translation (hand-edited layer) → punctuation normalization → space after co
 - the "match annotations" at the end color-code the characters changed by the rules: orange = punctuation/placeholder
   spaces, blue = conjunctions, green = person/town names;
 - word spacing (grouping by word) happens **at build time** and is not recomputed in the editor
-  (that would start a tokenizer and freeze the UI); to see the result, open `build/engine_text/<language>.toml`.
+  (that would start a tokenizer and freeze the UI); to see the result, open `build/preview/engine_text/<language>.toml`.
 
 ### Space coloring in the body (L1)
 

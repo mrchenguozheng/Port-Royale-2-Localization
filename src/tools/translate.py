@@ -59,7 +59,7 @@ REFERENCES_DIR = os.path.join(SRC, "orig")
 #: 文件名以语言代码开头，没有块头也没有字段名，所以语言代码与文件里
 #: 的内容是同一个名字，不需要任何映射表。
 #: 引擎文本（补空格、全角标点、`<n>` 之类的排版加工）是**构建产物**，
-#: 由 src\tools\text\engine_text.py 生成到 build\engine_text\<语言>.toml，
+#: 由 src\tools\text\engine_text.py 生成到 build\preview\engine_text\<语言>.toml，
 #: 不进仓库 —— 所以这里只读译文层，不存在第二份成品文本。
 #: 只读参考原文放在 orig\ 目录：
 #:     orig\en.gog_1.1.2.3.toml    英文原文（GOG 1.1.2.3 原版表），合并基准

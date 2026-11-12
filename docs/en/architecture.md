@@ -84,7 +84,7 @@ Status: done. `pr2_locale.h` unifies reading and writing back; the GUI is still 
 
 Status: done. `pack/build_artifacts.py` unifies language pack compilation and font generation:
 - Release: `noto`, output to `stage/fonts/<lang>/`;
-- Local: `stitch`, output to `build/fonts/<lang>/`.
+- Local: `stitch`, output to `build/runtime/fonts/<lang>/`.
 Runtime file copying is still handled by `make_release` / `pr2ctl` according to their own targets, and is not forcibly merged.
 
 ### Step 4: Runtime version check

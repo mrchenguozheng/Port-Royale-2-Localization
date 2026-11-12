@@ -13,7 +13,7 @@
 按语言分开
 ----------
 每个语言一份配置：``fontstitch/presets/<语言>.toml``，互不影响。
-字体也按语言分别生成到 ``build/fonts/<语言>/``，部署时只复制目标语言那一套。
+字体也按语言分别生成到 ``build/runtime/fonts/<语言>/``，部署时只复制目标语言那一套。
 
     python src\\tools\\font\\subset_fonts.py --check
     python src\\tools\\font\\subset_fonts.py --lang zh --force
@@ -41,7 +41,7 @@ ROOT = os.path.dirname(SRC_DIR)                       # 仓库根
 STRINGS = os.path.join(SRC_DIR, "translations")
 
 DEFAULT_SRC = os.path.join(ROOT, "assets", "fonts", "original")
-DEFAULT_OUT = os.path.join(ROOT, "build", "fonts")
+DEFAULT_OUT = os.path.join(ROOT, "build", "runtime", "fonts")
 FONTS = ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf")
 
 STITCH_DIR = os.path.join(TOOLS, "font", "fontstitch")
@@ -277,7 +277,7 @@ def _stitch_one(base, out, donors, codes, log):
 
 
 def ensure_fonts(out_dir=None, langs=None, src=None, log=None, force=False):
-    """按语言生成 build/fonts/<语言>/；返回 (ok, 说明)。"""
+    """按语言生成 build/runtime/fonts/<语言>/；返回 (ok, 说明)。"""
     out_dir = out_dir or DEFAULT_OUT
     log = log or (lambda msg: None)
     src = src or os.environ.get("PR2_ORIG_FONTS") or DEFAULT_SRC
@@ -370,7 +370,7 @@ def check_prereqs(langs=None):
 def main():
     ap = argparse.ArgumentParser(description="按语言缝合游戏字体")
     ap.add_argument("--src", default="", help="原版拉丁字体目录")
-    ap.add_argument("--out", default=DEFAULT_OUT, help="输出根目录（默认 build\\fonts）")
+    ap.add_argument("--out", default=DEFAULT_OUT, help="输出根目录（默认 build\\runtime\\fonts）")
     ap.add_argument("--lang", action="append", default=[],
                     help="只处理这个语言，可重复")
     ap.add_argument("--all", action="store_true", help="处理 presets/ 下全部语言")
@@ -392,7 +392,7 @@ def main():
                            src=args.src or None, log=print, force=args.force)
     print(msg)
     if ok:
-        print("部署时只复制目标语言那一套：build\\fonts\\<语言>\\")
+        print("部署时只复制目标语言那一套：build\\runtime\\fonts\\<语言>\\")
     return 0 if ok else 1
 
 
