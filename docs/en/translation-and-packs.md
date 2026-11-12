@@ -144,7 +144,7 @@ The compiled output **has no explanatory header of any kind**; the first byte is
 | `<o:0x…>…</o>` | color markup; after the colon is an ARGB color |
 | `<f:fonts\…>` | inline font specification |
 | `%1`, `@D$EndDate$` | placeholders; count and kind must match the original |
-| `\|` | **legacy form, deprecated**: still converted to `<n>` as a fallback at compile time, but do not write it in source files any more |
+| `\|` | **legacy form, deprecated and no longer converted**: use `<n>` for line breaks; a bare `\|` in a translation is now an error |
 
 The parser skips lines starting with `#` and `;`, so hand-written comments are not treated as data —
 but **do not rely on this**: the language pack is compiled output and they will be gone on the next compile. Put explanations here instead.
@@ -229,8 +229,9 @@ Toggle: particle spacing is a build-time strategy (`Spacing(mode="particle")`); 
 **Other**
 
 - **no spaces** on either side of the `<n>` line-break tag (`…。 <n>下一段` is normalized to `…。<n>下一段`);
-- these rules are applied in bulk by the translation-processing scripts (`|`→`<n>`, punctuation spacing, placeholder
-  spacing); a new language just needs to follow the same conventions.
+- these rules are applied in bulk by the translation-processing scripts (`<n>` normalization, punctuation spacing,
+  placeholder spacing); a new language just needs to follow the same conventions.
+  Legacy `|` line breaks are no longer converted and are rejected by validation.
 
 ---
 

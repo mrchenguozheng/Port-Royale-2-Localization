@@ -33,6 +33,7 @@ User double-clicks PR2Launcher.exe   (or the GUI calls it with --lang=xx)
 PR2.exe loads PR2TextSource.dll, DllMain → InstallHook()
    │
    ├─ LoadEditFile()      determines the language (see below), loads PR2Packs\<language>.txt
+   │                      then the optional PR2Packs\overrides\<language>.txt
    │
    ├─ hook #1  IAT: CStringManager::Add
    │            when the engine registers the main string table (MISSION_NPC_GOODS_INFO),
@@ -51,8 +52,11 @@ What the DLL does is **patch the import tables of the modules inside the process
 the slot that points at `A2dLib-2.20A.dll!CStringManager::Add` with itself — so the engine asks it
 for strings. The injection itself is done by the launcher; the DLL creates no remote threads.
 
-There is exactly **one** source for translation lookups — `PR2Packs\<language>.txt`. A hit is
-substituted; a miss goes back to the engine, which uses the original text.
+Lookups come from **the base pack plus an optional override**: the hook reads
+`PR2Packs\<language>.txt` first, then `PR2Packs\overrides\<language>.txt`.
+A hit is substituted; a miss goes back to the engine, which uses the original text.
+Entries in `overrides` with the same hash replace the base pack, which makes it
+suitable for local edits you do not want to commit.
 
 ---
 
@@ -61,9 +65,16 @@ substituted; a miss goes back to the engine, which uses the original text.
 ```
 PR2Packs\
 ├─ locale.ini     which pack to use
-└─ zh.txt         Simplified Chinese, 3548 entries, format: 0x<hash> = text
-                  (the filename is the language code; multiple files are allowed)
+├─ zh.txt         Simplified Chinese, 3548 entries, format: 0x<hash> = text
+│                 (the filename is the language code; multiple files are allowed)
+└─ overrides\
+   └─ zh.txt      optional local overrides, same format; same hash wins
 ```
+
+`overrides\` is optional and never appears in the launcher GUI's language list:
+the GUI only enumerates `PR2Packs\*.txt`, while overrides live in a subdirectory.
+The hook reads `zh.txt` first, then the exact path `overrides\zh.txt`; entries
+with the same hash in the latter file win.
 
 `locale.ini`:
 
@@ -98,7 +109,11 @@ and exit.
 shows its own built-in English — the engine's main string table is the natural fallback, and nothing
 extra needs preparing.
 
-Changing a translation **needs no rebuild**: edit `zh.txt`, save, restart the game.
+Changing text in the runtime pack **needs no rebuild**: edit `PR2Packs\zh.txt`
+directly, or put the changes in `PR2Packs\overrides\zh.txt`, then restart the game.
+The TOML source in the repository still goes through `quick.py` /
+`compile_pack.py` to produce the runtime pack; overrides are never overwritten
+by a build.
 
 ---
 
@@ -146,8 +161,9 @@ as empty or falls back to English; it never crashes the game.
   `g_pStringMgr` at `+0x142084`.
   On a different game version, if these don't line up, the hooks can't find their targets and the
   localization has no effect at all.
-- **`FindOverride` is a linear search**, and `AddEdit` does not deduplicate — if a pack contains a
-  duplicate hash, the one written first is returned.
+- **`FindOverride` is a linear search**; `AddEdit` replaces an existing hash, so
+  the last loaded entry wins. The base pack is loaded first and
+  `overrides\<language>.txt` second, so overrides win.
 - **Load failures were silent.** ~~When `LoadEditFile()` failed, everything returned silently~~
   Fixed: when `EditLoaded() == 0`, `InstallHook()` now writes a line
   `NO pack loaded: language 'xx' from <directory>`. Previously this failure was completely

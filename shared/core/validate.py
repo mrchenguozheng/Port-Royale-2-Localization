@@ -19,7 +19,8 @@ tools/translate 都从这里取，不再各写一份。合并之前同一条规�
 
 标签另算：比「轮廓」，即名字与数量，不比 <o:0xFF...> 里的颜色值（译文
 可以换颜色）。<n> 与正文里的 " | " 是同一个换行，比对时算同一种 ——
-否则「原文写 |、译文写 <n>」会被判成擅自加标签，而这正是编译期的写法。
+否则「原文写 |、译文写 <n>」会被判成擅自加标签。译文自身不再接受裸 `|`，
+换行统一写 <n>。
 """
 import re
 from collections import Counter
@@ -97,6 +98,15 @@ def is_placeholder(text):
     return bool(RE_PLACEHOLDER.match(text or ""))
 
 
+def has_bare_pipe(text):
+    """是否还有旧写法 `|` 换行（`<|>` 这种字面竖线不算）。
+
+    旧版编译会把它自动改成 `<n>`；现在不再兜底，源文件里出现就当错误，
+    免得“看起来是换行、游戏里却显示竖线”这种静默差异。
+    """
+    return bool(RE_PIPE_BREAK.search(str(text or "")))
+
+
 #: 消息按界面语言分表。规则只有一份，措辞才分语言。
 MESSAGES = {
     "en": {
@@ -106,14 +116,16 @@ MESSAGES = {
         "extra": "Extra placeholder(s): %s",
         "extra_tag": "Extra tag: %s",
         "missing_tag": "Missing tag: %s",
+        "bare_pipe": "Contains a bare |; use <n> for line breaks",
     },
     "zh": {
         "empty": "这一条是空的（游戏里显示英文）",
         "placeholder": "还没翻（仍是占位文本）",
         "missing": "译文少了占位符：%s（游戏里会显示成字面量）",
         "extra": "译文多了占位符：%s（确认是刻意为之的话可忽略）",
-        "extra_tag": "译文擅自新增标签 %s（换行只允许 <n> 或 |）",
+        "extra_tag": "译文擅自新增标签 %s（换行只允许 <n>）",
         "missing_tag": "标签比原文少：%s",
+        "bare_pipe": "译文含未转换的 |（换行请用 <n>）",
     },
 }
 
@@ -134,6 +146,8 @@ def check_text(text, english, lang="en"):
         return [{"level": "warn", "text": msg["placeholder"]}]
 
     out = []
+    if has_bare_pipe(text):
+        out.append({"level": "error", "text": msg["bare_pipe"]})
     a, b = tokens(english), tokens(text)
     if a - b:
         out.append({"level": "warn",

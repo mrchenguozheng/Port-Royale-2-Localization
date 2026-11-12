@@ -251,6 +251,9 @@ static void LoadLanguages(void) {
             if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
             char* dot = strrchr(fd.cFileName, '.');
             if (!dot || _stricmp(dot, ".txt") != 0) continue;
+            /* 语言代码里不允许再出现点号：像 zh.override.txt 这种
+             * 用户覆盖文件不能被列成语言 "zh.override"。 */
+            if (strchr(fd.cFileName, '.') != dot) continue;
             if (g_codeCount >= 64) break;
             int n = (int)(dot - fd.cFileName);
             if (n <= 0 || n >= 64) continue;

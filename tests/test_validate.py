@@ -81,6 +81,16 @@ class TestCheckText(unittest.TestCase):
         # 原文用 |、译文用 <n>：引擎里同一个换行，不该报擅自加标签
         self.assertEqual(V.check_text("甲<n>乙", "甲 | 乙", lang="zh"), [])
 
+    def test_bare_pipe_in_translation_is_error(self):
+        # 旧写法不再自动转换：译文自己写 | 会显示成竖线，必须拦下
+        out = V.check_text("甲 | 乙", "甲 | 乙", lang="zh")
+        self.assertEqual([x["level"] for x in out], ["error"])
+
+    def test_literal_pipe_in_angle_brackets_is_not_bare(self):
+        # 0x11f0398f 的字符清单里就有 <|>，它是字面竖线，不是换行标记
+        self.assertFalse(V.has_bare_pipe("<|>"))
+        self.assertEqual(V.check_text("<|>", "<|>", lang="zh"), [])
+
     def test_extra_tag_is_error(self):
         out = V.check_text("甲<n>乙<n>丙", "甲 | 乙", lang="zh")
         self.assertEqual([x["level"] for x in out], ["error"])

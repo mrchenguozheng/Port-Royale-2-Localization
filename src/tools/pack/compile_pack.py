@@ -25,7 +25,6 @@ src\orig\ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
 import argparse
 import io
 import os
-import re
 import sys
 import tomllib
 
@@ -39,7 +38,7 @@ if ROOT not in sys.path:
 DEFAULT_OUT = os.path.join(ROOT, "build", "PR2Packs")
 
 # 占位符与「占位文本」的判定只有一份，在 shared\core\validate.py。
-from shared.core.validate import is_placeholder, tokens  # noqa: E402
+from shared.core.validate import has_bare_pipe, is_placeholder, tokens  # noqa: E402
 
 #: 只读参考语言：英文 / 法文原文。**不参与编辑，也不生成语言包**。
 #: 实际名单以 translate.REFERENCE_LANGS 为准（这里是 import 不到时的兜底常量，
@@ -82,12 +81,17 @@ def check_placeholders(h, en, txt, errors, warnings):
 #: 判定本身（is_placeholder / RE_PLACEHOLDER）在 shared\core\validate.py。
 
 
-#: 译文与原文里用 " | " 表示换行，而**引擎只认 <n>**。
-#: 这里必须换掉：把竖线原样交给引擎，屏幕上就是一行行竖线
-#: （实测：test_en 的段落处显示 "| Your convoy is in..."，而同一句在原版里是分段）。
-#: 只换被空白包着、或位于串首/串尾的竖线；`<|>` 里的字面竖线放过 ——
-#: 0x11f0398f 是字符清单，正文里就有 `<|>`。
-RE_PIPE_BREAK = re.compile(r"(?<!<)\s*\|\s*(?!>)")
+#: 旧写法 `|` 已不再自动转换：换行统一写 `<n>`。裸 `|` 会在 build()
+#: 里作为致命错误拦下，避免“看起来是换行、游戏里显示竖线”。
+#: `<|>` 这种字面竖线（0x11f0398f 的字符清单）不算。
+
+
+def to_engine(txt):
+    """把 TOML 里的真实换行翻成引擎认的 `<n>`。
+
+    旧 `|` 兜底已删除；换行只认 `<n>` 和实际换行符。
+    """
+    return txt.replace("\n", "<n>")
 
 
 #: 必须原样保留英文的条目：法律声明、内部编号、纯符号/数字。
@@ -96,16 +100,6 @@ RE_PIPE_BREAK = re.compile(r"(?<!<)\s*\|\s*(?!>)")
 KEEP_ORIGINAL = {
     "0xfc512ea5": "版权声明",
 }
-
-
-def to_engine(txt):
-    """把 toml 里的排版约定翻成引擎认的写法。
-
-    * `|`（段落/换行分隔符）  -> `<n>`
-    * 真正的换行符            -> `<n>`
-    两件事在同一个地方做，免得以后又有人只改一半。
-    """
-    return RE_PIPE_BREAK.sub("<n>", txt).replace("\n", "<n>")
 
 
 # ---------------------------------------------------------------- 输出
@@ -185,7 +179,7 @@ def build(lang, out_dir, strict):
     engine_path = ET.write(field, engine, order)
     print("引擎文本 %d 条 → %s" % (len(engine), engine_path))
 
-    errors, warnings = [], []
+    errors, warnings, fatal = [], [], []
 
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, "%s.txt" % lang)
@@ -212,6 +206,9 @@ def build(lang, out_dir, strict):
         # 这不是放水 —— 它本来就没翻译，翻译后自然会进入校验。
         if not is_placeholder(txt):
             check_placeholders(h, s.get(T.BASE_LANG, ""), txt, errors, warnings)
+        if has_bare_pipe(txt):
+            fatal.append("%s 含未转换的 |（换行请写 <n>）" % h)
+            continue
         # 【坑】hash 必须写成**大写**（0x30A45770），与既有语言包一致。
         # patch.js 的合并逻辑按大写规范化 hash，产物若写成小写，
         # 用户手改过的条目就识别不出来，合并会静默失效（测试 test_patch.js
@@ -221,6 +218,15 @@ def build(lang, out_dir, strict):
         n += 1
         if is_placeholder(txt):
             n_ph += 1
+
+    if fatal:
+        print("\n错误 %d 条（旧写法 | 不再自动转换）：" % len(fatal))
+        for e in fatal[:30]:
+            print("  x " + e)
+        if len(fatal) > 30:
+            print("  … 还有 %d 条" % (len(fatal) - 30))
+        print("未生成 %s" % path)
+        return 1
 
     # 一条都没编出来就**不写文件**：写一个 0 条的语言包毫无用处，
     # 装进游戏目录等于没汉化，而调用方只看「文件在不在」。

@@ -9,6 +9,15 @@
  *     de.txt
  *     fr.txt
  *     ...
+ *     overrides/
+ *       zh.txt        <- optional user overrides, loaded after zh.txt
+ *       zh-TW.txt
+ *       ...
+ *
+ * The overrides/ subdirectory is deliberately below PR2Packs/: the GUI
+ * enumerates PR2Packs\*.txt as language codes, so a top-level
+ * "zh.override.txt" would show up as a language called "zh.override".
+ * The hook loads the override by an exact path after the base pack.
  *
  * The name is ours alone: PR2.exe never references it, and it does not
  * collide with the game's own pr2_loca.cpr. There is no fallback to the
@@ -102,8 +111,9 @@ static Edit* FindEdit(unsigned h) {
 }
 
 /* 容量必须 >= g_editN + extra。AddEdit 只在 g_edits==NULL 时才扩容，
- * 所以调用方（LoadOverrideFile）必须**一次性**分配够整份文件的条数；
- * 若AddEdit 的实际调用次数超过预留，仍会越界写—— 这就是这里留
+ * 所以调用方（LoadOverrideFile）必须**一次性**分配够整份文件的新增条数；
+ * 重复 hash 现在走覆盖路径，不占新槽位。
+ * 若 AddEdit 的实际新增次数超过预留，仍会越界写—— 这就是这里留
  * +1 余量的原因（行数统计与实际解析条数可能差1：末尾空行/BOM）。
  * 真要根治，应让 AddEdit 自己维护g_editCap 并按需扩容。 */
 static int g_editCap = 0;
@@ -122,6 +132,13 @@ static Edit* GrowBy(int extra) {
 }
 
 static void AddEdit(unsigned h, const char* utf8) {
+    Edit* e = FindEdit(h);
+    if (e) {
+        /* 后加载的文件覆盖先加载的：base pack -> overrides/<lang>.txt。
+         * 同一文件里出现重复 hash 时也是后一条生效。 */
+        e->len = Utf8ToWide(utf8, e->txt, ED_MAX);
+        return;
+    }
     if (g_editN >= ED_LINES) return;       /* 硬上限 */
     if (g_editN >= g_editCap && !GrowBy(1)) return;   /* 容量不足则放弃该条 */
     g_edits[g_editN].len  = Utf8ToWide(utf8, g_edits[g_editN].txt, ED_MAX);
@@ -258,6 +275,15 @@ void LoadEditFile(void) {
     lstrcatA(fp, g_locale);
     lstrcatA(fp, ".txt");
     LoadOverrideFile(fp);
+
+    /* optional per-user edits, loaded after the base pack so they win.
+     * Deliberately in a subdirectory: PR2Packs\*.txt is the GUI's language
+     * list, and "zh.override.txt" would otherwise appear there as a language. */
+    lstrcpynA(fp, g_locDir, MAX_PATH);
+    lstrcatA(fp, "\\overrides\\");
+    lstrcatA(fp, g_locale);
+    lstrcatA(fp, ".txt");
+    LoadOverrideFile(fp);
 }
 
 /* 供 pr2_text_source.cpp 调用：查该 hash 有没有译文。
@@ -265,8 +291,8 @@ void LoadEditFile(void) {
  * 调用方据此让引擎保留自己的英文原文。
  *
  * ⚠ 查表为**线性扫描**，每次游戏取字都要走一遍；语言包满额时平均扫到一半。
- * ⚠ AddEdit 不做同 hash 去重：语言包内部若出现重复 hash，这里返回的是
- *   **先写入**的那条。要改成二分 + 去重，得同时改这两处。 */
+ * ⚠ AddEdit 对同 hash 采用**后写覆盖**：base pack 先载入，overrides 后载入，
+ *   所以 override 里的条目会赢。要改成二分查找，得同时保持这个覆盖语义。 */
 unsigned short* OverrideEdit(unsigned h, unsigned* lenOut) {
     Edit* e = FindEdit(h);
     if (e && e->len > 0) { if (lenOut) *lenOut = (unsigned)e->len; return e->txt; }
