@@ -35,7 +35,7 @@ GET_URLS = [
     "/api/entries?offset=0&limit=1&filter=all&lang=zh",
     "/api/entry-info?lang=zh&id=0xc46f793a",
     "/api/rule-trace?lang=zh&id=0xc46f793a",
-    "/api/seed?lang=zh&id=0xc46f793a",
+    "/api/translation?lang=zh&id=0xc46f793a",
     "/api/terms?lang=zh",
     "/api/find?id=0xc46f793a",
     "/api/ids?q=0xc46f",
@@ -197,16 +197,16 @@ class TestServerApi(unittest.TestCase):
         self.assertEqual(diff, [hid])
         self.assertFalse(os.path.exists(self._zh_path() + ".tmp"))
 
-    def test_seed_writes_temp_file(self):
+    def test_translation_writes_temp_file(self):
         before = self._zh()
         hid = next(iter(before))
-        status, body = self._post("/api/seed", {
-            "lang": "zh", "id": hid, "text": "seed 改过"})
+        status, body = self._post("/api/translation", {
+            "lang": "zh", "id": hid, "text": "单条改过"})
         self.assertEqual(status, 200, body)
         self.assertTrue(body.get("ok"))
         after = self._zh()
         self.assertEqual(len(after), len(before))
-        self.assertEqual(after[hid], "seed 改过")
+        self.assertEqual(after[hid], "单条改过")
 
     def test_zz_repo_files_untouched(self):
         changed = [p for p, d in self.repo_digests.items()

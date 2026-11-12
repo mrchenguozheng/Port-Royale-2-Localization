@@ -89,7 +89,7 @@ field is Japanese). Do not treat it as a language-code key.
    `/api/check`, but `/api/patch` does not block tag differences. Call
    `/api/check` before submitting.
 5. An empty translation is valid and falls back to English in game.
-   `POST /api/seed` may set one entry back to an empty string.
+   `POST /api/translation` may set one entry back to an empty string.
 6. Do not judge layout with pixel or font width. The editor only handles
    the text layer; real line breaks are verified in game.
 
@@ -111,7 +111,7 @@ killing a process. If no editor runs on that port it returns `ok:false`.
 |---|---|---|---|
 | GET | `/api/context-batch` | `ids` (comma-separated, first 200 used), `lang` | `{id: context}`; unknown ids omitted |
 | GET | `/api/rule-trace` | `id`, `lang` (both required) | `{"id","stages":[{"key","label","text"}]}`; 404 if missing |
-| GET | `/api/seed` | `id`, `lang` (both required) | `{"text": current translation}`; 404 if the id is not in the file |
+| GET | `/api/translation` | `id`, `lang` (default zh) | `{"text": current translation}`; 404 if the id is not in the file |
 | GET | `/api/entry-info` | `id`, `lang` | Placeholder/tag/length statistics, see below; 404 if missing |
 | GET | `/api/list` | `lang` | Short previews of all rows `[{id,en,zh}]` (60 chars each) |
 | GET | `/api/ids` | `q`, `limit` (default 20), `lang` | `{"ids":[{id,en,zh}],"count":total hits}`; `q` matches an id substring |
@@ -121,7 +121,7 @@ killing a process. If no editor runs on that port it returns `ok:false`.
 | GET | `/api/entries` | `offset`, `limit`, `filter`, `lang` | Array of entry rows; `limit<=0` returns all, `offset<0` treated as 0 |
 | GET | `/api/search` | `q`, `filter`, `lang` | Array of entry rows; empty `q` returns `[]`, no pagination limit |
 | POST | `/api/check` | `{"id","text","lang"}` | `[{level:"error"|"warn","text":message}]`; unknown id returns `[]` |
-| POST | `/api/seed` | `{"id","lang","text"}` | `{"ok":true,"text"}`; 404 if no language file or id |
+| POST | `/api/translation` | `{"id","lang","text"}` (`lang` defaults to zh) | `{"ok":true,"text"}`; 404 if no language file or id |
 | POST | `/api/patch` | `{"lang","rows":[{"id","text"}]}` | `{"ok":true,"written":rows in file,"changed":submitted rows}` |
 
 ### Details
@@ -167,7 +167,7 @@ build artifacts, not part of the translation layer.
   so final padding is not included.
 - `POST /api/check` takes new, unsaved text and does not write. Messages
   are always Chinese (matching the frontend).
-- `POST /api/seed` is a **single-row replacement** and writes immediately.
+- `POST /api/translation` is a **single-row replacement** and writes immediately.
   Good for reverting one entry; use `/api/patch` for batches.
 - For `/api/patch`, `written` is the final number of rows written to the
   file (3548 in the current base) and `changed` is the number of submitted
@@ -301,12 +301,12 @@ Read and translate a batch:
 4. `POST /api/check` per entry; resolve `error`/`warn`.
 5. Put this batch's `{"id","text"}` into `rows` and call
    `POST /api/patch` once.
-6. Spot-check with `GET /api/entry-info` or `GET /api/seed`.
+6. Spot-check with `GET /api/entry-info` or `GET /api/translation`.
 
 Single-row edit:
 
 ```http
-POST /api/seed
+POST /api/translation
 Content-Type: application/json
 
 {"id":"0xc46f793a","lang":"zh","text":"new translation"}

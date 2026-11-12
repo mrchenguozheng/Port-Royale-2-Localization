@@ -1,5 +1,5 @@
 // 行渲染与编辑：语境/参照、contenteditable 译文格、占位符、单条保存与校验、
-// 条目信息和 seed/规则面板。只依赖 ./core。
+// 条目信息和已保存译文/规则面板。只依赖 ./core。
 import {
   S, $, el, api, toast, ensureDialogs, FOLLOW, Entry, Problem, cssEsc, setDirty,
   updateStat, syncScrollers, updatePath, markActiveInList, langName, isPlaceholder,
@@ -89,9 +89,9 @@ export function undoEdit(id: string) {
   void loadEntryInfo(id);
 }
 
-export async function copySeed(id: string) {
-  const seed = S.seed[id];
-  if (seed === undefined) return;
+export async function copySaved(id: string) {
+  const saved = S.savedText[id];
+  if (saved === undefined) return;
   const ed = zhEditor();
   const cur = ed ? editorText(ed) : '';
   if (cur) {
@@ -99,11 +99,11 @@ export async function copySeed(id: string) {
     st.push(cur);
     if (st.length > 20) st.shift();
   }
-  setEditorText(seed);
+  setEditorText(saved);
   void loadEntryInfo(id);
 }
 
-export let seedId = '';
+export let savedId = '';
 
 export async function editMeaning(id: string, token: string, cur: string) {
   const val = window.prompt('占位符 ' + token + ' 的含义（留空恢复自动判断）', cur);
@@ -157,50 +157,50 @@ export async function openRules(id: string) {
   }
 }
 
-export async function openSeed(id: string) {
+export async function openSaved(id: string) {
   try {
     await ensureDialogs();
     const r = await api<{ text: string }>(
-      `/api/seed?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
-    seedId = id;
-    const ta = $('seedText') as HTMLTextAreaElement;
+      `/api/translation?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
+    savedId = id;
+    const ta = $('savedText') as HTMLTextAreaElement;
     ta.value = r.text;
     ta.setAttribute('readonly', '');
-    ($('seedSave') as HTMLButtonElement).disabled = true;
-    $('seedLockInfo').textContent =
+    ($('savedSave') as HTMLButtonElement).disabled = true;
+    $('savedLockInfo').textContent =
       '已保存译文默认锁定。解锁后只能改这一条，保存或关闭后重新锁定。';
-    ($('seedModal') as any).show?.();
+    ($('savedModal') as any).show?.();
     ta.focus();
   } catch (err) {
     toast('读取已保存译文失败：' + (err as Error).message);
   }
 }
 
-export async function unlockSeed() {
+export async function unlockSaved() {
   if (!window.confirm('只解锁这一条的已保存译文，且仅本次修改有效。继续？')) return;
-  const ta = $('seedText') as HTMLTextAreaElement;
+  const ta = $('savedText') as HTMLTextAreaElement;
   ta.removeAttribute('readonly');
-  ($('seedSave') as HTMLButtonElement).disabled = false;
-  $('seedLockInfo').textContent = '已解锁（仅本次修改）。保存或关闭后重新锁定。';
+  ($('savedSave') as HTMLButtonElement).disabled = false;
+  $('savedLockInfo').textContent = '已解锁（仅本次修改）。保存或关闭后重新锁定。';
   ta.focus();
 }
 
-export async function saveSeed() {
+export async function saveSaved() {
   try {
-    const ta = $('seedText') as HTMLTextAreaElement;
-    await api('/api/seed', { lang: S.lang, id: seedId, text: ta.value });
+    const ta = $('savedText') as HTMLTextAreaElement;
+    await api('/api/translation', { lang: S.lang, id: savedId, text: ta.value });
     ta.setAttribute('readonly', '');
-    ($('seedSave') as HTMLButtonElement).disabled = true;
-    $('seedLockInfo').textContent = '译文已保存，已重新锁定。引擎文本未变。';
+    ($('savedSave') as HTMLButtonElement).disabled = true;
+    $('savedLockInfo').textContent = '译文已保存，已重新锁定。引擎文本未变。';
   } catch (err) {
     toast('保存失败：' + (err as Error).message);
   }
 }
 
-export function closeSeed() {
-  ($('seedModal') as any).hide?.();
-  ($('seedText') as HTMLTextAreaElement).readOnly = true;
-  ($('seedSave') as HTMLButtonElement).disabled = true;
+export function closeSaved() {
+  ($('savedModal') as any).hide?.();
+  ($('savedText') as HTMLTextAreaElement).readOnly = true;
+  ($('savedSave') as HTMLButtonElement).disabled = true;
 }
 
 export async function setTermRule(id: string, term: string, skip: boolean) {
@@ -304,16 +304,16 @@ export async function loadEntryInfo(id: string) {
     box.appendChild(actions);
     try {
       const sd = await api<{ text: string }>(
-        `/api/seed?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
-      S.seed[id] = sd.text;
-      const body = document.querySelector('.seed-inline .seed-body');
+        `/api/translation?lang=${encodeURIComponent(S.lang)}&id=${encodeURIComponent(id)}`);
+      S.savedText[id] = sd.text;
+      const body = document.querySelector('.saved-inline .saved-body');
       if (body) body.textContent = sd.text;
-      const sb = document.querySelector('.seed-inline');
+      const sb = document.querySelector('.saved-inline');
       const ed = zhEditor();
       const norm = (t: string) => t.replace(/\s+/g, '');
       if (sb && ed) sb.classList.toggle('diff', norm(ed.textContent || '') !== norm(sd.text));
     } catch {
-      const body = document.querySelector('.seed-inline .seed-body');
+      const body = document.querySelector('.saved-inline .saved-body');
       if (body) body.textContent = '（没有已保存译文）';
     }
 
@@ -359,21 +359,21 @@ export function rowOf(e: Entry): HTMLElement {
   // 左栏：已保存译文、原文 A、原文 B；右栏：译文编辑
   const left = el('div', 'col-src');
 
-  const seedBox = el('div', 'seed-inline ref-block');
-  const seedHead = el('div', 'ref-head');
-  seedHead.appendChild(el('span', 'ref-label', '已保存译文'));
-  const seedCopy = el('button', 'mini seed-edit', '复制到译文');
-  seedCopy.title = '用已保存译文覆盖编辑框（可撤销）';
-  seedCopy.addEventListener('click', () => void copySeed(e.id));
-  seedHead.appendChild(seedCopy);
-  const seedEdit = el('button', 'mini seed-edit', '解锁编辑');
-  seedEdit.title = '逐条解锁，仅本次修改有效';
-  seedEdit.addEventListener('click', () => void openSeed(e.id));
-  seedHead.appendChild(seedEdit);
-  seedBox.appendChild(seedHead);
-  const seedBody = el('div', 'seed-body', '（读取中…）');
-  seedBox.appendChild(seedBody);
-  left.appendChild(seedBox);
+  const savedBox = el('div', 'saved-inline ref-block');
+  const savedHead = el('div', 'ref-head');
+  savedHead.appendChild(el('span', 'ref-label', '已保存译文'));
+  const savedCopy = el('button', 'mini saved-edit', '复制到译文');
+  savedCopy.title = '用已保存译文覆盖编辑框（可撤销）';
+  savedCopy.addEventListener('click', () => void copySaved(e.id));
+  savedHead.appendChild(savedCopy);
+  const savedEdit = el('button', 'mini saved-edit', '解锁编辑');
+  savedEdit.title = '逐条解锁，仅本次修改有效';
+  savedEdit.addEventListener('click', () => void openSaved(e.id));
+  savedHead.appendChild(savedEdit);
+  savedBox.appendChild(savedHead);
+  const savedBody = el('div', 'saved-body', '（读取中…）');
+  savedBox.appendChild(savedBody);
+  left.appendChild(savedBox);
 
   left.appendChild(refLine('A', e));
   left.appendChild(refLine('B', e));
@@ -505,11 +505,11 @@ export function zhCell(e: Entry): HTMLElement {
     ed.replaceChildren(renderRich(fixed));
     setCaretOffset(ed, off);
     record(fixed);
-    const sb = document.querySelector('.seed-inline');
+    const sb = document.querySelector('.saved-inline');
     if (sb) {
-      const seed = S.seed[e.id];
+      const saved = S.savedText[e.id];
       const norm = (t: string) => t.replace(/\s+/g, '');
-      sb.classList.toggle('diff', !!seed && norm(seed) !== norm(fixed));
+      sb.classList.toggle('diff', !!saved && norm(saved) !== norm(fixed));
     }
   };
 

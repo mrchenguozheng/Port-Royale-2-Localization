@@ -300,7 +300,7 @@ def get_rule_trace(req):
     return req.send_json({"id": hid, "stages": stages})
 
 
-def get_seed(req):
+def get_translation(req):
     query = req.query
     body = req.body
     hid = (query.get("id") or [""])[0]
@@ -484,21 +484,21 @@ def post_check(req):
     return req.send_json([] if row is None else check_one(row, lang, text))
 
 
-def post_seed(req):
+def post_translation(req):
     query = req.query
     body = req.body
     lang = body.get("lang", "zh")
     hid = body.get("id", "")
     text = body.get("text", "")
-    seed = T.lang_path(lang)
-    if not os.path.isfile(seed):
+    path = T.lang_path(lang)
+    if not os.path.isfile(path):
         return req.send_json({"detail": "没有译文文件"}, 404)
-    cur = tomllib.load(open(seed, "rb"))
+    cur = tomllib.load(open(path, "rb"))
     if hid not in cur:
         return req.send_json({"detail": "译文里没有这一条"}, 404)
     order = list(cur)
     cur[hid] = text
-    TI.write_doc_atomic(seed, cur, order, TI.head_lines(seed))
+    TI.write_doc_atomic(path, cur, order, TI.head_lines(path))
     return req.send_json({"ok": True, "text": text})
 
 
@@ -525,7 +525,7 @@ def post_patch(req):
 ROUTES = {
     ("GET", "/api/context-batch"): get_context_batch,
     ("GET", "/api/rule-trace"): get_rule_trace,
-    ("GET", "/api/seed"): get_seed,
+    ("GET", "/api/translation"): get_translation,
     ("GET", "/api/entry-info"): get_entry_info,
     ("GET", "/api/list"): get_list,
     ("GET", "/api/ids"): get_ids,
@@ -535,6 +535,6 @@ ROUTES = {
     ("GET", "/api/entries"): get_entries,
     ("GET", "/api/search"): get_search,
     ("POST", "/api/check"): post_check,
-    ("POST", "/api/seed"): post_seed,
+    ("POST", "/api/translation"): post_translation,
     ("POST", "/api/patch"): post_patch,
 }

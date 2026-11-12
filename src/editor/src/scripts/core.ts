@@ -72,7 +72,7 @@ export const S = {
   undo: {} as Record<string, string[]>,
   last: {} as Record<string, string>,
   suppressUndo: false,
-  seed: {} as Record<string, string>,
+  savedText: {} as Record<string, string>,
   curMeaning: new Map<string, string>(),
   curId: '',
   dirtyIds: [] as string[],
@@ -152,7 +152,7 @@ export function setView(view: string) {
 
 export function syncScrollers() {
   const panes = Array.from(
-    document.querySelectorAll('.col-src .body, .col-src .seed-body'),
+    document.querySelectorAll('.col-src .body, .col-src .saved-body'),
   ) as HTMLElement[];
   if (panes.length < 2) return;
   let lock = false;

@@ -33,7 +33,7 @@ import {
   cssEsc, loadSideList, setView, setJumpHook, FOLLOW, PRESET_SIZES,
   LS_LANG, LS_REFA, LS_REFB, LS_SIZE, LS_SIZES, Entry,
 } from './core';
-import { drawRows, saveOne, unlockSeed, saveSeed, closeSeed } from './rows';
+import { drawRows, saveOne, unlockSaved, saveSaved, closeSaved } from './rows';
 
 export function initTabs() {
   for (const t of document.querySelectorAll('.tab')) {
@@ -620,9 +620,9 @@ setJumpHook((id) => { void jumpToId(id); });
 // ── 语境推断 ────────────────────────────────────────────
 
 $('ruleClose').addEventListener('click', () => { ($('ruleModal') as any).hide?.(); });
-$('seedUnlock').addEventListener('click', () => void unlockSeed());
-$('seedSave').addEventListener('click', () => void saveSeed());
-$('seedClose').addEventListener('click', closeSeed);
+$('savedUnlock').addEventListener('click', () => void unlockSaved());
+$('savedSave').addEventListener('click', () => void saveSaved());
+$('savedClose').addEventListener('click', closeSaved);
 
 function showBootError(msg: string) {
   const box = document.getElementById('loading');

@@ -163,12 +163,12 @@ const title = 'PR2 本地化 · 译文编辑';
     </sl-dialog>
 
     <!-- 已保存译文：默认锁定，逐条解锁，仅本次修改有效 -->
-    <sl-dialog id="seedModal" label="已保存译文">
-      <p id="seedLockInfo" class="modal-note">已保存译文默认锁定。解锁后只能改这一条，保存或关闭后重新锁定。</p>
-      <sl-textarea id="seedText" resize="auto" readonly></sl-textarea>
-      <sl-button slot="footer" id="seedUnlock" size="small">解锁编辑</sl-button>
-      <sl-button slot="footer" id="seedSave" size="small" disabled>保存译文</sl-button>
-      <sl-button slot="footer" id="seedClose" size="small">关闭</sl-button>
+    <sl-dialog id="savedModal" label="已保存译文">
+      <p id="savedLockInfo" class="modal-note">已保存译文默认锁定。解锁后只能改这一条，保存或关闭后重新锁定。</p>
+      <sl-textarea id="savedText" resize="auto" readonly></sl-textarea>
+      <sl-button slot="footer" id="savedUnlock" size="small">解锁编辑</sl-button>
+      <sl-button slot="footer" id="savedSave" size="small" disabled>保存译文</sl-button>
+      <sl-button slot="footer" id="savedClose" size="small">关闭</sl-button>
     </sl-dialog>
 
     <!-- 添加语言：选一个已存在的语言当模板，复制成新语言的基础 -->

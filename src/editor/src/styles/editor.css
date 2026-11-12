@@ -1253,25 +1253,17 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 .term-chip { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--warn, #e0a000); }
 .term-chip.term-off { color: var(--fg-dim); }
 
-.seed-text {
-  width: 100%; min-height: 9rem; resize: vertical;
-  font-family: var(--font-mono); font-size: 0.95rem;
-  background: var(--bg); color: var(--fg);
-  border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem;
-}
-.seed-text[readonly] { opacity: 0.75; }
-
-.seed-inline { min-width: 0; }
-.seed-inline .ref-label { color: var(--fg-dim); font-size: 0.85em; }
-.seed-inline .seed-body {
+.saved-inline { min-width: 0; }
+.saved-inline .ref-label { color: var(--fg-dim); font-size: 0.85em; }
+.saved-inline .saved-body {
   font-family: var(--font-mono); font-size: var(--text-size); white-space: pre-wrap;
   color: var(--fg-dim); background: var(--bg-row-alt); border-radius: 4px;
   padding: 0.3rem 0.5rem; margin-top: 0.2rem;
 }
-.seed-inline.diff .seed-body { border-left: 3px solid var(--accent); }
+.saved-inline.diff .saved-body { border-left: 3px solid var(--accent); }
 
-.seed-inline .ref-head { display: flex; align-items: center; gap: 0.5rem; }
-.seed-inline .seed-edit { margin-left: auto; }
+.saved-inline .ref-head { display: flex; align-items: center; gap: 0.5rem; }
+.saved-inline .saved-edit { margin-left: auto; }
 
 .rule-stages { display: flex; flex-direction: column; gap: 0.5rem; max-height: 60vh; overflow: auto; }
 .rule-stage .rule-label { color: var(--fg-dim); font-size: 0.8em; }
@@ -1309,7 +1301,7 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
   overflow: auto;
   overscroll-behavior: contain;
 }
-.seed-inline .seed-body {
+.saved-inline .saved-body {
   max-height: 18vh;
   overflow: auto;
   overscroll-behavior: contain;
@@ -1334,8 +1326,8 @@ body > #rows { flex: 1 1 auto; overflow: auto; }
 }
 sl-dialog::part(panel) { max-height: 85vh; max-width: min(1100px, 92vw); }
 sl-dialog::part(body) { overflow: auto; }
-#seedText { width: 100%; min-height: 40vh; }
-#seedText::part(textarea) { font-family: var(--font-mono); font-size: 0.95rem; min-height: 38vh; }
+#savedText { width: 100%; min-height: 40vh; }
+#savedText::part(textarea) { font-family: var(--font-mono); font-size: 0.95rem; min-height: 38vh; }
 
 /* 顶部工具栏里的 Shoelace 下拉：压成行内小控件 */
 .editor-tools label.tb {

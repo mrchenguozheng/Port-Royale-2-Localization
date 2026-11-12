@@ -25,9 +25,10 @@ If you edit `build\PR2Packs\*.txt` directly, it will be overwritten on the next 
 > engine wrap lines; it is the difference between "same translation, different delivery form".
 > Keeping it in the repository means maintaining the same text twice, and the two copies
 > drift apart after a single round of hand edits.
-> An earlier version used two layers — `seed/` (clean text) and `live/` (text with the added
-> spaces); they are now merged into **one translation layer plus a build artifact**:
-> `seed/` is today's `translations/`, `live/` is today's `build/engine_text/`.
+> An earlier version used two layers — initial text (clean text) and working text (text
+> with the added spaces); they are now merged into **one translation layer plus a build
+> artifact**: the initial layer is today's `translations/`, the working layer is today's
+> `build/engine_text/`.
 >
 > The Chinese in `translations/zh.toml` is **clean text without layout spaces**
 > (none between Han characters, around punctuation, or on either side of placeholders);
