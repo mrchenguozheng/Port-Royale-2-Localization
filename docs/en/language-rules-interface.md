@@ -139,10 +139,12 @@ your own; the interface does not prescribe grouping internals.
 - `python tests\test_rules.py`, `tests\test_validate.py`, `tests\test_server_api.py` and
   `python src\tools\check.py` all pass.
 
-The old names inside `apply_zh_rules` / `apply_ja_rules` (`fix_conj`, `space_tokens`,
-`build_names`, `find_names`, `pad_names`, `generate_doc`) and
-`zh.normalize` / `ja.normalize(particles=)` are kept as compatibility shims so tests and
-existing scripts keep working.
+`engine_text.py` is the only build entry point (`--lang zh|ja`, `--check` to compare,
+`--stats` for per-stage counts, `--diff` to print each difference). The old Chinese names
+remain importable from `apply_zh_rules` (`fix_conj`, `space_tokens`, `build_names`,
+`find_names`, `pad_names`, `generate_doc`), which is now just a compatibility facade;
+`apply_ja_rules.py` has been deleted — use `engine_text --lang ja`.
+`zh.normalize` / `ja.normalize(particles=)` also stay as shims.
 
 ---
 

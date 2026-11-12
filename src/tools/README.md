@@ -30,12 +30,13 @@ src/tools/
 | 脚本 | 作用 |
 |---|---|
 | `text/normalize_text.py` | 按语言规则归一化标点（只改标点，不补排版空格） |
-| `text/engine_text.py` | 译文 → 引擎文本（排版总入口，只认 lang_rules 的 spec，产物写 `build/engine_text/`） |
+| `text/engine_text.py` | 译文 → 引擎文本（**唯一构建入口**，只认 lang_rules 的 spec；`--check/--stats/--diff`） |
 | `text/lang_rules/spec.py` | 三段式接口：`Punctuation` / `Segmenter` / `Spacing` + `LangSpec` + 执行器 |
-| `text/apply_zh_rules.py` / `text/apply_ja_rules.py` | 中文/日文的构建入口（都走 spec，产物写 `build/engine_text/`） |
+| `text/apply_zh_rules.py` | 中文旧名的兼容门面（`fix_conj`、`space_tokens`、`generate_doc` 等），新代码用 `zh_pipeline` |
 | `text/zh_pipeline.py` | 中文「分词前」：连词、人名、数字/破折号/`<n><n>` 空格 |
 | `text/zh_space.py` | 中文分词与按字数成组补空格（spaCy → jieba → 机械兜底） |
-| `text/segment_zh.py` / `text/zh_dep_space.py` | 分词子进程入口、弃用空格对照小工具 |
+| `text/toml_io.py` | 译文/产物共用的 TOML 读写（id 顺序、转义、header） |
+| `text/segment_zh.py` | spaCy 分词子进程入口 |
 | `data/zh_names.txt` / `data/zh_towns.txt` / `data/zh_userdict.txt` | 人名、地名、分词词典 |
 
 ## 翻译与术语

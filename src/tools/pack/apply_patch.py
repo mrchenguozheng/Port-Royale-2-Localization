@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """apply_patch.py —— 开发流程用：一条命令把当前译文构建并打补丁到游戏目录。
 
-做四件事，任何一步失败就停：
+做三件事，任何一步失败就停：
 
-1. 归一化译文（normalize_text）
-2. 校验换行/占位符（check_breaks --strict）
-3. 编译语言包 + 字体（compile_pack）
-4. 复制到游戏目录并核对（deploy + SHA-256 比对）
+1. 校验换行/占位符（check_breaks --strict）
+2. 编译语言包 + 字体（compile_pack，排版规则在编译期套用）
+3. 复制到游戏目录并核对（deploy + SHA-256 比对）
+
+归一化标点是单独的手工步骤（`text/normalize_text.py`），不在这条命令里：
+它会改译文文件，构建只读译文。
 
 用法
 ----
@@ -85,26 +87,15 @@ def pick_game_dir(explicit):
     sys.exit("找不到游戏目录：用 --game-dir 指定，或先在 start.bat 里选一次。")
 
 
-def spacy_python():
-    explicit = os.environ.get("PR2_SPACY_PYTHON")
-    if explicit:
-        return explicit
-    local = os.path.join(ROOT, ".venv-spacy", "Scripts", "python.exe")
-    return local if os.path.isfile(local) else ""
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--langs", default="", help="逗号分隔，默认 ja,zh")
     ap.add_argument("--game-dir", default="", help="游戏目录（含 PR2.exe）")
-    ap.add_argument("--no-normalize", action="store_true", help="跳过 normalize_text")
     ap.add_argument("--no-check", action="store_true", help="跳过 check_breaks")
     ap.add_argument("--no-fonts", action="store_true", help="编译时不重裁字体")
     ap.add_argument("--launch", action="store_true", help="部署完成后启动游戏")
     ap.add_argument("--locale", default="",
                     help="部署后把游戏语言设为该代码（默认保持现有 locale.ini）")
-    ap.add_argument("--dep", action="store_true",
-                    help="中文：用依存句法给 ≥60 字的段落补空格（需要 .venv-spacy）")
     ap.add_argument("--dry-run", action="store_true", help="只打印计划，不写文件")
     args = ap.parse_args()
 

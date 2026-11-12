@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.join(ROOT, "src", "tools"))
 sys.path.insert(0, os.path.join(ROOT, "src", "tools", "text"))
 
 from text import apply_zh_rules as ZH  # noqa: E402
-from text import apply_ja_rules as JA  # noqa: E402
 from text import engine_text as ET  # noqa: E402
 from text import zh_space  # noqa: E402
 import lang_rules  # noqa: E402
@@ -150,8 +149,9 @@ class TestEngineText(unittest.TestCase):
 
     def test_ja_generate_from_pure(self):
         ja = lang_rules.get("ja")
-        self.assertEqual(JA.generate_from({"0x1": "テスト。"}, ["0x1"]).get("0x1"),
-                         ja.normalize("テスト。", particles=True))
+        self.assertEqual(
+            ET.build("ja", {"0x1": "テスト。"}, ["0x1"]).get("0x1"),
+            ja.normalize("テスト。", particles=True))
 
     def test_zh_keys_preserved(self):
         doc = {"0x1": "你好", "0x2": "世界"}

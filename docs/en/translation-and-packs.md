@@ -435,7 +435,7 @@ Tool: `python src/tools/placeholder_roles.py`
 - rules are kept separately per language: `placeholder_roles/zh.toml`, `placeholder_roles/ja.toml`; default `--lang zh`.
 
 To add a rule: find that parameter pair in the CSV → add a line to the toml → `--check` → (if needed) `--fix`
-→ regenerate with `apply_zh_rules.py`.
+→ regenerate with `python src/tools/text/engine_text.py --lang zh`.
 
 ### Prefer spaces for layout; do not change words or sentences
 
@@ -477,8 +477,8 @@ and is no longer part of the daily flow; `en` / `fr` remain read-only references
 ### Japanese: translation → build artifact
 
 ```powershell
-python src/tools/text/apply_ja_rules.py             # writes build/engine_text/ja.toml
-python src/tools/text/apply_ja_rules.py --check     # compare only, writes nothing
+python src/tools/text/engine_text.py --lang ja          # writes build/engine_text/ja.toml
+python src/tools/text/engine_text.py --lang ja --check  # compare only, writes nothing
 ```
 
 The rules come from the spec declared in `lang_rules/ja.py`: punctuation (`Punctuation`), a morphological

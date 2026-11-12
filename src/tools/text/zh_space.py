@@ -21,7 +21,7 @@
 * 两个都没有，才退回 `fallback_wrap()` —— 按字数机械切，**不保证切在词界**
   （会出现「因 而」这种断在词中间的结果）。这是降级路径，不是默认路径。
 
-用法（生成逻辑在 apply_zh_rules.py，这里只提供能力）
+用法（生成逻辑在 engine_text.py，这里只提供能力）
 ----
     from text import zh_space
     runs = zh_space.collect_runs(texts, min_run=12)

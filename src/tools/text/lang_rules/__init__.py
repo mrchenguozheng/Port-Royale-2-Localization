@@ -23,7 +23,8 @@ REGISTRY = ("zh", "ja")
 def get(lang):
     if lang not in REGISTRY:
         return None
-    return importlib.import_module("lang_rules." + lang)
+    # 用包自身的名字导入，避免依赖「text 目录在 sys.path 上」这种副作用
+    return importlib.import_module(__name__ + "." + lang)
 
 
 def names():

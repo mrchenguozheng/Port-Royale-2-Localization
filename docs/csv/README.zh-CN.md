@@ -31,9 +31,7 @@ CSV 是分析和人工审校的附属数据，不是游戏运行需要的文件�
 
 | 文件 | 生成方式 | 说明 |
 |---|---|---|
-| `generated/zh-dep-space.csv` | `python src/tools/text/zh_dep_space.py`（可选） | 依存句法补空格试验输出 |
-| `generated/space-conj-dryrun.csv` | 历史 dry-run | 早期依存句法试验，仅保留作对照 |
-| `generated/space-name-dryrun.csv` | 历史 dry-run | 早期专名补空格试验，仅保留作对照 |
+| `generated/zh-dep-space.csv` | 历史 dry-run | 依存句法补空格试验输出（脚本已删） |
 
 ## 不在这里的 CSV
 

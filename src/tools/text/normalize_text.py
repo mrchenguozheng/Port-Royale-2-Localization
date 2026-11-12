@@ -19,23 +19,16 @@
 """
 
 import argparse
-import io
 import os
-import re
 import sys
-import tomllib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, TOOLS)
 sys.path.insert(0, HERE)
 import translate as T  # noqa: E402
-from text import lang_rules  # noqa: E402
+from text import lang_rules, toml_io  # noqa: E402
 from text.lang_rules import base  # noqa: E402
-
-
-def esc(t):
-    return t.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
 def main():
@@ -65,9 +58,7 @@ def main():
     path = T.lang_path(a.lang)
     if not os.path.isfile(path):
         raise SystemExit("没有 %s" % path)
-    doc = tomllib.load(open(path, "rb"))
-    ids = [m.group(1) for m in
-           (re.match(r'^"([^"]+)"\s*=', l) for l in io.open(path, encoding="utf-8")) if m]
+    doc, ids = toml_io.read_doc(path)
 
     changed = 0
     for k in ids:
@@ -83,17 +74,8 @@ def main():
     if a.dry_run or not changed:
         return
 
-    head = []
-    try:
-        for ln in io.open(path, encoding="utf-8"):
-            if ln.startswith("#"):
-                head.append(ln.rstrip("\n"))
-            else:
-                break
-    except OSError:
-        pass
-    io.open(path, "w", encoding="utf-8", newline="\n").write(
-        "\n".join(head + ['"%s" = "%s"' % (k, esc(doc[k])) for k in ids]) + "\n")
+    head = toml_io.head_lines(path)
+    toml_io.write_doc(path, doc, ids, head)
     print("已写回", path)
 
 

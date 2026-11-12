@@ -69,7 +69,7 @@ from shared.core.validate import check_text  # noqa: E402
 import translate as T          # noqa: E402
 from pack import compile_pack as C       # noqa: E402
 import terms_check             # noqa: E402
-from text import apply_zh_rules as ZH_GEN  # noqa: E402
+from text import zh_pipeline as ZH_GEN  # noqa: E402
 from text import lang_rules  # noqa: E402
 from install import pr2ctl as P  # noqa: E402
 

@@ -165,7 +165,7 @@ def main():
             return t.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
         io.open(ref_path, "w", encoding="utf-8", newline="\n").write(
             "\n".join(head + ['"%s" = "%s"' % (k, esc(doc[k])) for k in order]) + "\n")
-        print("按规则修正 %d 条；接着跑 apply_zh_rules.py。" % changed)
+        print("按规则修正 %d 条；接着跑 engine_text.py 重新生成。" % changed)
 
 
 if __name__ == "__main__":
