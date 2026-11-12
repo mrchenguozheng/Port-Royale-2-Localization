@@ -24,6 +24,7 @@ const title = 'PR2 本地化编辑器';
         编辑
         <select id="lang"></select>
       </label>
+      <button id="addLang" class="mini" title="添加一种语言">＋</button>
 
       <span class="sep"></span>
 
@@ -54,19 +55,52 @@ const title = 'PR2 本地化编辑器';
       <div id="headLabels">翻译对照</div>
     </div>
 
-    <main id="rows">
-      <!-- 滚动条长度的占位：未加载的条目按估算高度撑在这里，
-           它同时是 IntersectionObserver 的探测点，快到底时触发下一批。 -->
-      <div id="tail" class="tail"></div>
-    </main>
+    <main id="rows"></main>
 
     <footer class="foot">
       <input id="q" type="search" placeholder="搜索 id 或原文 / 译文…" spellcheck="false" />
       <span id="stat">载入中…</span>
       <span id="dirty" class="dirty"></span>
+
+      <span class="pager">
+        <button id="prev" title="上一页">‹</button>
+        <input id="pageInput" class="page-num" type="number" min="1" step="1"
+               aria-label="页码" />
+        <span id="pageCount">/ 1</span>
+        <button id="next" title="下一页">›</button>
+        <select id="pageSize" title="每页条数"></select>
+      </span>
+
       <span class="hint">Ctrl+Enter 下一条</span>
       <button id="save" disabled>保存</button>
     </footer>
+
+    <!-- 添加语言：选一个已存在的语言当模板，复制成新语言的基础 -->
+    <div id="modal" class="modal" hidden>
+      <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="newTitle">
+        <h2 id="newTitle">添加语言</h2>
+
+        <label>
+          语言代码（文件名，也是游戏里 locale.ini 用的值）
+          <input id="newCode" placeholder="例如 zh-TW、de、es" spellcheck="false" />
+        </label>
+
+        <label>
+          以哪种语言为模板
+          <select id="newFrom"></select>
+        </label>
+
+        <p class="modal-note">
+          会复制一份该语言的全部条目作为新语言的基础；之后逐条改就是新译文。
+        </p>
+        <p id="newErr" class="modal-err"></p>
+
+        <div class="modal-actions">
+          <button id="newCancel">取消</button>
+          <button id="newOk">创建</button>
+        </div>
+      </div>
+    </div>
 
     <script src="../scripts/app.ts"></script>
   </body>

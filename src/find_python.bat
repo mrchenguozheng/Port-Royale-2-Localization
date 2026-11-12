@@ -13,9 +13,10 @@ REM  interpreter bundled with editors and toolchains -- so a PATH
 REM  hit is not good enough in that case and the search has to keep
 REM  testing the remaining candidates.
 REM
-REM  Do NOT try to select by "which Python has FastAPI". The editor
-REM  runs inside its own venv (src\editor\.venv) with the deps baked
-REM  in, so this script only ever needs to produce *some* working
+REM  Do NOT try to select by "which Python has the right packages".
+REM  The editor backend is pure standard library now (http.server),
+REM  so there is nothing to select for -- any working Python 3.11+
+REM  will do. This script only needs to produce *some* working
 REM  interpreter for the GUI and the build scripts.
 REM
 REM  Sources, in order:
