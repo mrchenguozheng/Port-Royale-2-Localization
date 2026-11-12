@@ -75,7 +75,7 @@ def main():
         return
 
     head = toml_io.head_lines(path)
-    toml_io.write_doc(path, doc, ids, head)
+    toml_io.write_doc_atomic(path, doc, ids, head)
     print("已写回", path)
 
 

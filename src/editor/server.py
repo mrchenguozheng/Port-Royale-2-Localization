@@ -24,7 +24,6 @@ translate.py / compile_pack.py 里，那是唯一的一份。抄到 JS 里就多
 
 import argparse
 import difflib
-import io
 import json
 import mimetypes
 import os
@@ -71,6 +70,7 @@ from pack import compile_pack as C       # noqa: E402
 import terms_check             # noqa: E402
 from text import zh_pipeline as ZH_GEN  # noqa: E402
 from text import lang_rules  # noqa: E402
+from text import toml_io as TI  # noqa: E402
 from install import pr2ctl as P  # noqa: E402
 
 
@@ -653,36 +653,6 @@ def load_all():
     return rows
 
 
-def toml_escape(s):
-    r"""把一条译文安全地放进 TOML 的双引号字符串里。
-
-    【必须做】译文里有三种字符会破坏文件结构：
-      * 双引号 "   —— 不转义就把字符串提前关掉
-      * 反斜杠 \  —— 后面跟字符会被当转义序列
-      * 控制符（换行、Tab…）—— 换行最致命，它会把一条劈成两行，
-        而 load_toml 立刻报 TOMLDecodeError
-    实测 0x11f0398f 就是这种：``"``°§$%&()=?\^';,:<|>@/*~[]"²³€``。
-    转义顺序也有讲究：反斜杠必须**先**转，否则会把后面刚加的引号再转一遍。
-    """
-    out = []
-    for ch in s:
-        if ch == "\\":
-            out.append("\\\\")
-        elif ch == '"':
-            out.append('\\"')
-        elif ch == "\n":
-            out.append("\\n")
-        elif ch == "\r":
-            out.append("\\r")
-        elif ch == "\t":
-            out.append("\\t")
-        elif ord(ch) < 0x20:
-            out.append("\\u%04X" % ord(ch))
-        else:
-            out.append(ch)
-    return "".join(out)
-
-
 def rows_of(body):
     """从请求体里取 rows，并保持 (id, text) 的形状。
 
@@ -699,20 +669,6 @@ def rows_of(body):
         text = r.get("text", "")
         out.append({"id": r["id"], "text": "" if text is None else str(text)})
     return out
-
-
-def _keep_header(path, lines):
-    """保留目标文件开头的注释块（生成物头部说明）。"""
-    head = []
-    try:
-        for ln in open(path, encoding="utf-8"):
-            if ln.startswith("#"):
-                head.append(ln.rstrip("\n"))
-            else:
-                break
-    except OSError:
-        pass
-    return head + lines
 
 
 def save_all(lang, rows):
@@ -735,29 +691,9 @@ def save_all(lang, rows):
         if a != b:
             raise ValueError("第 %d 条 id 不符：收到 %s，应为 %s" % (i, a, b))
 
-    lines = ['"%s" = "%s"' % (r["id"], toml_escape(r["text"])) for r in rows]
-    lines = _keep_header(path, lines)
-
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(lines) + "\n")
-
-    # 写完立刻自检：自己能解析出来的才算写成功。否则一个转义 bug
-    # 会毁掉译文文件，而错误要等到下次构建才暴露 —— 那时已经晚了。
-    import tomllib
-    try:
-        with open(tmp, "rb") as f:
-            back = tomllib.load(f)
-    except Exception as exc:
-        os.remove(tmp)
-        raise ValueError("写入后的文件无法解析，已放弃写入：%s" % exc)
-    if len(back) != len(rows):
-        os.remove(tmp)
-        raise ValueError("写入后条目数不符（%d vs %d），已放弃写入"
-                         % (len(back), len(rows)))
-
-    os.replace(tmp, path)          # 原子替换：中途失败不留半个文件
-    return len(lines)
+    texts = {r["id"]: r["text"] for r in rows}
+    TI.write_doc_atomic(path, texts, order, TI.head_lines(path))
+    return len(rows)
 
 
 def patch_all(lang, rows):
@@ -788,29 +724,11 @@ def patch_all(lang, rows):
     if unknown:
         raise ValueError("有 id 不在文件里：%s" % "、".join(unknown[:3]))
 
-    lines = []
+    texts = {}
     for rid in order:
         text = upd.get(rid)
-        if text is None:
-            text = cur.get(rid, "")      # 没传的保持原样
-        lines.append('"%s" = "%s"' % (rid, toml_escape(text)))
-    lines = _keep_header(path, lines)
-
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(lines) + "\n")
-
-    try:
-        with open(tmp, "rb") as f:
-            back = tomllib.load(f)
-    except Exception as exc:
-        os.remove(tmp)
-        raise ValueError("写入后的文件无法解析，已放弃写入：%s" % exc)
-    if len(back) != len(order):
-        os.remove(tmp)
-        raise ValueError("写入后条目数不符，已放弃写入")
-
-    os.replace(tmp, path)
+        texts[rid] = cur.get(rid, "") if text is None else text
+    TI.write_doc_atomic(path, texts, order, TI.head_lines(path))
     return len(order), len(upd)
 
 
@@ -1532,9 +1450,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"detail": "译文里没有这一条"}, 404)
             order = list(cur)
             cur[hid] = text
-            with io.open(seed, "w", encoding="utf-8", newline="\n") as fh:
-                for rid in order:
-                    fh.write('"%s" = "%s"\n' % (rid, toml_escape(cur[rid])))
+            TI.write_doc_atomic(seed, cur, order, TI.head_lines(seed))
             return self.send_json({"ok": True, "text": text})
 
         if path == "/api/hash-rule":
