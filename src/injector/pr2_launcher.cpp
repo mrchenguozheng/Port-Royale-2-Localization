@@ -1,4 +1,4 @@
-﻿/* pr2_launcher.cpp -- 注入启动器 (独立工具, 非游戏文件)
+/* pr2_launcher.cpp -- 注入启动器 (独立工具, 非游戏文件)
  * 以挂起方式启动同目录下的 PR2.exe, 把同目录 PR2TextSource.dll 注入后恢复执行。
  * 全程不修改任何游戏文件、不修改 PR2.exe。
  *
@@ -30,17 +30,24 @@ static void SiblingPath(char* out, const char* self, const char* name) {
     strcpy(out, tmp);
 }
 
-/* 语言代码只允许字母数字和连字符，且不能是 "." 或 ".." —— 它要拼进
- * PR2Packs\<code>.txt 这样的路径，放任 "../" 就是目录穿越。
- * 返回 1 表示可用，0 表示不可用。 */
+/* 语言代码只允许字母数字、连字符和下划线，且不能是 "." 或 ".." —— 它要
+ * 拼进 PR2Packs\<code>.txt 这样的路径，放任 "../" 就是目录穿越。
+ * 返回 1 表示可用，0 表示不可用。
+ *
+ * 【下划线必须放行】之前只允许字母数字和连字符，而编辑器/文档里写的是
+ * "字母 / 数字 / - / _"。于是 test_en 这种名字编译、部署都成功，点「启动
+ * 游戏」时却被这里判成不合法、启动器直接退出 —— 现象是黑框一闪、游戏
+ * 根本没起来，而错误只打在启动器自己的控制台里，一闪就没。
+ * 下划线在文件名里完全安全，没有理由拦它。 */
 static int ValidLangCode(const char* s) {
     const char* p;
     if (!s || !*s) return 0;
+    if (strlen(s) >= 64) return 0;          /* 与下面的 MAX_PATH 拼接留余量 */
     if (strcmp(s, ".") == 0 || strcmp(s, "..") == 0) return 0;
     for (p = s; *p; p++) {
         char c = *p;
         int okChar = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                  || (c >= '0' && c <= '9') || c == '-';
+                  || (c >= '0' && c <= '9') || c == '-' || c == '_';
         if (!okChar) return 0;
     }
     return 1;
@@ -69,7 +76,7 @@ int main(int argc, char** argv) {
     }
     if (lang && !ValidLangCode(lang)) {
         printf("[PR2Launch] --lang 的值不合法: %s\n", lang);
-        printf("[PR2Launch] 只允许字母、数字和连字符，例如 --lang=zh。\n");
+        printf("[PR2Launch] 只允许字母、数字、连字符和下划线，例如 --lang=zh 或 --lang=zh-TW。\n");
         return 1;
     }
 
