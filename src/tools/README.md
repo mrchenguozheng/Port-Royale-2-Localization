@@ -11,15 +11,22 @@ src/tools/
 ├─ install/    pr2ctl 构建/部署/启动
 ├─ data/       人名、地名、分词词典
 ├─ translate.py / glossary.py / terms_check.py / placeholder_roles.py   共享核心
+├─ extract_strings.py                                                  从 PR2.exe 重提基准原文
 ├─ check.py / lint_imports.py                                          质量检查
 └─ paths.py    公共路径
 ```
+
+## 基准原文
+
+| 脚本 | 作用 |
+|---|---|
+| `extract_strings.py` | 从 `PR2.exe` 的 PE 资源（`BINARY/167`）解出字符串表写成 toml；换游戏版本、或要对照别的语言版本时，用它重建 `src/orig/*.toml` |
 
 ## 常用入口
 
 | 脚本 | 作用 |
 |---|---|
-| `pack/apply_patch.py` | 归一化 → 校验 → 编译 → 部署，一条命令跑完（`apply_patch.bat` 调它） |
+| `pack/apply_patch.py` | 校验 → 编译 → 部署，一条命令跑完（`apply_patch.bat` 调它） |
 | `check.py` | 跑全部静态检查与单测（`check.bat` 调它） |
 | `pack/new_lang.py` | 命令行新建语言（编辑器里也能建） |
 | `pack/compile_pack.py` | 把 `src/translations/*.toml` 排版后编译成 `build/PR2Packs/*.txt`，引擎文本落在 `build/engine_text/*.toml` |

@@ -109,7 +109,7 @@ def render(target, target_doc, groups, en, others):
     lines.append("# 术语对照表（%s）" % lang_name(target))
     lines.append("")
     srcs = ["`src\\translations\\%s.toml`" % target]
-    srcs += ["`src\\references\\%s.toml`" % c for c, _l, _d in others]
+    srcs += ["`src\\orig\\%s.toml`" % c for c, _l, _d in others]
     lines.append("> 由 `src\\tools\\glossary.py` 生成，数据来自 %s。"
                  "改译文后重新生成，不要手改本文件。" % "、".join(srcs))
     lines.append("")
@@ -155,7 +155,7 @@ def main():
     ap.add_argument("--lang", action="append", default=[],
                     help="语言代码，可重复；默认所有可编辑语言")
     ap.add_argument("--with", dest="extra", action="append", default=[],
-                    help="并排对照的其它语言（默认带 references 里的法文原本）")
+                    help="并排对照的其它语言（默认带 src\\orig 里的法文原本）")
     ap.add_argument("--csv", action="store_true", help="同时导出 .csv")
     ap.add_argument("--out", default=OUT_DIR, help="输出目录（默认 build\\glossary）")
     args = ap.parse_args()
