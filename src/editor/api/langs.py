@@ -281,15 +281,6 @@ def get_lang_exists(req):
     return req.send_json(lang_status((query.get("code") or [""])[0]))
 
 
-def get_placeholder_meanings(req):
-    query = req.query
-    body = req.body
-    hid = (query.get("id") or [""])[0]
-    lang = (query.get("lang") or ["zh"])[0]
-    return req.send_json({"id": hid, "lang": lang,
-                           "meanings": meaning_for(lang, hid)})
-
-
 def get_hash_rules(req):
     query = req.query
     body = req.body
@@ -324,20 +315,6 @@ def post_hash_rule(req):
     return req.send_json({"ok": True, "rules": rules})
 
 
-def post_placeholder_meanings(req):
-    query = req.query
-    body = req.body
-    lang = (body.get("lang") or "zh").strip() or "zh"
-    hid = (body.get("id") or "").strip().lower()
-    meanings = body.get("meanings") or {}
-    if not hid or not isinstance(meanings, dict):
-        return req.send_json({"ok": False, "error": "参数不对"})
-    for tok, mean in meanings.items():
-        save_meaning(lang, hid, str(tok), str(mean))
-    return req.send_json({"ok": True,
-                           "meanings": meaning_for(lang, hid)})
-
-
 def post_newlang(req):
     query = req.query
     body = req.body
@@ -350,10 +327,8 @@ ROUTES = {
     ("GET", "/api/langs"): get_langs,
     ("GET", "/api/lang-summary"): get_lang_summary,
     ("GET", "/api/lang-exists"): get_lang_exists,
-    ("GET", "/api/placeholder-meanings"): get_placeholder_meanings,
     ("GET", "/api/hash-rules"): get_hash_rules,
     ("POST", "/api/placeholder-meaning"): post_placeholder_meaning,
     ("POST", "/api/hash-rule"): post_hash_rule,
-    ("POST", "/api/placeholder-meanings"): post_placeholder_meanings,
     ("POST", "/api/newlang"): post_newlang,
 }

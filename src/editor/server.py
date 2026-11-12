@@ -139,40 +139,6 @@ def server_instances():
     return {"current": CURRENT_PORT, "instances": [x for x in found if x]}
 
 
-# ---------------------------------------------------------------- 筛选
-
-_ATTN_CACHE = {}
-
-
-MEANINGS = os.path.join(os.path.dirname(SRC), "glossary", "placeholder_meanings.toml")
-_MEAN_CACHE = {"key": None, "data": {}}
-
-
-HASH_RULES = os.path.join(os.path.dirname(SRC), "glossary", "hash_rules.toml")
-_HASH_CACHE = {"key": None, "data": {}}
-
-
-# ---------------------------------------------------------------- 语境推断
-
-ORDER_FILE = os.path.join(HERE, "data", "table-order.txt")
-_ORDER = None
-
-PH_MEAN = {
-    "@T$": "Town", "@N$": "Person", "@n$": "Country", "@D$": "Date",
-    "@I$": "Integer", "@a$": "Quantity", "@G$": "Goods", "@g$": "Amount",
-    "@S$": "Ship type", "@l$": "Location", "@C$": "Fleet", "@P$": "Pirate",
-}
-TAG_MEAN = [
-    ("<n:", "Paragraph spacing"), ("<n>", "Line break"), ("<c>", "Color: start"),
-    ("<o:", "Color value"), ("<r>", "Red text"), ("<t>", "Tab"),
-    ("<ts:", "Tab stop"), ("<g:", "Icon/graphic"),
-    ("<gs:", "Graphic script marker (keep as is)"), ("<f:", "Font"),
-]
-
-
-ARG_RX = re.compile(r"@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]")
-
-
 # ---------------------------------------------------------------- 数据
 
 # 读缓存、整表写回、补丁写回都在 api\store.py；这里只剩「换根」。

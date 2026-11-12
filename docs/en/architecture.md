@@ -125,10 +125,15 @@ After the split:
 - Same kind of cleanup: the frontend "context inference" dialog (`openCtx`) was never
   wired up; inline context only uses `/api/context-batch`. The dialog and
   `GET /api/context` were removed together, route count 46→45;
+- Another pass against actual frontend calls: the frontend only uses the single-entry
+  `POST /api/placeholder-meaning` plus `/api/entry-info`, so the plural
+  `GET`/`POST /api/placeholder-meanings` had no caller; and `POST /api/font/stitch`
+  duplicates the CLI path (`subset_fonts.py`), while the install page only uses
+  `font-status` / `font/export`. All three were removed, route count 45→42;
 - The stage-1 `--data` / `--presets-dir` flags remain, and tests run POST against a
   temporary data root.
 
-Status: done. `tests/test_server_api.py` 7 tests (21 GET routes all 200, POST writes
+Status: done. `tests/test_server_api.py` 7 tests (20 GET routes all 200, POST writes
 to the temporary root, real repository file SHAs unchanged); `check.py` 46 tests;
 `engine_text --check` reports "一致" for both zh and ja; pack SHAs match the
 pre-refactoring baseline (zh `2B209420…920F`, ja `17517FB6…FAB`).

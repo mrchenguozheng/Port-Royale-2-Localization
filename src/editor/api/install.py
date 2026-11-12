@@ -211,19 +211,6 @@ def post_font_export(req):
                            "status": font_status()})
 
 
-def post_font_stitch(req):
-    query = req.query
-    body = req.body
-    sf = _font_module()
-    lines = []
-    langs = body.get("langs") or None
-    ok, msg = sf.ensure_fonts(langs=langs,
-                              force=bool(body.get("force", True)),
-                              log=lines.append)
-    return req.send_json({"ok": ok, "message": msg, "log": lines,
-                           "status": font_status()})
-
-
 def post_start_pick(req):
     query = req.query
     body = req.body
@@ -366,7 +353,6 @@ ROUTES = {
     ("GET", "/api/start/dirs"): get_start_dirs,
     ("GET", "/api/start/job"): get_start_job,
     ("POST", "/api/font/export"): post_font_export,
-    ("POST", "/api/font/stitch"): post_font_stitch,
     ("POST", "/api/start/pick"): post_start_pick,
     ("POST", "/api/start/use"): post_start_use,
     ("POST", "/api/start/forget"): post_start_forget,
