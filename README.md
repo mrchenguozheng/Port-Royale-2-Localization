@@ -15,17 +15,17 @@
 1. 确认是 **GOG 英文版 `1.1.2.3`**，或 Steam 英文版（实验性）；
 2. 从 Release 下载对应语言的 zip，例如 `PR2-zh-v1.0.0.zip`；
 3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
-4. GOG 双击 `PR2.exe`；Steam 直接从 Steam 启动游戏；
+4. GOG 双击 `PR2LauncherGUI.exe`，选语言后点「以所选语言启动」；
+   Steam 从 Steam 启动游戏；
 5. 进游戏后看 `PR2TextSource.log`，第一行应有 `pack 'zh' ... overrides`。
 
-`VERSION.dll` 是代理宿主，游戏会自然加载同目录的 `PR2TextSource.dll`；
-不需要启动器，也不需要远程注入。仍然可以双击 `PR2LauncherGUI.exe`，
-选语言后点「以所选语言启动」，作为代理冲突时的备用入口。
+GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析到
+`C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入游戏进程，结果是原版英文。
+`PR2Launcher.exe` / `PR2LauncherGUI.exe` 是 GOG 的正式入口，负责注入
+`PR2TextSource.dll`；原版 `PR2.exe` 本身不改。
 
 注意：
 
-- 目录里已有别的 mod 占用 `VERSION.dll` 时，先移除本包的 `VERSION.dll`，
-  改用 `PR2LauncherGUI.exe`；
 - 不要删除 `fonts\` 根目录的四份原版字体；
 - 缺字体时 GUI 会提示，把 zip 里的 `fonts\<语言>\` 重新解压完整即可。
 
@@ -39,7 +39,7 @@
 
 | 游戏版本 | 状态 |
 |---|---|
-| **GOG 英文 `1.1.2.3`** | ✅ 已实测 |
+| **GOG 英文 `1.1.2.3`** | ✅ 已实测（`PR2LauncherGUI` 入口） |
 | **Steam 英文（当前测试目录）** | 🟡 实验性：`VERSION.dll` 代理加载链已构建，待进游戏验证 |
 | GOG 法语 `1.1.2.42` | ❌ 不支持（只用作翻译参照） |
 | 其他版本 | ❌ 不支持 |

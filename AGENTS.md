@@ -7,11 +7,13 @@
 ## 项目边界
 
 - 这是《Port Royale 2》的**外挂式本地化运行时**：原版 `PR2.exe` 不改字节。
-  首选加载路径是游戏目录里的 `VERSION.dll` 代理自然加载 `PR2TextSource.dll`；
-  启动器仍保留为备用注入入口。
-- **GOG 英文版 `1.1.2.3` 已实测；Steam 英文版为实验性支持**，`VERSION.dll` 代理
-  加载链已构建，但还没进游戏验证。GOG 法语版和其他版本不在支持范围内；
-  不要在未支持版本上部署后把“注入不生效”当作本仓库回归。
+  GOG 的正式入口是 `PR2LauncherGUI.exe` / `PR2Launcher.exe`，由启动器注入
+  `PR2TextSource.dll`。不要按“GOG 双击 `PR2.exe` 自然加载”做回归：GOG 加载器会把
+  `VERSION.dll` 解析到 `C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入
+  `PR2.exe` 进程。Steam 的实验性自然加载路径才使用 `VERSION.dll` 代理。
+- **GOG 英文版 `1.1.2.3` 已通过启动器入口实测；Steam 英文版为实验性支持**。
+  GOG 法语版和其他版本不在支持范围内；不要在未支持版本上部署后把“注入不生效”
+  当作本仓库回归。
 - 发行包按语言拆分；玩家拿到的是构建好的 `VERSION.dll`、`PR2TextSource.dll`、
   语言包和字体，不需要 Python 或 Rust 工具链。不要把“让每个玩家自行构建”写成默认流程。
 

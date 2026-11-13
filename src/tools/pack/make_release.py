@@ -112,10 +112,10 @@ def write_readme(lang, stage, mode):
 
 安装（解压即用）：
   1. 把本压缩包里的全部文件解压到游戏根目录（和 PR2.exe 同一层）。
-  2. GOG：正常启动 PR2.exe；Steam：从 Steam 正常启动游戏。
-     VERSION.dll 是代理宿主，会在游戏进程里加载 PR2TextSource.dll，不需要启动器注入。
-     也可以继续用启动器：双击 PR2LauncherGUI.exe，选语言后点「以所选语言启动」。
-  3. 如果目录里已有别的 mod 占用 VERSION.dll，先移除本包的 VERSION.dll，
+  2. GOG：双击 PR2LauncherGUI.exe，选语言后点「以所选语言启动」。
+     不要直接双击 PR2.exe：GOG 会把 VERSION.dll 解析到系统目录，本地代理不生效。
+     Steam：从 Steam 正常启动游戏；也可用 PR2LauncherGUI.exe 注入。
+  3. Steam 上如果目录里已有别的 mod 占用 VERSION.dll，先移除本包的 VERSION.dll，
      改用 PR2LauncherGUI.exe 启动，避免 DLL 代理冲突。
 
 确认是否生效：
