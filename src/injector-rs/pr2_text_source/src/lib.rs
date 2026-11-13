@@ -36,7 +36,9 @@ const ADDSTR_EXPORT: &[u8] = b"?AddStringRes@CW32StringManager@NA2dLib@@MAE_NPBD
 static REAL_ADD: AtomicUsize = AtomicUsize::new(0);
 static REAL_ADDSTR: AtomicUsize = AtomicUsize::new(0);
 static REAL_LSR: AtomicUsize = AtomicUsize::new(0);
-static REAL_FOPEN: AtomicUsize = AtomicUsize::new(0);
+static REAL_FOPEN_71: AtomicUsize = AtomicUsize::new(0);
+static REAL_FOPEN_70: AtomicUsize = AtomicUsize::new(0);
+static REAL_FOPEN_CRT: AtomicUsize = AtomicUsize::new(0);
 static REAL_CREATE_A: AtomicUsize = AtomicUsize::new(0);
 static REAL_CREATE_W: AtomicUsize = AtomicUsize::new(0);
 static REAL_FIND_FIRST: AtomicUsize = AtomicUsize::new(0);
@@ -67,6 +69,7 @@ struct Pack {
 }
 
 type AddFn = unsafe extern "thiscall" fn(*mut c_void, *const c_char, *const c_void, u32);
+type AddStrFn = unsafe extern "thiscall" fn(*mut c_void, *const c_char, *const c_void, u32) -> bool;
 type LsrFn = unsafe extern "thiscall" fn(*mut c_void, u32, *mut c_void) -> bool;
 type ResolveFn = unsafe extern "thiscall" fn(*mut c_void, i32, *mut c_void) -> i32;
 
@@ -135,7 +138,14 @@ unsafe extern "thiscall" fn my_add(
     if real == 0 {
         return;
     }
-    apply_overlay(real, this, name, data, len);
+    let (payload, payload_len) = prepare_overlay(data, len);
+    let real: AddFn = std::mem::transmute(real);
+    real(
+        overlay_manager(this),
+        name,
+        payload,
+        payload_len,
+    );
 }
 
 unsafe extern "thiscall" fn my_add_str(
@@ -143,39 +153,50 @@ unsafe extern "thiscall" fn my_add_str(
     name: *const c_char,
     data: *const c_void,
     len: u32,
-) {
+) -> bool {
     if !MGR_CAPTURED.load(Ordering::Acquire) {
         MGR.store(this, Ordering::Release);
         MGR_CAPTURED.store(true, Ordering::Release);
     }
     let real = REAL_ADDSTR.load(Ordering::Acquire);
     if real == 0 {
-        return;
+        return false;
     }
-    apply_overlay(real, this, name, data, len);
+    let (payload, payload_len) = prepare_overlay(data, len);
+    let real: AddStrFn = std::mem::transmute(real);
+    real(
+        overlay_manager(this),
+        name,
+        payload,
+        payload_len,
+    )
 }
 
-unsafe fn apply_overlay(
-    real: usize,
-    this: *mut c_void,
-    name: *const c_char,
+unsafe fn overlay_manager(this: *mut c_void) -> *mut c_void {
+    let captured = MGR.load(Ordering::Acquire);
+    if captured.is_null() {
+        this
+    } else {
+        captured
+    }
+}
+
+unsafe fn prepare_overlay(
     data: *const c_void,
     len: u32,
-) {
+) -> (*const c_void, u32) {
     if !VT_DONE.swap(true, Ordering::AcqRel) {
         install_vtable_hooks();
     }
-    let real: AddFn = std::mem::transmute(real);
     if !data.is_null() && len >= 4 {
         if let Some((new_data, new_len)) = replace_table(data as *const u8, len as usize) {
             if !FIRED.swap(true, Ordering::AcqRel) {
                 log_line("[text] pack overlay applied to table");
             }
-            real(this, name, new_data as *const c_void, new_len);
-            return;
+            return (new_data as *const c_void, new_len);
         }
     }
-    real(this, name, data, len);
+    (data, len)
 }
 
 unsafe fn install_vtable_hooks() {
@@ -935,8 +956,12 @@ type FindFirstFileAFn = unsafe extern "system" fn(*const u8, *mut WIN32_FIND_DAT
 type GetFileAttributesExAFn =
     unsafe extern "system" fn(*const u8, GET_FILEEX_INFO_LEVELS, *mut c_void) -> BOOL;
 
-unsafe extern "C" fn my_fopen(path: *const u8, mode: *const u8) -> *mut c_void {
-    let real = REAL_FOPEN.load(Ordering::Acquire);
+unsafe fn fopen_impl(
+    path: *const u8,
+    mode: *const u8,
+    real: &AtomicUsize,
+) -> *mut c_void {
+    let real = real.load(Ordering::Acquire);
     if real == 0 {
         return ptr::null_mut();
     }
@@ -947,6 +972,18 @@ unsafe extern "C" fn my_fopen(path: *const u8, mode: *const u8) -> *mut c_void {
     let f: FopenFn = std::mem::transmute(real);
     let c_path = to_cstr(use_s);
     f(c_path.as_ptr(), mode)
+}
+
+unsafe extern "C" fn my_fopen_71(path: *const u8, mode: *const u8) -> *mut c_void {
+    fopen_impl(path, mode, &REAL_FOPEN_71)
+}
+
+unsafe extern "C" fn my_fopen_70(path: *const u8, mode: *const u8) -> *mut c_void {
+    fopen_impl(path, mode, &REAL_FOPEN_70)
+}
+
+unsafe extern "C" fn my_fopen_crt(path: *const u8, mode: *const u8) -> *mut c_void {
+    fopen_impl(path, mode, &REAL_FOPEN_CRT)
 }
 
 unsafe extern "system" fn my_create_file_a(
@@ -1179,9 +1216,36 @@ unsafe fn install_font_log_hooks() {
             }
         }
     }
+    let mut f71 = 0usize;
+    let mut f70 = 0usize;
+    let mut fcrt = 0usize;
     for m in enum_modules() {
-        for dll in [&b"msvcr71.dll\0"[..], &b"msvcr70.dll\0"[..], &b"msvcrt.dll\0"[..]] {
-            patch_iat_in(m, dll, b"fopen\0", my_fopen as *const () as usize, &REAL_FOPEN);
+        if patch_iat_in(
+            m,
+            b"msvcr71.dll\0",
+            b"fopen\0",
+            my_fopen_71 as *const () as usize,
+            &REAL_FOPEN_71,
+        ) {
+            f71 += 1;
+        }
+        if patch_iat_in(
+            m,
+            b"msvcr70.dll\0",
+            b"fopen\0",
+            my_fopen_70 as *const () as usize,
+            &REAL_FOPEN_70,
+        ) {
+            f70 += 1;
+        }
+        if patch_iat_in(
+            m,
+            b"msvcrt.dll\0",
+            b"fopen\0",
+            my_fopen_crt as *const () as usize,
+            &REAL_FOPEN_CRT,
+        ) {
+            fcrt += 1;
         }
         patch_iat_in(
             m,
@@ -1211,5 +1275,11 @@ unsafe fn install_font_log_hooks() {
             my_get_attributes_ex as *const () as usize,
             &REAL_GET_ATTR,
         );
+    }
+    if f71 + f70 + fcrt > 0 {
+        log_line(&format!(
+            "[text] font fopen hooks: msvcr71={} msvcr70={} msvcrt={}",
+            f71, f70, fcrt
+        ));
     }
 }
