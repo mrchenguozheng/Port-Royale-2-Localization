@@ -1304,9 +1304,9 @@ fn redirect_font_path(input: &str) -> Option<String> {
         return None;
     }
 
-    // 配置映射优先；它不依赖打包字体目录，因此没有 PR2Localization\fonts\<lang>\
-    // 时也能把 fonts\ARIAL.TTF 指到系统字体。映射文件不存在或不可读时继续走
-    // 内置字体目录，最后才回退到原版 fonts\...。
+    // 配置映射优先；映射值是 PR2Localization\fonts\ 内的实际字体文件名，
+    // 不读取系统字体目录。映射文件不存在或文件不存在时继续走内置字体目录，
+    // 最后才回退到原版 fonts\...。
     if let Some(map) = font_map() {
         if let Some(mapped) = map.lookup(rest) {
             return Some(mapped);

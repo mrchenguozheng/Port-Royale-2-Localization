@@ -136,12 +136,13 @@ fn resolve_font_path(root: &Path, value: &str) -> Option<String> {
     if lower.ends_with(".ttc") || lower.contains("-vf.ttf") {
         return None;
     }
-    let path = PathBuf::from(expanded);
-    let path = if path.is_absolute() {
-        path
-    } else {
-        root.join(path)
-    };
+    // 映射值只取文件名：实际字体必须位于 PR2Localization\fonts\，
+    // 避免配置把游戏引到系统字体目录或字体目录之外。
+    let file_name = Path::new(&expanded).file_name()?.to_string_lossy().into_owned();
+    if file_name.trim().is_empty() {
+        return None;
+    }
+    let path = fonts_dir(root).join(file_name);
     if path.is_file() {
         Some(path.to_string_lossy().into_owned())
     } else {
@@ -325,20 +326,16 @@ pub fn bundled_fonts_complete(root: &Path, lang: &str) -> bool {
     if lang.is_empty() {
         return false;
     }
-    let dir = fonts_dir(root);
-    FONT_NAMES.iter().all(|name| dir.join(name).is_file())
+    FontMap::load(root, lang)
+        .map(|map| map.has_all())
+        .unwrap_or(false)
 }
 
 pub fn language_fonts_complete(root: &Path, lang: &str) -> bool {
     if lang.is_empty() {
         return false;
     }
-    if bundled_fonts_complete(root, lang) {
-        return true;
-    }
-    FontMap::load(root, lang)
-        .map(|map| map.has_all())
-        .unwrap_or(false)
+    bundled_fonts_complete(root, lang)
 }
 
 pub fn font_rel_dir(root: &Path, _lang: &str) -> String {
@@ -389,15 +386,9 @@ mod tests {
     #[test]
     fn font_map_parses_sections_and_resolves_paths() {
         let root = temp_root();
-        let font = root.join("fake-cjk.ttf");
+        let font = root.join(DATA_DIR).join("fonts").join("fake-cjk.ttf");
         fs::write(&font, b"fake").unwrap();
-        let cfg = format!(
-            "[fonts]\nARIAL.TTF={}\n[zh]\nELGRECO_.TTF={}\nTiepolo_black.ttf={}\nTiepolo_bold.ttf={}\n",
-            font.display(),
-            font.display(),
-            font.display(),
-            font.display()
-        );
+        let cfg = "[fonts]\nARIAL.TTF=fake-cjk.ttf\n[zh]\nELGRECO_.TTF=fake-cjk.ttf\nTiepolo_black.ttf=fake-cjk.ttf\nTiepolo_bold.ttf=fake-cjk.ttf\n";
         fs::write(
             root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE),
             cfg,
@@ -418,9 +409,9 @@ mod tests {
     #[test]
     fn font_map_skips_ttc_candidates() {
         let root = temp_root();
-        let collection = root.join("fake-cjk.ttc");
+        let collection = root.join(DATA_DIR).join("fonts").join("fake-cjk.ttc");
         fs::write(&collection, b"fake").unwrap();
-        let cfg = format!("[zh]\nARIAL.TTF={}\n", collection.display());
+        let cfg = "[zh]\nARIAL.TTF=fake-cjk.ttc\n";
         fs::write(
             root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE),
             cfg,
@@ -434,9 +425,9 @@ mod tests {
     #[test]
     fn font_map_skips_variable_fonts() {
         let root = temp_root();
-        let variable = root.join("fake-cjk-VF.ttf");
+        let variable = root.join(DATA_DIR).join("fonts").join("fake-cjk-VF.ttf");
         fs::write(&variable, b"fake").unwrap();
-        let cfg = format!("[zh]\nARIAL.TTF={}\n", variable.display());
+        let cfg = "[zh]\nARIAL.TTF=fake-cjk-VF.ttf\n";
         fs::write(
             root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE),
             cfg,
@@ -448,14 +439,29 @@ mod tests {
     }
 
     #[test]
-    fn missing_mapping_falls_through_to_bundled_fonts() {
+    fn font_map_rejects_fonts_outside_fonts_dir() {
         let root = temp_root();
-        let lang_dir = root.join(DATA_DIR).join("fonts");
-        fs::create_dir_all(&lang_dir).unwrap();
+        let outside = root.join("outside.ttf");
+        fs::write(&outside, b"fake").unwrap();
+        let cfg = format!("[zh]\nARIAL.TTF={}\n", outside.display());
+        fs::write(
+            root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE),
+            cfg,
+        )
+        .unwrap();
+        let map = FontMap::load(&root, "zh").unwrap();
+        assert!(map.lookup("fonts\\ARIAL.TTF").is_none());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn actual_font_files_without_map_are_incomplete() {
+        let root = temp_root();
+        let fonts = root.join(DATA_DIR).join("fonts");
         for name in FONT_NAMES {
-            fs::write(lang_dir.join(name), b"fake").unwrap();
+            fs::write(fonts.join(name), b"fake").unwrap();
         }
-        assert!(language_fonts_complete(&root, "zh"));
+        assert!(!language_fonts_complete(&root, "zh"));
         let _ = fs::remove_dir_all(&root);
     }
 }

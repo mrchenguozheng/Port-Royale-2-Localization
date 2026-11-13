@@ -2,12 +2,15 @@
 # -*- coding: utf-8 -*-
 """make_noto_fonts.py —— 为发行版生成 Noto 替换字体。
 
-发行版不缝合，直接用完整的 Noto 字体替换游戏四个字体：
+发行版不缝合，直接把完整 Noto 字体以原始文件名放进 fonts 目录，
+再由 font-map.ini 把游戏请求的四个逻辑名映射到这些文件，例如：
 
-    ARIAL.TTF          Noto Sans  <语言> Regular
-    ELGREGO_.TTF       Noto Serif <语言> Black
-    Tiepolo_black.ttf  Noto Serif <语言> Black
-    Tiepolo_bold.ttf   Noto Serif <语言> Bold
+    ARIAL.TTF          -> NotoSansSC-Regular.ttf
+    ELGRECO_.TTF       -> NotoSerifSC-Black.ttf
+    Tiepolo_black.ttf  -> NotoSerifSC-Black.ttf
+    Tiepolo_bold.ttf   -> NotoSerifSC-Bold.ttf
+
+输出保留 Noto 原始文件名，不把文件改名为 ARIAL.TTF 等逻辑名。
 
 默认不裁剪。字体来源是本机安装的 Noto；VF 会实例化成静态字重。
 
@@ -25,7 +28,6 @@ TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.dirname(TOOLS)
 ROOT = os.path.dirname(SRC)
 
-OUT_NAMES = ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf")
 CACHE_VERSION = 1
 DEFAULT_CACHE = os.path.join(ROOT, "build", "cache", "noto")
 
@@ -95,7 +97,7 @@ def _static(path, weight, out_path):
             "这个 Noto 字体是可变字体（VF），需要 fontTools 实例化："
             "python -m pip install fonttools\n"
             "或者安装静态字重文件，例如 NotoSerifSC-Black.ttf / -Bold.ttf，"
-            "这样只复制改名，不需要 fontTools")
+            "这样只复制，不需要重命名，也不需要 fontTools")
     font = TTFont(path)
     if "fvar" in font:
         font = instantiateVariableFont(font, {"wght": weight}, inplace=False)
@@ -147,8 +149,12 @@ def _emit(source, is_var, weight, dst, cache_dir, use_cache, log):
         os.replace(tmp, cached)
 
 
+def _weight_name(weight):
+    return {400: "Regular", 700: "Bold", 900: "Black"}.get(weight, str(weight))
+
+
 def ensure_noto_fonts(lang, out_dir, log=None, cache=True, cache_dir=None):
-    """生成某语言的四个 Noto 替换字体；返回 {文件名: 字节数}。"""
+    """生成某语言的实际 Noto 字体文件；返回 {文件名: 字节数}。"""
     log = log or (lambda m: None)
     cache_dir = DEFAULT_CACHE if cache_dir is None else cache_dir
     if not cache:
@@ -171,21 +177,26 @@ def ensure_noto_fonts(lang, out_dir, log=None, cache=True, cache_dir=None):
             "源字体是 VF 可变字体，需要 fontTools 实例化："
             "python -m pip install fonttools；"
             "或安装静态字重文件（NotoSerifSC-Bold.ttf / -Black.ttf），"
-            "这样只复制改名，不需要 fontTools")
+            "这样只复制，不需要重命名，也不需要 fontTools")
+    sans_name = "%s-%s.ttf" % (
+        cfg["sans"][0], _weight_name(cfg["sans"][1]))
+    serif_black_name = "%s-%s.ttf" % (
+        cfg["serif"][0], _weight_name(cfg["serif"][1][1]))
+    serif_bold_name = "%s-%s.ttf" % (
+        cfg["serif"][0], _weight_name(cfg["serif"][1][0]))
     mapping = {
-        "ARIAL.TTF": (sans_path, sans_var, cfg["sans"][1]),
-        "ELGRECO_.TTF": (serif_path, serif_var, cfg["serif"][1][1]),
-        "Tiepolo_black.ttf": (serif_path, serif_var, cfg["serif"][1][1]),
-        "Tiepolo_bold.ttf": (serif_bold or serif_path,
-                             serif_bold_var if serif_bold else serif_var,
-                             cfg["serif"][1][0]),
+        sans_name: (sans_path, sans_var, cfg["sans"][1]),
+        serif_black_name: (serif_path, serif_var, cfg["serif"][1][1]),
+        serif_bold_name: (serif_bold or serif_path,
+                          serif_bold_var if serif_bold else serif_var,
+                          cfg["serif"][1][0]),
     }
     result = {}
     for name, (path, is_var, weight) in mapping.items():
         dst = os.path.join(out_dir, name)
         _emit(path, is_var, weight, dst, cache_dir, cache, log)
         result[name] = os.path.getsize(dst)
-        log("  %-18s <- %s wght=%s (%.1f MB)" % (
+        log("  %-28s <- %s wght=%s (%.1f MB)" % (
             name, os.path.basename(path), weight, result[name] / 1048576.0))
 
     with open(os.path.join(out_dir, "NOTO-SOURCES.txt"), "w",

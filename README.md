@@ -35,9 +35,11 @@ GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析�
 
 - 不要删除 `fonts\` 根目录的四份原版字体；
 - 缺字体时 GUI 会提示，把 zip 里的 `PR2Localization\fonts\` 重新解压完整即可；
-  发行包默认把四份静态 Noto 平铺进 `PR2Localization\fonts\`，同时附带映射配置；
-  也可用 `-Fonts config` 只带 `PR2Localization\fonts\font-map.ini`，按配置映射系统字体；
-  非拉丁系默认映射 Noto 对应字体，只接受静态字重，不使用 `.ttc` 或 `-VF.ttf`。
+  发行包默认把 Noto 实际字体文件（保留原始文件名）平铺进 `PR2Localization\fonts\`，
+  同时附带 `font-map.ini`，由它映射游戏的四个逻辑字体名；
+  也可用 `-Fonts config` 只带 `PR2Localization\fonts\font-map.ini`，此时必须自己把
+  映射中写明的实际字体文件放进 `fonts`；映射不读取系统字体目录；
+  非拉丁系默认使用 Noto 对应字体，只接受静态字重，不使用 `.ttc` 或 `-VF.ttf`。
 
 完整步骤、卸载和常见问题见[玩家指南](docs/玩家指南.md)。
 
@@ -191,7 +193,10 @@ pr2-localization/
   换游戏版本（包括 GOG 的法语版 `1.1.2.42`）很可能需要改偏移，否则整体不生效。
 - **中文条目整条不显示是分词问题，不是标签问题。** 引擎按空格切词，
   整串汉字超宽会被整条丢弃，只能逐条在游戏里实测。
-- **字体统一放在 `PR2Localization\fonts\`。** 四个 TTF 平铺，不按语言子目录；同一次安装只放一个语言。开发用缝合版，发行用完整 Noto；部署时复制到游戏 `PR2Localization\fonts\`，不覆盖根目录原版。译文新增生僻字时，
+- **字体统一放在 `PR2Localization\fonts\`。** 实际字体文件（默认保留 Noto 原始文件名）平铺，
+  不按语言子目录；同一次安装只放一个语言。四个游戏逻辑名由 `font-map.ini` 映射到这些文件，
+  映射只接受 fonts 内的文件。开发用缝合版，发行用完整 Noto；部署时复制到游戏
+  `PR2Localization\fonts\`，不覆盖根目录原版。译文新增生僻字时，
   构建会自动重缝，缺字就会显示空白。
 
 ---
