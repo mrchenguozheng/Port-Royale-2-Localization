@@ -6,18 +6,20 @@
 
 ## 项目边界
 
-- 这是《Port Royale 2》的**外挂式本地化运行时**：原版 `PR2.exe` 不改字节，启动器负责
-  注入 `PR2TextSource.dll`，由 DLL hook 引擎取字。
-- **只支持 GOG 英文版 `1.1.2.3`**。Steam 版、GOG 法语版和其他版本不在支持范围内；
+- 这是《Port Royale 2》的**外挂式本地化运行时**：原版 `PR2.exe` 不改字节。
+  首选加载路径是游戏目录里的 `VERSION.dll` 代理自然加载 `PR2TextSource.dll`；
+  启动器仍保留为备用注入入口。
+- **GOG 英文版 `1.1.2.3` 已实测；Steam 英文版为实验性支持**，`VERSION.dll` 代理
+  加载链已构建，但还没进游戏验证。GOG 法语版和其他版本不在支持范围内；
   不要在未支持版本上部署后把“注入不生效”当作本仓库回归。
-- 发行包按语言拆分；玩家拿到的是构建好的 `PR2LauncherGUI.exe`、语言包和字体，不需要
-  Python 或 Rust 工具链。不要把“让每个玩家自行构建”写成默认流程。
+- 发行包按语言拆分；玩家拿到的是构建好的 `VERSION.dll`、`PR2TextSource.dll`、
+  语言包和字体，不需要 Python 或 Rust 工具链。不要把“让每个玩家自行构建”写成默认流程。
 
 ## 当前结构
 
 | 路径 | 作用 |
 |---|---|
-| `src/injector-rs/` | Rust workspace：`pr2_common`、`pr2_text_source`、`pr2_launcher`、`pr2_launcher_gui` |
+| `src/injector-rs/` | Rust workspace：`pr2_common`、`pr2_proxy`、`pr2_text_source`、`pr2_launcher`、`pr2_launcher_gui` |
 | `src/injector-rs/ui/` | GUI 界面翻译 `zh.ini` / `en.ini` / `ja.ini` |
 | `src/translations/` | 唯一手改译文层：`zh.toml`、`ja.toml` 等 |
 | `src/editor/` | 最小译文编辑器：Astro 前端 + `server.py` + `api/` 分域模块 |
@@ -28,9 +30,14 @@
 
 Rust 产物：
 
+- `VERSION.dll`
 - `PR2TextSource.dll`
 - `PR2Launcher.exe`
 - `PR2LauncherGUI.exe`
+
+`VERSION.dll` 是代理宿主，不是游戏原文件；它必须和 `PR2TextSource.dll` 同目录。
+不要用裸 `LoadLibraryExW("version.dll")` 找系统 DLL，可能递归到代理自身；
+用 `GetSystemDirectoryW` 拼绝对路径。
 
 ## 不可破坏的契约
 

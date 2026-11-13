@@ -1,7 +1,8 @@
 # Port Royale 2 Localization
 
-An external localization runtime for **Port Royale 2 (GOG English `1.1.2.3`)**.
-Language packs replace the game's UI text; the original `PR2.exe` is not modified.
+An external localization runtime for **Port Royale 2 (GOG English `1.1.2.3` and
+Steam English, experimental)**. Language packs replace the game's UI text; the
+original `PR2.exe` is not modified.
 
 ## Supported languages
 
@@ -15,8 +16,13 @@ Language packs replace the game's UI text; the original `PR2.exe` is not modifie
 language and the fallback when a pack is missing. The launcher UI is available
 in `en`, `ja`, and `zh`.
 
-Only the GOG English `1.1.2.3` build is supported. Steam, GOG French, and other
-builds are out of scope.
+The GOG English `1.1.2.3` build is tested. Steam English is experimental: the
+`VERSION.dll` proxy loading chain is built, but it still needs an in-game check.
+GOG French and other builds are out of scope.
+
+With this chain, the game loads `PR2TextSource.dll` from its own directory through
+a local `VERSION.dll` proxy; no launcher injection is required. `PR2LauncherGUI.exe`
+remains available as a fallback if another mod already uses `VERSION.dll`.
 
 ## Documentation
 

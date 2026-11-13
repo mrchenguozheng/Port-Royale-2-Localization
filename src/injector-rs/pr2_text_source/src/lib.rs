@@ -13,7 +13,7 @@ use std::sync::{Mutex, OnceLock};
 use pr2_common::{
     exe_dir, override_path, pack_path, read_locale_language, valid_lang_code,
 };
-use windows_sys::Win32::Foundation::{BOOL, HANDLE, HMODULE};
+use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HANDLE, HMODULE};
 use windows_sys::Win32::Storage::FileSystem::{
     GET_FILEEX_INFO_LEVELS, WIN32_FIND_DATAA,
 };
@@ -25,13 +25,15 @@ use windows_sys::Win32::System::Memory::{
     PAGE_GUARD, PAGE_NOACCESS, PAGE_READWRITE, VirtualProtect, VirtualQuery,
 };
 use windows_sys::Win32::System::ProcessStatus::{EnumProcessModules, GetModuleBaseNameA};
-use windows_sys::Win32::System::Threading::GetCurrentProcess;
+use windows_sys::Win32::System::Threading::{CreateThread, GetCurrentProcess, Sleep};
 
 const A2DLIB: &[u8] = b"A2dLib-2.20A.dll\0";
 const ADD_EXPORT: &[u8] =
     b"?Add@CStringManager@NA2dLib@@QAEXPBDPBXI@Z\0";
 const LSR_EXPORT: &[u8] = b"?LoadStringRes@CW32StringManager@NA2dLib@@UAE_NIAAV?$basic_string@GV?$char_traits@G@_STL@@V?$allocator@G@2@@_STL@@@Z\0";
 const ADDSTR_EXPORT: &[u8] = b"?AddStringRes@CW32StringManager@NA2dLib@@MAE_NPBDPBXI@Z\0";
+const STRING_MGR_EXPORT: &[u8] =
+    b"?g_pStringMgr@NA2dLib@@3PAVCStringManager@1@A\0";
 
 static REAL_ADD: AtomicUsize = AtomicUsize::new(0);
 static REAL_ADDSTR: AtomicUsize = AtomicUsize::new(0);
@@ -51,6 +53,10 @@ static VT_DONE: AtomicBool = AtomicBool::new(false);
 static LSR_VT_DONE: AtomicBool = AtomicBool::new(false);
 static ADDSTR_VT_DONE: AtomicBool = AtomicBool::new(false);
 static RESOLVE_HOOKED: AtomicBool = AtomicBool::new(false);
+static HOOK_STARTED: AtomicBool = AtomicBool::new(false);
+static ADD_IAT_DONE: AtomicBool = AtomicBool::new(false);
+static ADD_MISS_LOGGED: AtomicBool = AtomicBool::new(false);
+static RESOLVE_MISS_LOGGED: AtomicBool = AtomicBool::new(false);
 static FIRED: AtomicBool = AtomicBool::new(false);
 static LSR_COUNT: AtomicU32 = AtomicU32::new(0);
 static RESOLVE_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -85,11 +91,13 @@ pub extern "system" fn DllMain(hinst: HANDLE, reason: u32, _reserved: *mut c_voi
 }
 
 unsafe fn install_hook() {
-    if REAL_ADD.load(Ordering::Acquire) != 0 {
+    if HOOK_STARTED.swap(true, Ordering::AcqRel) {
         return;
     }
-    install_font_log_hooks();
+    // Load the pack first: font_dir() falls back to the selected pack's
+    // locale when no launcher set PR2_FONT_DIR.
     load_edit_file();
+    install_font_log_hooks();
     log_line(&format!(
         "[text] pack '{}' from {}: {} overrides",
         pack_locale(),
@@ -97,6 +105,15 @@ unsafe fn install_hook() {
         pack_count()
     ));
 
+    patch_add_iat();
+    install_resolve_hook();
+    start_hook_retry();
+}
+
+unsafe fn patch_add_iat() -> usize {
+    if ADD_IAT_DONE.load(Ordering::Acquire) {
+        return 0;
+    }
     let detour = my_add as *const () as usize;
     let mut patched = 0usize;
     let main = GetModuleHandleA(ptr::null());
@@ -116,12 +133,48 @@ unsafe fn install_hook() {
             patched += 1;
         }
     }
-    install_resolve_hook();
     if patched > 0 {
+        ADD_IAT_DONE.store(true, Ordering::Release);
         log_line("[text] hook installed (CStringManager::Add -> MyAdd)");
-    } else {
-        log_line("[text] FAILED: Add not found in any module IAT");
+    } else if !ADD_MISS_LOGGED.swap(true, Ordering::AcqRel) {
+        log_line("[text] FAILED: Add not found in any module IAT (will retry)");
     }
+    patched
+}
+
+unsafe fn start_hook_retry() {
+    let th = CreateThread(
+        ptr::null(),
+        0,
+        Some(hook_retry_thread),
+        ptr::null_mut(),
+        0,
+        ptr::null_mut(),
+    );
+    if th != 0 {
+        CloseHandle(th);
+    }
+}
+
+unsafe extern "system" fn hook_retry_thread(_: *mut c_void) -> u32 {
+    // The proxy may load this DLL before the import loader has finished.
+    // Wait for A2dLib and retry the two hooks that need its module base.
+    for _ in 0..120 {
+        if GetModuleHandleA(A2DLIB.as_ptr()) != 0 {
+            if !ADD_IAT_DONE.load(Ordering::Acquire) {
+                patch_add_iat();
+            }
+            install_resolve_hook();
+            if ADD_IAT_DONE.load(Ordering::Acquire)
+                && RESOLVE_HOOKED.load(Ordering::Acquire)
+            {
+                return 0;
+            }
+        }
+        Sleep(250);
+    }
+    log_line("[text] retry window ended; hook may be incomplete");
+    0
 }
 
 unsafe extern "thiscall" fn my_add(
@@ -248,8 +301,8 @@ unsafe fn hook_vtable_slot(
     if !mgr.is_null() {
         candidates.push(*(mgr as *const *const usize));
     }
-    let gp = (h as *const u8).add(0x142084) as *const *mut c_void;
-    let pm = *gp;
+    let gp = string_mgr_global(h);
+    let pm = gp;
     if !pm.is_null() && pm != mgr {
         candidates.push(*(pm as *const *const usize));
     }
@@ -332,17 +385,74 @@ unsafe extern "thiscall" fn my_lsr(this: *mut c_void, hash: u32, out: *mut c_voi
     ret
 }
 
+const RESOLVE_THUNK_RVA: usize = 0x1DC5;
+const RESOLVE_REAL_RVA: usize = 0x25C70;
+const STRING_MGR_FALLBACK_RVA: usize = 0x142084;
+
+struct ResolveProfile {
+    thunk_rva: usize,
+    real_rva: usize,
+}
+
+// Only versions whose thunk actually resolves to the expected target are
+// accepted. Unknown builds stop with a log line instead of patching blindly.
+const RESOLVE_PROFILES: &[ResolveProfile] = &[ResolveProfile {
+    thunk_rva: RESOLVE_THUNK_RVA,
+    real_rva: RESOLVE_REAL_RVA,
+}];
+
+unsafe fn resolve_profile(h: HMODULE) -> Option<&'static ResolveProfile> {
+    for p in RESOLVE_PROFILES {
+        let thunk = (h as *mut u8).wrapping_add(p.thunk_rva);
+        if !readable(thunk as *const c_void, 5) {
+            continue;
+        }
+        if *thunk != 0xE9 {
+            continue;
+        }
+        let rel = ptr::read_unaligned(thunk.add(1) as *const i32);
+        let target = (thunk as isize + 5 + rel as isize) as usize;
+        if target == (h as usize).wrapping_add(p.real_rva) {
+            return Some(p);
+        }
+    }
+    None
+}
+
+unsafe fn string_mgr_global(h: HMODULE) -> *mut c_void {
+    // A2dLib exports the singleton pointer; prefer it over a fixed RVA.
+    if let Some(f) = GetProcAddress(h, STRING_MGR_EXPORT.as_ptr()) {
+        let p = f as *const *mut c_void;
+        if readable(p as *const c_void, std::mem::size_of::<*mut c_void>()) {
+            return *p;
+        }
+    }
+    let p = (h as *const u8).wrapping_add(STRING_MGR_FALLBACK_RVA) as *const *mut c_void;
+    if readable(p as *const c_void, std::mem::size_of::<*mut c_void>()) {
+        return *p;
+    }
+    ptr::null_mut()
+}
+
 unsafe fn install_resolve_hook() {
     if RESOLVE_HOOKED.load(Ordering::Acquire) {
         return;
     }
     let h = GetModuleHandleA(A2DLIB.as_ptr());
     if h == 0 {
-        log_line("[text] ResolveHook: A2dLib-2.20A.dll not loaded yet");
+        if !RESOLVE_MISS_LOGGED.swap(true, Ordering::AcqRel) {
+            log_line("[text] ResolveHook: A2dLib-2.20A.dll not loaded yet (will retry)");
+        }
         return;
     }
-    let real = (h as usize).wrapping_add(0x25C70);
-    let thunk = (h as *mut u8).wrapping_add(0x1DC5);
+    let Some(profile) = resolve_profile(h) else {
+        if !RESOLVE_MISS_LOGGED.swap(true, Ordering::AcqRel) {
+            log_line("[text] ResolveHook: no known profile for this A2dLib build");
+        }
+        return;
+    };
+    let real = (h as usize).wrapping_add(profile.real_rva);
+    let thunk = (h as *mut u8).wrapping_add(profile.thunk_rva);
     let detour = my_resolve as *const () as usize;
     let mut old = 0u32;
     if VirtualProtect(
@@ -358,7 +468,10 @@ unsafe fn install_resolve_hook() {
         VirtualProtect(thunk as *const c_void, 5, old, &mut old);
         RESOLVE_REAL.store(real, Ordering::Release);
         RESOLVE_HOOKED.store(true, Ordering::Release);
-        log_line("[text] ResolveHook: CScreenStrings::ResolveByHash patched (thunk 0x1DC5 -> MyResolve)");
+        log_line(&format!(
+            "[text] ResolveHook: CScreenStrings::ResolveByHash patched (thunk 0x{:X} -> MyResolve)",
+            profile.thunk_rva
+        ));
     } else {
         log_line("[text] ResolveHook: VirtualProtect failed");
     }
@@ -1118,10 +1231,21 @@ fn font_log_all() -> bool {
 fn font_dir() -> Option<&'static str> {
     FONT_DIR
         .get_or_init(|| {
-            std::env::var("PR2_FONT_DIR")
-                .ok()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty() && valid_lang_code(s))
+            if let Ok(s) = std::env::var("PR2_FONT_DIR") {
+                let s = s.trim().to_string();
+                if !s.is_empty() && valid_lang_code(&s) {
+                    return Some(s);
+                }
+            }
+            // Natural launch (VERSION.dll proxy or plain PR2.exe) has no
+            // launcher to set PR2_FONT_DIR. Use the selected pack's font
+            // directory when it exists, otherwise keep the original fonts.
+            let lang = pack_locale();
+            if exe_dir().join("fonts").join(&lang).is_dir() {
+                Some(lang)
+            } else {
+                None
+            }
         })
         .as_deref()
 }

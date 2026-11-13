@@ -92,6 +92,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "pr2_proxy"
+version = "0.1.0"
+dependencies = [
+ "windows-sys",
+]
+
+[[package]]
 name = "pr2_text_source"
 version = "0.1.0"
 dependencies = [

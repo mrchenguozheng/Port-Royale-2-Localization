@@ -6,7 +6,9 @@
 
     PR2-zh-v1.0.0/
       PR2Launcher.exe
+      PR2LauncherGUI.exe
       PR2TextSource.dll
+      VERSION.dll
       PR2Packs/zh.txt
       PR2Packs/locale.ini
       fonts/ARIAL.TTF ...          # Noto 替换字体（默认）
@@ -39,7 +41,7 @@ BUILD = os.path.join(ROOT, "build")
 RUNTIME = os.path.join(BUILD, "runtime")
 
 LABELS = {"zh": "简体中文", "ja": "日本語"}
-FLAT = ("PR2Launcher.exe", "PR2LauncherGUI.exe", "PR2TextSource.dll")
+FLAT = ("PR2Launcher.exe", "PR2LauncherGUI.exe", "PR2TextSource.dll", "VERSION.dll")
 RUNTIME_VERSION = 1  # 与 src/injector-rs/pr2_common/src/lib.rs 的 RUNTIME_VERSION 保持一致
 
 
@@ -106,17 +108,24 @@ def write_readme(lang, stage, mode):
     }[mode]
     text = """Port Royale 2 本地化 - %s
 
-支持游戏版本：GOG 英文 1.1.2.3（仅此版本）。其他版本请勿使用。
+支持游戏版本：GOG 英文 1.1.2.3；Steam 英文 1.1.2.3 为实验性支持，需进游戏后看 PR2TextSource.log 确认。
 
 安装（解压即用）：
   1. 把本压缩包里的全部文件解压到游戏根目录（和 PR2.exe 同一层）。
-  2. 双击 PR2LauncherGUI.exe，选语言后点「以所选语言启动」。
-     也可以命令行：PR2Launcher.exe --lang=<语言>。
-  3. 不要直接运行 PR2.exe，那样不会加载语言包。
+  2. GOG：正常启动 PR2.exe；Steam：从 Steam 正常启动游戏。
+     VERSION.dll 是代理宿主，会在游戏进程里加载 PR2TextSource.dll，不需要启动器注入。
+     也可以继续用启动器：双击 PR2LauncherGUI.exe，选语言后点「以所选语言启动」。
+  3. 如果目录里已有别的 mod 占用 VERSION.dll，先移除本包的 VERSION.dll，
+     改用 PR2LauncherGUI.exe 启动，避免 DLL 代理冲突。
+
+确认是否生效：
+  游戏启动后检查 PR2TextSource.log 第一行是否为：
+    [text] pack 'zh' from <游戏目录>\\PR2Packs: ... overrides
+  首行是 NO pack loaded 或没有日志，说明语言包/代理没有加载成功。
 
 字体：
-  字体在 fonts\\<语言>\\；启动器通过路径重定向读取，不覆盖根目录原版。
-  同一目录可以放多个语言（fonts\\zh、fonts\\ja），启动器按 locale.ini 或 --lang 选择。
+  字体在 fonts\\<语言>\\；DLL 通过路径重定向读取，不覆盖根目录原版。
+  同一目录可以放多个语言（fonts\\zh、fonts\\ja），按 locale.ini 或启动器 --lang 选择。
 
 如果启动器提示“字体缺失”：
   1. 确认 fonts\\<语言>\\ 下四个文件都在：
@@ -128,7 +137,7 @@ def write_readme(lang, stage, mode):
   仍要启动会回退原版拉丁字体，中文可能缺字。
 
 卸载：
-  删除 PR2Launcher.exe、PR2LauncherGUI.exe、PR2TextSource.dll、PR2Packs\\%s.txt；
+  删除 PR2Launcher.exe、PR2LauncherGUI.exe、PR2TextSource.dll、VERSION.dll、PR2Packs\\%s.txt；
   如果覆盖过 fonts\\ 里的字体，请先用备份恢复。
 
 注意：

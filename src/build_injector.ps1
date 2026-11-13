@@ -2,9 +2,12 @@
 # ============================================================
 #  PR2 Localization - Rust build script
 #
-#  Builds the three native programs from src\injector-rs:
-#    PR2TextSource.dll, PR2Launcher.exe, PR2LauncherGUI.exe
+#  Builds the native programs from src\injector-rs:
+#    PR2TextSource.dll, PR2Launcher.exe, PR2LauncherGUI.exe, VERSION.dll
 #  and copies them into build\runtime\.
+#
+#  VERSION.dll is the proxy host that lets the game load PR2TextSource.dll
+#  naturally under Steam, without a launcher or remote injection.
 #
 #  Requires rustup + the i686-pc-windows-msvc target:
 #    rustup target add i686-pc-windows-msvc
@@ -85,7 +88,7 @@ try {
 if ($code -ne 0) { Stop-WithError 'FAILED. See the errors above.' }
 
 $Out = Join-Path $RustDir 'target\i686-pc-windows-msvc\release'
-$artifacts = @('PR2TextSource.dll', 'PR2Launcher.exe', 'PR2LauncherGUI.exe')
+$artifacts = @('PR2TextSource.dll', 'PR2Launcher.exe', 'PR2LauncherGUI.exe', 'VERSION.dll')
 foreach ($name in $artifacts) {
     if (-not (Test-Path -LiteralPath (Join-Path $Out $name) -PathType Leaf)) {
         Stop-WithError "FAILED: missing $(Join-Path $Out $name)"

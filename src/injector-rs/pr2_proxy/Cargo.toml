@@ -1,0 +1,16 @@
+[package]
+name = "pr2_proxy"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "VERSION"
+crate-type = ["cdylib"]
+
+[dependencies]
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_System_LibraryLoader",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+] }

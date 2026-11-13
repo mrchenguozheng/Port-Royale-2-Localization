@@ -5,6 +5,7 @@ members = [
     "pr2_text_source",
     "pr2_launcher",
     "pr2_launcher_gui",
+    "pr2_proxy",
 ]
 
 [workspace.package]
