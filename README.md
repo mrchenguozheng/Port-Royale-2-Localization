@@ -35,7 +35,8 @@ GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析�
 
 - 不要删除 `fonts\` 根目录的四份原版字体；
 - 缺字体时 GUI 会提示，把 zip 里的 `PR2Localization\fonts\<语言>\` 重新解压完整即可；
-  发行包也可用 `-Fonts config` 只带 `PR2Localization\fonts\font-map.ini`，按配置映射系统字体。
+  发行包也可用 `-Fonts config` 只带 `PR2Localization\fonts\font-map.ini`，按配置映射系统字体；
+  非拉丁系默认映射 Noto 对应字体，不使用 `.ttc`。
 
 完整步骤、卸载和常见问题见[玩家指南](docs/玩家指南.md)。
 

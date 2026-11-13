@@ -131,6 +131,10 @@ fn resolve_font_path(root: &Path, value: &str) -> Option<String> {
     if expanded.trim().is_empty() {
         return None;
     }
+    // 不把 .ttc 集合交给游戏字体读取器：它是否能处理集合尚未验证，默认跳过。
+    if expanded.to_ascii_lowercase().ends_with(".ttc") {
+        return None;
+    }
     let path = PathBuf::from(expanded);
     let path = if path.is_absolute() {
         path
@@ -407,6 +411,22 @@ mod tests {
         );
         assert!(language_fonts_complete(&root, "zh"));
         assert!(!language_fonts_complete(&root, "ja"));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn font_map_skips_ttc_candidates() {
+        let root = temp_root();
+        let collection = root.join("fake-cjk.ttc");
+        fs::write(&collection, b"fake").unwrap();
+        let cfg = format!("[zh]\nARIAL.TTF={}\n", collection.display());
+        fs::write(
+            root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE),
+            cfg,
+        )
+        .unwrap();
+        let map = FontMap::load(&root, "zh").unwrap();
+        assert!(map.lookup("fonts\\ARIAL.TTF").is_none());
         let _ = fs::remove_dir_all(&root);
     }
 

@@ -131,7 +131,7 @@ def write_readme(lang, stage, mode, edition):
         "noto": "字体：Noto Sans / Noto Serif（SIL OFL 1.1），完整字体，未裁剪。",
         "stitch": "字体：本地缝合版（仅限自用，不要公开分发）。",
         "none": "字体：本包不含字体，请自行准备中/日文字体。",
-        "config": "字体：使用 PR2Localization\\fonts\\font-map.ini 映射到系统字体（不打包字体文件）。",
+        "config": "字体：PR2Localization\\fonts\\font-map.ini 映射系统字体；非拉丁系默认 Noto，不打包字体文件。",
     }[mode]
     if edition == "gog":
         install_step = """  2. GOG：双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
@@ -159,6 +159,8 @@ def write_readme(lang, stage, mode, edition):
   本包不含字体文件。PR2Localization\\fonts\\font-map.ini 把游戏请求的逻辑字体名
   （ARIAL.TTF、ELGRECO_.TTF、Tiepolo_black.ttf、Tiepolo_bold.ttf）映射到系统字体。
   按当前语言包的 [zh] / [ja] 节读取，[fonts] 提供全局默认；支持 %WINDIR% 和 | 候选。
+  非拉丁系默认映射 Noto Sans/Serif SC 或 JP，优先静态字重，没有静态文件时使用 -VF.ttf；
+  不使用 .ttc 集合。
   没有映射、映射文件缺失或候选文件不存在时，回退到
   PR2Localization\\fonts\\<语言>\\，最后回退根目录原版 fonts\\...
 
