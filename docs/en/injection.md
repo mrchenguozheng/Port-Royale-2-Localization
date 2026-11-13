@@ -154,9 +154,9 @@ The Rust workspace lives in `src\injector-rs\`:
 | `pr2_launcher_gui/src/{main,gui,packs,process,strings}.rs` | Win32 GUI. Window/layout, pack list, launcher/kill process, `ui/*.ini` |
 | `ui/en.ini`, `ui/ja.ini`, `ui/zh.ini` | GUI translations, copied to `build\runtime\ui\` by the build script |
 
-The old C++ implementation (`pr2_text_source.cpp`, `pr2_text_pack.c`, `pr2_launcher.cpp`,
-`pr2_launcher_gui.cpp`) has been replaced by these Rust crates and removed from the working
-tree; use git history if you need to compare.
+The old C++ implementation is no longer in the working tree. This page does not keep
+file-level comparisons; see [Refactoring History](refactor-history.md) for the old
+filenames and migration details.
 
 ### Hook safety
 
