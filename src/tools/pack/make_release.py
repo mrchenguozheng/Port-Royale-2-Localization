@@ -85,6 +85,15 @@ def copy_fonts(lang, stage, mode, log, cache=True):
     if mode == "none":
         log("跳过字体（发行包不含字体）")
         return
+    if mode == "config":
+        src = os.path.join(SRC, "font-map.ini")
+        if not os.path.isfile(src):
+            raise FileNotFoundError("缺字体映射模板：%s" % src)
+        dst = os.path.join(stage, DATA_DIR, "fonts", "font-map.ini")
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+        log("复制字体映射（不打包字体文件）")
+        return
     dst = os.path.join(stage, DATA_DIR, "fonts", lang)
     from build_artifacts import build_fonts
     out_base = os.path.join(stage, DATA_DIR, "fonts")
@@ -122,6 +131,7 @@ def write_readme(lang, stage, mode, edition):
         "noto": "字体：Noto Sans / Noto Serif（SIL OFL 1.1），完整字体，未裁剪。",
         "stitch": "字体：本地缝合版（仅限自用，不要公开分发）。",
         "none": "字体：本包不含字体，请自行准备中/日文字体。",
+        "config": "字体：使用 PR2Localization\\fonts\\font-map.ini 映射到系统字体（不打包字体文件）。",
     }[mode]
     if edition == "gog":
         install_step = """  2. GOG：双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
@@ -144,6 +154,41 @@ def write_readme(lang, stage, mode, edition):
         support_line = "支持游戏版本：GOG 英文 1.1.2.3 已实测。本包只用于 GOG；Steam 请下载 Steam 版。"
     else:
         support_line = "支持游戏版本：Steam 英文 1.1.2.3 已实测（宿主 DLL 代理，中文界面）；GOG 请下载 GOG 版。"
+    if mode == "config":
+        font_help = """字体：
+  本包不含字体文件。PR2Localization\\fonts\\font-map.ini 把游戏请求的逻辑字体名
+  （ARIAL.TTF、ELGRECO_.TTF、Tiepolo_black.ttf、Tiepolo_bold.ttf）映射到系统字体。
+  按当前语言包的 [zh] / [ja] 节读取，[fonts] 提供全局默认；支持 %WINDIR% 和 | 候选。
+  没有映射、映射文件缺失或候选文件不存在时，回退到
+  PR2Localization\\fonts\\<语言>\\，最后回退根目录原版 fonts\\...
+
+  如果启动器提示“字体缺失”：
+  1. 确认 font-map.ini 里四个逻辑字体名都有映射，且路径指向真实存在的字体文件。
+  2. 确认 %WINDIR%\\Fonts\\ 下确实有配置的字体；精简 Windows 可能没有中日字体。
+  3. 可以把候选改成 %WINDIR%\\Fonts\\msyh.ttc 或单个 .ttf；多个候选用 | 分隔。
+  4. 修改后重新启动游戏，字体映射只在启动时读取一次。"""
+    else:
+        font_help = """字体：
+  字体在 PR2Localization\\fonts\\<语言>\\；DLL 通过路径重定向读取，不覆盖根目录原版。
+  同一目录可以放多个语言（PR2Localization\\fonts\\zh、PR2Localization\\fonts\\ja），
+  按 locale.ini 或启动器 --lang 选择。
+
+  如果启动器提示“字体缺失”：
+  1. 确认 PR2Localization\\fonts\\<语言>\\ 下四个文件都在：
+     ARIAL.TTF、ELGRECO_.TTF、Tiepolo_black.ttf、Tiepolo_bold.ttf
+  2. 从压缩包重新解压 PR2Localization 目录；只复制 packs 里的语言包不够。
+  3. 不要把字体放到 PR2Localization\\fonts\\ 根目录；根目录保留原版。
+  4. 检查杀毒软件是否隔离了字体文件。
+  5. 确认 PR2Localization\\packs\\<语言>.txt、PR2Localization\\fonts\\<语言>\\、
+     locale.ini 的语言代码一致。
+  仍要启动会回退原版拉丁字体，中文可能缺字。"""
+    if mode in ("noto", "stitch"):
+        license_help = """字体许可：
+  Noto 字体使用 SIL Open Font License 1.1，详见同目录 OFL.txt
+  或 https://openfontlicense.org/"""
+    else:
+        license_help = """字体许可：
+  本包不包含字体文件，不附带 OFL.txt。"""
     text = """Port Royale 2 本地化 - %s（%s）
 
 %s
@@ -157,20 +202,7 @@ def write_readme(lang, stage, mode, edition):
     [text] pack '%s' from <游戏目录>\\PR2Localization\\packs: ... overrides
   首行是 NO pack loaded 或没有日志，说明语言包/代理没有加载成功。
 
-字体：
-  字体在 PR2Localization\\fonts\\<语言>\\；DLL 通过路径重定向读取，不覆盖根目录原版。
-  同一目录可以放多个语言（PR2Localization\\fonts\\zh、PR2Localization\\fonts\\ja），
-  按 locale.ini 或启动器 --lang 选择。
-
-如果启动器提示“字体缺失”：
-  1. 确认 PR2Localization\\fonts\\<语言>\\ 下四个文件都在：
-     ARIAL.TTF、ELGRECO_.TTF、Tiepolo_black.ttf、Tiepolo_bold.ttf
-  2. 从压缩包重新解压 PR2Localization 目录；只复制 packs 里的语言包不够。
-  3. 不要把字体放到 PR2Localization\\fonts\\ 根目录；根目录保留原版。
-  4. 检查杀毒软件是否隔离了字体文件。
-  5. 确认 PR2Localization\\packs\\<语言>.txt、PR2Localization\\fonts\\<语言>\\、
-     locale.ini 的语言代码一致。
-  仍要启动会回退原版拉丁字体，中文可能缺字。
+%s
 
 卸载：
 %s
@@ -180,16 +212,16 @@ def write_readme(lang, stage, mode, edition):
   - 安装前建议备份游戏根目录的 fonts\\。
   - %s
 
-字体许可：
-  Noto 字体使用 SIL Open Font License 1.1，详见同目录 OFL.txt
-  或 https://openfontlicense.org/
-""" % (label, edition_label, support_line, install_step, lang, uninstall_line, font_line)
+%s
+""" % (label, edition_label, support_line, install_step, lang, font_help, uninstall_line, font_line, license_help)
     with open(os.path.join(stage, "README.txt"), "w",
               encoding="utf-8", newline="\n") as fh:
         fh.write(text)
 
 
-def copy_license(stage, log):
+def copy_license(stage, log, mode="noto"):
+    if mode not in ("noto", "stitch"):
+        return
     for rel in (os.path.join("assets", "fonts", "OFL.txt"),
                 "OFL.txt",
                 os.path.join("docs", "OFL.txt")):
@@ -235,7 +267,7 @@ def make_release(lang, version, out_dir, mode, edition, log=None, cache=True):
     log("复制 PR2Localization\\ui\\")
     copy_fonts(lang, stage, mode, log, cache=cache)
     write_readme(lang, stage, mode, edition)
-    copy_license(stage, log)
+    copy_license(stage, log, mode)
     zip_path = make_zip(stage, out_dir)
     log("完成：%s" % zip_path)
     return zip_path
@@ -249,7 +281,8 @@ def main():
                     help="发行入口：gog 不带宿主 DLL；steam 带宿主 DLL 和挂载脚本")
     ap.add_argument("--version", default="dev")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
-    ap.add_argument("--fonts", choices=("noto", "stitch", "none"), default="noto")
+    ap.add_argument("--fonts", choices=("noto", "stitch", "config", "none"),
+                    default="noto")
     ap.add_argument("--no-font-cache", action="store_true",
                     help="忽略 build/cache/noto 里的 Noto 字体缓存")
     args = ap.parse_args()

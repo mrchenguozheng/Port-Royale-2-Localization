@@ -4,7 +4,7 @@ use std::path::Path;
 use std::ptr;
 
 use pr2_common::{
-    exe_dir, fonts_dir, language_fonts_complete, pack_runtime_ok, read_locale_language,
+    exe_dir, fonts_dir, bundled_fonts_complete, pack_runtime_ok, read_locale_language,
     valid_lang_code, FONT_NAMES, RUNTIME_VERSION,
 };
 use sha2::{Digest, Sha256};
@@ -125,7 +125,7 @@ fn run() -> Result<(), i32> {
         .filter(|code| valid_lang_code(code))
         .and_then(|code| {
             let dir = fonts_dir(&root).join(code);
-            if dir.is_dir() && language_fonts_complete(&root, code) {
+            if dir.is_dir() && bundled_fonts_complete(&root, code) {
                 Some(dir)
             } else {
                 None
@@ -133,7 +133,9 @@ fn run() -> Result<(), i32> {
         });
 
     if let Some(code) = font_lang.as_ref() {
-        if valid_lang_code(code) && fonts_dir(&root).join(code).is_dir() && font_dir.is_none() {
+        if valid_lang_code(code) && fonts_dir(&root).join(code).is_dir() && font_dir.is_none()
+            && !pr2_common::language_fonts_complete(&root, code)
+        {
             eprintln!(
                 "[PR2Loc] PR2Localization\\fonts\\{} 字体不完整，回退到原版根目录字体",
                 code

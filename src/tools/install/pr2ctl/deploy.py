@@ -45,6 +45,10 @@ def deploy_steps(target, langs, edition=None):
     # 字体按语言分别生成在 build\runtime\fonts\<语言>\；复制到游戏 fonts\<语言>\，
     # 不覆盖根目录的原版字体。启动器用 PR2_FONT_DIR 做重定向。
     font_lang = _font_lang(target, langs)
+    cfg = os.path.join(RUNTIME, FONT_DIR, "font-map.ini")
+    if os.path.isfile(cfg):
+        steps.append(("PR2Localization\\fonts\\font-map.ini", cfg,
+                      os.path.join(target, FONT_DIR, "font-map.ini")))
     for fl in (langs or ([font_lang] if font_lang else [])):
         font_dir = os.path.join(RUNTIME, FONT_DIR, fl)
         if not os.path.isdir(font_dir):

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs;
 use std::os::windows::ffi::OsStringExt;
@@ -13,6 +14,7 @@ pub const FONT_NAMES: [&str; 4] = [
     "Tiepolo_black.ttf",
     "Tiepolo_bold.ttf",
 ];
+pub const FONT_MAP_FILE: &str = "font-map.ini";
 
 pub fn exe_path() -> PathBuf {
     let mut buf = [0u16; 260];
@@ -58,6 +60,153 @@ pub fn fonts_dir(root: &Path) -> PathBuf {
         root.join("fonts")
     } else {
         new
+    }
+}
+
+/// `PR2Localization\fonts\font-map.ini`（旧布局为 `fonts\font-map.ini`）。
+///
+/// 配置按语言分段，`[fonts]` 是全局默认，`[zh]` / `[ja]` 覆盖它。
+/// 值可以是绝对路径、相对游戏根目录的路径，或带 `%WINDIR%` 等环境变量的路径；
+/// 多个候选用 `|` 分隔，取第一个存在的文件。
+pub struct FontMap {
+    root: PathBuf,
+    entries: HashMap<String, Vec<String>>,
+}
+
+fn font_map_candidates(root: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let data = data_dir(root);
+    for dir in [data.join("fonts"), root.join("fonts"), data.clone()] {
+        let path = dir.join(FONT_MAP_FILE);
+        if !out.iter().any(|p| p == &path) {
+            out.push(path);
+        }
+    }
+    out
+}
+
+fn font_map_path(root: &Path) -> Option<PathBuf> {
+    font_map_candidates(root)
+        .into_iter()
+        .find(|path| path.is_file())
+}
+
+fn expand_env(value: &str) -> String {
+    let mut out = String::new();
+    let mut rest = value;
+    while let Some(start) = rest.find('%') {
+        let Some(end_rel) = rest[start + 1..].find('%') else {
+            break;
+        };
+        let end = start + 1 + end_rel;
+        let name = &rest[start + 1..end];
+        if name.is_empty() {
+            out.push_str(&rest[..=start]);
+            rest = &rest[start + 1..];
+            continue;
+        }
+        if let Ok(replacement) = std::env::var(name) {
+            out.push_str(&rest[..start]);
+            out.push_str(&replacement);
+            rest = &rest[end + 1..];
+        } else {
+            out.push_str(&rest[..=end]);
+            rest = &rest[end + 1..];
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+fn normalize_font_key(value: &str) -> String {
+    let mut name = value.trim();
+    if let Some(pos) = name.rfind(|c| c == '\\' || c == '/') {
+        name = &name[pos + 1..];
+    }
+    name.trim_matches('"').to_ascii_lowercase()
+}
+
+fn resolve_font_path(root: &Path, value: &str) -> Option<String> {
+    let expanded = expand_env(value.trim().trim_matches('"'));
+    if expanded.trim().is_empty() {
+        return None;
+    }
+    let path = PathBuf::from(expanded);
+    let path = if path.is_absolute() {
+        path
+    } else {
+        root.join(path)
+    };
+    if path.is_file() {
+        Some(path.to_string_lossy().into_owned())
+    } else {
+        None
+    }
+}
+
+impl FontMap {
+    pub fn load(root: &Path, lang: &str) -> Option<FontMap> {
+        let path = font_map_path(root)?;
+        let text = fs::read_to_string(path).ok()?;
+        let lang = lang.to_ascii_lowercase();
+        let mut global: HashMap<String, Vec<String>> = HashMap::new();
+        let mut local: HashMap<String, Vec<String>> = HashMap::new();
+        let mut section = "fonts".to_string();
+
+        for raw in text.lines() {
+            let line = raw.trim().trim_start_matches('\u{feff}');
+            if line.is_empty() || line.starts_with(';') || line.starts_with('#') {
+                continue;
+            }
+            if line.starts_with('[') && line.ends_with(']') {
+                section = line[1..line.len() - 1].trim().to_ascii_lowercase();
+                continue;
+            }
+            let Some((key, value)) = line.split_once('=') else {
+                continue;
+            };
+            let key = normalize_font_key(key);
+            if key.is_empty() {
+                continue;
+            }
+            let values: Vec<String> = value
+                .split('|')
+                .map(|v| v.trim().trim_matches('"').to_string())
+                .filter(|v| !v.is_empty())
+                .collect();
+            if values.is_empty() {
+                continue;
+            }
+            if section == "fonts" || section == "font" {
+                global.insert(key, values);
+            } else if !lang.is_empty() && section == lang {
+                local.insert(key, values);
+            }
+        }
+
+        for (key, values) in local {
+            global.insert(key, values);
+        }
+        if global.is_empty() {
+            return None;
+        }
+        Some(FontMap {
+            root: root.to_path_buf(),
+            entries: global,
+        })
+    }
+
+    /// 按游戏请求的文件名/路径取第一个实际存在的映射文件。
+    pub fn lookup(&self, logical: &str) -> Option<String> {
+        let key = normalize_font_key(logical);
+        let values = self.entries.get(&key)?;
+        values
+            .iter()
+            .find_map(|value| resolve_font_path(&self.root, value))
+    }
+
+    pub fn has_all(&self) -> bool {
+        FONT_NAMES.iter().all(|name| self.lookup(name).is_some())
     }
 }
 
@@ -167,14 +316,24 @@ pub fn pack_runtime_ok(root: &Path, lang: &str) -> bool {
     pack_min_runtime(root, lang) <= RUNTIME_VERSION
 }
 
-pub fn language_fonts_complete(root: &Path, lang: &str) -> bool {
+pub fn bundled_fonts_complete(root: &Path, lang: &str) -> bool {
     if lang.is_empty() {
         return false;
     }
     let dir = fonts_dir(root).join(lang);
-    FONT_NAMES
-        .iter()
-        .all(|name| dir.join(name).is_file())
+    FONT_NAMES.iter().all(|name| dir.join(name).is_file())
+}
+
+pub fn language_fonts_complete(root: &Path, lang: &str) -> bool {
+    if lang.is_empty() {
+        return false;
+    }
+    if bundled_fonts_complete(root, lang) {
+        return true;
+    }
+    FontMap::load(root, lang)
+        .map(|map| map.has_all())
+        .unwrap_or(false)
 }
 
 pub fn font_rel_dir(root: &Path, lang: &str) -> String {
@@ -205,4 +364,61 @@ pub fn wide(s: &str) -> Vec<u16> {
 
 pub fn path_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_root() -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pr2-font-map-{stamp}"));
+        fs::create_dir_all(root.join(DATA_DIR).join("fonts")).unwrap();
+        root
+    }
+
+    #[test]
+    fn font_map_parses_sections_and_resolves_paths() {
+        let root = temp_root();
+        let font = root.join("fake-cjk.ttf");
+        fs::write(&font, b"fake").unwrap();
+        let cfg = format!(
+            "[fonts]\nARIAL.TTF={}\n[zh]\nELGRECO_.TTF={}\nTiepolo_black.ttf={}\nTiepolo_bold.ttf={}\n",
+            font.display(),
+            font.display(),
+            font.display(),
+            font.display()
+        );
+        fs::write(
+            root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE),
+            cfg,
+        )
+        .unwrap();
+
+        let map = FontMap::load(&root, "zh").unwrap();
+        assert!(map.has_all());
+        assert_eq!(
+            map.lookup("fonts\\ELGRECO_.TTF").unwrap(),
+            font.to_string_lossy()
+        );
+        assert!(language_fonts_complete(&root, "zh"));
+        assert!(!language_fonts_complete(&root, "ja"));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn missing_mapping_falls_through_to_bundled_fonts() {
+        let root = temp_root();
+        let lang_dir = root.join(DATA_DIR).join("fonts").join("zh");
+        fs::create_dir_all(&lang_dir).unwrap();
+        for name in FONT_NAMES {
+            fs::write(lang_dir.join(name), b"fake").unwrap();
+        }
+        assert!(language_fonts_complete(&root, "zh"));
+        let _ = fs::remove_dir_all(&root);
+    }
 }

@@ -32,7 +32,7 @@ param(
 
     [string]$Out = 'dist',
 
-    [ValidateSet('noto', 'stitch', 'none')]
+    [ValidateSet('noto', 'stitch', 'config', 'none')]
     [string]$Fonts = 'noto',
 
     [switch]$SkipInjector,

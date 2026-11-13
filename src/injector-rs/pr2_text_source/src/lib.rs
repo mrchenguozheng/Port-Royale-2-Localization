@@ -11,8 +11,8 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, AtomicUsize, Ordering}
 use std::sync::{Mutex, OnceLock};
 
 use pr2_common::{
-    exe_dir, font_rel_dir, fonts_dir, log_dir, pack_dir, override_path, pack_path,
-    read_locale_language, valid_lang_code,
+    bundled_fonts_complete, exe_dir, font_rel_dir, log_dir, pack_dir, override_path,
+    pack_path, read_locale_language, valid_lang_code, FontMap,
 };
 use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HANDLE, HMODULE};
 use windows_sys::Win32::Storage::FileSystem::{
@@ -67,6 +67,7 @@ static RESOLVE_LOG: OnceLock<Mutex<Option<File>>> = OnceLock::new();
 static LSR_LOG: OnceLock<Mutex<Option<File>>> = OnceLock::new();
 static FONT_LOG: OnceLock<Mutex<Option<File>>> = OnceLock::new();
 static FONT_DIR: OnceLock<Option<String>> = OnceLock::new();
+static FONT_MAP: OnceLock<Option<FontMap>> = OnceLock::new();
 static GAP_SET: OnceLock<Mutex<HashSet<u32>>> = OnceLock::new();
 
 struct Pack {
@@ -1257,10 +1258,10 @@ fn font_dir() -> Option<&'static str> {
                 }
             }
             // Steam natural launch has no launcher to set PR2_FONT_DIR.
-            // Use the selected pack's font directory when it exists,
+            // Use the selected pack's font directory when it is complete,
             // otherwise keep the original fonts.
             let lang = pack_locale();
-            if fonts_dir(&root).join(&lang).is_dir() {
+            if bundled_fonts_complete(&root, &lang) {
                 Some(font_rel_dir(&root, &lang))
             } else {
                 None
@@ -1269,8 +1270,16 @@ fn font_dir() -> Option<&'static str> {
         .as_deref()
 }
 
+fn font_map() -> Option<&'static FontMap> {
+    FONT_MAP
+        .get_or_init(|| {
+            let root = exe_dir();
+            FontMap::load(&root, &pack_locale())
+        })
+        .as_ref()
+}
+
 fn redirect_font_path(input: &str) -> Option<String> {
-    let dir = font_dir()?;
     let lower = input.to_ascii_lowercase();
     let mut start = 0usize;
     let pos = loop {
@@ -1294,6 +1303,17 @@ fn redirect_font_path(input: &str) -> Option<String> {
     if !is_ttf && !lowered_rest.contains("*.*") {
         return None;
     }
+
+    // 配置映射优先；它不依赖打包字体目录，因此没有 PR2Localization\fonts\<lang>\
+    // 时也能把 fonts\ARIAL.TTF 指到系统字体。映射文件不存在或不可读时继续走
+    // 内置字体目录，最后才回退到原版 fonts\...。
+    if let Some(map) = font_map() {
+        if let Some(mapped) = map.lookup(rest) {
+            return Some(mapped);
+        }
+    }
+
+    let dir = font_dir()?;
     Some(format!("{}{}{}{}", &input[..pos], dir, sep, rest))
 }
 
@@ -1329,7 +1349,8 @@ fn font_log_path(path: &str) {
 
 unsafe fn install_font_log_hooks() {
     let fd = font_dir();
-    if !font_log_enabled() && fd.is_none() {
+    let fm = font_map();
+    if !font_log_enabled() && fd.is_none() && fm.is_none() {
         return;
     }
     if font_log_enabled() {
