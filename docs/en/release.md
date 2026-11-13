@@ -68,7 +68,9 @@ can hold several language subdirectories; the launcher selects one via `locale.i
 
 Players can also double-click `PR2LauncherGUI.exe`: pick a language from the list →
 "Launch selected language"; "Launch original" goes straight to English. The GUI merely
-calls `PR2Launcher.exe --lang=…`.
+calls `PR2Launcher.exe --lang=…`. It uses a single-column layout at a `560x400` base
+size and scales with the system DPI; the language picker, launch actions, end-process
+action and status box are kept in separate rows.
 If the game hangs on exit, use **End game process**: it only ends `PR2.exe`
 started from this folder, asks for confirmation first, and will not kill a Steam
 or other copy of the game.

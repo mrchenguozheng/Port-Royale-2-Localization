@@ -52,6 +52,10 @@ Notes:
 1. Select the target language;
 2. Click **Launch selected language**.
 
+The upper part holds the language picker and launch actions; below it are the status
+box and footer hint. The window uses a single-column layout and scales with the system
+DPI; it does not need manual resizing.
+
 If the game hangs on exit, click **End game process**. It only ends `PR2.exe`
 started from this folder and asks for confirmation first; it will not kill a
 Steam or other copy of the game.

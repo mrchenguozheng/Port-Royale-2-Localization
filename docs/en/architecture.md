@@ -147,7 +147,7 @@ After the split:
   temporary data root.
 
 Status: done. `tests/test_server_api.py` 5 tests (21 GET routes all 200, POST writes
-to the temporary root, real repository file SHAs unchanged); `check.py` 46 tests;
+to the temporary root, real repository file SHAs unchanged); at that time `check.py` 46 tests;
 `engine_text --check` reports "一致" for both zh and ja; pack SHAs match the
 pre-refactoring baseline (zh `2B209420…920F`, ja `17517FB6…FAB`).
 
@@ -155,7 +155,7 @@ pre-refactoring baseline (zh `2B209420…920F`, ja `17517FB6…FAB`).
 
 The three C++ native programs are now a Rust workspace at `src\injector-rs\`:
 
-| Crate | Output | Old implementation |
+| Crate | Output | Historical implementation (removed) |
 |---|---|---|
 | `pr2_common` | none (library) | shared parts of `pr2_fonts.h` / `pr2_locale.h` / `pr2_version.h` |
 | `pr2_text_source` | `PR2TextSource.dll` | `pr2_text_source.cpp` + `pr2_text_pack.c` |
