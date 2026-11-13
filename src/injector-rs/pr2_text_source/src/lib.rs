@@ -85,10 +85,26 @@ pub extern "system" fn DllMain(hinst: HANDLE, reason: u32, _reserved: *mut c_voi
     if reason == 1 {
         unsafe {
             DisableThreadLibraryCalls(hinst as HMODULE);
-            install_hook();
+            let th = CreateThread(
+                ptr::null(),
+                0,
+                Some(init_thread),
+                ptr::null_mut(),
+                0,
+                ptr::null_mut(),
+            );
+            if th != 0 {
+                CloseHandle(th);
+            }
         }
     }
     1
+}
+
+unsafe extern "system" fn init_thread(_: *mut c_void) -> u32 {
+    Sleep(250);
+    install_hook();
+    0
 }
 
 unsafe fn install_hook() {
@@ -988,7 +1004,8 @@ unsafe fn patch_iat_in(
             let oft = read_u32(imp) as usize;
             let ft = read_u32(imp.add(16)) as usize;
             if ft != 0 {
-                let mut oft_p = base.add(oft);
+                let lookup = if oft != 0 { oft } else { ft };
+                let mut oft_p = base.add(lookup);
                 let mut ft_p = base.add(ft) as *mut usize;
                 while read_u32(oft_p) != 0 {
                     let oft_val = read_u32(oft_p);
@@ -1311,7 +1328,8 @@ fn font_log_path(path: &str) {
 }
 
 unsafe fn install_font_log_hooks() {
-    if !font_log_enabled() && font_dir().is_none() {
+    let fd = font_dir();
+    if !font_log_enabled() && fd.is_none() {
         return;
     }
     if font_log_enabled() {
@@ -1334,6 +1352,10 @@ unsafe fn install_font_log_hooks() {
     let mut f70 = 0usize;
     let mut fcrt = 0usize;
     for m in enum_modules() {
+        let module = module_name(m);
+        if module.eq_ignore_ascii_case("d3d8.dll") {
+            continue;
+        }
         if patch_iat_in(
             m,
             b"msvcr71.dll\0",
