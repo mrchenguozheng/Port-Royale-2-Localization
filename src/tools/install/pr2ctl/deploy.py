@@ -42,22 +42,26 @@ def deploy_steps(target, langs, edition=None):
     steps = [(n, os.path.join(RUNTIME, n), os.path.join(target, n))
              for n in FLAT_FILES]
 
-    # 字体按语言分别生成在 build\runtime\fonts\<语言>\；复制到游戏 fonts\<语言>\，
-    # 不覆盖根目录的原版字体。启动器用 PR2_FONT_DIR 做重定向。
+    # 四个 TTF 平铺在 build\runtime\PR2Localization\fonts\；也兼容旧的语言子目录。
+    # 复制到游戏 PR2Localization\fonts\，不覆盖根目录的原版字体。
     font_lang = _font_lang(target, langs)
     cfg = os.path.join(RUNTIME, FONT_DIR, "font-map.ini")
     if os.path.isfile(cfg):
         steps.append(("PR2Localization\\fonts\\font-map.ini", cfg,
                       os.path.join(target, FONT_DIR, "font-map.ini")))
-    for fl in (langs or ([font_lang] if font_lang else [])):
-        font_dir = os.path.join(RUNTIME, FONT_DIR, fl)
-        if not os.path.isdir(font_dir):
-            continue
-        for name in sorted(os.listdir(font_dir)):
-            if name.lower().endswith(".ttf"):
-                steps.append(("PR2Localization\\fonts\\%s\\%s" % (fl, name),
-                              os.path.join(font_dir, name),
-                              os.path.join(target, FONT_DIR, fl, name)))
+    font_src = os.path.join(RUNTIME, FONT_DIR)
+    names = [n for n in sorted(os.listdir(font_src))
+             if n.lower().endswith(".ttf")] if os.path.isdir(font_src) else []
+    if not names and font_lang:
+        fallback = os.path.join(font_src, font_lang)
+        if os.path.isdir(fallback):
+            font_src = fallback
+            names = [n for n in sorted(os.listdir(font_src))
+                     if n.lower().endswith(".ttf")]
+    for name in names:
+        steps.append(("PR2Localization\\fonts\\%s" % name,
+                      os.path.join(font_src, name),
+                      os.path.join(target, FONT_DIR, name)))
 
     ui_src = os.path.join(RUNTIME, UI_DIR)
     if os.path.isdir(ui_src):

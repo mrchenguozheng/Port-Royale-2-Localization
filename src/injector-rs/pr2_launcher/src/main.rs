@@ -124,21 +124,19 @@ fn run() -> Result<(), i32> {
         .as_ref()
         .filter(|code| valid_lang_code(code))
         .and_then(|code| {
-            let dir = fonts_dir(&root).join(code);
-            if dir.is_dir() && bundled_fonts_complete(&root, code) {
-                Some(dir)
+            if fonts_dir(&root).is_dir() && bundled_fonts_complete(&root, code) {
+                Some(fonts_dir(&root))
             } else {
                 None
             }
         });
 
     if let Some(code) = font_lang.as_ref() {
-        if valid_lang_code(code) && fonts_dir(&root).join(code).is_dir() && font_dir.is_none()
+        if valid_lang_code(code) && fonts_dir(&root).is_dir() && font_dir.is_none()
             && !pr2_common::language_fonts_complete(&root, code)
         {
             eprintln!(
-                "[PR2Loc] PR2Localization\\fonts\\{} 字体不完整，回退到原版根目录字体",
-                code
+                "[PR2Loc] PR2Localization\\fonts 字体不完整，回退到原版根目录字体"
             );
         }
     }
@@ -147,7 +145,7 @@ fn run() -> Result<(), i32> {
         Some(_) => {
             if let Some(code) = font_lang.as_ref() {
                 std::env::set_var("PR2_FONT_DIR", code);
-                println!("[PR2Loc] 字体使用 PR2Localization\\fonts\\{code}\\（不覆盖原版）");
+                println!("[PR2Loc] 字体使用 PR2Localization\\fonts（不覆盖原版）");
             }
         }
         None => {

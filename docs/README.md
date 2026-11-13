@@ -68,7 +68,7 @@
 - 游戏语言：`PR2Localization/packs/locale.ini` 的 `language=`
 - 语言包显示名/界面语言/最低运行时：`PR2Localization/packs/<语言>.txt` 开头
   `# pack-meta alias=…` / `gui=…` / `min_runtime=…`
-- 字体：`PR2Localization/fonts/<语言>/` 四个 TTF，不覆盖 `fonts/` 根目录原版
+- 字体：`PR2Localization/fonts/` 四个 TTF，不按语言子目录，不覆盖 `fonts/` 根目录原版
 - 启动器界面翻译：`PR2Localization/ui/<语言>.ini`
 - 运行时版本：`src/injector-rs/pr2_common/src/lib.rs`；发行包根目录 `RUNTIME-VERSION`
 

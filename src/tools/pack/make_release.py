@@ -11,7 +11,7 @@
       PR2Localization/
         packs/zh.txt
         packs/locale.ini
-        fonts/zh/ARIAL.TTF ...    # Noto 替换字体（默认）
+        fonts/ARIAL.TTF ...        # 四个静态字体平铺（默认）
         ui/zh.ini
         logs/
       README.txt
@@ -21,7 +21,9 @@ GOG 版不带宿主 DLL；Steam 版带 Ascaron.Logging-2.6.dll 代理，安装�
 必须先把原版备份成 Ascaron.Logging-2.6.orig.dll。PR2HostMount.ps1 负责
 校验大小/哈希、备份、挂载和还原；校验不通过时不会覆盖原文件。
 发行包不包含游戏本体，也不包含缝合字体。想用原版字形的人可以走
-``--fonts stitch``（仅自用/私有包，不要公开分发）。
+``--fonts stitch``（仅自用/私有包，不要公开分发）。字体模式：
+``noto`` 默认静态 Noto，并附带 font-map.ini；``config`` 只带 font-map.ini；
+``none`` 不带字体。
 
     python src\\tools\\pack\\make_release.py --lang zh --edition gog --version v1.0.0
     python src\\tools\\pack\\make_release.py --lang zh --edition steam --version v1.0.0
@@ -81,40 +83,65 @@ def copy_runtime(stage, edition, log):
         log("复制 %s" % name)
 
 
+def copy_font_map(stage, log):
+    src = os.path.join(SRC, "font-map.ini")
+    if not os.path.isfile(src):
+        raise FileNotFoundError("缺字体映射模板：%s" % src)
+    dst = os.path.join(stage, DATA_DIR, "fonts", "font-map.ini")
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    shutil.copy2(src, dst)
+    log("复制字体映射（配置优先）")
+
+
+def copy_fonts_flat(src_dir, flat_dir, log):
+    if not os.path.isdir(src_dir):
+        raise FileNotFoundError("缺字体目录：%s" % src_dir)
+    os.makedirs(flat_dir, exist_ok=True)
+    n = 0
+    for name in os.listdir(src_dir):
+        src = os.path.join(src_dir, name)
+        if os.path.isfile(src) and name.lower().endswith(".ttf"):
+            shutil.copy2(src, os.path.join(flat_dir, name))
+            n += 1
+    if n != 4:
+        raise FileNotFoundError(
+            "字体不完整：%s 下应有 4 个 TTF，实际 %d 个" % (src_dir, n))
+    log("平铺字体 %d 个文件到 PR2Localization\\fonts\\" % n)
+
+
 def copy_fonts(lang, stage, mode, log, cache=True):
     if mode == "none":
         log("跳过字体（发行包不含字体）")
         return
     if mode == "config":
-        src = os.path.join(SRC, "font-map.ini")
-        if not os.path.isfile(src):
-            raise FileNotFoundError("缺字体映射模板：%s" % src)
-        dst = os.path.join(stage, DATA_DIR, "fonts", "font-map.ini")
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.copy2(src, dst)
-        log("复制字体映射（不打包字体文件）")
+        copy_font_map(stage, log)
+        log("不打包字体文件")
         return
-    dst = os.path.join(stage, DATA_DIR, "fonts", lang)
+    flat = os.path.join(stage, DATA_DIR, "fonts")
     from build_artifacts import build_fonts
-    out_base = os.path.join(stage, DATA_DIR, "fonts")
     if mode == "stitch":
         ok, msg = build_fonts([lang], out_dir=None, mode="stitch", log=log)
         if not ok:
             raise FileNotFoundError(msg)
-        shutil.copytree(os.path.join(RUNTIME, DATA_DIR, "fonts", lang),
-                        dst, dirs_exist_ok=True)
+        copy_fonts_flat(os.path.join(RUNTIME, DATA_DIR, "fonts", lang),
+                        flat, log)
         log("复制缝合字体（仅限私有/自用包）")
+        copy_font_map(stage, log)
         return
 
-    ok, msg = build_fonts([lang], out_dir=out_base, mode="noto",
+    ok, msg = build_fonts([lang], out_dir=flat, mode="noto",
                           log=log, cache=cache)
     if not ok:
         raise RuntimeError(msg)
-    # 字体目录只留 TTF；来源说明移到包根，避免游戏扫描 PR2Localization\fonts\<语言>\*.* 时
-    # 看到无关的 .txt。
-    notice = os.path.join(dst, "NOTO-SOURCES.txt")
+    src_lang = os.path.join(flat, lang)
+    # 来源说明移到包根；游戏会扫描 fonts\*.*，不应看到无关文本。
+    notice = os.path.join(src_lang, "NOTO-SOURCES.txt")
     if os.path.isfile(notice):
         shutil.move(notice, os.path.join(stage, "NOTO-SOURCES.txt"))
+    copy_fonts_flat(src_lang, flat, log)
+    shutil.rmtree(src_lang)
+    copy_font_map(stage, log)
+    log("复制 Noto 静态字体（配置映射失败时兜底）")
 
 
 def write_runtime_version(stage, log):
@@ -128,7 +155,7 @@ def write_readme(lang, stage, mode, edition):
     label = LABELS.get(lang, lang)
     edition_label = "GOG 版" if edition == "gog" else "Steam 版"
     font_line = {
-        "noto": "字体：Noto Sans / Noto Serif（SIL OFL 1.1），完整字体，未裁剪。",
+        "noto": "字体：Noto Sans / Noto Serif（SIL OFL 1.1），完整静态字体，未裁剪；另带 font-map.ini。",
         "stitch": "字体：本地缝合版（仅限自用，不要公开分发）。",
         "none": "字体：本包不含字体，请自行准备中/日文字体。",
         "config": "字体：PR2Localization\\fonts\\font-map.ini 映射系统字体；非拉丁系默认 Noto，不打包字体文件。",
@@ -156,32 +183,34 @@ def write_readme(lang, stage, mode, edition):
         support_line = "支持游戏版本：Steam 英文 1.1.2.3 已实测（宿主 DLL 代理，中文界面）；GOG 请下载 GOG 版。"
     if mode == "config":
         font_help = """字体：
-  本包不含字体文件。PR2Localization\\fonts\\font-map.ini 把游戏请求的逻辑字体名
+  本包不含字体文件。
+  PR2Localization\\fonts\\font-map.ini 把游戏请求的逻辑字体名
   （ARIAL.TTF、ELGRECO_.TTF、Tiepolo_black.ttf、Tiepolo_bold.ttf）映射到系统字体。
-  按当前语言包的 [zh] / [ja] 节读取，[fonts] 提供全局默认；支持 %WINDIR% 和 | 候选。
-  非拉丁系默认映射 Noto Sans/Serif SC 或 JP，优先静态字重，没有静态文件时使用 -VF.ttf；
-  不使用 .ttc 集合。
+  按当前语言包的 [zh] / [ja] 节读取，[fonts] 提供全局默认；支持 %%WINDIR%% 和 | 候选。
+  非拉丁系默认映射 Noto Sans/Serif SC 或 JP；只接受静态字重文件，
+  不使用 .ttc 或 -VF.ttf 可变字体。
   没有映射、映射文件缺失或候选文件不存在时，回退到
-  PR2Localization\\fonts\\<语言>\\，最后回退根目录原版 fonts\\...
+  PR2Localization\\fonts\\，最后回退根目录原版 fonts\\...
 
   如果启动器提示“字体缺失”：
-  1. 确认 font-map.ini 里四个逻辑字体名都有映射，且路径指向真实存在的字体文件。
-  2. 确认 %WINDIR%\\Fonts\\ 下确实有配置的字体；精简 Windows 可能没有中日字体。
-  3. 可以把候选改成 %WINDIR%\\Fonts\\msyh.ttc 或单个 .ttf；多个候选用 | 分隔。
+  1. 确认 font-map.ini 里四个逻辑字体名都有映射，且路径指向真实存在的静态字体文件。
+  2. 确认 %%WINDIR%%\\Fonts\\ 下确实有配置的字体；精简 Windows 可能没有中日字体。
+  3. 可以改用静态 .ttf 文件；多个候选用 | 分隔。不要使用 .ttc 或 -VF.ttf。
   4. 修改后重新启动游戏，字体映射只在启动时读取一次。"""
     else:
         font_help = """字体：
-  字体在 PR2Localization\\fonts\\<语言>\\；DLL 通过路径重定向读取，不覆盖根目录原版。
-  同一目录可以放多个语言（PR2Localization\\fonts\\zh、PR2Localization\\fonts\\ja），
-  按 locale.ini 或启动器 --lang 选择。
+  字体在 PR2Localization\\fonts\\；DLL 通过路径重定向读取，不覆盖根目录原版。
+  不按语言单开子目录；同一次安装只放一个语言的四个 TTF。
+  PR2Localization\\fonts\\font-map.ini 会优先映射系统静态字体；映射不存在或不可用时
+  回退到上面的内置字体，最后回退根目录原版。
 
   如果启动器提示“字体缺失”：
-  1. 确认 PR2Localization\\fonts\\<语言>\\ 下四个文件都在：
+  1. 确认 PR2Localization\\fonts\\ 下四个文件都在：
      ARIAL.TTF、ELGRECO_.TTF、Tiepolo_black.ttf、Tiepolo_bold.ttf
   2. 从压缩包重新解压 PR2Localization 目录；只复制 packs 里的语言包不够。
-  3. 不要把字体放到 PR2Localization\\fonts\\ 根目录；根目录保留原版。
+  3. 四个 TTF 平铺在 PR2Localization\\fonts\\，不要多包一层语言子目录。
   4. 检查杀毒软件是否隔离了字体文件。
-  5. 确认 PR2Localization\\packs\\<语言>.txt、PR2Localization\\fonts\\<语言>\\、
+  5. 确认 PR2Localization\\packs\\<语言>.txt、PR2Localization\\fonts\\、
      locale.ini 的语言代码一致。
   仍要启动会回退原版拉丁字体，中文可能缺字。"""
     if mode in ("noto", "stitch"):

@@ -570,7 +570,7 @@ impl App {
             if !language_fonts_complete(&self.root, code) {
                 let text = self
                     .strings
-                    .tf("error.font_missing", &[Arg::Str(code.to_string())]);
+                    .tf("error.font_missing", &[]);
                 if !self.confirm(&text) {
                     return;
                 }

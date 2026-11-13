@@ -37,7 +37,8 @@ $InjectorScript = Join-Path $Src 'build_injector.ps1'
 $TranslationScript = Join-Path $Src 'build_translation.ps1'
 
 function Get-PwshPath {
-    $cmd = Get-Command pwsh.exe -CommandType Application -ErrorAction SilentlyContinue
+    $cmd = Get-Command pwsh.exe -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
     if ($cmd) { return $cmd.Source }
 
     $local = Join-Path $PSHOME 'pwsh.exe'

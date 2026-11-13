@@ -30,7 +30,7 @@ const BUILTIN: &[(&str, &str)] = &[
     ("error.launch_failed", "Failed to start PR2Localization.exe."),
     ("error.kill_failed", "Failed to end PR2.exe (error %lu)."),
     ("error.exit_code", "Launcher exit code %lu; the game did not start."),
-    ("error.font_missing", "PR2Localization\\fonts\\%s\\ has no TTF fonts."),
+    ("error.font_missing", "PR2Localization\\fonts\\ has no TTF fonts."),
     (
         "error.pack_too_new",
         "Language pack needs a newer launcher (runtime v%d, current v%d).",

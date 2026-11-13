@@ -54,9 +54,9 @@ Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
 - 运行时语言包是 `PR2Localization/packs/<语言>.txt`，格式为 `0x... = text` 一行一条；不要把旧的
   `|` 换行兜底重新加回来。需要换行时用引擎标签/已有规则，不要自行发明格式。
 - `PR2Localization/packs/locale.ini` 的 `language=` 是游戏默认语言，也是 GUI 的唯一语言状态。
-- `PR2Localization/fonts/<语言>/` 固定四个 TTF；不要覆盖游戏根目录 `fonts/` 的原版字体。
-  可选 `PR2Localization/fonts/font-map.ini` 把逻辑字体名映射到系统字体，配置优先于内置字体；
-非拉丁系默认映射 Noto 对应字体，不使用 `.ttc` 集合。
+- `PR2Localization/fonts/` 固定四个 TTF；不按语言单开子目录，也不要覆盖游戏根目录 `fonts/` 的原版字体。
+  同一安装只放一个语言的字体；`font-map.ini` 按语言节选择具体文件或系统字体，配置优先于内置字体；
+非拉丁系默认映射 Noto 对应字体，只接受静态字重，不使用 `.ttc` 或 `-VF.ttf`。
 - 译文里的 hash id、`%1` 等占位符、`@D$...$` 脚本变量、`<n>`、`<c>`、`<f:...>` 标签
   都不是可翻译文本；改译文时保持原样。
 - 字体路径、语言包路径和 GUI 文案的详细规则见

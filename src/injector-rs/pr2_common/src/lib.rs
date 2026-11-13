@@ -131,8 +131,9 @@ fn resolve_font_path(root: &Path, value: &str) -> Option<String> {
     if expanded.trim().is_empty() {
         return None;
     }
-    // 不把 .ttc 集合交给游戏字体读取器：它是否能处理集合尚未验证，默认跳过。
-    if expanded.to_ascii_lowercase().ends_with(".ttc") {
+    // 不把 .ttc 集合或 -VF.ttf 可变字体交给游戏字体读取器：两者都未验证/不接受。
+    let lower = expanded.to_ascii_lowercase();
+    if lower.ends_with(".ttc") || lower.contains("-vf.ttf") {
         return None;
     }
     let path = PathBuf::from(expanded);
@@ -324,7 +325,7 @@ pub fn bundled_fonts_complete(root: &Path, lang: &str) -> bool {
     if lang.is_empty() {
         return false;
     }
-    let dir = fonts_dir(root).join(lang);
+    let dir = fonts_dir(root);
     FONT_NAMES.iter().all(|name| dir.join(name).is_file())
 }
 
@@ -340,15 +341,15 @@ pub fn language_fonts_complete(root: &Path, lang: &str) -> bool {
         .unwrap_or(false)
 }
 
-pub fn font_rel_dir(root: &Path, lang: &str) -> String {
-    let new = root.join(DATA_DIR).join("fonts").join(lang);
-    let old = root.join("fonts").join(lang);
+pub fn font_rel_dir(root: &Path, _lang: &str) -> String {
+    let new = root.join(DATA_DIR).join("fonts");
+    let old = root.join("fonts");
     if new.is_dir() {
-        format!("{}\\fonts\\{}", DATA_DIR, lang)
+        format!("{}\\fonts", DATA_DIR)
     } else if old.is_dir() {
-        format!("fonts\\{}", lang)
+        "fonts".to_string()
     } else {
-        format!("{}\\fonts\\{}", DATA_DIR, lang)
+        format!("{}\\fonts", DATA_DIR)
     }
 }
 
@@ -431,9 +432,25 @@ mod tests {
     }
 
     #[test]
+    fn font_map_skips_variable_fonts() {
+        let root = temp_root();
+        let variable = root.join("fake-cjk-VF.ttf");
+        fs::write(&variable, b"fake").unwrap();
+        let cfg = format!("[zh]\nARIAL.TTF={}\n", variable.display());
+        fs::write(
+            root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE),
+            cfg,
+        )
+        .unwrap();
+        let map = FontMap::load(&root, "zh").unwrap();
+        assert!(map.lookup("fonts\\ARIAL.TTF").is_none());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
     fn missing_mapping_falls_through_to_bundled_fonts() {
         let root = temp_root();
-        let lang_dir = root.join(DATA_DIR).join("fonts").join("zh");
+        let lang_dir = root.join(DATA_DIR).join("fonts");
         fs::create_dir_all(&lang_dir).unwrap();
         for name in FONT_NAMES {
             fs::write(lang_dir.join(name), b"fake").unwrap();
