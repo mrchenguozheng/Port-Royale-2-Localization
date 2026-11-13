@@ -38,13 +38,12 @@ PACK_OUT = os.path.join(RUNTIME, "PR2Localization", "packs")
 LOCALE_INI = os.path.join(SRC, "locale.ini")
 
 # 直接复制进游戏目录的文件。名字以 PR2Localization 开头，
-# 和游戏原版文件区分；Steam 的代理构建产物叫 PR2LocalizationProxy.dll，
-# 部署时必须改名成 VERSION.dll —— PR2.exe 的导入表固定要求这个名字。
+# 和游戏原版文件区分。Steam 的宿主 DLL 由 steam_host.py 单独处理：
+# 它要先把原版 Ascaron.Logging-2.6.dll 备份，再覆盖，不能走这里。
 FLAT_FILES = (
     "PR2Localization.exe",
     "PR2LocalizationGUI.exe",
     "PR2LocalizationCore.dll",
-    "VERSION.dll",
 )
 # 运行时数据目录；语言包、字体、UI、日志都放在它下面。
 DATA_DIR = "PR2Localization"
@@ -110,7 +109,6 @@ PATCH_ITEMS = (
     "PR2Localization.exe",
     "PR2LocalizationGUI.exe",
     "PR2LocalizationCore.dll",
-    "VERSION.dll",
     "PR2Localization\\",
 )
 

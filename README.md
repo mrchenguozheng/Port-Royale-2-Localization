@@ -12,16 +12,20 @@
 
 不需要安装器、不需要 Python、不需要编译。
 
-1. 确认是 **GOG 英文版 `1.1.2.3`**，或 Steam 英文版（实验性）；
+1. 确认是 **GOG 英文版 `1.1.2.3`**，或 Steam 英文版 `1.1.2.3`（宿主 DLL 入口）；
 2. 从 Release 下载对应语言和入口的 zip：GOG 版是 `PR2-zh-gog-v1.0.0.zip`，
    Steam 版是 `PR2-zh-steam-v1.0.0.zip`；
 3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
 4. GOG 双击 `PR2LocalizationGUI.exe`，选语言后点「以所选语言启动」；
-   Steam 从 Steam 启动游戏；
+   Steam 先在游戏根目录运行 `PR2HostMount.ps1 -Action Mount`，再从 Steam 启动游戏；
 5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... overrides`。
 
-GOG 包刻意不含 `VERSION.dll`；Steam 包才带，供 `PR2.exe` 自然加载代理。
-GOG 从旧包升级时，根目录残留的 `VERSION.dll` 可以删除，GOG 不加载它。
+GOG 包刻意不含 `VERSION.dll`。Steam 包不带 `VERSION.dll`，而是带
+`Ascaron.Logging-2.6.dll` 宿主代理和 `PR2HostMount.ps1`：挂载脚本先校验原版
+`Ascaron.Logging-2.6.dll` 的 `11,776 B` / SHA-256，通过后备份成
+`Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\`，再换代理；
+原版大小或哈希不对时脚本停止，不强行覆盖。GOG 从旧包升级时，根目录残留的
+`VERSION.dll` 可以删除，GOG 不加载它。
 GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析到
 `C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入游戏进程，结果是原版英文。
 `PR2Localization.exe` / `PR2LocalizationGUI.exe` 是 GOG 的正式入口，负责注入
@@ -43,13 +47,14 @@ GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析�
 | 游戏版本 | 状态 |
 |---|---|
 | **GOG 英文 `1.1.2.3`** | ✅ 已实测（`PR2LocalizationGUI` 入口） |
-| **Steam 英文（当前测试目录）** | 🟡 实验性：`VERSION.dll` 代理加载链已构建，待进游戏验证 |
+| **Steam 英文 `1.1.2.3`** | ✅ 已实测（宿主 `Ascaron.Logging-2.6.dll` 代理，中文界面） |
 | GOG 法语 `1.1.2.42` | ❌ 不支持（只用作翻译参照） |
 | 其他版本 | ❌ 不支持 |
 
-Steam 版不再依赖启动器远程注入：`PR2.exe` 导入 `VERSION.dll`，本项目的
-`VERSION.dll` 转发系统 version API，并在工作线程里加载同目录
+Steam 版不再尝试 `VERSION.dll` 自然加载：`PR2.exe` 静态导入
+`Ascaron.Logging-2.6.dll`，本项目的代理接管这个导出，并在工作线程里加载同目录
 `PR2LocalizationCore.dll`；后者等待 `A2dLib-2.20A.dll` 后再装 hook。
+挂载和还原都经过 `Ascaron.Logging-2.6.dll` 的大小/SHA-256 校验，未知文件不覆盖。
 未验证的版本不要反馈“汉化已支持”，先附 `PR2Localization\logs\runtime.log` 和
 `PR2Localization\logs\proxy.log`。
 
@@ -57,7 +62,7 @@ Steam 版不再依赖启动器远程注入：`PR2.exe` 导入 `VERSION.dll`，�
 
 ## 开发者：构建与翻译
 
-需要 Rust（rustup + `i686-pc-windows-msvc` target）+ Python 3.11 以上（当前用 3.15）+ PowerShell 7（`pwsh`）。
+需要 Rust（rustup + `i686-pc-windows-msvc` target）+ Python 3.11 以上（当前用 3.15）+ PowerShell 7（`pwsh`）+ Visual Studio 2022 C++ 工具链（编译 Steam 宿主代理）。
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1

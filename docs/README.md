@@ -2,9 +2,10 @@
 
 [项目 README](../README.md)
 
-> **GOG 英文版 `1.1.2.3` 已通过 `PR2LocalizationGUI` 入口实测；Steam 英文版为实验性支持，
-> `VERSION.dll` 代理加载链已构建，待进游戏验证。** 其他版本不在支持范围内。
-> GOG 直接双击 `PR2.exe` 会走系统 `VERSION.dll`，不是本地化入口。
+> **GOG 英文版 `1.1.2.3` 已通过 `PR2LocalizationGUI` 入口实测；Steam 英文版 `1.1.2.3` 已通过
+> 宿主 DLL 代理实测（中文界面）。** 其他版本不在支持范围内。
+> GOG 直接双击 `PR2.exe` 会走系统 `VERSION.dll`，不是本地化入口；Steam 使用
+> `Ascaron.Logging-2.6.dll` 和 `PR2HostMount.ps1`，不再使用 `VERSION.dll`。
 
 这不是项目介绍，而是“遇到问题该翻哪一份”。先看当前状态，再看历史/规范类文档。
 

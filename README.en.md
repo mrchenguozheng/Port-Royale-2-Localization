@@ -1,7 +1,7 @@
 # Port Royale 2 Localization
 
 An external localization runtime for **Port Royale 2 (GOG English `1.1.2.3` and
-Steam English, experimental)**. Language packs replace the game's UI text; the
+Steam English `1.1.2.3`)**. Language packs replace the game's UI text; the
 original `PR2.exe` is not modified.
 
 ## Supported languages
@@ -16,18 +16,25 @@ original `PR2.exe` is not modified.
 language and the fallback when a pack is missing. The launcher UI is available
 in `en`, `ja`, and `zh`.
 
-The GOG English `1.1.2.3` build is tested through `PR2LocalizationGUI.exe`. Steam
-English is experimental: the `VERSION.dll` proxy loading chain is built, but it
-still needs an in-game check. GOG French and other builds are out of scope.
+The GOG English `1.1.2.3` build is tested through `PR2LocalizationGUI.exe`. The
+Steam English `1.1.2.3` build is tested with the host-DLL proxy and a Chinese UI.
+GOG French and other builds are out of scope.
 
 On GOG, do **not** start `PR2.exe` directly: the loader resolves `VERSION.dll`
 from `C:\Windows\SysWOW64`, so the local proxy is bypassed and the game starts
-in English. Use `PR2LocalizationGUI.exe` and choose a language. Steam can use the
-local `VERSION.dll` proxy; `PR2LocalizationGUI.exe` remains available as a fallback.
+in English. Use `PR2LocalizationGUI.exe` and choose a language.
+
+Steam does not use `VERSION.dll`. `PR2.exe` statically imports
+`Ascaron.Logging-2.6.dll`; the package ships a proxy with that name plus
+`PR2HostMount.ps1`. Run `PR2HostMount.ps1 -Action Mount` once: it verifies the
+original DLL (`11,776 B`, SHA-256 `0568EC...`) and backs it up as
+`Ascaron.Logging-2.6.orig.dll` and `PR2Localization\host-backup\`, then replaces
+it. If the size or hash does not match, it stops without overwriting anything.
+Use `-Action Restore` to put the original DLL back.
 
 Release packages are split by entry point: GOG packages
-(`PR2-<lang>-gog-<version>.zip`) intentionally omit `VERSION.dll`; Steam packages
-(`PR2-<lang>-steam-<version>.zip`) include it for natural loading by `PR2.exe`.
+(`PR2-<lang>-gog-<version>.zip`) intentionally omit the host DLL; Steam packages
+(`PR2-<lang>-steam-<version>.zip`) include the host-DLL proxy and mount script.
 
 ## Documentation
 

@@ -10,12 +10,16 @@
   GOG 的正式入口是 `PR2LocalizationGUI.exe` / `PR2Localization.exe`，由启动器注入
   `PR2LocalizationCore.dll`。不要按“GOG 双击 `PR2.exe` 自然加载”做回归：GOG 加载器会把
   `VERSION.dll` 解析到 `C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入
-  `PR2.exe` 进程。Steam 的实验性自然加载路径才使用 `VERSION.dll` 代理。
-- **GOG 英文版 `1.1.2.3` 已通过启动器入口实测；Steam 英文版为实验性支持**。
+  `PR2.exe` 进程。
+- **GOG 英文版 `1.1.2.3` 已通过启动器入口实测；Steam 英文版 `1.1.2.3` 已通过宿主 DLL
+  代理实测（中文界面）**。Steam 不再走 `VERSION.dll`：`PR2.exe` 静态导入
+  `Ascaron.Logging-2.6.dll`，代理接管它的 `Log` 导出。
   GOG 法语版和其他版本不在支持范围内；不要在未支持版本上部署后把“注入不生效”
   当作本仓库回归。
-- 发行包按语言和入口拆分：GOG 版不带 `VERSION.dll`，Steam 版带 `VERSION.dll`；
-  两版都包含 `PR2LocalizationCore.dll`、语言包和字体，不需要 Python 或 Rust 工具链。
+- 发行包按语言和入口拆分：GOG 版不带宿主 DLL；Steam 版带
+  `Ascaron.Logging-2.6.dll`、`PR2HostMount.ps1`、`PR2LocalizationCore.dll`、语言包和字体，
+  不需要 Python 或 Rust 工具链。Steam 挂载必须先校验原版
+  `Ascaron.Logging-2.6.dll` 的 11,776 B / SHA-256，再备份、替换；未知文件不覆盖。
   不要把“让每个玩家自行构建”写成默认流程。
 
 ## 当前结构
@@ -24,6 +28,7 @@
 |---|---|
 | `src/injector-rs/` | Rust workspace：`pr2_common`、`pr2_proxy`、`pr2_text_source`、`pr2_launcher`、`pr2_launcher_gui` |
 | `src/injector-rs/ui/` | GUI 界面翻译 `zh.ini` / `en.ini` / `ja.ini` |
+| `src/host-proxy/` | Steam 宿主代理 C++ 源码与 MSVC 构建脚本（产物 `Ascaron.Logging-2.6.dll`） |
 | `src/translations/` | 唯一手改译文层：`zh.toml`、`ja.toml` 等 |
 | `src/editor/` | 最小译文编辑器：Astro 前端 + `server.py` + `api/` 分域模块 |
 | `src/tools/` | 语言包编译、字体、部署、校验和分析工具 |
@@ -33,15 +38,15 @@
 
 Rust 产物：
 
-- `PR2LocalizationProxy.dll`（构建产物；部署时必须改名为 `VERSION.dll`）
-- `VERSION.dll`
 - `PR2LocalizationCore.dll`
 - `PR2Localization.exe`
 - `PR2LocalizationGUI.exe`
+- `PR2LocalizationProxy.dll`（旧 `VERSION.dll` 代理构建；Steam 发行包已不再使用）
 
-`VERSION.dll` 是代理宿主，不是游戏原文件；它必须和 `PR2LocalizationCore.dll` 同目录。
-不要用裸 `LoadLibraryExW("version.dll")` 找系统 DLL，可能递归到代理自身；
-用 `GetSystemDirectoryW` 拼绝对路径。
+Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
+`src/tools/install/PR2HostMount.ps1`。代理不是游戏原文件；原版备份为
+`Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\Ascaron.Logging-2.6.dll`，
+不要在未校验原版大小/哈希时覆盖。
 
 ## 不可破坏的契约
 

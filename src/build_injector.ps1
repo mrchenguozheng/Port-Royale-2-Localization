@@ -9,11 +9,10 @@
 #    PR2LocalizationCore.dll
 #    PR2Localization.exe
 #    PR2LocalizationGUI.exe
-#    VERSION.dll            (the proxy must keep this name for PR2.exe)
+#    VERSION.dll            (legacy proxy; Steam packages no longer ship it)
 #
-#  VERSION.dll is the proxy host that lets the game load
-#  PR2LocalizationCore.dll naturally under Steam, without a launcher
-#  or remote injection.
+#  Also builds the Steam host proxy from src\host-proxy:
+#    Ascaron.Logging-2.6.dll
 #
 #  Runtime data lives under build\runtime\PR2Localization\:
 #    packs\ fonts\ ui\ logs\
@@ -95,6 +94,14 @@ try {
 }
 
 if ($code -ne 0) { Stop-WithError 'FAILED. See the errors above.' }
+
+$HostProxyBuild = Join-Path $Src 'host-proxy\build.ps1'
+if (Test-Path -LiteralPath $HostProxyBuild -PathType Leaf) {
+    Write-Host ''
+    Write-Host '[build] 编译 Steam 宿主代理'
+    & $HostProxyBuild -NoPause
+    if ($LASTEXITCODE -ne 0) { Stop-WithError '宿主代理编译失败。' }
+}
 
 $Out = Join-Path $RustDir 'target\i686-pc-windows-msvc\release'
 $artifactMap = @{

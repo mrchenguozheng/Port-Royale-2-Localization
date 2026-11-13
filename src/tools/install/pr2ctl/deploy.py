@@ -2,6 +2,13 @@
 """pr2ctl.deploy —— 把构建产物复制进游戏目录。"""
 
 from .base import *  # noqa: F401,F403
+from . import steam_host
+
+
+def edition_of(target, edition=None):
+    """显式传入优先；否则按 Steam 宿主 DLL 或 PR2.exe 哈希判断。"""
+    return edition or steam_host.detect_edition(target)
+
 
 def _font_lang(target, langs):
     """部署哪一套字体：优先游戏当前 locale，否则选中的第一个语言。"""
@@ -24,13 +31,14 @@ def _font_lang(target, langs):
     return langs[0]
 
 
-def deploy_steps(target, langs):
+def deploy_steps(target, langs, edition=None):
     """列出复制要做的事，供进度条按步推进。
 
     langs 给出时只复制这些语言的语言包 —— build\\runtime\\PR2Localization\\packs 是累积
     目录，里面可能还留着上一次构建的其他语言，整目录照搬会把
     locale.ini 根本没指向的语言也塞进游戏。langs 为 None 时整目录复制。
     """
+    edition = edition_of(target, edition)
     steps = [(n, os.path.join(RUNTIME, n), os.path.join(target, n))
              for n in FLAT_FILES]
 
@@ -65,6 +73,12 @@ def deploy_steps(target, langs):
         if os.path.isfile(src):
             steps.append(("%s\\%s" % (PACK_DIR, name), src,
                           os.path.join(target, PACK_DIR, name)))
+
+    if edition == "steam":
+        # 宿主代理最后复制：前面的文件失败时，原版 DLL 还没有被替换。
+        steps.append((steam_host.HOST_DLL,
+                      os.path.join(RUNTIME, steam_host.HOST_DLL),
+                      os.path.join(target, steam_host.HOST_DLL)))
     return steps
 
 
@@ -125,19 +139,27 @@ def prune_stale_pack(target, langs):
     return removed
 
 
-def deploy(target, langs=None):
+def deploy(target, langs=None, edition=None):
     """把构建产物复制到 target。返回 (是否成功, 说明)。"""
     if not writable(target):
         return False, (
             "无法写入该目录。\n\n"
             "最常见的原因是游戏正在运行 —— 请先关闭 Port Royale 2 再试。"
         )
+    edition = edition_of(target, edition)
+    try:
+        if edition == "steam":
+            # 先验证原版并建立 .orig / host-backup 备份；失败就完全不改目录。
+            steam_host.prepare_mount(target)
+    except steam_host.HostError as exc:
+        return False, "Steam 宿主 DLL 检查失败，未挂载：\n\n%s" % exc
+
     copied, same, failed = [], [], []
     try:
         for name in prune_stale_pack(target, langs):
             same.append("%s（已移除）" % name)
 
-        for label, src, dst in deploy_steps(target, langs):
+        for label, src, dst in deploy_steps(target, langs, edition):
             if src is None:                        # 目录本身
                 os.makedirs(dst, exist_ok=True)
                 continue
@@ -145,6 +167,11 @@ def deploy(target, langs=None):
             name = os.path.basename(dst)
             (copied if r == "copied" else same if r == "same" else failed).append(name)
 
+        if edition == "steam" and not failed:
+            steam_host.write_manifest(target)
+
+    except steam_host.HostError as exc:
+        return False, "Steam 宿主 DLL 清单写入失败：\n\n%s" % exc
     except PermissionError:
         return False, "权限不足。请确认游戏已关闭，且该目录允许写入。"
     except OSError as exc:
@@ -152,19 +179,27 @@ def deploy(target, langs=None):
 
     if failed:
         return False, "以下文件复制失败：%s\n\n请确认游戏已关闭。" % "、".join(failed)
+    extra = ""
+    if edition == "steam":
+        extra = (
+            "\n\nSteam 宿主：原版已备份为 %s 和 %s；"
+            "还原时先把 .orig.dll 复制回 %s。"
+            % (steam_host.HOST_ORIG, steam_host.HOST_BACKUP,
+               steam_host.HOST_DLL)
+        )
     return True, (
         "已复制到：\n%s\n\n"
         "新复制：%s\n未改动：%s\n\n"
         "点「启动游戏（已注入）」即可启动，或以后手动运行这个目录下的\n"
-        "%s。语言包在游戏启动时读取，改完翻译重新构建再复制一次即可。"
+        "%s。语言包在游戏启动时读取，改完翻译重新构建再复制一次即可。%s"
         % (target,
            "、".join(copied) or "（无）",
            "、".join(same) or "（无）",
-           LAUNCHER)
+           LAUNCHER, extra)
     )
 
 
-def run_deploy(target, langs, events):
+def run_deploy(target, langs, events, edition=None):
     """部署线程主体，逐步推进进度条。任何一步失败就停下。"""
     try:
         if not writable(target):
@@ -173,10 +208,20 @@ def run_deploy(target, langs, events):
             events.put(("deploy_failed", ""))
             return
 
+        edition = edition_of(target, edition)
+        if edition == "steam":
+            try:
+                steam_host.prepare_mount(target)
+                events.put(("line", "已校验并备份 Steam 宿主 DLL"))
+            except steam_host.HostError as exc:
+                events.put(("line", "Steam 宿主检查失败，未挂载：%s" % exc))
+                events.put(("deploy_failed", ""))
+                return
+
         for name in prune_stale_pack(target, langs):
             events.put(("line", "移除 %s\\%s（本次不装）" % (PACK_DIR, name)))
 
-        steps = deploy_steps(target, langs)
+        steps = deploy_steps(target, langs, edition)
         for i, (label, src, dst) in enumerate(steps, 1):
             events.put(("deploy_step", (i, len(steps), label)))
             if src is None:
@@ -194,7 +239,14 @@ def run_deploy(target, langs, events):
                 events.put(("deploy_failed", ""))
                 return
 
+        if edition == "steam":
+            steam_host.write_manifest(target)
+            events.put(("line", "已写入 Steam 宿主挂载清单"))
+
         events.put(("deploy_ok", target))
+    except steam_host.HostError as exc:
+        events.put(("line", "Steam 宿主清单写入失败：%s" % exc))
+        events.put(("deploy_failed", ""))
     except Exception as exc:                      # 兜底，别让线程静默死掉
         events.put(("line", "部署出错：%s" % exc))
         events.put(("deploy_failed", ""))

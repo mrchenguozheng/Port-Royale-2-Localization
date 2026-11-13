@@ -17,7 +17,9 @@
       README.txt
       OFL.txt
 
-GOG 版不带 VERSION.dll；Steam 版额外带 VERSION.dll，供 PR2.exe 自然加载。
+GOG 版不带宿主 DLL；Steam 版带 Ascaron.Logging-2.6.dll 代理，安装时
+必须先把原版备份成 Ascaron.Logging-2.6.orig.dll。PR2HostMount.ps1 负责
+校验大小/哈希、备份、挂载和还原；校验不通过时不会覆盖原文件。
 发行包不包含游戏本体，也不包含缝合字体。想用原版字形的人可以走
 ``--fonts stitch``（仅自用/私有包，不要公开分发）。
 
@@ -48,7 +50,9 @@ LABELS = {"zh": "简体中文", "ja": "日本語"}
 DATA_DIR = "PR2Localization"
 FLAT_COMMON = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
                "PR2LocalizationCore.dll")
-FLAT_STEAM = FLAT_COMMON + ("VERSION.dll",)
+HOST_DLL = "Ascaron.Logging-2.6.dll"
+HOST_MOUNT_SCRIPT = "PR2HostMount.ps1"
+FLAT_STEAM = FLAT_COMMON + (HOST_DLL, HOST_MOUNT_SCRIPT)
 RUNTIME_VERSION = 1  # 与 src/injector-rs/pr2_common/src/lib.rs 的 RUNTIME_VERSION 保持一致
 
 
@@ -67,7 +71,10 @@ def build_pack(lang, stage, log):
 def copy_runtime(stage, edition, log):
     flat = FLAT_STEAM if edition == "steam" else FLAT_COMMON
     for name in flat:
-        src = os.path.join(RUNTIME, name)
+        if name == HOST_MOUNT_SCRIPT:
+            src = os.path.join(TOOLS, "install", name)
+        else:
+            src = os.path.join(RUNTIME, name)
         if not os.path.isfile(src):
             raise FileNotFoundError("缺 %s，先构建注入器" % src)
         shutil.copy2(src, os.path.join(stage, name))
@@ -121,18 +128,22 @@ def write_readme(lang, stage, mode, edition):
      本包是 GOG 版，刻意不包含 VERSION.dll；不要直接双击 PR2.exe。
      如果从旧包升级，根目录残留的 VERSION.dll 可以删除，GOG 不加载它。"""
     else:
-        install_step = """  2. Steam：从 Steam 正常启动游戏，VERSION.dll 会加载同目录的 PR2LocalizationCore.dll。
-     需要临时指定语言时，可用 PR2LocalizationGUI.exe 启动。
-  3. 如果目录里已有别的 mod 占用 VERSION.dll，先移除本包的 VERSION.dll，
-     改用 PR2LocalizationGUI.exe 启动，避免代理冲突。"""
+        install_step = """  2. Steam：解压后先运行（在游戏根目录打开 PowerShell）：
+       powershell -ExecutionPolicy Bypass -File .\\PR2HostMount.ps1 -Action Mount
+     脚本会校验原版 Ascaron.Logging-2.6.dll 的 11,776 B / SHA-256，
+     通过后备份为 Ascaron.Logging-2.6.orig.dll 和
+     PR2Localization\\host-backup\\Ascaron.Logging-2.6.dll，再换上代理。
+     大小或哈希不对时脚本会停止，不会强行覆盖。
+  3. 挂载成功后从 Steam 正常启动游戏；需要临时指定语言时，可用
+     PR2LocalizationGUI.exe 启动。"""
     if edition == "gog":
         uninstall_line = "  删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll\n  和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。"
     else:
-        uninstall_line = "  删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll、VERSION.dll\n  和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。"
+        uninstall_line = "  先运行 .\\PR2HostMount.ps1 -Action Restore 还原 Ascaron.Logging-2.6.dll，\n  再删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll、\n  PR2HostMount.ps1 和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。"
     if edition == "gog":
         support_line = "支持游戏版本：GOG 英文 1.1.2.3 已实测。本包只用于 GOG；Steam 请下载 Steam 版。"
     else:
-        support_line = "支持游戏版本：Steam 英文 1.1.2.3 为实验性支持，需进游戏后看 PR2Localization\\logs\\runtime.log 确认；GOG 请下载 GOG 版。"
+        support_line = "支持游戏版本：Steam 英文 1.1.2.3 已实测（宿主 DLL 代理，中文界面）；GOG 请下载 GOG 版。"
     text = """Port Royale 2 本地化 - %s（%s）
 
 %s
@@ -235,7 +246,7 @@ def main():
     ap.add_argument("--lang", action="append", required=True,
                     help="语言代码，可重复")
     ap.add_argument("--edition", choices=("gog", "steam"), required=True,
-                    help="发行入口：gog 不带 VERSION.dll；steam 带 VERSION.dll")
+                    help="发行入口：gog 不带宿主 DLL；steam 带宿主 DLL 和挂载脚本")
     ap.add_argument("--version", default="dev")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
     ap.add_argument("--fonts", choices=("noto", "stitch", "none"), default="noto")
