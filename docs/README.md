@@ -29,7 +29,7 @@ document set was removed on purpose; the Japanese *game* translation
 
 | Document | When to read |
 |---|---|
-| [Architecture](en/architecture.md) | Layers, file contracts, refactor record, remaining boundaries |
+| [Architecture](en/architecture.md) | Layers, file contracts, current boundaries, known issues |
 | [Editor API contract](en/agent-api.md) | 41 HTTP routes for agent reads/writes, checks, build/deploy |
 | [Injector](en/injection.md) | How the DLL hooks text lookups and how the launcher injects it |
 | [Translations & packs](en/translation-and-packs.md) | TOML format, `hash = text`, editor workflow |
@@ -56,6 +56,12 @@ These are detailed analysis documents kept in Chinese:
 | [中文分词方案](中文分词方案.md) | Build-time word spacing: character budget, tokenizer priority, non-goals |
 | [中文文本改动对比](中文文本改动对比.md) | Historical Chinese text diffs |
 | [CSV data](csv/README.md) | Analysis, voice, review and generated CSV files |
+
+## History
+
+| Document | Contents |
+|---|---|
+| [Refactoring history](en/refactor-history.md) | Completed phases, old route changes and the C++ migration comparison |
 
 ## Current contracts
 
