@@ -30,6 +30,7 @@ document set was removed on purpose; the Japanese *game* translation
 | Document | When to read |
 |---|---|
 | [Architecture](en/architecture.md) | Layers, file contracts, current boundaries, known issues |
+| [Agent maintenance guide](../AGENTS.md) | Boundaries, commands, documentation and acceptance rules for agents |
 | [Editor API contract](en/agent-api.md) | 41 HTTP routes for agent reads/writes, checks, build/deploy |
 | [Injector](en/injection.md) | How the DLL hooks text lookups and how the launcher injects it |
 | [Translations & packs](en/translation-and-packs.md) | TOML format, `hash = text`, editor workflow |
