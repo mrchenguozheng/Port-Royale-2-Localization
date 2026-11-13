@@ -180,7 +180,18 @@ Verification:
 - a fake 32-bit `PR2.exe` plus `PR2Launcher.exe --lang=zh` injects successfully; the DLL log
   reports `pack 'zh' ...: 3548 overrides`;
 - `build\runtime\PR2LauncherGUI.exe` launches and shows the pack count in Chinese;
+- the GUI uses a single-column layout at a `560x400` base size, scales with system DPI,
+  and shows title/subtitle, language pack row, launch/vanilla/refresh row, a separate
+  end-process button, status box and footer hint; all controls fit inside the client
+  area in the Chinese and Japanese UI.
 - `python src\tools\check.py` passes 55 tests and `tests.test_quick` passes 9.
+
+Known issue (recorded, not fixed): after finishing the first tutorial campaign and
+clicking exit, `PR2.exe` may stay alive with a black or white residual window, sometimes
+with an MSVC Runtime Error dialog. It has reproduced with the original English build,
+the GUI-launched original build, and the Chinese build; a single successful original
+exit is not enough to rule it out. No crash dump for that path is available yet. The
+GUI's end-process action is only a fallback.
 
 Not yet verified: the three hooks inside the real game (`A2dLib-2.20A.dll` IAT / vtable /
 ResolveByHash). The fake host does not load A2dLib, so `A2dLib not loaded` and

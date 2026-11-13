@@ -21,6 +21,11 @@ The source lives in `src\injector-rs\` (a Rust workspace); the build script is i
 | `PR2TextSource.dll` | Main logic. Hooks the engine's three string-lookup paths and substitutes the translations |
 | `PR2Packs\` | Language pack directory. Holds packs and configuration; the text can be edited directly, no rebuild required |
 
+The GUI uses a single-column layout (`560x400` base at 96 DPI), scales with the system
+DPI, and keeps the language picker, launch actions, the separate end-process action
+and the status box in distinct rows. The footer hint is localized through the
+`subtitle` and `hint.footer` keys in `ui/*.ini`.
+
 ---
 
 ## How it works

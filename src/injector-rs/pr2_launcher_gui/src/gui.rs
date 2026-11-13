@@ -7,16 +7,25 @@ use pr2_common::{
 };
 use windows_sys::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::Globalization::GetUserDefaultUILanguage;
-use windows_sys::Win32::Graphics::Gdi::{COLOR_BTNFACE, HBRUSH};
+use windows_sys::Win32::Graphics::Gdi::{
+    CreateFontW, DeleteObject, GetDC, GetDeviceCaps, GetStockObject, HDC, ReleaseDC, SetBkMode,
+    SetTextColor, CLEARTYPE_QUALITY, COLOR_BTNFACE, DEFAULT_CHARSET, DEFAULT_PITCH, FF_DONTCARE,
+    FW_BOLD, FW_NORMAL, HBRUSH, LOGPIXELSX, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, TRANSPARENT,
+    WHITE_BRUSH,
+};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows_sys::Win32::UI::HiDpi::{
+    SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowLongPtrW,
     LoadCursorW, MessageBoxW, PostQuitMessage, RegisterClassW, SendMessageW, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, TranslateMessage, BS_PUSHBUTTON, CB_ADDSTRING, CB_GETCURSEL,
-    CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW, CW_USEDEFAULT,
-    GWLP_USERDATA, IDC_ARROW, IDYES, MB_ICONERROR, MB_ICONWARNING, MB_YESNO, MSG, SW_SHOW,
-    WM_COMMAND, WM_CREATE, WM_DESTROY, WM_NCDESTROY, WS_CAPTION, WS_CHILD, WS_MINIMIZEBOX,
-    WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL, WNDCLASSW,
+    SetWindowTextW, ShowWindow, TranslateMessage, BS_DEFPUSHBUTTON, BS_PUSHBUTTON, CB_ADDSTRING,
+    CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW,
+    CW_USEDEFAULT, GWLP_USERDATA, IDC_ARROW, IDYES, MB_ICONERROR, MB_ICONWARNING, MB_YESNO, MSG,
+    SW_SHOW, WM_COMMAND, WM_CREATE, WM_CTLCOLORSTATIC, WM_DESTROY, WM_NCDESTROY, WM_SETFONT,
+    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP,
+    WS_VISIBLE, WS_VSCROLL, WNDCLASSW,
 };
 
 use crate::packs::{self, Pack};
@@ -29,16 +38,28 @@ const ID_VANILLA: i32 = 1003;
 const ID_REFRESH: i32 = 1004;
 const ID_STATUS: i32 = 1005;
 const ID_KILL: i32 = 1006;
+const ID_TITLE: i32 = 1007;
+const ID_SUBTITLE: i32 = 1008;
+const ID_SEPARATOR: i32 = 1009;
+const ID_HINT: i32 = 1010;
+const ST_LEFT: u32 = 0x0000;
+const ST_NOPREFIX: u32 = 0x0080;
+const ST_ETCHEDHORZ: u32 = 0x0010;
 
 struct AppInit {
     root: PathBuf,
     default_ui: String,
     strings: Strings,
+    dpi: u32,
 }
 
 struct App {
     root: PathBuf,
     hwnd: HWND,
+    title: HWND,
+    subtitle: HWND,
+    separator: HWND,
+    hint: HWND,
     combo: HWND,
     status: HWND,
     label: HWND,
@@ -49,9 +70,17 @@ struct App {
     packs: Vec<Pack>,
     strings: Strings,
     default_ui: String,
+    dpi: u32,
+    font_title: isize,
+    font_normal: isize,
+    font_small: isize,
 }
 
 pub fn run() {
+    unsafe {
+        SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    }
+    let dpi = dpi_for_system();
     let root = exe_dir();
     let default_ui = ui_for_system();
     let strings = Strings::load(&root, &default_ui);
@@ -59,6 +88,7 @@ pub fn run() {
         root,
         default_ui,
         strings,
+        dpi,
     })) as *const c_void;
 
     unsafe {
@@ -87,8 +117,8 @@ pub fn run() {
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
-            490,
-            240,
+            scale(560, dpi),
+            scale(400, dpi),
             0,
             0,
             inst,
@@ -132,6 +162,12 @@ extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRES
             }
             return 0;
         }
+        WM_CTLCOLORSTATIC => {
+            if let Some(app) = app_mut(hwnd) {
+                return app.color_static(wp as HDC, lp as HWND);
+            }
+            return unsafe { DefWindowProcW(hwnd, msg, wp, lp) };
+        }
         WM_DESTROY => {
             unsafe {
                 PostQuitMessage(0);
@@ -164,9 +200,14 @@ fn app_mut(hwnd: HWND) -> Option<&'static mut App> {
 
 impl App {
     fn new(init: AppInit) -> Self {
+        let dpi = init.dpi;
         Self {
             root: init.root,
             hwnd: 0,
+            title: 0,
+            subtitle: 0,
+            separator: 0,
+            hint: 0,
             combo: 0,
             status: 0,
             label: 0,
@@ -177,21 +218,69 @@ impl App {
             packs: Vec::new(),
             strings: init.strings,
             default_ui: init.default_ui,
+            dpi,
+            font_title: make_font(dpi, 16, FW_BOLD as i32),
+            font_normal: make_font(dpi, 10, FW_NORMAL as i32),
+            font_small: make_font(dpi, 9, FW_NORMAL as i32),
         }
     }
 
     fn create_controls(&mut self, hwnd: HWND) {
         self.hwnd = hwnd;
+        let dpi = self.dpi;
+        let px = |v: i32| scale(v, dpi);
         unsafe {
+            self.title = CreateWindowExW(
+                0,
+                wide("STATIC").as_ptr(),
+                wide(&self.strings.t("title")).as_ptr(),
+                WS_CHILD | WS_VISIBLE | ST_LEFT | ST_NOPREFIX,
+                px(24),
+                px(16),
+                px(496),
+                px(34),
+                hwnd,
+                ID_TITLE as isize,
+                0,
+                ptr::null(),
+            );
+            self.subtitle = CreateWindowExW(
+                0,
+                wide("STATIC").as_ptr(),
+                wide(&self.strings.t("subtitle")).as_ptr(),
+                WS_CHILD | WS_VISIBLE | ST_LEFT | ST_NOPREFIX,
+                px(24),
+                px(54),
+                px(496),
+                px(20),
+                hwnd,
+                ID_SUBTITLE as isize,
+                0,
+                ptr::null(),
+            );
+            self.separator = CreateWindowExW(
+                0,
+                wide("STATIC").as_ptr(),
+                ptr::null(),
+                WS_CHILD | WS_VISIBLE | ST_ETCHEDHORZ,
+                px(24),
+                px(82),
+                px(496),
+                px(2),
+                hwnd,
+                ID_SEPARATOR as isize,
+                0,
+                ptr::null(),
+            );
             self.label = CreateWindowExW(
                 0,
                 wide("STATIC").as_ptr(),
                 wide(&self.strings.t("label.language")).as_ptr(),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                18,
-                420,
-                20,
+                WS_CHILD | WS_VISIBLE | ST_LEFT | ST_NOPREFIX,
+                px(24),
+                px(94),
+                px(496),
+                px(20),
                 hwnd,
                 0,
                 0,
@@ -202,10 +291,10 @@ impl App {
                 wide("COMBOBOX").as_ptr(),
                 ptr::null(),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST as u32 | WS_VSCROLL,
-                16,
-                42,
-                420,
-                200,
+                px(24),
+                px(116),
+                px(496),
+                px(260),
                 hwnd,
                 ID_LANG as isize,
                 0,
@@ -215,11 +304,11 @@ impl App {
                 0,
                 wide("BUTTON").as_ptr(),
                 wide(&self.strings.t("button.launch")).as_ptr(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON as u32,
-                16,
-                84,
-                190,
-                32,
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON as u32,
+                px(24),
+                px(158),
+                px(220),
+                px(42),
                 hwnd,
                 ID_LAUNCH as isize,
                 0,
@@ -230,10 +319,10 @@ impl App {
                 wide("BUTTON").as_ptr(),
                 wide(&self.strings.t("button.vanilla")).as_ptr(),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON as u32,
-                216,
-                84,
-                150,
-                32,
+                px(256),
+                px(158),
+                px(160),
+                px(42),
                 hwnd,
                 ID_VANILLA as isize,
                 0,
@@ -244,10 +333,10 @@ impl App {
                 wide("BUTTON").as_ptr(),
                 wide(&self.strings.t("button.refresh")).as_ptr(),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON as u32,
-                376,
-                84,
-                80,
-                32,
+                px(428),
+                px(158),
+                px(90),
+                px(42),
                 hwnd,
                 ID_REFRESH as isize,
                 0,
@@ -258,29 +347,80 @@ impl App {
                 wide("BUTTON").as_ptr(),
                 wide(&self.strings.t("button.kill")).as_ptr(),
                 WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON as u32,
-                16,
-                124,
-                190,
-                28,
+                px(304),
+                px(214),
+                px(216),
+                px(34),
                 hwnd,
                 ID_KILL as isize,
                 0,
                 ptr::null(),
             );
             self.status = CreateWindowExW(
-                0,
+                WS_EX_CLIENTEDGE,
                 wide("STATIC").as_ptr(),
                 ptr::null(),
-                WS_CHILD | WS_VISIBLE,
-                16,
-                164,
-                440,
-                40,
+                WS_CHILD | WS_VISIBLE | ST_LEFT | ST_NOPREFIX,
+                px(24),
+                px(262),
+                px(496),
+                px(52),
                 hwnd,
                 ID_STATUS as isize,
                 0,
                 ptr::null(),
             );
+            self.hint = CreateWindowExW(
+                0,
+                wide("STATIC").as_ptr(),
+                wide(&self.strings.t("hint.footer")).as_ptr(),
+                WS_CHILD | WS_VISIBLE | ST_LEFT | ST_NOPREFIX,
+                px(24),
+                px(322),
+                px(496),
+                px(36),
+                hwnd,
+                ID_HINT as isize,
+                0,
+                ptr::null(),
+            );
+        }
+
+        for (control, font) in [
+            (self.title, self.font_title),
+            (self.subtitle, self.font_small),
+            (self.label, self.font_normal),
+            (self.combo, self.font_normal),
+            (self.btn_launch, self.font_normal),
+            (self.btn_vanilla, self.font_normal),
+            (self.btn_refresh, self.font_normal),
+            (self.btn_kill, self.font_normal),
+            (self.status, self.font_small),
+            (self.hint, self.font_small),
+        ] {
+            if font != 0 {
+                unsafe {
+                    SendMessageW(control, WM_SETFONT, font as WPARAM, 1);
+                }
+            }
+        }
+    }
+
+    fn color_static(&self, hdc: HDC, control: HWND) -> LRESULT {
+        unsafe {
+            SetBkMode(hdc, TRANSPARENT as i32);
+            if control == self.status {
+                SetTextColor(hdc, rgb(32, 32, 32));
+                return GetStockObject(WHITE_BRUSH) as LRESULT;
+            }
+            if control == self.title {
+                SetTextColor(hdc, rgb(20, 45, 80));
+            } else if control == self.subtitle || control == self.hint {
+                SetTextColor(hdc, rgb(96, 96, 96));
+            } else {
+                SetTextColor(hdc, rgb(32, 32, 32));
+            }
+            (COLOR_BTNFACE + 1) as LRESULT
         }
     }
 
@@ -357,6 +497,11 @@ impl App {
     fn update_texts(&self) {
         unsafe {
             SetWindowTextW(self.hwnd, wide(&self.strings.t("title")).as_ptr());
+            SetWindowTextW(self.title, wide(&self.strings.t("title")).as_ptr());
+            SetWindowTextW(
+                self.subtitle,
+                wide(&self.strings.t("subtitle")).as_ptr(),
+            );
             SetWindowTextW(
                 self.label,
                 wide(&self.strings.t("label.language")).as_ptr(),
@@ -376,6 +521,10 @@ impl App {
             SetWindowTextW(
                 self.btn_kill,
                 wide(&self.strings.t("button.kill")).as_ptr(),
+            );
+            SetWindowTextW(
+                self.hint,
+                wide(&self.strings.t("hint.footer")).as_ptr(),
             );
         }
         self.update_status();
@@ -520,6 +669,65 @@ impl App {
         };
         answer == IDYES
     }
+}
+
+impl Drop for App {
+    fn drop(&mut self) {
+        for font in [self.font_title, self.font_normal, self.font_small] {
+            if font != 0 {
+                unsafe {
+                    DeleteObject(font);
+                }
+            }
+        }
+    }
+}
+
+fn make_font(dpi: u32, point: i32, weight: i32) -> isize {
+    let height = -((point * dpi as i32 + 36) / 72);
+    let face = wide("Segoe UI");
+    unsafe {
+        CreateFontW(
+            height,
+            0,
+            0,
+            0,
+            weight,
+            0,
+            0,
+            0,
+            DEFAULT_CHARSET as u32,
+            OUT_DEFAULT_PRECIS as u32,
+            CLIP_DEFAULT_PRECIS as u32,
+            CLEARTYPE_QUALITY as u32,
+            (DEFAULT_PITCH | FF_DONTCARE) as u32,
+            face.as_ptr(),
+        )
+    }
+}
+
+fn scale(value: i32, dpi: u32) -> i32 {
+    value * dpi as i32 / 96
+}
+
+fn dpi_for_system() -> u32 {
+    unsafe {
+        let dc = GetDC(0);
+        if dc == 0 {
+            return 96;
+        }
+        let dpi = GetDeviceCaps(dc, LOGPIXELSX as i32);
+        ReleaseDC(0, dc);
+        if dpi >= 96 {
+            dpi as u32
+        } else {
+            96
+        }
+    }
+}
+
+fn rgb(r: u8, g: u8, b: u8) -> u32 {
+    r as u32 | ((g as u32) << 8) | ((b as u32) << 16)
 }
 
 fn ui_for_system() -> String {

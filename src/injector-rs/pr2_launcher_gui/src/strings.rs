@@ -4,6 +4,7 @@ use std::path::Path;
 
 const BUILTIN: &[(&str, &str)] = &[
     ("title", "Port Royale 2 Launcher"),
+    ("subtitle", "Port Royale 2 localization runtime"),
     ("label.language", "Language pack:"),
     ("button.launch", "Launch localized"),
     ("button.vanilla", "Launch original"),
@@ -14,6 +15,10 @@ const BUILTIN: &[(&str, &str)] = &[
     ("status.launched", "Localized game launched."),
     ("status.vanilla", "Original game launched."),
     ("status.killed", "Ended %d PR2.exe process(es)."),
+    (
+        "hint.footer",
+        "Language packs live in PR2Packs.\nIf exit hangs, end PR2.exe here.",
+    ),
     (
         "confirm.kill",
         "Force-end %d PR2.exe process(es) from this folder?\nUnsaved game progress will be lost.",
