@@ -25,6 +25,10 @@ from `C:\Windows\SysWOW64`, so the local proxy is bypassed and the game starts
 in English. Use `PR2LocalizationGUI.exe` and choose a language. Steam can use the
 local `VERSION.dll` proxy; `PR2LocalizationGUI.exe` remains available as a fallback.
 
+Release packages are split by entry point: GOG packages
+(`PR2-<lang>-gog-<version>.zip`) intentionally omit `VERSION.dll`; Steam packages
+(`PR2-<lang>-steam-<version>.zip`) include it for natural loading by `PR2.exe`.
+
 ## Documentation
 
 All maintained documentation is in Chinese. This page is the only English

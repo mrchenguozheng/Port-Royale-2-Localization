@@ -64,7 +64,7 @@ src/tools/
 | `font/make_noto_fonts.py` | 发行版 Noto 替换字体（完整字体，不裁剪） |
 | `font/extract_fonts.py` | 从游戏 `pr2_loca.cpr` 导出原版拉丁字体 |
 | `font/fontstitch/` | 缝合引擎、`presets/` 目录、校验工具 |
-| `pack/make_release.py` | 按语言生成发行 zip（语言包 + 启动器 + Noto 字体） |
+| `pack/make_release.py` | 按语言和 GOG/Steam 入口生成发行 zip（GOG 不含 VERSION.dll） |
 
 字体前置检查：
 

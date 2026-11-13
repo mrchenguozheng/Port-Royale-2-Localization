@@ -14,8 +14,9 @@
 - **GOG 英文版 `1.1.2.3` 已通过启动器入口实测；Steam 英文版为实验性支持**。
   GOG 法语版和其他版本不在支持范围内；不要在未支持版本上部署后把“注入不生效”
   当作本仓库回归。
-- 发行包按语言拆分；玩家拿到的是构建好的 `VERSION.dll`、`PR2LocalizationCore.dll`、
-  语言包和字体，不需要 Python 或 Rust 工具链。不要把“让每个玩家自行构建”写成默认流程。
+- 发行包按语言和入口拆分：GOG 版不带 `VERSION.dll`，Steam 版带 `VERSION.dll`；
+  两版都包含 `PR2LocalizationCore.dll`、语言包和字体，不需要 Python 或 Rust 工具链。
+  不要把“让每个玩家自行构建”写成默认流程。
 
 ## 当前结构
 
@@ -69,7 +70,9 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 .\build.ps1 -Target Packs -Lang zh  # 只编中文语言包
 .\build.ps1 -Target Injector        # 只编 Rust 注入器
 
-.\release.ps1 -Version v1.0.0       # 构建运行时 + 生成 dist\PR2-<语言>-<版本>.zip
+.\release.ps1 -Version v1.0.0       # 同时生成 gog/steam 两套 zip
+.\release.ps1 -Version v1.0.0 -Edition gog    # 只出 GOG 包
+.\release.ps1 -Version v1.0.0 -Edition steam  # 只出 Steam 包
 .\release.ps1 -Version v1.0.0 -Tag -Push  # 出包并创建/推送 release-<版本> tag
 ```
 

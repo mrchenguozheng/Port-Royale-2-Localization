@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""make_release.py —— 生成按语言分发的发行包。
+"""make_release.py —— 生成按语言、按发行入口分发的发行包。
 
-一个语言一个 zip，解压到游戏根目录即可：
+一个语言、一个入口一个 zip，解压到游戏根目录即可：
 
-    PR2-zh-v1.0.0/
+    PR2-zh-gog-v1.0.0/
       PR2Localization.exe
       PR2LocalizationGUI.exe
       PR2LocalizationCore.dll
-      VERSION.dll
       PR2Localization/
         packs/zh.txt
         packs/locale.ini
@@ -18,10 +17,12 @@
       README.txt
       OFL.txt
 
+GOG 版不带 VERSION.dll；Steam 版额外带 VERSION.dll，供 PR2.exe 自然加载。
 发行包不包含游戏本体，也不包含缝合字体。想用原版字形的人可以走
 ``--fonts stitch``（仅自用/私有包，不要公开分发）。
 
-    python src\\tools\\pack\\make_release.py --lang zh --version v1.0.0
+    python src\\tools\\pack\\make_release.py --lang zh --edition gog --version v1.0.0
+    python src\\tools\\pack\\make_release.py --lang zh --edition steam --version v1.0.0
 """
 
 import argparse
@@ -45,8 +46,9 @@ RUNTIME = os.path.join(BUILD, "runtime")
 
 LABELS = {"zh": "简体中文", "ja": "日本語"}
 DATA_DIR = "PR2Localization"
-FLAT = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
-        "PR2LocalizationCore.dll", "VERSION.dll")
+FLAT_COMMON = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
+               "PR2LocalizationCore.dll")
+FLAT_STEAM = FLAT_COMMON + ("VERSION.dll",)
 RUNTIME_VERSION = 1  # 与 src/injector-rs/pr2_common/src/lib.rs 的 RUNTIME_VERSION 保持一致
 
 
@@ -62,8 +64,9 @@ def build_pack(lang, stage, log):
         fh.write("language=%s\n" % lang)
 
 
-def copy_runtime(stage, log):
-    for name in FLAT:
+def copy_runtime(stage, edition, log):
+    flat = FLAT_STEAM if edition == "steam" else FLAT_COMMON
+    for name in flat:
         src = os.path.join(RUNTIME, name)
         if not os.path.isfile(src):
             raise FileNotFoundError("缺 %s，先构建注入器" % src)
@@ -105,24 +108,38 @@ def write_runtime_version(stage, log):
     log("写入 RUNTIME-VERSION (%d)" % RUNTIME_VERSION)
 
 
-def write_readme(lang, stage, mode):
+def write_readme(lang, stage, mode, edition):
     label = LABELS.get(lang, lang)
+    edition_label = "GOG 版" if edition == "gog" else "Steam 版"
     font_line = {
         "noto": "字体：Noto Sans / Noto Serif（SIL OFL 1.1），完整字体，未裁剪。",
         "stitch": "字体：本地缝合版（仅限自用，不要公开分发）。",
         "none": "字体：本包不含字体，请自行准备中/日文字体。",
     }[mode]
-    text = """Port Royale 2 本地化 - %s
+    if edition == "gog":
+        install_step = """  2. GOG：双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
+     本包是 GOG 版，刻意不包含 VERSION.dll；不要直接双击 PR2.exe。
+     如果从旧包升级，根目录残留的 VERSION.dll 可以删除，GOG 不加载它。"""
+    else:
+        install_step = """  2. Steam：从 Steam 正常启动游戏，VERSION.dll 会加载同目录的 PR2LocalizationCore.dll。
+     需要临时指定语言时，可用 PR2LocalizationGUI.exe 启动。
+  3. 如果目录里已有别的 mod 占用 VERSION.dll，先移除本包的 VERSION.dll，
+     改用 PR2LocalizationGUI.exe 启动，避免代理冲突。"""
+    if edition == "gog":
+        uninstall_line = "  删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll\n  和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。"
+    else:
+        uninstall_line = "  删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll、VERSION.dll\n  和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。"
+    if edition == "gog":
+        support_line = "支持游戏版本：GOG 英文 1.1.2.3 已实测。本包只用于 GOG；Steam 请下载 Steam 版。"
+    else:
+        support_line = "支持游戏版本：Steam 英文 1.1.2.3 为实验性支持，需进游戏后看 PR2Localization\\logs\\runtime.log 确认；GOG 请下载 GOG 版。"
+    text = """Port Royale 2 本地化 - %s（%s）
 
-支持游戏版本：GOG 英文 1.1.2.3；Steam 英文 1.1.2.3 为实验性支持，需进游戏后看 PR2Localization\\logs\\runtime.log 确认。
+%s
 
 安装（解压即用）：
   1. 把本压缩包里的全部文件解压到游戏根目录（和 PR2.exe 同一层）。
-  2. GOG：双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
-     不要直接双击 PR2.exe：GOG 会把 VERSION.dll 解析到系统目录，本地代理不生效。
-     Steam：从 Steam 正常启动游戏；也可用 PR2LocalizationGUI.exe 注入。
-  3. Steam 上如果目录里已有别的 mod 占用 VERSION.dll，先移除本包的 VERSION.dll，
-     改用 PR2LocalizationGUI.exe 启动，避免 DLL 代理冲突。
+%s
 
 确认是否生效：
   游戏启动后检查 PR2Localization\\logs\\runtime.log 第一行是否为：
@@ -145,8 +162,7 @@ def write_readme(lang, stage, mode):
   仍要启动会回退原版拉丁字体，中文可能缺字。
 
 卸载：
-  删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll、VERSION.dll
-  和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。
+%s
 
 注意：
   - 本包不包含游戏本体、地图、音乐等游戏资源。
@@ -156,7 +172,7 @@ def write_readme(lang, stage, mode):
 字体许可：
   Noto 字体使用 SIL Open Font License 1.1，详见同目录 OFL.txt
   或 https://openfontlicense.org/
-""" % (label, lang, font_line)
+""" % (label, edition_label, support_line, install_step, lang, uninstall_line, font_line)
     with open(os.path.join(stage, "README.txt"), "w",
               encoding="utf-8", newline="\n") as fh:
         fh.write(text)
@@ -186,14 +202,14 @@ def make_zip(stage, out_dir):
     return zip_path
 
 
-def make_release(lang, version, out_dir, mode, log=None, cache=True):
+def make_release(lang, version, out_dir, mode, edition, log=None, cache=True):
     log = log or print
-    stage = os.path.join(out_dir, "PR2-%s-%s" % (lang, version))
+    stage = os.path.join(out_dir, "PR2-%s-%s-%s" % (lang, edition, version))
     if os.path.isdir(stage):
         shutil.rmtree(stage)
     os.makedirs(stage)
     build_pack(lang, stage, log)
-    copy_runtime(stage, log)
+    copy_runtime(stage, edition, log)
     write_runtime_version(stage, log)
     # 优先用运行时构建产物里的 PR2Localization\ui\；没有时回退到 Rust 源码目录。
     # 旧路径 src/injector/ui 不存在，静默跳过会让发行包缺 ui/*.ini。
@@ -207,7 +223,7 @@ def make_release(lang, version, out_dir, mode, log=None, cache=True):
     os.makedirs(os.path.join(stage, DATA_DIR, "logs"), exist_ok=True)
     log("复制 PR2Localization\\ui\\")
     copy_fonts(lang, stage, mode, log, cache=cache)
-    write_readme(lang, stage, mode)
+    write_readme(lang, stage, mode, edition)
     copy_license(stage, log)
     zip_path = make_zip(stage, out_dir)
     log("完成：%s" % zip_path)
@@ -215,9 +231,11 @@ def make_release(lang, version, out_dir, mode, log=None, cache=True):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="生成按语言分发的 PR2 本地化发行包")
+    ap = argparse.ArgumentParser(description="生成按语言、按入口分发的 PR2 本地化发行包")
     ap.add_argument("--lang", action="append", required=True,
                     help="语言代码，可重复")
+    ap.add_argument("--edition", choices=("gog", "steam"), required=True,
+                    help="发行入口：gog 不带 VERSION.dll；steam 带 VERSION.dll")
     ap.add_argument("--version", default="dev")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
     ap.add_argument("--fonts", choices=("noto", "stitch", "none"), default="noto")
@@ -226,7 +244,7 @@ def main():
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     for lang in args.lang:
-        make_release(lang, args.version, args.out, args.fonts)
+        make_release(lang, args.version, args.out, args.fonts, args.edition)
     return 0
 
 

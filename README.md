@@ -13,12 +13,15 @@
 不需要安装器、不需要 Python、不需要编译。
 
 1. 确认是 **GOG 英文版 `1.1.2.3`**，或 Steam 英文版（实验性）；
-2. 从 Release 下载对应语言的 zip，例如 `PR2-zh-v1.0.0.zip`；
+2. 从 Release 下载对应语言和入口的 zip：GOG 版是 `PR2-zh-gog-v1.0.0.zip`，
+   Steam 版是 `PR2-zh-steam-v1.0.0.zip`；
 3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
 4. GOG 双击 `PR2LocalizationGUI.exe`，选语言后点「以所选语言启动」；
    Steam 从 Steam 启动游戏；
 5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... overrides`。
 
+GOG 包刻意不含 `VERSION.dll`；Steam 包才带，供 `PR2.exe` 自然加载代理。
+GOG 从旧包升级时，根目录残留的 `VERSION.dll` 可以删除，GOG 不加载它。
 GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析到
 `C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入游戏进程，结果是原版英文。
 `PR2Localization.exe` / `PR2LocalizationGUI.exe` 是 GOG 的正式入口，负责注入
@@ -85,7 +88,9 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 .\build.ps1 -Target Packs -Lang zh  # 只编中文语言包
 .\build.ps1 -Target Injector        # 只编 Rust 注入器
 
-.\release.ps1 -Version v1.0.0       # 构建运行时 + 生成 dist\PR2-<语言>-<版本>.zip
+.\release.ps1 -Version v1.0.0       # 同时生成 gog 和 steam 两套 zip
+.\release.ps1 -Version v1.0.0 -Edition gog    # 只出 GOG 包
+.\release.ps1 -Version v1.0.0 -Edition steam  # 只出 Steam 包
 .\release.ps1 -Version v1.0.0 -Tag  # 额外创建 release-v1.0.0 本地 tag
 .\release.ps1 -Version v1.0.0 -Tag -Push  # 再推送 tag
 ```

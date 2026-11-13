@@ -4,12 +4,16 @@
 #
 #    .\release.ps1 -Version v1.0.0
 #    .\release.ps1 -Version v1.0.0 -Lang zh
+#    .\release.ps1 -Version v1.0.0 -Edition gog
+#    .\release.ps1 -Version v1.0.0 -Edition steam
 #    .\release.ps1 -Version v1.0.0 -Tag
 #    .\release.ps1 -Version v1.0.0 -Tag -Push
 #
 #  Default flow:
 #    1. build the injector into build\runtime
-#    2. compile each language and assemble dist\PR2-<lang>-<version>.zip
+#    2. compile each language and assemble
+#       dist\PR2-<lang>-gog-<version>.zip and
+#       dist\PR2-<lang>-steam-<version>.zip
 #    3. (optional) create release-<version> tag; -Push also pushes it
 #
 #  The pack assembly implementation stays in:
@@ -20,6 +24,9 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Version,
+
+    [ValidateSet('all', 'gog', 'steam')]
+    [string]$Edition = 'all',
 
     [string[]]$Lang = @(),
 
@@ -100,8 +107,11 @@ $OutDir = if ([System.IO.Path]::IsPathRooted($Out)) {
 }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
+$editions = if ($Edition -eq 'all') { @('gog', 'steam') } else { @($Edition) }
+
 Write-Host "[release] 版本：$Version"
 Write-Host "[release] 语言：$($languages -join ', ')"
+Write-Host "[release] 入口：$($editions -join ', ')"
 Write-Host "[release] 输出：$OutDir"
 Write-Host "[release] 字体：$Fonts"
 
@@ -119,22 +129,27 @@ if (-not $SkipInjector) {
 
 Write-Host ''
 Write-Host '[release] 2/2 组装发行包'
-$releaseArgs = @(
-    $ReleaseScript,
-    '--version', $Version,
-    '--out', $OutDir,
-    '--fonts', $Fonts
-)
-foreach ($lang in $languages) {
-    $releaseArgs += @('--lang', $lang)
-}
-if ($NoFontCache) {
-    $releaseArgs += '--no-font-cache'
-}
+foreach ($edition in $editions) {
+    Write-Host ''
+    Write-Host "[release] 入口：$edition"
+    $releaseArgs = @(
+        $ReleaseScript,
+        '--version', $Version,
+        '--out', $OutDir,
+        '--fonts', $Fonts,
+        '--edition', $edition
+    )
+    foreach ($lang in $languages) {
+        $releaseArgs += @('--lang', $lang)
+    }
+    if ($NoFontCache) {
+        $releaseArgs += '--no-font-cache'
+    }
 
-& $Python @releaseArgs
-if ($LASTEXITCODE -ne 0) {
-    throw "生成发行包失败（退出码 $LASTEXITCODE）。"
+    & $Python @releaseArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "生成 $edition 发行包失败（退出码 $LASTEXITCODE）。"
+    }
 }
 
 $zips = @(Get-ChildItem -LiteralPath $OutDir -Filter "PR2-*-$Version.zip" -File |
