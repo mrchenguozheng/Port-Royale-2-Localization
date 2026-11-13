@@ -1,0 +1,20 @@
+[package]
+name = "pr2_launcher_gui"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "PR2LauncherGUI"
+path = "src/main.rs"
+
+[dependencies]
+pr2_common = { path = "../pr2_common" }
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+] }

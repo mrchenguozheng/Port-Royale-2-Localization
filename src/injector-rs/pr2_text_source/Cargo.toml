@@ -1,0 +1,19 @@
+[package]
+name = "pr2_text_source"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "PR2TextSource"
+crate-type = ["cdylib"]
+
+[dependencies]
+pr2_common = { path = "../pr2_common" }
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+] }

@@ -27,7 +27,7 @@ handled by the maintainer.**
 
 ### A. Use the workbench
 
-Requires Python 3.11+, but not Visual Studio (when the injector build artifacts
+Requires Python 3.11+, but no Rust toolchain (when the injector build artifacts
 already exist).
 
 ```bat

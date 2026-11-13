@@ -49,7 +49,7 @@ work are in [Pending issues](docs/en/pending.md).
 
 ## Developers: build and translate
 
-Requirements: Visual Studio (Desktop development with C++) and Python 3.11+
+Requirements: Rust (rustup + `i686-pc-windows-msvc` target) and Python 3.11+
 (currently 3.15).
 
 ```bat
@@ -90,7 +90,7 @@ pr2-localization/
 │  ├─ data/                   hand-maintained data (placeholder roles, keep-original list)
 │  ├─ orig/                   original English/French (read-only reference)
 │  ├─ editor/                 translation editor (Astro frontend + server.py, domain modules in api/)
-│  ├─ injector/               injector sources (C++)
+│  ├─ injector-rs/            injector sources (Rust workspace, includes ui/)
 │  └─ tools/
 │     ├─ pack/                build, deploy, new language
 │     ├─ text/                normalization, CJK rules, tokenization
@@ -114,7 +114,7 @@ pr2-localization/
 
 ## Adding a language
 
-No C++ changes are required:
+No injector-source changes are required:
 
 1. Run `start.bat`, open **Translation editor**, click **＋** next to the language
    dropdown and use an existing language as a template;

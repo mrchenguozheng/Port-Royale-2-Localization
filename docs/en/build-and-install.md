@@ -88,7 +88,7 @@ Set the `PR2_SETTINGS` environment variable to change the location. It stores on
 
 | Button | Effect |
 |---|---|
-| Compile injector (DLL + launcher) | Calls MSVC to produce `PR2TextSource.dll`, `PR2Launcher.exe`, and `PR2LauncherGUI.exe` |
+| Compile injector (DLL + launcher) | Calls cargo to produce `PR2TextSource.dll`, `PR2Launcher.exe`, and `PR2LauncherGUI.exe` |
 | Compile language packs | Compiles the checked languages, and checks/re-stitches fonts |
 | Deploy to game directory | Copies the runtime, language packs, `ui/`, and `fonts/<language>/` |
 
@@ -248,7 +248,7 @@ Everything under `build\` is an artifact; you can delete the whole thing and reb
 |---|---|
 | `start.bat` | Starts the local workbench service |
 | `apply_patch.bat` | Build + deploy + verify |
-| `src\build_injector.bat` | Compiles the DLL/launcher |
+| `src\build_injector.bat` | Builds the Rust DLL/launcher with cargo |
 | `src\build_translation.bat` | Compiles language packs |
 | `src\find_python.bat` | Locates Python |
 

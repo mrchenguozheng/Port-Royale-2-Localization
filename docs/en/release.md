@@ -274,9 +274,10 @@ fonts from the root directory.
 
 ### 1. Build the runtime
 
-Requires Visual Studio with the C++ desktop workload:
+Requires Rust (rustup) and the `i686-pc-windows-msvc` target:
 
 ```bat
+rustup target add i686-pc-windows-msvc
 cd C:\path\to\pr2-localization
 src\build_injector.bat
 ```

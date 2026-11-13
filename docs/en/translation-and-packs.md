@@ -341,7 +341,7 @@ outside the repository; that is a separate matter.
 
 ## Adding a language
 
-Three steps, with no need to touch C++ or the DLL at any point. For the complete from-scratch
+Three steps, with no need to touch the injector source or the DLL at any point. For the complete from-scratch
 workflow, see [New language](new-language.md).
 
 1. **Create the translation file** `src\translations\<code>.toml`.

@@ -130,7 +130,7 @@ def main():
     # 2) 注入器产物必须已在 build\runtime\ 里
     missing = [n for n in B.FLAT_FILES if not os.path.isfile(os.path.join(B.RUNTIME, n))]
     if missing:
-        sys.exit("缺少注入器产物：%s\n先运行 build_injector.bat（需要 Visual Studio）。"
+        sys.exit("缺少注入器产物：%s\n先运行 build_injector.bat（需要 Rust rustup + i686-pc-windows-msvc）。"
                  % "、".join(missing))
 
     # 3) 部署

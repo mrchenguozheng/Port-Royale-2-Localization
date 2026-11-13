@@ -41,8 +41,8 @@ src/editor/server.py editor HTTP service; per-domain modules under api/
 
 | Risk before refactoring | Handling | Remaining boundary |
 |---|---|---|
-| Font name/integrity checks scattered | `pr2_fonts.h` unifies the launcher and GUI | The Python build writes by output filename and does not share the C header |
-| locale semantics diverge | `pr2_locale.h` unifies reads; the GUI is the only writer | Running `PR2.exe` directly bypasses the launcher |
+| Font name/integrity checks scattered | `pr2_common` unifies the launcher and GUI | The Python build writes by output filename and does not share the same constants |
+| locale semantics diverge | `pr2_common` unifies reads; the GUI is the only writer | Running `PR2.exe` directly bypasses the launcher |
 | Many build entry points | `build_artifacts.py` unifies language packs and fonts | Runtime file copying is still handled separately by release/deploy |
 | Implicit file formats | `min_runtime` adds an integer version check | Still a minimal format, with no schema or validator |
 | Multiple language packs overwrite the runtime | `min_runtime` + `RUNTIME-VERSION` | Direct `PR2.exe` bypasses the check; no automatic updates |
@@ -59,14 +59,14 @@ src/editor/server.py editor HTTP service; per-domain modules under api/
 
 ### Step 1: Shared font contract
 
-- Add `src/injector/pr2_fonts.h`:
+- Add font helpers in `src/injector-rs/pr2_common/src/lib.rs`:
   - the four font names;
   - the `fonts/<lang>/` integrity check.
 - The launcher and GUI were switched to call the same implementation;
 - The launcher's original font backup also reuses the font names;
 - Build and verify both the missing-font and complete-font paths.
 
-Status: done. `pr2_fonts.h` unifies font names and the integrity check; the build and the missing-font fallback were verified.
+Status: done. `pr2_common` unifies font names and the integrity check; the Rust build and the missing-font fallback compile, but the real game font chain is not yet exercised.
 
 ### Step 2: Unified locale
 
@@ -74,7 +74,7 @@ Status: done. `pr2_fonts.h` unifies font names and the integrity check; the buil
 - Make it explicit: only the GUI writes after a successful launch; the CLI only reads;
 - The GUI no longer keeps a second copy of the language state.
 
-Status: done. `pr2_locale.h` unifies reading and writing back; the GUI is still the only writer; both launching the CLI directly and writing back after a GUI launch were verified.
+Status: done. `pr2_common` unifies reading and writing back; the GUI is still the only writer; both launching the CLI directly and writing back after a GUI launch were verified.
 
 ### Step 3: Unified build artifact entry points
 
@@ -150,6 +150,41 @@ Status: done. `tests/test_server_api.py` 5 tests (21 GET routes all 200, POST wr
 to the temporary root, real repository file SHAs unchanged); `check.py` 46 tests;
 `engine_text --check` reports "一致" for both zh and ja; pack SHAs match the
 pre-refactoring baseline (zh `2B209420…920F`, ja `17517FB6…FAB`).
+
+## Native programs migrated to Rust
+
+The three C++ native programs are now a Rust workspace at `src\injector-rs\`:
+
+| Crate | Output | Old implementation |
+|---|---|---|
+| `pr2_common` | none (library) | shared parts of `pr2_fonts.h` / `pr2_locale.h` / `pr2_version.h` |
+| `pr2_text_source` | `PR2TextSource.dll` | `pr2_text_source.cpp` + `pr2_text_pack.c` |
+| `pr2_launcher` | `PR2Launcher.exe` | `pr2_launcher.cpp` |
+| `pr2_launcher_gui` | `PR2LauncherGUI.exe` | `pr2_launcher_gui.cpp` |
+
+- The workspace `.cargo\config.toml` pins `i686-pc-windows-msvc`, matching the 32-bit game process;
+- `build_injector.bat` now runs `cargo build --release --locked` and copies the artifacts
+  and `ui\*.ini` into `build\runtime\`;
+- The GUI is compiled with `#![windows_subsystem = "windows"]`, so double-clicking it does
+  not open a console;
+- The DLL replaces SEH with `VirtualQuery` readability checks; the vtable scan, thunk patch,
+  whole-table replacement, `PR2Packs` / `overrides` loading and log limits preserve the old
+  behavior;
+- The old C++ sources and `src\injector\ui` were moved out of the working tree; the UI files
+  now live in `src\injector-rs\ui\`.
+
+Verification:
+
+- `cargo build --release` passes; all three outputs are 32-bit;
+- a 32-bit `LoadLibraryA` loads and frees the Rust DLL;
+- a fake 32-bit `PR2.exe` plus `PR2Launcher.exe --lang=zh` injects successfully; the DLL log
+  reports `pack 'zh' ...: 3548 overrides`;
+- `build\runtime\PR2LauncherGUI.exe` launches and shows the pack count in Chinese;
+- `python src\tools\check.py` passes 55 tests and `tests.test_quick` passes 9.
+
+Not yet verified: the three hooks inside the real game (`A2dLib-2.20A.dll` IAT / vtable /
+ResolveByHash). The fake host does not load A2dLib, so `A2dLib not loaded` and
+`Add not found` in the log are expected.
 
 ## Verification gate
 

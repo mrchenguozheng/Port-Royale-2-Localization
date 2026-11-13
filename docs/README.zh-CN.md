@@ -35,7 +35,7 @@
 | [语言规则接口](语言规则接口.md) | 三段式：标点 / 分词器 / 补空格，新语言只写一个文件 |
 | [新语言完整流程](新语言完整流程.md) | 从零加一种语言，按步骤做 |
 | [新语言协作流程](新语言协作流程.md) | 译者与维护者如何分工、交接和验收 |
-| [开发依赖](开发依赖.md) | Python、fontTools、Visual Studio 等 |
+| [开发依赖](开发依赖.md) | Python、fontTools、Rust 等 |
 | [翻译局限](翻译局限.md) | 哪些文本改不了、排版为什么只能实机看 |
 
 ## 翻译规范
@@ -65,6 +65,6 @@
   `# pack-meta alias=…` / `gui=…` / `min_runtime=…`
 - 字体：`fonts/<语言>/` 四个 TTF，不覆盖 `fonts/` 根目录原版
 - 启动器界面翻译：`ui/<语言>.ini`
-- 运行时版本：`src/injector/pr2_version.h`；发行包根目录 `RUNTIME-VERSION`
+- 运行时版本：`src/injector-rs/pr2_common/src/lib.rs`；发行包根目录 `RUNTIME-VERSION`
 
 旧的 `launcher.ini`、`lang/aliases.ini` 已移除；旧语言包不再兼容。

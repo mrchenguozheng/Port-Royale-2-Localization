@@ -6,7 +6,7 @@ The runtime part of localizing *Port Royale 2*: **a launcher + a DLL + a languag
 the DLL takes over the engine's string lookups, feeding in the translations from `PR2Packs\`.
 The original exe stays read-only throughout.
 
-The source lives in `src\injector\`; the build script is in `src\`.
+The source lives in `src\injector-rs\` (a Rust workspace); the build script is in `src\`.
 
 ---
 
@@ -41,11 +41,10 @@ PR2.exe loads PR2TextSource.dll, DllMain → InstallHook()
    │
    ├─ hook #2  vtable: CW32StringManager::AddStringRes / LoadStringRes
    │
-   └─ hook #3  A2dLib::LoadStringRes function body
-                 catches the lookups the two hooks above don't cover;
-                 and writes the hashes the pack doesn't cover, together with
-                 the English the engine resolved, to PR2TextSource_gap.log
-                 in the game directory, as leads for filling in translations
+   └─ hook #3  A2dLib CScreenStrings::ResolveByHash thunk
+                 the thunk is at A2dLib base +0x1DC5, the real body at +0x25C70;
+                 [R] goes to resolve.log, [RGAP] records hashes the pack does not
+                 cover plus the engine's original text
 ```
 
 What the DLL does is **patch the import tables of the modules inside the process**, replacing
@@ -140,17 +139,25 @@ manually, or use shorter wording.
 
 ## Source
 
+The Rust workspace lives in `src\injector-rs\`:
+
 | File | Responsibility |
 |---|---|
-| `pr2_text_source.cpp` | Main logic. The three hooks, whole-table replacement, missed-translation capture |
-| `pr2_text_pack.c` | Pack loader (pure C89). INI parsing, `hash = text` parsing, UTF-8→UTF-16 |
-| `pr2_launcher.cpp` | Launcher. Suspended start + remote injection |
+| `pr2_common/src/lib.rs` | Shared paths, `locale.ini`, pack version checks, font completeness checks |
+| `pr2_text_source/src/lib.rs` | DLL. The three hooks, whole-table replacement, missed-translation capture |
+| `pr2_launcher/src/main.rs` | Launcher. Suspended start + remote injection + font backup/restore |
+| `pr2_launcher_gui/src/main.rs` | Win32 GUI. Language list, `ui/*.ini`, calls the launcher |
+| `ui/en.ini`, `ui/ja.ini`, `ui/zh.ini` | GUI translations, copied to `build\runtime\ui\` by the build script |
 
-`pr2_text_pack.c` is compiled into the DLL; it has no separate output.
+The old C++ implementation (`pr2_text_source.cpp`, `pr2_text_pack.c`, `pr2_launcher.cpp`,
+`pr2_launcher_gui.cpp`) has been replaced by these Rust crates and removed from the working
+tree; use git history if you need to compare.
 
 ### Hook safety
 
-Every operation that can fail is wrapped in `__try/__except`. At worst the string in question shows
+The Rust version drops SEH (`__try/__except`) and uses `VirtualQuery` to check whether a target
+address is readable before touching candidate vtable / thunk entries. It is more conservative
+than the C++ version: unreadable targets are skipped instead of forced. At worst a string shows
 as empty or falls back to English; it never crashes the game.
 
 ### Known issues
@@ -161,7 +168,7 @@ as empty or falls back to English; it never crashes the game.
   `g_pStringMgr` at `+0x142084`.
   On a different game version, if these don't line up, the hooks can't find their targets and the
   localization has no effect at all.
-- **`FindOverride` is a linear search**; `AddEdit` replaces an existing hash, so
+- **Override lookup is a hash map**; `AddEdit` replaces an existing hash, so
   the last loaded entry wins. The base pack is loaded first and
   `overrides\<language>.txt` second, so overrides win.
 - **Load failures were silent.** ~~When `LoadEditFile()` failed, everything returned silently~~
@@ -179,12 +186,11 @@ Written to the game directory, all named after `PR2TextSource`:
 | File | Contents |
 |---|---|
 | `PR2TextSource.log` | First line = the pack actually loaded and its entry count; on load failure the first line is `NO pack loaded: …` |
-| `PR2TextSource_gap.log` | Hashes the pack doesn't cover + the English the engine resolved, for filling in translations |
-| `PR2TextSource_lsr.log` | Record of the vtable hook |
-| `PR2TextSource_resolve.log` | Record of `ResolveByHash` |
+| `PR2TextSource_lsr.log` | Record of the vtable hook (up to 5000 entries) |
+| `PR2TextSource_resolve.log` | `ResolveByHash` `[R]` records (truncated at process start, up to 8000 entries); `[RGAP]` = hashes the pack does not cover + the engine's original text, deduplicated to 2048 |
 | `PR2FontPaths.log` | With `PR2_FONT_LOG=1`, logs the font paths the game reads; `PR2_FONT_LOG_ALL=1` logs every file API call |
 
-`gap.log` is the main source of leads for filling in missing translations.
+`[RGAP]` lines in `resolve.log` are the main source of leads for filling in missing translations.
 
 ## Font backup and switching
 
@@ -221,7 +227,7 @@ In `PR2FontPaths.log` you will see the rewritten paths such as `fonts\zh\ARIAL.T
 is active** — check it first once the game is running:
 
 ```
-[text] pack 'zh' from C:\Games\Port Royale 2\PR2Packs  (3548 entries)
+[text] pack 'zh' from C:\Games\Port Royale 2\PR2Packs: 3548 overrides
 ```
 
 A line like this = the pack was found and the localization is active; the Chinese on screen comes
@@ -233,33 +239,30 @@ shows the original English.
 
 ## Build
 
-Requires Visual Studio (Desktop development with C++ workload).
+Requires Rust (rustup) and the `i686-pc-windows-msvc` target:
 
-```
+```bat
+rustup target add i686-pc-windows-msvc
 src\build_injector.bat
 ```
 
-The script locates MSVC and the Windows SDK itself; output goes to `build\runtime\` at the repo root.
+`src\injector-rs\.cargo\config.toml` pins the default target to
+`i686-pc-windows-msvc`. The script runs `cargo build --release --locked`, then copies
+`PR2TextSource.dll`, `PR2Launcher.exe`, `PR2LauncherGUI.exe`, and `ui\*.ini` into
+`build\runtime\` at the repo root.
+
 **The target architecture is x86** — PR2 is a 32-bit process and the hook code relies on 32-bit
-calling conventions.
+calling conventions. `PR2LauncherGUI.exe` is compiled with
+`#![windows_subsystem = "windows"]`, so double-clicking it does not open a console.
 
-You can also run the commands by hand in an "x64 Native Tools Command Prompt for VS":
+By hand:
 
-```
-cd src\injector
-cl /nologo /MT /LD /Ox /W3 /utf-8 /D_CRT_SECURE_NO_WARNINGS ^
-   pr2_text_source.cpp pr2_text_pack.c ^
-   /Fe:PR2TextSource.dll /link /OUT:PR2TextSource.dll psapi.lib
-
-cl /nologo /MT /Ox /W3 /utf-8 /wd4819 /D_CRT_SECURE_NO_WARNINGS ^
-   pr2_launcher.cpp ^
-   /Fe:PR2Launcher.exe /link /OUT:PR2Launcher.exe
+```bat
+cd src\injector-rs
+cargo build --release
 ```
 
-Both `/utf-8` and the UTF-8 BOM on the source files are mandatory: without them, `cl` reads the
-sources as code page 936 and Chinese literals are truncated at compile time (`到` becomes half a
-byte), leaving every Chinese message from the launcher garbled. `/wd4819` suppresses the C4819
-false positive that is still reported under `/utf-8` — the literals themselves are intact.
+The artifacts land in `src\injector-rs\target\i686-pc-windows-msvc\release\`.
 
 ---
 

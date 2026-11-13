@@ -46,7 +46,7 @@
 
 ## 开发者：构建与翻译
 
-需要 Visual Studio（C++ 桌面开发组件）+ Python 3.11 以上（当前用 3.15）。
+需要 Rust（rustup + `i686-pc-windows-msvc` target）+ Python 3.11 以上（当前用 3.15）。
 
 ```
 start.bat
@@ -84,7 +84,7 @@ pr2-localization/
 │  ├─ data/                  人工维护的数据（占位符语义、原样保留清单）
 │  ├─ orig/                  原版英文/法文（只读参照）
 │  ├─ editor/                译文编辑器（Astro 前端 + server.py，api/ 按域分模块）
-│  ├─ injector/              注入组件源码（C++）
+│  ├─ injector-rs/           注入组件源码（Rust workspace，含 ui/）
 │  └─ tools/
 │     ├─ pack/               编译、部署、新建语言
 │     ├─ text/               归一化、中文/日文规则、分词
@@ -108,7 +108,7 @@ pr2-localization/
 
 ## 加一种语言
 
-不用碰 C++，流程是：
+不用碰注入器源码，流程是：
 
 1. 跑 `start.bat`，在「译文编辑」页点语言下拉旁的「＋」，用现成语言当模板；
 2. 逐条翻译并保存（写进 `src/translations/<代码>.toml`）；

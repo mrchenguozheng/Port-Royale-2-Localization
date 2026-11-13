@@ -40,7 +40,7 @@ RUNTIME = os.path.join(BUILD, "runtime")
 
 LABELS = {"zh": "简体中文", "ja": "日本語"}
 FLAT = ("PR2Launcher.exe", "PR2LauncherGUI.exe", "PR2TextSource.dll")
-RUNTIME_VERSION = 1  # 与 src/injector/pr2_version.h 的 PR2_RUNTIME_VERSION 保持一致
+RUNTIME_VERSION = 1  # 与 src/injector-rs/pr2_common/src/lib.rs 的 RUNTIME_VERSION 保持一致
 
 
 def build_pack(lang, stage, log):

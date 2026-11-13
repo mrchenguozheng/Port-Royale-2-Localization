@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""pr2ctl.build —— 调 cl.exe 构建注入器，编译语言包。"""
+"""pr2ctl.build —— 调 cargo 构建注入器，编译语言包。"""
 
 from .base import *  # noqa: F401,F403
 from .detect import missing_outputs, read_ini_language
@@ -26,9 +26,10 @@ def child_env():
 def read_lines(proc, events):
     r"""把子进程的输出逐行送进队列。
 
-    Python 子进程由 child_env() 统一成 UTF-8；MSVC 的 cl.exe 不受它
-    影响，按控制台代码页写中文提示。所以每行先按 utf-8 解，解不动
-    再退回代码页 —— 只在确实解不出时才换，不会把正常文本弄坏。
+    Python 子进程由 child_env() 统一成 UTF-8；cargo/rustc 的警告与
+    启动器输出也按 UTF-8 写。bat 里的 cmd 内置命令仍可能按控制台代码页
+    写中文提示，所以每行先按 utf-8 解，解不动再退回代码页 —— 只在
+    确实解不出时才换，不会把正常文本弄坏。
     """
     for raw in proc.stdout:
         line = raw.rstrip()
@@ -38,7 +39,7 @@ def read_lines(proc, events):
             line = line.decode("utf-8")
         except UnicodeDecodeError:
             # mbcs = 系统 ANSI 代码页（简体中文机器是 cp936），
-            # 也就是 cl.exe 写中文提示时用的那套。不用
+            # 也就是 cmd 内置命令写中文提示时用的那套。不用
             # getpreferredencoding()：开了 UTF-8 模式的 Python 会
             # 把它报成 utf-8，退回原处等于没退。
             line = line.decode("mbcs", "replace")
@@ -99,11 +100,11 @@ def count_entries(pack_path):
 
 
 def build_injector(events):
-    """在子进程里跑 build_injector.bat，编译 PR2TextSource.dll 与
-    PR2Launcher.exe。
+    """在子进程里跑 build_injector.bat，用 cargo 编译三个 Rust 原生程序。
 
-    走 bat 而不是直接调 cl：脚本自己会定位 MSVC 与 SDK，那是它的职责；
-    这里只负责把输出转成事件、以及把退出码如实带回来。
+    走 bat 而不是直接调 cargo：脚本自己会定位 cargo、检查 target 并把
+    产物复制到 build/runtime，那是它的职责；这里只负责把输出转成事件、
+    以及把退出码如实带回来。
     """
     events.put(("line", "[注入器] 编译中…"))
     proc = subprocess.Popen(

@@ -64,6 +64,6 @@ These are detailed analysis documents kept in Chinese:
   header (`# pack-meta alias=…`, `gui=…`, `min_runtime=…`)
 - Fonts: four TTF files in `fonts/<lang>/`; never overwrite the originals in `fonts/`
 - Launcher UI translations: `ui/<lang>.ini`
-- Runtime version: `src/injector/pr2_version.h`; `RUNTIME-VERSION` in release zips
+- Runtime version: `src/injector-rs/pr2_common/src/lib.rs`; `RUNTIME-VERSION` in release zips
 
 See [Architecture](en/architecture.md) for the full contract.
