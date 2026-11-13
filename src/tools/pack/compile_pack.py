@@ -35,7 +35,7 @@ SRC = os.path.dirname(TOOLS)                              # 仓库的 src\
 ROOT = os.path.dirname(SRC)                              # 仓库根
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
-DEFAULT_OUT = os.path.join(ROOT, "build", "runtime", "PR2Packs")
+DEFAULT_OUT = os.path.join(ROOT, "build", "runtime", "PR2Localization", "packs")
 
 # 占位符与「占位文本」的判定只有一份，在 shared\core\validate.py。
 from shared.core.validate import has_bare_pipe, is_placeholder, tokens  # noqa: E402

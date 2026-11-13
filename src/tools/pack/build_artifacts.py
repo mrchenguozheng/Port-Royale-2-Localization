@@ -13,7 +13,7 @@ COMPILE = os.path.join(HERE, "compile_pack.py")
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 BUILD = os.path.join(ROOT, "build")
 RUNTIME = os.path.join(BUILD, "runtime")
-FONT_DIR = os.path.join(RUNTIME, "fonts")
+FONT_DIR = os.path.join(RUNTIME, "PR2Localization", "fonts")
 
 
 def _line(raw):
@@ -37,7 +37,7 @@ def run_stream(cmd, on_line=None, env=None):
 
 
 def compile_pack(lang, out_dir, no_fonts=True, on_line=None, env=None):
-    """把一个语言编成 PR2Packs/<lang>.txt；返回退出码。"""
+    """把一个语言编成 PR2Localization\\packs\\<lang>.txt；返回退出码。"""
     cmd = [sys.executable, COMPILE, "--lang", lang, "--out", out_dir]
     if no_fonts:
         cmd.append("--no-fonts")

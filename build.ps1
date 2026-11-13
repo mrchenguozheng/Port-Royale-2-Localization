@@ -117,7 +117,7 @@ if ($Target -in @('All', 'Injector')) {
     Write-Host '[build] 运行时：build\runtime'
 }
 if ($Target -in @('All', 'Packs')) {
-    Write-Host '[build] 语言包：build\runtime\PR2Packs'
+    Write-Host '[build] 语言包：build\runtime\PR2Localization\packs'
 }
 
 if (-not $NoPause -and $Host.Name -eq 'ConsoleHost') {

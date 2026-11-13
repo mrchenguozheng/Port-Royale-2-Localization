@@ -357,7 +357,7 @@ GET /api/health
 
 * `deploy`、`start/lang`、`start/launch` 都要求已选有效游戏目录。
 
-* `/api/start/kill` 结束 `PR2.exe` / `PR2Launcher.exe`；`launch` 的
+* `/api/start/kill` 结束 `PR2.exe` / `PR2Localization.exe`；`launch` 的
 
   `vanilla:true` 启动无注入的原版。
 

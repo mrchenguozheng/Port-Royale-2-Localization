@@ -36,7 +36,7 @@ sys.path.insert(0, HERE)
 from install import pr2ctl as B  # noqa: E402
 from build_artifacts import compile_pack  # noqa: E402
 
-PACK_OUT = os.path.join(ROOT, "build", "runtime", "PR2Packs")
+PACK_OUT = os.path.join(ROOT, "build", "runtime", "PR2Localization", "packs")
 
 
 def sha256(path):
@@ -156,7 +156,7 @@ def main():
         src = os.path.join(PACK_OUT, "%s.txt" % lang)
         dst = os.path.join(target, B.PACK_DIR, "%s.txt" % lang)
         same = sha256(src) == sha256(dst) and os.path.isfile(dst)
-        print("   %-24s %s" % ("PR2Packs\\%s.txt" % lang, "一致" if same else "不一致"))
+        print("   %-24s %s" % ("PR2Localization\\packs\\%s.txt" % lang, "一致" if same else "不一致"))
         bad += 0 if same else 1
     for name in B.FLAT_FILES:
         src = os.path.join(B.RUNTIME, name)

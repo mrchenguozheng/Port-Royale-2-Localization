@@ -4,10 +4,11 @@ version.workspace = true
 edition.workspace = true
 
 [lib]
-name = "VERSION"
+name = "PR2LocalizationProxy"
 crate-type = ["cdylib"]
 
 [dependencies]
+pr2_common = { path = "../pr2_common" }
 windows-sys = { version = "0.52", features = [
     "Win32_Foundation",
     "Win32_System_LibraryLoader",

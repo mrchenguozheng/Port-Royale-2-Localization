@@ -4,8 +4,8 @@ use std::path::Path;
 use std::ptr;
 
 use pr2_common::{
-    exe_dir, language_fonts_complete, pack_runtime_ok, read_locale_language, valid_lang_code,
-    FONT_NAMES, RUNTIME_VERSION,
+    exe_dir, fonts_dir, language_fonts_complete, pack_runtime_ok, read_locale_language,
+    valid_lang_code, FONT_NAMES, RUNTIME_VERSION,
 };
 use sha2::{Digest, Sha256};
 use windows_sys::Win32::Foundation::{CloseHandle, GetLastError};
@@ -51,24 +51,24 @@ fn run() -> Result<(), i32> {
         } else if arg == "--vanilla" {
             vanilla = true;
         } else if arg == "--help" || arg == "-h" {
-            println!("[PR2Launch] 用法: PR2Launcher.exe [--lang=<代码>] [--vanilla]");
-            println!("[PR2Launch]   --lang     这一次启动用哪个语言包，");
-            println!("[PR2Launch]              优先于 PR2Packs\\locale.ini 的 language=，不写文件。");
-            println!("[PR2Launch]   --vanilla  恢复原版字体后直接启动 PR2.exe，不注入。");
+            println!("[PR2Loc] 用法: PR2Localization.exe [--lang=<代码>] [--vanilla]");
+            println!("[PR2Loc]   --lang     这一次启动用哪个语言包，");
+            println!("[PR2Loc]              优先于 PR2Localization\\packs\\locale.ini 的 language=，不写文件。");
+            println!("[PR2Loc]   --vanilla  恢复原版字体后直接启动 PR2.exe，不注入。");
             return Ok(());
         }
     }
     if let Some(code) = &lang {
         if !valid_lang_code(code) {
-            eprintln!("[PR2Launch] --lang 的值不合法: {code}");
-            eprintln!("[PR2Launch] 只允许字母、数字、连字符和下划线，例如 --lang=zh 或 --lang=zh-TW。");
+            eprintln!("[PR2Loc] --lang 的值不合法: {code}");
+            eprintln!("[PR2Loc] 只允许字母、数字、连字符和下划线，例如 --lang=zh 或 --lang=zh-TW。");
             return Err(1);
         }
     }
 
     let exe_path = root.join("PR2.exe");
     if !exe_path.is_file() {
-        eprintln!("[PR2Launch] 同目录下找不到 PR2.exe: {}", exe_path.display());
+        eprintln!("[PR2Loc] 同目录下找不到 PR2.exe: {}", exe_path.display());
         return Err(1);
     }
 
@@ -85,20 +85,20 @@ fn run() -> Result<(), i32> {
             }
             Err(_) => {
                 eprintln!(
-                    "[PR2Launch] 启动原版 PR2.exe 失败 (错误 {})",
+                    "[PR2Loc] 启动原版 PR2.exe 失败 (错误 {})",
                     unsafe { GetLastError() }
                 );
                 return Err(1);
             }
         }
-        println!("[PR2Launch] 已恢复原版字体，启动原版 PR2.exe（未注入）");
+        println!("[PR2Loc] 已恢复原版字体，启动原版 PR2.exe（未注入）");
         return Ok(());
     }
 
-    let dll_path = root.join("PR2TextSource.dll");
+    let dll_path = root.join("PR2LocalizationCore.dll");
     if !dll_path.is_file() {
         eprintln!(
-            "[PR2Launch] 同目录下找不到 PR2TextSource.dll: {}",
+            "[PR2Loc] 同目录下找不到 PR2LocalizationCore.dll: {}",
             dll_path.display()
         );
         return Err(1);
@@ -111,7 +111,7 @@ fn run() -> Result<(), i32> {
     if let Some(code) = &font_lang {
         if valid_lang_code(code) && !pack_runtime_ok(&root, code) {
             eprintln!(
-                "[PR2Launch] 语言包 {} 需要运行时 v{}，当前 v{}，拒绝启动",
+                "[PR2Loc] 语言包 {} 需要运行时 v{}，当前 v{}，拒绝启动",
                 code,
                 pr2_common::pack_min_runtime(&root, code),
                 RUNTIME_VERSION
@@ -124,7 +124,7 @@ fn run() -> Result<(), i32> {
         .as_ref()
         .filter(|code| valid_lang_code(code))
         .and_then(|code| {
-            let dir = root.join("fonts").join(code);
+            let dir = fonts_dir(&root).join(code);
             if dir.is_dir() && language_fonts_complete(&root, code) {
                 Some(dir)
             } else {
@@ -133,9 +133,9 @@ fn run() -> Result<(), i32> {
         });
 
     if let Some(code) = font_lang.as_ref() {
-        if valid_lang_code(code) && root.join("fonts").join(code).is_dir() && font_dir.is_none() {
+        if valid_lang_code(code) && fonts_dir(&root).join(code).is_dir() && font_dir.is_none() {
             eprintln!(
-                "[PR2Launch] fonts\\{} 字体不完整，回退到原版根目录字体",
+                "[PR2Loc] PR2Localization\\fonts\\{} 字体不完整，回退到原版根目录字体",
                 code
             );
         }
@@ -145,7 +145,7 @@ fn run() -> Result<(), i32> {
         Some(_) => {
             if let Some(code) = font_lang.as_ref() {
                 std::env::set_var("PR2_FONT_DIR", code);
-                println!("[PR2Launch] 字体使用 fonts\\{code}\\（不覆盖原版）");
+                println!("[PR2Loc] 字体使用 PR2Localization\\fonts\\{code}\\（不覆盖原版）");
             }
         }
         None => {
@@ -155,14 +155,14 @@ fn run() -> Result<(), i32> {
 
     if let Some(code) = &lang {
         std::env::set_var("PR2_PACK_LANG", code);
-        println!("[PR2Launch] 本次使用语言包: {code}.txt (优先于 locale.ini，本次启动生效)");
+        println!("[PR2Loc] 本次使用语言包: {code}.txt (优先于 locale.ini，本次启动生效)");
     }
 
     let pi = match create_process(&exe_path, &root, CREATE_SUSPENDED) {
         Ok(v) => v,
         Err(_) => {
             eprintln!(
-                "[PR2Launch] 启动 PR2.exe 失败 (错误 {})",
+                "[PR2Loc] 启动 PR2.exe 失败 (错误 {})",
                 unsafe { GetLastError() }
             );
             return Err(1);
@@ -177,7 +177,7 @@ fn run() -> Result<(), i32> {
     }
     match result {
         Ok(()) => {
-            println!("[PR2Launch] 语言包已注入, PR2.exe 启动中...");
+            println!("[PR2Loc] 语言包已注入, PR2.exe 启动中...");
             Ok(())
         }
         Err(code) => Err(code),
@@ -225,7 +225,7 @@ fn inject_dll(pi: &PROCESS_INFORMATION, dll: &Path) -> Result<(), i32> {
     };
     if remote.is_null() {
         eprintln!(
-            "[PR2Launch] VirtualAllocEx 失败 {}",
+            "[PR2Loc] VirtualAllocEx 失败 {}",
             unsafe { GetLastError() }
         );
         return Err(1);
@@ -241,7 +241,7 @@ fn inject_dll(pi: &PROCESS_INFORMATION, dll: &Path) -> Result<(), i32> {
     };
     if wrote == 0 {
         eprintln!(
-            "[PR2Launch] WriteProcessMemory 失败 {}",
+            "[PR2Loc] WriteProcessMemory 失败 {}",
             unsafe { GetLastError() }
         );
         return Err(1);
@@ -251,7 +251,7 @@ fn inject_dll(pi: &PROCESS_INFORMATION, dll: &Path) -> Result<(), i32> {
     let load_lib = match load_lib {
         Some(f) => f,
         None => {
-            eprintln!("[PR2Launch] 找不到 LoadLibraryA");
+            eprintln!("[PR2Loc] 找不到 LoadLibraryA");
             return Err(1);
         }
     };
@@ -269,7 +269,7 @@ fn inject_dll(pi: &PROCESS_INFORMATION, dll: &Path) -> Result<(), i32> {
     };
     if th == 0 {
         eprintln!(
-            "[PR2Launch] CreateRemoteThread 失败 {}",
+            "[PR2Loc] CreateRemoteThread 失败 {}",
             unsafe { GetLastError() }
         );
         return Err(1);
@@ -283,8 +283,8 @@ fn inject_dll(pi: &PROCESS_INFORMATION, dll: &Path) -> Result<(), i32> {
         CloseHandle(th);
     }
     if exit == 0 {
-        eprintln!("[PR2Launch] PR2TextSource.dll 注入失败 (LoadLibrary 返回 NULL)");
-        eprintln!("[PR2Launch] 提示: 游戏可能因缺少 VC 运行库或 DLL 缺失而未能加载补丁。");
+        eprintln!("[PR2Loc] PR2LocalizationCore.dll 注入失败 (LoadLibrary 返回 NULL)");
+        eprintln!("[PR2Loc] 提示: 游戏可能因缺少 VC 运行库或 DLL 缺失而未能加载补丁。");
         return Err(1);
     }
     Ok(())
@@ -298,12 +298,12 @@ fn path_cstr(path: &Path) -> Vec<u8> {
 }
 
 fn backup_original_fonts(root: &Path) {
-    let bak = root.join("fonts").join("_original");
+    let bak = fonts_dir(root).join("_original");
     if bak.exists() {
         return;
     }
     if !looks_like_original_fonts(root) {
-        println!("[PR2Launch] fonts 根目录不是原版字体，跳过原版备份");
+        println!("[PR2Loc] 根目录 fonts 不是原版字体，跳过原版备份");
         return;
     }
     let _ = fs::create_dir_all(&bak);
@@ -316,14 +316,14 @@ fn backup_original_fonts(root: &Path) {
         }
     }
     if n == 4 {
-        println!("[PR2Launch] 已备份原版字体: fonts\\_original\\");
+        println!("[PR2Loc] 已备份原版字体: PR2Localization\\fonts\\_original\\");
     } else {
-        println!("[PR2Launch] 原版字体备份不完整（{n}/4）");
+        println!("[PR2Loc] 原版字体备份不完整（{n}/4）");
     }
 }
 
 fn restore_original_fonts(root: &Path) {
-    let bak = root.join("fonts").join("_original");
+    let bak = fonts_dir(root).join("_original");
     if !bak.is_dir() {
         return;
     }
@@ -335,12 +335,12 @@ fn restore_original_fonts(root: &Path) {
             if hex.eq_ignore_ascii_case(ORIG_FONT_HASHES[i]) && fs::copy(src, dst).is_ok() {
                 n += 1;
             } else {
-                println!("[PR2Launch] 原版备份哈希不匹配，拒绝恢复: {name}");
+                println!("[PR2Loc] 原版备份哈希不匹配，拒绝恢复: {name}");
             }
         }
     }
     if n > 0 {
-        println!("[PR2Launch] 已恢复原版字体 ({n}/4)");
+        println!("[PR2Loc] 已恢复原版字体 ({n}/4)");
     }
 }
 
@@ -352,7 +352,7 @@ fn looks_like_original_fonts(root: &Path) -> bool {
         }
         if let Some(hex) = file_sha256(&path) {
             if !hex.eq_ignore_ascii_case(ORIG_FONT_HASHES[i]) {
-                println!("[PR2Launch] 字体大小像原版但 SHA-256 不匹配，跳过备份: {name}");
+                println!("[PR2Loc] 字体大小像原版但 SHA-256 不匹配，跳过备份: {name}");
                 return false;
             }
         } else {

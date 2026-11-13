@@ -7,7 +7,7 @@ r"""engine_text.py —— 译文层 → 引擎层（构建期的唯一入口）�
             ↓ 本模块（标点 / 分词 / 补空格，规则见 lang_rules 的 spec）
     build/preview/engine_text/<lang>.toml  引擎文本，构建产物，不进仓库
             ↓ compile_pack
-    build/runtime/PR2Packs/<lang>.txt      语言包
+    build/runtime/PR2Localization/packs/<lang>.txt      语言包
 
 只有一份真相源：译文层。引擎层随时可以从头重建，删掉它不影响构建。
 

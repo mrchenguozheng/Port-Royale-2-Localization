@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [[bin]]
-name = "PR2LauncherGUI"
+name = "PR2LocalizationGUI"
 path = "src/main.rs"
 
 [dependencies]

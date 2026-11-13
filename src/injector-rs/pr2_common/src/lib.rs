@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use windows_sys::Win32::System::LibraryLoader::GetModuleFileNameW;
 
 pub const RUNTIME_VERSION: u32 = 1;
+pub const DATA_DIR: &str = "PR2Localization";
 pub const FONT_NAMES: [&str; 4] = [
     "ARIAL.TTF",
     "ELGRECO_.TTF",
@@ -29,8 +30,60 @@ pub fn exe_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
+pub fn data_dir(root: &Path) -> PathBuf {
+    let new = root.join(DATA_DIR);
+    if new.is_dir() {
+        new
+    } else {
+        root.to_path_buf()
+    }
+}
+
+pub fn packs_dir(root: &Path) -> PathBuf {
+    let new = root.join(DATA_DIR).join("packs");
+    if new.is_dir() {
+        new
+    } else if root.join("PR2Packs").is_dir() {
+        root.join("PR2Packs")
+    } else {
+        new
+    }
+}
+
+pub fn fonts_dir(root: &Path) -> PathBuf {
+    let new = root.join(DATA_DIR).join("fonts");
+    if new.is_dir() {
+        new
+    } else if root.join("fonts").is_dir() {
+        root.join("fonts")
+    } else {
+        new
+    }
+}
+
+pub fn ui_dir(root: &Path) -> PathBuf {
+    let new = root.join(DATA_DIR).join("ui");
+    if new.is_dir() {
+        new
+    } else if root.join("ui").is_dir() {
+        root.join("ui")
+    } else {
+        new
+    }
+}
+
+pub fn log_dir(root: &Path) -> PathBuf {
+    if root.join(DATA_DIR).is_dir() {
+        let dir = root.join(DATA_DIR).join("logs");
+        let _ = fs::create_dir_all(&dir);
+        dir
+    } else {
+        root.to_path_buf()
+    }
+}
+
 pub fn pack_dir(root: &Path) -> PathBuf {
-    root.join("PR2Packs")
+    packs_dir(root)
 }
 
 pub fn pack_path(root: &Path, lang: &str) -> PathBuf {
@@ -64,6 +117,9 @@ pub fn read_locale_language(root: &Path) -> Option<String> {
 
 pub fn write_locale_language(root: &Path, lang: &str) -> bool {
     let path = locale_path(root);
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
     let old = fs::read_to_string(&path).unwrap_or_default();
     let mut lines: Vec<String> = old.lines().map(str::to_string).collect();
     let mut replaced = false;
@@ -115,9 +171,22 @@ pub fn language_fonts_complete(root: &Path, lang: &str) -> bool {
     if lang.is_empty() {
         return false;
     }
+    let dir = fonts_dir(root).join(lang);
     FONT_NAMES
         .iter()
-        .all(|name| root.join("fonts").join(lang).join(name).is_file())
+        .all(|name| dir.join(name).is_file())
+}
+
+pub fn font_rel_dir(root: &Path, lang: &str) -> String {
+    let new = root.join(DATA_DIR).join("fonts").join(lang);
+    let old = root.join("fonts").join(lang);
+    if new.is_dir() {
+        format!("{}\\fonts\\{}", DATA_DIR, lang)
+    } else if old.is_dir() {
+        format!("fonts\\{}", lang)
+    } else {
+        format!("{}\\fonts\\{}", DATA_DIR, lang)
+    }
 }
 
 pub fn valid_lang_code(s: &str) -> bool {

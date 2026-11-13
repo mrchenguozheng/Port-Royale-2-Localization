@@ -80,7 +80,7 @@ def installed_langs(target):
     """游戏目录里真实存在的语言包代码，按字母序。
 
     选的是这里而不是 src\\translations\\：那边是还没编译的译文源，
-    只有装进 PR2Packs\\ 的才真的能让游戏切换过去。
+    只有装进 PR2Localization\\packs\\ 的才真的能让游戏切换过去。
     """
     pack_dir = os.path.join(target, PACK_DIR)
     if not os.path.isdir(pack_dir):
@@ -171,19 +171,20 @@ def patch_report(path):
     out = []
     out.append(("PR2.exe", "有" if is_game_dir(path) else "缺失",
                 "必需" if is_game_dir(path) else "该目录里没有 PR2.exe"))
-    out.append(("PR2Launcher.exe", "有" if launcher_installed(path) else "无",
+    out.append(("PR2Localization.exe", "有" if launcher_installed(path) else "无",
                 "注入启动器"))
-    out.append(("PR2TextSource.dll", "有" if os.path.isfile(
-        os.path.join(path, "PR2TextSource.dll")) else "无", "注入 DLL"))
+    out.append(("PR2LocalizationCore.dll", "有" if os.path.isfile(
+        os.path.join(path, "PR2LocalizationCore.dll")) else "无", "注入 DLL"))
     packs = installed_langs(path)
-    out.append(("PR2Packs\\", "%d 个语言包" % len(packs) if packs else "无",
+    out.append(("PR2Localization\\packs\\", "%d 个语言包" % len(packs) if packs else "无",
                 "、".join(packs) if packs else "还没有复制语言包"))
     ini = os.path.join(path, PACK_DIR, "locale.ini")
     if os.path.isfile(ini):
-        out.append(("PR2Packs\\locale.ini", read_ini_language(ini) or "无 language=",
+        out.append(("PR2Localization\\packs\\locale.ini",
+                    read_ini_language(ini) or "无 language=",
                     "决定游戏加载哪个包"))
     else:
-        out.append(("PR2Packs\\locale.ini", "无", "复制后才会生成"))
+        out.append(("PR2Localization\\packs\\locale.ini", "无", "复制后才会生成"))
     fonts_dir = os.path.join(path, "fonts")
     orig_dir = os.path.join(ROOT, "assets", "fonts", "original")
     for name in ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf"):

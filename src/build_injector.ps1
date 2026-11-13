@@ -3,11 +3,20 @@
 #  PR2 Localization - Rust build script
 #
 #  Builds the native programs from src\injector-rs:
-#    PR2TextSource.dll, PR2Launcher.exe, PR2LauncherGUI.exe, VERSION.dll
-#  and copies them into build\runtime\.
+#    PR2LocalizationCore.dll, PR2Localization.exe,
+#    PR2LocalizationGUI.exe, PR2LocalizationProxy.dll
+#  and copies them into build\runtime\ with the deployed names:
+#    PR2LocalizationCore.dll
+#    PR2Localization.exe
+#    PR2LocalizationGUI.exe
+#    VERSION.dll            (the proxy must keep this name for PR2.exe)
 #
-#  VERSION.dll is the proxy host that lets the game load PR2TextSource.dll
-#  naturally under Steam, without a launcher or remote injection.
+#  VERSION.dll is the proxy host that lets the game load
+#  PR2LocalizationCore.dll naturally under Steam, without a launcher
+#  or remote injection.
+#
+#  Runtime data lives under build\runtime\PR2Localization\:
+#    packs\ fonts\ ui\ logs\
 #
 #  Requires rustup + the i686-pc-windows-msvc target:
 #    rustup target add i686-pc-windows-msvc
@@ -88,20 +97,29 @@ try {
 if ($code -ne 0) { Stop-WithError 'FAILED. See the errors above.' }
 
 $Out = Join-Path $RustDir 'target\i686-pc-windows-msvc\release'
-$artifacts = @('PR2TextSource.dll', 'PR2Launcher.exe', 'PR2LauncherGUI.exe', 'VERSION.dll')
-foreach ($name in $artifacts) {
-    if (-not (Test-Path -LiteralPath (Join-Path $Out $name) -PathType Leaf)) {
-        Stop-WithError "FAILED: missing $(Join-Path $Out $name)"
+$artifactMap = @{
+    'PR2LocalizationCore.dll' = 'PR2LocalizationCore.dll'
+    'PR2Localization.exe' = 'PR2Localization.exe'
+    'PR2LocalizationGUI.exe' = 'PR2LocalizationGUI.exe'
+    'PR2LocalizationProxy.dll' = 'VERSION.dll'
+}
+foreach ($srcName in $artifactMap.Keys) {
+    if (-not (Test-Path -LiteralPath (Join-Path $Out $srcName) -PathType Leaf)) {
+        Stop-WithError "FAILED: missing $(Join-Path $Out $srcName)"
     }
 }
 
-foreach ($name in $artifacts) {
-    Copy-Item -LiteralPath (Join-Path $Out $name) `
-        -Destination (Join-Path $Runtime $name) -Force
+foreach ($srcName in $artifactMap.Keys) {
+    Copy-Item -LiteralPath (Join-Path $Out $srcName) `
+        -Destination (Join-Path $Runtime $artifactMap[$srcName]) -Force
 }
 
+$DataOut = Join-Path $Runtime 'PR2Localization'
+New-Item -ItemType Directory -Force -Path $DataOut | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $DataOut 'logs') | Out-Null
+
 if (Test-Path -LiteralPath $UiSrc -PathType Container) {
-    $UiOut = Join-Path $Runtime 'ui'
+    $UiOut = Join-Path $DataOut 'ui'
     New-Item -ItemType Directory -Force -Path $UiOut | Out-Null
     foreach ($lang in @('en', 'ja', 'zh')) {
         $ini = Join-Path $UiSrc "$lang.ini"
@@ -113,7 +131,10 @@ if (Test-Path -LiteralPath $UiSrc -PathType Container) {
 
 Write-Host ''
 Write-Host '[build] SUCCESS:'
-foreach ($name in $artifacts) { Write-Host $name }
+foreach ($srcName in $artifactMap.Keys) {
+    Write-Host ("  {0}  ->  {1}" -f $srcName, $artifactMap[$srcName])
+}
+Write-Host ("  data  ->  {0}" -f $DataOut)
 Write-Host ''
 Write-Host '[build] Next:  src\build_translation.ps1   (build the language pack)'
 Wait-IfPaused

@@ -93,7 +93,7 @@ pub fn run() {
 
     unsafe {
         let inst = GetModuleHandleW(ptr::null()) as HINSTANCE;
-        let class_name = wide("PR2LauncherGUI");
+        let class_name = wide("PR2LocalizationGUI");
         let mut wc: WNDCLASSW = std::mem::zeroed();
         wc.style = 0;
         wc.lpfnWndProc = Some(wndproc);
@@ -109,7 +109,7 @@ pub fn run() {
             drop(Box::from_raw(init as *mut AppInit));
             return;
         }
-        let title = wide("Port Royale 2 Launcher");
+        let title = wide("Port Royale 2 Localization");
         let hwnd = CreateWindowExW(
             0,
             class_name.as_ptr(),

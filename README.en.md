@@ -16,14 +16,14 @@ original `PR2.exe` is not modified.
 language and the fallback when a pack is missing. The launcher UI is available
 in `en`, `ja`, and `zh`.
 
-The GOG English `1.1.2.3` build is tested through `PR2LauncherGUI.exe`. Steam
+The GOG English `1.1.2.3` build is tested through `PR2LocalizationGUI.exe`. Steam
 English is experimental: the `VERSION.dll` proxy loading chain is built, but it
 still needs an in-game check. GOG French and other builds are out of scope.
 
 On GOG, do **not** start `PR2.exe` directly: the loader resolves `VERSION.dll`
 from `C:\Windows\SysWOW64`, so the local proxy is bypassed and the game starts
-in English. Use `PR2LauncherGUI.exe` and choose a language. Steam can use the
-local `VERSION.dll` proxy; `PR2LauncherGUI.exe` remains available as a fallback.
+in English. Use `PR2LocalizationGUI.exe` and choose a language. Steam can use the
+local `VERSION.dll` proxy; `PR2LocalizationGUI.exe` remains available as a fallback.
 
 ## Documentation
 

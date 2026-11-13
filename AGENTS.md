@@ -7,14 +7,14 @@
 ## 项目边界
 
 - 这是《Port Royale 2》的**外挂式本地化运行时**：原版 `PR2.exe` 不改字节。
-  GOG 的正式入口是 `PR2LauncherGUI.exe` / `PR2Launcher.exe`，由启动器注入
-  `PR2TextSource.dll`。不要按“GOG 双击 `PR2.exe` 自然加载”做回归：GOG 加载器会把
+  GOG 的正式入口是 `PR2LocalizationGUI.exe` / `PR2Localization.exe`，由启动器注入
+  `PR2LocalizationCore.dll`。不要按“GOG 双击 `PR2.exe` 自然加载”做回归：GOG 加载器会把
   `VERSION.dll` 解析到 `C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入
   `PR2.exe` 进程。Steam 的实验性自然加载路径才使用 `VERSION.dll` 代理。
 - **GOG 英文版 `1.1.2.3` 已通过启动器入口实测；Steam 英文版为实验性支持**。
   GOG 法语版和其他版本不在支持范围内；不要在未支持版本上部署后把“注入不生效”
   当作本仓库回归。
-- 发行包按语言拆分；玩家拿到的是构建好的 `VERSION.dll`、`PR2TextSource.dll`、
+- 发行包按语言拆分；玩家拿到的是构建好的 `VERSION.dll`、`PR2LocalizationCore.dll`、
   语言包和字体，不需要 Python 或 Rust 工具链。不要把“让每个玩家自行构建”写成默认流程。
 
 ## 当前结构
@@ -32,22 +32,23 @@
 
 Rust 产物：
 
+- `PR2LocalizationProxy.dll`（构建产物；部署时必须改名为 `VERSION.dll`）
 - `VERSION.dll`
-- `PR2TextSource.dll`
-- `PR2Launcher.exe`
-- `PR2LauncherGUI.exe`
+- `PR2LocalizationCore.dll`
+- `PR2Localization.exe`
+- `PR2LocalizationGUI.exe`
 
-`VERSION.dll` 是代理宿主，不是游戏原文件；它必须和 `PR2TextSource.dll` 同目录。
+`VERSION.dll` 是代理宿主，不是游戏原文件；它必须和 `PR2LocalizationCore.dll` 同目录。
 不要用裸 `LoadLibraryExW("version.dll")` 找系统 DLL，可能递归到代理自身；
 用 `GetSystemDirectoryW` 拼绝对路径。
 
 ## 不可破坏的契约
 
 - `src/translations/<语言>.toml` 是**唯一手改层**；不要直接改 `build/` 下的产物。
-- 运行时语言包是 `PR2Packs/<语言>.txt`，格式为 `0x... = text` 一行一条；不要把旧的
+- 运行时语言包是 `PR2Localization/packs/<语言>.txt`，格式为 `0x... = text` 一行一条；不要把旧的
   `|` 换行兜底重新加回来。需要换行时用引擎标签/已有规则，不要自行发明格式。
-- `PR2Packs/locale.ini` 的 `language=` 是游戏默认语言，也是 GUI 的唯一语言状态。
-- `fonts/<语言>/` 固定四个 TTF；不要覆盖 `fonts/` 根目录原版字体。
+- `PR2Localization/packs/locale.ini` 的 `language=` 是游戏默认语言，也是 GUI 的唯一语言状态。
+- `PR2Localization/fonts/<语言>/` 固定四个 TTF；不要覆盖游戏根目录 `fonts/` 的原版字体。
 - 译文里的 hash id、`%1` 等占位符、`@D$...$` 脚本变量、`<n>`、`<c>`、`<f:...>` 标签
   都不是可翻译文本；改译文时保持原样。
 - 字体路径、语言包路径和 GUI 文案的详细规则见
@@ -142,7 +143,7 @@ git diff --check
 
 - 现象：完成第一个教程战役后点「退出游戏」，`PR2.exe` 可能不退出，窗口黑屏或白屏残留；
   有时出现 MSVC Runtime Error，Program 指向 `PR2.exe`。
-- 已复现：直接启动原版英文、用 `PR2LauncherGUI` 启动原版、启动中文版都出现过。
+- 已复现：直接启动原版英文、用 `PR2LocalizationGUI` 启动原版、启动中文版都出现过。
   单次“原版正常”不能作为根因结论。
 - 当前没有该路径的崩溃 dump，**根因未定位，状态是未修复**。
 - GUI 的「结束游戏进程」只是兜底，仅结束 GUI 所在目录的 `PR2.exe`，不是修复。

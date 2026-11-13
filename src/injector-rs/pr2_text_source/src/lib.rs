@@ -11,7 +11,8 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, AtomicUsize, Ordering}
 use std::sync::{Mutex, OnceLock};
 
 use pr2_common::{
-    exe_dir, override_path, pack_path, read_locale_language, valid_lang_code,
+    exe_dir, font_rel_dir, fonts_dir, log_dir, pack_dir, override_path, pack_path,
+    read_locale_language, valid_lang_code,
 };
 use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HANDLE, HMODULE};
 use windows_sys::Win32::Storage::FileSystem::{
@@ -529,7 +530,7 @@ fn resolve_log(line: &str) {
     let m = RESOLVE_LOG.get_or_init(|| Mutex::new(None));
     let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
     if guard.is_none() {
-        let path = exe_dir().join("PR2TextSource_resolve.log");
+        let path = log_dir(&exe_dir()).join("resolve.log");
         *guard = OpenOptions::new()
             .create(true)
             .truncate(true)
@@ -572,7 +573,7 @@ fn lsr_log(line: &str) {
     let m = LSR_LOG.get_or_init(|| Mutex::new(None));
     let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
     if guard.is_none() {
-        let path = exe_dir().join("PR2TextSource_lsr.log");
+        let path = log_dir(&exe_dir()).join("vtable.log");
         *guard = OpenOptions::new()
             .create(true)
             .append(true)
@@ -588,7 +589,7 @@ fn lsr_log(line: &str) {
 }
 
 fn log_line(msg: &str) {
-    let path = exe_dir().join("PR2TextSource.log");
+    let path = log_dir(&exe_dir()).join("runtime.log");
     if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(path) {
         let _ = writeln!(f, "{msg}");
     }
@@ -812,7 +813,7 @@ unsafe fn load_edit_file() {
         }
     }
 
-    let dir = root.join("PR2Packs");
+    let dir = pack_dir(&root);
     let mut edits = HashMap::new();
     load_override_file(&pack_path(&root, &locale), &mut edits);
     load_override_file(&override_path(&root, &locale), &mut edits);
@@ -1231,18 +1232,19 @@ fn font_log_all() -> bool {
 fn font_dir() -> Option<&'static str> {
     FONT_DIR
         .get_or_init(|| {
+            let root = exe_dir();
             if let Ok(s) = std::env::var("PR2_FONT_DIR") {
                 let s = s.trim().to_string();
                 if !s.is_empty() && valid_lang_code(&s) {
-                    return Some(s);
+                    return Some(font_rel_dir(&root, &s));
                 }
             }
-            // Natural launch (VERSION.dll proxy or plain PR2.exe) has no
-            // launcher to set PR2_FONT_DIR. Use the selected pack's font
-            // directory when it exists, otherwise keep the original fonts.
+            // Steam natural launch has no launcher to set PR2_FONT_DIR.
+            // Use the selected pack's font directory when it exists,
+            // otherwise keep the original fonts.
             let lang = pack_locale();
-            if exe_dir().join("fonts").join(&lang).is_dir() {
-                Some(lang)
+            if fonts_dir(&root).join(&lang).is_dir() {
+                Some(font_rel_dir(&root, &lang))
             } else {
                 None
             }
@@ -1268,26 +1270,14 @@ fn redirect_font_path(input: &str) -> Option<String> {
     let sep = input.as_bytes()[pos + 5] as char;
     let rest = &input[pos + 6..];
     let lowered_rest = rest.to_ascii_lowercase();
-    if lowered_rest.starts_with(&dir.to_ascii_lowercase())
-        && rest
-            .as_bytes()
-            .get(dir.len())
-            .is_some_and(|b| *b == b'\\' || *b == b'/')
-    {
+    if lower.contains("pr2localization\\fonts") || lower.contains("pr2localization/fonts") {
         return None;
     }
     let is_ttf = lowered_rest.ends_with(".ttf");
     if !is_ttf && !lowered_rest.contains("*.*") {
         return None;
     }
-    Some(format!(
-        "{}fonts{}{}{}{}",
-        &input[..pos],
-        sep,
-        dir,
-        sep,
-        rest
-    ))
+    Some(format!("{}{}{}{}", &input[..pos], dir, sep, rest))
 }
 
 fn font_log_path(path: &str) {
@@ -1304,7 +1294,7 @@ fn font_log_path(path: &str) {
     let m = FONT_LOG.get_or_init(|| Mutex::new(None));
     let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
     if guard.is_none() {
-        let p = exe_dir().join("PR2FontPaths.log");
+        let p = log_dir(&exe_dir()).join("font-paths.log");
         *guard = OpenOptions::new()
             .create(true)
             .truncate(true)
@@ -1328,7 +1318,7 @@ unsafe fn install_font_log_hooks() {
         let m = FONT_LOG.get_or_init(|| Mutex::new(None));
         let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
         if guard.is_none() {
-            let p = exe_dir().join("PR2FontPaths.log");
+            let p = log_dir(&exe_dir()).join("font-paths.log");
             *guard = OpenOptions::new()
                 .create(true)
                 .truncate(true)

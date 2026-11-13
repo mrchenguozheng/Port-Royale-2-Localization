@@ -3,7 +3,7 @@
 #  PR2 Localization - language pack build script
 #
 #  Compiles src\translations\<lang>.toml into the pack the DLL
-#  reads at runtime: build\runtime\PR2Packs\<lang>.txt
+#  reads at runtime: build\runtime\PR2Localization\packs\<lang>.txt
 #
 #    .\src\build_translation.ps1
 #    .\src\build_translation.ps1 -Lang ja -NoPause
@@ -37,7 +37,7 @@ $ErrorActionPreference = 'Stop'
 $Src = $PSScriptRoot
 $Repo = Split-Path -Parent $Src
 $Tools = Join-Path $Src 'tools\pack'
-$Out = Join-Path $Repo 'build\runtime\PR2Packs'
+$Out = Join-Path $Repo 'build\runtime\PR2Localization\packs'
 $Locale = Join-Path $Src 'locale.ini'
 
 function Wait-IfPaused {
@@ -99,6 +99,6 @@ Write-Host '[pack] SUCCESS:'
 Get-ChildItem -LiteralPath $Out | ForEach-Object { Write-Host $_.Name }
 Write-Host ''
 Write-Host '[pack] The pack is read at game start. Launch'
-Write-Host '[pack] build\runtime\PR2Launcher.exe - no rebuild needed.'
+Write-Host '[pack] build\runtime\PR2LocalizationGUI.exe - no rebuild needed.'
 Wait-IfPaused
 exit 0

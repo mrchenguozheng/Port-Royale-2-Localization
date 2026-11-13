@@ -2,7 +2,7 @@
 //!
 //! PR2.exe imports `VERSION.dll`; Windows resolves that import from the game
 //! directory first. This proxy forwards the version APIs to the real system
-//! DLL and, on a worker thread, loads the sibling `PR2TextSource.dll`.
+//! DLL and, on a worker thread, loads the sibling `PR2LocalizationCore.dll`.
 //!
 //! The worker is created from `DllMain`, but the actual `LoadLibraryW` happens
 //! after `DllMain` returns, so it never calls the loader while the process
@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 use std::ptr;
 use std::sync::OnceLock;
 
+use pr2_common::log_dir;
 use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HANDLE, HMODULE};
 use windows_sys::Win32::System::LibraryLoader::{
     DisableThreadLibraryCalls, GetModuleFileNameW, GetProcAddress, LoadLibraryW,
@@ -25,7 +26,7 @@ use windows_sys::Win32::System::LibraryLoader::{
 use windows_sys::Win32::System::SystemInformation::GetSystemDirectoryW;
 use windows_sys::Win32::System::Threading::{CreateThread, Sleep};
 
-const TEXT_SOURCE: &str = "PR2TextSource.dll";
+const TEXT_SOURCE: &str = "PR2LocalizationCore.dll";
 
 type GetFileVersionInfoAFn =
     unsafe extern "system" fn(*const u8, u32, u32, *mut c_void) -> i32;
@@ -168,7 +169,15 @@ fn log_line(dir: &Path, msg: &str) {
     if let Ok(mut f) = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(dir.join("PR2Proxy.log"))
+        .open(log_dir(dir).join("proxy.log"))
+    {
+        let _ = writeln!(f, "{msg}");
+        return;
+    }
+    if let Ok(mut f) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("proxy.log"))
     {
         let _ = writeln!(f, "{msg}");
     }

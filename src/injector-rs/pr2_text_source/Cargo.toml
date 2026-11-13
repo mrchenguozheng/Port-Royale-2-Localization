@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [lib]
-name = "PR2TextSource"
+name = "PR2LocalizationCore"
 crate-type = ["cdylib"]
 
 [dependencies]

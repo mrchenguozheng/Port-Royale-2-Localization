@@ -34,16 +34,29 @@ SRC = os.path.dirname(HERE)                              # 仓库的 src\
 ROOT = os.path.dirname(SRC)                              # 仓库根
 BUILD = os.path.join(ROOT, "build")
 RUNTIME = os.path.join(BUILD, "runtime")
-PACK_OUT = os.path.join(RUNTIME, "PR2Packs")
+PACK_OUT = os.path.join(RUNTIME, "PR2Localization", "packs")
 LOCALE_INI = os.path.join(SRC, "locale.ini")
 
-# 直接复制进游戏目录的文件。
-FLAT_FILES = ("PR2Launcher.exe", "PR2LauncherGUI.exe", "PR2TextSource.dll")
-# 整个目录一起复制。
-PACK_DIR = "PR2Packs"
+# 直接复制进游戏目录的文件。名字以 PR2Localization 开头，
+# 和游戏原版文件区分；Steam 的代理构建产物叫 PR2LocalizationProxy.dll，
+# 部署时必须改名成 VERSION.dll —— PR2.exe 的导入表固定要求这个名字。
+FLAT_FILES = (
+    "PR2Localization.exe",
+    "PR2LocalizationGUI.exe",
+    "PR2LocalizationCore.dll",
+    "VERSION.dll",
+)
+# 运行时数据目录；语言包、字体、UI、日志都放在它下面。
+DATA_DIR = "PR2Localization"
+PACK_DIR = os.path.join(DATA_DIR, "packs")
+FONT_DIR = os.path.join(DATA_DIR, "fonts")
+UI_DIR = os.path.join(DATA_DIR, "ui")
+LOG_DIR = os.path.join(DATA_DIR, "logs")
 GAME_EXE = "PR2.exe"
 #: 装好之后用它启动游戏。它挂起 PR2.exe、注入 DLL、再恢复执行。
-LAUNCHER = "PR2Launcher.exe"
+LAUNCHER = "PR2Localization.exe"
+#: GUI 入口；GOG 的正式入口是它。
+LAUNCHER_GUI = "PR2LocalizationGUI.exe"
 #: 编译注入器。子进程里跑 PowerShell 7，结果读它的输出。
 INJECTOR_PS1 = os.path.join(SRC, "build_injector.ps1")
 #: 译文编辑器（本地 Web）。它跟上面三条链路都无关 —— 不编译、不复制、
@@ -61,7 +74,7 @@ EDITOR_PORT_BASE = 8777
 #: 而上一轮留下的实例可能正好停在更上面。多扫几个端口很便宜（本地拒绝是
 #: 立刻返回的），漏扫的代价却是「没认出来 → 又起一个」。
 EDITOR_PORT_TRIES = 24
-#: 启动语言下拉里的「不指定」项：读PR2Packs\locale.ini 的 language=。
+#: 启动语言下拉里的「不指定」项：读 PR2Localization\packs\locale.ini 的 language=。
 FOLLOW_LANG = "跟随 locale.ini"
 
 #: 日志保留的最大行数。超过就丢最老的那些：一次构建几十行，
@@ -74,7 +87,7 @@ KNOWN_BUILDS = (
         "id": "gog-en-1.1.2.3",
         "label": "GOG 英文版 1.1.2.3",
         "sha256": "394CE2A48BC6B21708B81A232C7C88459BE7F3C8082CC593AD83B0B8E4C168EC",
-        "note": "原版英文，注入方案首选；安装目录自带 PR2Packs 目录。",
+        "note": "原版英文，注入方案首选；安装目录自带语言包目录。",
     },
     {
         "id": "gog-fr-1.1.2.42",
@@ -94,13 +107,11 @@ BUILD_BY_SHA = {b['sha256'].upper(): b for b in KNOWN_BUILDS}
 
 
 PATCH_ITEMS = (
-    "PR2Launcher.exe",
-    "PR2TextSource.dll",
-    "PR2TextSource.log",
-    "PR2TextSource_gap.log",
-    "PR2TextSource_lsr.log",
-    "PR2TextSource_resolve.log",
-    "PR2Packs\\",
+    "PR2Localization.exe",
+    "PR2LocalizationGUI.exe",
+    "PR2LocalizationCore.dll",
+    "VERSION.dll",
+    "PR2Localization\\",
 )
 
 def is_game_dir(path):

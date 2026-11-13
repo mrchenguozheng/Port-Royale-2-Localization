@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use pr2_common::valid_lang_code;
+use pr2_common::{pack_dir, valid_lang_code};
 
 pub struct Pack {
     pub code: String,
@@ -11,7 +11,7 @@ pub struct Pack {
 }
 
 pub fn scan(root: &Path) -> Vec<Pack> {
-    let packs_dir = root.join("PR2Packs");
+    let packs_dir = pack_dir(root);
     let mut entries: Vec<_> = match fs::read_dir(&packs_dir) {
         Ok(v) => v.filter_map(|e| e.ok()).collect(),
         Err(_) => Vec::new(),

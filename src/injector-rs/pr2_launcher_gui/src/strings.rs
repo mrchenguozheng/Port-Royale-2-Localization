@@ -1,9 +1,10 @@
+use pr2_common::ui_dir;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
 const BUILTIN: &[(&str, &str)] = &[
-    ("title", "Port Royale 2 Launcher"),
+    ("title", "Port Royale 2 Localization"),
     ("subtitle", "Port Royale 2 localization runtime"),
     ("label.language", "Language pack:"),
     ("button.launch", "Launch localized"),
@@ -11,25 +12,25 @@ const BUILTIN: &[(&str, &str)] = &[
     ("button.refresh", "Refresh"),
     ("button.kill", "End game process"),
     ("status.count", "%d language pack(s)"),
-    ("status.none", "No .txt in PR2Packs"),
+    ("status.none", "No .txt in PR2Localization\\packs"),
     ("status.launched", "Localized game launched."),
     ("status.vanilla", "Original game launched."),
     ("status.killed", "Ended %d PR2.exe process(es)."),
     (
         "hint.footer",
-        "Language packs live in PR2Packs.\nIf exit hangs, end PR2.exe here.",
+        "Language packs live in PR2Localization\\packs.\nIf exit hangs, end PR2.exe here.",
     ),
     (
         "confirm.kill",
         "Force-end %d PR2.exe process(es) from this folder?\nUnsaved game progress will be lost.",
     ),
-    ("error.no_launcher", "PR2Launcher.exe not found in this folder."),
+    ("error.no_launcher", "PR2Localization.exe not found in this folder."),
     ("error.no_language", "No language pack selected."),
     ("error.no_game", "No running PR2.exe from this folder was found."),
-    ("error.launch_failed", "Failed to start PR2Launcher.exe."),
+    ("error.launch_failed", "Failed to start PR2Localization.exe."),
     ("error.kill_failed", "Failed to end PR2.exe (error %lu)."),
     ("error.exit_code", "Launcher exit code %lu; the game did not start."),
-    ("error.font_missing", "fonts\\%s\\ has no TTF fonts."),
+    ("error.font_missing", "PR2Localization\\fonts\\%s\\ has no TTF fonts."),
     (
         "error.pack_too_new",
         "Language pack needs a newer launcher (runtime v%d, current v%d).",
@@ -48,9 +49,10 @@ pub struct Strings {
 impl Strings {
     pub fn load(root: &Path, ui: &str) -> Self {
         let mut values = HashMap::new();
-        read_ini(&root.join("ui").join(format!("{ui}.ini")), &mut values);
+        let dir = ui_dir(root);
+        read_ini(&dir.join(format!("{ui}.ini")), &mut values);
         if values.is_empty() && ui != "en" {
-            read_ini(&root.join("ui").join("en.ini"), &mut values);
+            read_ini(&dir.join("en.ini"), &mut values);
         }
         Self { values }
     }

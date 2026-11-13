@@ -57,10 +57,10 @@ def launch_game(target, lang=None):
 
 
 def launch_vanilla(target):
-    """启动原版 PR2.exe，并先恢复 fonts\\_original\\ 里的原版字体。
+    """启动原版 PR2.exe，并先恢复 PR2Localization\\fonts\\_original\\ 里的原版字体。
 
     直接用 PR2.exe 启动也可以，但那样会继续用上一次替换过的字体；
-    走 PR2Launcher.exe --vanilla 才能先把原版字体恢复回来。
+    走 PR2Localization.exe --vanilla 才能先把原版字体恢复回来。
     没有启动器时退回直接启动。
     """
     if not is_game_dir(target):
@@ -240,7 +240,7 @@ def _server_exe():
 
 
 def game_processes():
-    """列出正在运行的 PR2.exe / PR2Launcher.exe。"""
+    """列出正在运行的 PR2.exe / PR2Localization.exe。"""
     import csv as _csv
     import io as _io
     import subprocess as _sp
@@ -261,7 +261,7 @@ def game_processes():
 
 
 def kill_game():
-    """强制结束 PR2.exe / PR2Launcher.exe，返回 (ok, message)。"""
+    """强制结束 PR2.exe / PR2Localization.exe，返回 (ok, message)。"""
     import subprocess as _sp
     procs = game_processes()
     if not procs:

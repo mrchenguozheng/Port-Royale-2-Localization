@@ -42,7 +42,7 @@ ROOT = os.path.dirname(SRC)                     # 仓库根
 sys.path.insert(0, HERE)
 
 REF_JSON = os.path.join(ROOT, "editor", "data", "editor-data.json")
-ZH_TXT = os.path.join(ROOT, "build", "runtime", "PR2Packs", "zh.txt")
+ZH_TXT = os.path.join(ROOT, "build", "runtime", "PR2Localization", "packs", "zh.txt")
 STRINGS = os.path.join(SRC, "translations")
 #: 只读参考（英/法/中文文本源）在 src\references\
 REFS = os.path.join(SRC, "orig")

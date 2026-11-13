@@ -19,7 +19,7 @@ pub enum LaunchError {
 }
 
 pub fn launch(root: &Path, lang: Option<&str>, vanilla: bool) -> Result<(), LaunchError> {
-    let launcher = root.join("PR2Launcher.exe");
+    let launcher = root.join("PR2Localization.exe");
     if !launcher.is_file() {
         return Err(LaunchError::NoLauncher);
     }

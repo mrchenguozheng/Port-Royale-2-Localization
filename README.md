@@ -15,19 +15,19 @@
 1. 确认是 **GOG 英文版 `1.1.2.3`**，或 Steam 英文版（实验性）；
 2. 从 Release 下载对应语言的 zip，例如 `PR2-zh-v1.0.0.zip`；
 3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
-4. GOG 双击 `PR2LauncherGUI.exe`，选语言后点「以所选语言启动」；
+4. GOG 双击 `PR2LocalizationGUI.exe`，选语言后点「以所选语言启动」；
    Steam 从 Steam 启动游戏；
-5. 进游戏后看 `PR2TextSource.log`，第一行应有 `pack 'zh' ... overrides`。
+5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... overrides`。
 
 GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析到
 `C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入游戏进程，结果是原版英文。
-`PR2Launcher.exe` / `PR2LauncherGUI.exe` 是 GOG 的正式入口，负责注入
-`PR2TextSource.dll`；原版 `PR2.exe` 本身不改。
+`PR2Localization.exe` / `PR2LocalizationGUI.exe` 是 GOG 的正式入口，负责注入
+`PR2LocalizationCore.dll`；原版 `PR2.exe` 本身不改。
 
 注意：
 
 - 不要删除 `fonts\` 根目录的四份原版字体；
-- 缺字体时 GUI 会提示，把 zip 里的 `fonts\<语言>\` 重新解压完整即可。
+- 缺字体时 GUI 会提示，把 zip 里的 `PR2Localization\fonts\<语言>\` 重新解压完整即可。
 
 完整步骤、卸载和常见问题见[玩家指南](docs/玩家指南.md)。
 
@@ -39,16 +39,16 @@ GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析�
 
 | 游戏版本 | 状态 |
 |---|---|
-| **GOG 英文 `1.1.2.3`** | ✅ 已实测（`PR2LauncherGUI` 入口） |
+| **GOG 英文 `1.1.2.3`** | ✅ 已实测（`PR2LocalizationGUI` 入口） |
 | **Steam 英文（当前测试目录）** | 🟡 实验性：`VERSION.dll` 代理加载链已构建，待进游戏验证 |
 | GOG 法语 `1.1.2.42` | ❌ 不支持（只用作翻译参照） |
 | 其他版本 | ❌ 不支持 |
 
 Steam 版不再依赖启动器远程注入：`PR2.exe` 导入 `VERSION.dll`，本项目的
 `VERSION.dll` 转发系统 version API，并在工作线程里加载同目录
-`PR2TextSource.dll`；后者等待 `A2dLib-2.20A.dll` 后再装 hook。
-未验证的版本不要反馈“汉化已支持”，先附 `PR2TextSource.log` 和
-`PR2Proxy.log`。
+`PR2LocalizationCore.dll`；后者等待 `A2dLib-2.20A.dll` 后再装 hook。
+未验证的版本不要反馈“汉化已支持”，先附 `PR2Localization\logs\runtime.log` 和
+`PR2Localization\logs\proxy.log`。
 
 ---
 
@@ -126,10 +126,10 @@ pr2-localization/
 
 | 文件 | 角色 |
 |---|---|
-| `PR2Launcher.exe` | 启动器。挂起方式启动 `PR2.exe`，注入 DLL 后恢复执行（构建产物） |
-| `PR2TextSource.dll` | 主逻辑。hook 引擎取字的三条路径，把译文替换进去（构建产物） |
-| `PR2Packs\` | 语言包目录。`<语言>.txt` + `locale.ini`，可直接改文本 |
-| `fonts\` | 本地化字体；缺字会显示空白 |
+| `PR2Localization.exe` | 启动器。挂起方式启动 `PR2.exe`，注入 DLL 后恢复执行（构建产物） |
+| `PR2LocalizationCore.dll` | 主逻辑。hook 引擎取字的三条路径，把译文替换进去（构建产物） |
+| `PR2Localization\packs\` | 语言包目录。`<语言>.txt` + `locale.ini`，可直接改文本 |
+| `PR2Localization\fonts\` | 本地化字体；缺字会显示空白 |
 
 ## 加一种语言
 
@@ -178,8 +178,8 @@ pr2-localization/
   换游戏版本（包括 GOG 的法语版 `1.1.2.42`）很可能需要改偏移，否则整体不生效。
 - **中文条目整条不显示是分词问题，不是标签问题。** 引擎按空格切词，
   整串汉字超宽会被整条丢弃，只能逐条在游戏里实测。
-- **字体按语言分开。** 开发用缝合版 `build\runtime\fonts\<语言>\`，发行用完整 Noto；
-  部署时复制到游戏 `fonts\<语言>\`，不覆盖根目录原版。译文新增生僻字时，
+- **字体按语言分开。** 开发用缝合版 `build\runtime\PR2Localization\fonts\<语言>\`，发行用完整 Noto；
+  部署时复制到游戏 `PR2Localization\fonts\<语言>\`，不覆盖根目录原版。译文新增生僻字时，
   构建会自动重缝，缺字就会显示空白。
 
 ---

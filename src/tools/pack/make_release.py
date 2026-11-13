@@ -5,13 +5,16 @@
 一个语言一个 zip，解压到游戏根目录即可：
 
     PR2-zh-v1.0.0/
-      PR2Launcher.exe
-      PR2LauncherGUI.exe
-      PR2TextSource.dll
+      PR2Localization.exe
+      PR2LocalizationGUI.exe
+      PR2LocalizationCore.dll
       VERSION.dll
-      PR2Packs/zh.txt
-      PR2Packs/locale.ini
-      fonts/ARIAL.TTF ...          # Noto 替换字体（默认）
+      PR2Localization/
+        packs/zh.txt
+        packs/locale.ini
+        fonts/zh/ARIAL.TTF ...    # Noto 替换字体（默认）
+        ui/zh.ini
+        logs/
       README.txt
       OFL.txt
 
@@ -41,12 +44,14 @@ BUILD = os.path.join(ROOT, "build")
 RUNTIME = os.path.join(BUILD, "runtime")
 
 LABELS = {"zh": "简体中文", "ja": "日本語"}
-FLAT = ("PR2Launcher.exe", "PR2LauncherGUI.exe", "PR2TextSource.dll", "VERSION.dll")
+DATA_DIR = "PR2Localization"
+FLAT = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
+        "PR2LocalizationCore.dll", "VERSION.dll")
 RUNTIME_VERSION = 1  # 与 src/injector-rs/pr2_common/src/lib.rs 的 RUNTIME_VERSION 保持一致
 
 
 def build_pack(lang, stage, log):
-    out = os.path.join(stage, "PR2Packs")
+    out = os.path.join(stage, DATA_DIR, "packs")
     os.makedirs(out, exist_ok=True)
     log("编译语言包 %s …" % lang)
     from build_artifacts import compile_pack
@@ -70,14 +75,15 @@ def copy_fonts(lang, stage, mode, log, cache=True):
     if mode == "none":
         log("跳过字体（发行包不含字体）")
         return
-    dst = os.path.join(stage, "fonts", lang)
+    dst = os.path.join(stage, DATA_DIR, "fonts", lang)
     from build_artifacts import build_fonts
-    out_base = os.path.join(stage, "fonts")
+    out_base = os.path.join(stage, DATA_DIR, "fonts")
     if mode == "stitch":
         ok, msg = build_fonts([lang], out_dir=None, mode="stitch", log=log)
         if not ok:
             raise FileNotFoundError(msg)
-        shutil.copytree(os.path.join(RUNTIME, "fonts", lang), dst, dirs_exist_ok=True)
+        shutil.copytree(os.path.join(RUNTIME, DATA_DIR, "fonts", lang),
+                        dst, dirs_exist_ok=True)
         log("复制缝合字体（仅限私有/自用包）")
         return
 
@@ -85,7 +91,7 @@ def copy_fonts(lang, stage, mode, log, cache=True):
                           log=log, cache=cache)
     if not ok:
         raise RuntimeError(msg)
-    # 字体目录只留 TTF；来源说明移到包根，避免游戏扫描 fonts\<语言>\*.* 时
+    # 字体目录只留 TTF；来源说明移到包根，避免游戏扫描 PR2Localization\fonts\<语言>\*.* 时
     # 看到无关的 .txt。
     notice = os.path.join(dst, "NOTO-SOURCES.txt")
     if os.path.isfile(notice):
@@ -108,41 +114,43 @@ def write_readme(lang, stage, mode):
     }[mode]
     text = """Port Royale 2 本地化 - %s
 
-支持游戏版本：GOG 英文 1.1.2.3；Steam 英文 1.1.2.3 为实验性支持，需进游戏后看 PR2TextSource.log 确认。
+支持游戏版本：GOG 英文 1.1.2.3；Steam 英文 1.1.2.3 为实验性支持，需进游戏后看 PR2Localization\\logs\\runtime.log 确认。
 
 安装（解压即用）：
   1. 把本压缩包里的全部文件解压到游戏根目录（和 PR2.exe 同一层）。
-  2. GOG：双击 PR2LauncherGUI.exe，选语言后点「以所选语言启动」。
+  2. GOG：双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
      不要直接双击 PR2.exe：GOG 会把 VERSION.dll 解析到系统目录，本地代理不生效。
-     Steam：从 Steam 正常启动游戏；也可用 PR2LauncherGUI.exe 注入。
+     Steam：从 Steam 正常启动游戏；也可用 PR2LocalizationGUI.exe 注入。
   3. Steam 上如果目录里已有别的 mod 占用 VERSION.dll，先移除本包的 VERSION.dll，
-     改用 PR2LauncherGUI.exe 启动，避免 DLL 代理冲突。
+     改用 PR2LocalizationGUI.exe 启动，避免 DLL 代理冲突。
 
 确认是否生效：
-  游戏启动后检查 PR2TextSource.log 第一行是否为：
-    [text] pack 'zh' from <游戏目录>\\PR2Packs: ... overrides
+  游戏启动后检查 PR2Localization\\logs\\runtime.log 第一行是否为：
+    [text] pack '%s' from <游戏目录>\\PR2Localization\\packs: ... overrides
   首行是 NO pack loaded 或没有日志，说明语言包/代理没有加载成功。
 
 字体：
-  字体在 fonts\\<语言>\\；DLL 通过路径重定向读取，不覆盖根目录原版。
-  同一目录可以放多个语言（fonts\\zh、fonts\\ja），按 locale.ini 或启动器 --lang 选择。
+  字体在 PR2Localization\\fonts\\<语言>\\；DLL 通过路径重定向读取，不覆盖根目录原版。
+  同一目录可以放多个语言（PR2Localization\\fonts\\zh、PR2Localization\\fonts\\ja），
+  按 locale.ini 或启动器 --lang 选择。
 
 如果启动器提示“字体缺失”：
-  1. 确认 fonts\\<语言>\\ 下四个文件都在：
+  1. 确认 PR2Localization\\fonts\\<语言>\\ 下四个文件都在：
      ARIAL.TTF、ELGRECO_.TTF、Tiepolo_black.ttf、Tiepolo_bold.ttf
-  2. 从压缩包重新解压 fonts 目录；只复制 PR2Packs 里的语言包不够。
-  3. 不要把字体放到 fonts\\ 根目录；根目录保留原版。
+  2. 从压缩包重新解压 PR2Localization 目录；只复制 packs 里的语言包不够。
+  3. 不要把字体放到 PR2Localization\\fonts\\ 根目录；根目录保留原版。
   4. 检查杀毒软件是否隔离了字体文件。
-  5. 确认 PR2Packs\\<语言>.txt、fonts\\<语言>\\、locale.ini 的语言代码一致。
+  5. 确认 PR2Localization\\packs\\<语言>.txt、PR2Localization\\fonts\\<语言>\\、
+     locale.ini 的语言代码一致。
   仍要启动会回退原版拉丁字体，中文可能缺字。
 
 卸载：
-  删除 PR2Launcher.exe、PR2LauncherGUI.exe、PR2TextSource.dll、VERSION.dll、PR2Packs\\%s.txt；
-  如果覆盖过 fonts\\ 里的字体，请先用备份恢复。
+  删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll、VERSION.dll
+  和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。
 
 注意：
   - 本包不包含游戏本体、地图、音乐等游戏资源。
-  - 安装前建议备份游戏 fonts\\ 目录。
+  - 安装前建议备份游戏根目录的 fonts\\。
   - %s
 
 字体许可：
@@ -187,16 +195,17 @@ def make_release(lang, version, out_dir, mode, log=None, cache=True):
     build_pack(lang, stage, log)
     copy_runtime(stage, log)
     write_runtime_version(stage, log)
-    # 优先用运行时构建产物里的 ui/；没有时回退到 Rust 源码目录。
+    # 优先用运行时构建产物里的 PR2Localization\ui\；没有时回退到 Rust 源码目录。
     # 旧路径 src/injector/ui 不存在，静默跳过会让发行包缺 ui/*.ini。
-    ui_dir = os.path.join(RUNTIME, "ui")
+    ui_dir = os.path.join(RUNTIME, DATA_DIR, "ui")
     if not os.path.isdir(ui_dir):
         ui_dir = os.path.join(ROOT, "src", "injector-rs", "ui")
     if not os.path.isdir(ui_dir):
         raise FileNotFoundError("缺 ui 目录：%s（先构建注入器）" % ui_dir)
-    shutil.copytree(ui_dir, os.path.join(stage, "ui"),
+    shutil.copytree(ui_dir, os.path.join(stage, DATA_DIR, "ui"),
                     dirs_exist_ok=True)
-    log("复制 ui/")
+    os.makedirs(os.path.join(stage, DATA_DIR, "logs"), exist_ok=True)
+    log("复制 PR2Localization\\ui\\")
     copy_fonts(lang, stage, mode, log, cache=cache)
     write_readme(lang, stage, mode)
     copy_license(stage, log)

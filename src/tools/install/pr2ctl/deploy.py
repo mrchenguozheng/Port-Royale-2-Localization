@@ -27,7 +27,7 @@ def _font_lang(target, langs):
 def deploy_steps(target, langs):
     """列出复制要做的事，供进度条按步推进。
 
-    langs 给出时只复制这些语言的语言包 —— build\\runtime\\PR2Packs 是累积
+    langs 给出时只复制这些语言的语言包 —— build\\runtime\\PR2Localization\\packs 是累积
     目录，里面可能还留着上一次构建的其他语言，整目录照搬会把
     locale.ini 根本没指向的语言也塞进游戏。langs 为 None 时整目录复制。
     """
@@ -38,23 +38,24 @@ def deploy_steps(target, langs):
     # 不覆盖根目录的原版字体。启动器用 PR2_FONT_DIR 做重定向。
     font_lang = _font_lang(target, langs)
     for fl in (langs or ([font_lang] if font_lang else [])):
-        font_dir = os.path.join(RUNTIME, "fonts", fl)
+        font_dir = os.path.join(RUNTIME, FONT_DIR, fl)
         if not os.path.isdir(font_dir):
             continue
         for name in sorted(os.listdir(font_dir)):
             if name.lower().endswith(".ttf"):
-                steps.append(("fonts\\%s\\%s" % (fl, name),
+                steps.append(("PR2Localization\\fonts\\%s\\%s" % (fl, name),
                               os.path.join(font_dir, name),
-                              os.path.join(target, "fonts", fl, name)))
+                              os.path.join(target, FONT_DIR, fl, name)))
 
-    ui_src = os.path.join(RUNTIME, "ui")
+    ui_src = os.path.join(RUNTIME, UI_DIR)
     if os.path.isdir(ui_src):
         for name in sorted(os.listdir(ui_src)):
             src = os.path.join(ui_src, name)
             if os.path.isfile(src):
-                steps.append(("ui\\%s" % name, src,
-                              os.path.join(target, "ui", name)))
+                steps.append(("PR2Localization\\ui\\%s" % name, src,
+                              os.path.join(target, UI_DIR, name)))
 
+    steps.append(("PR2Localization\\logs\\", None, os.path.join(target, LOG_DIR)))
     steps.append(("%s\\" % PACK_DIR, None, os.path.join(target, PACK_DIR)))
     wanted = ["locale.ini"]
     if langs:
@@ -97,7 +98,7 @@ def copy_if_different(src, dst):
 
 
 def prune_stale_pack(target, langs):
-    """删掉游戏目录 PR2Packs\\ 里本次不装的文件，返回删掉的名字。
+    """删掉游戏目录 PR2Localization\\packs\\ 里本次不装的文件，返回删掉的名字。
 
     只删多出来的，不动要留的 —— 整个 rmtree 会让「内容相同就跳过」
     永远生效不了，语言包每次都被重写。

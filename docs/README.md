@@ -2,7 +2,7 @@
 
 [项目 README](../README.md)
 
-> **GOG 英文版 `1.1.2.3` 已通过 `PR2LauncherGUI` 入口实测；Steam 英文版为实验性支持，
+> **GOG 英文版 `1.1.2.3` 已通过 `PR2LocalizationGUI` 入口实测；Steam 英文版为实验性支持，
 > `VERSION.dll` 代理加载链已构建，待进游戏验证。** 其他版本不在支持范围内。
 > GOG 直接双击 `PR2.exe` 会走系统 `VERSION.dll`，不是本地化入口。
 
@@ -64,11 +64,11 @@
 
 ## 当前唯一的契约
 
-- 游戏语言：`PR2Packs/locale.ini` 的 `language=`
-- 语言包显示名/界面语言/最低运行时：`PR2Packs/<语言>.txt` 开头
+- 游戏语言：`PR2Localization/packs/locale.ini` 的 `language=`
+- 语言包显示名/界面语言/最低运行时：`PR2Localization/packs/<语言>.txt` 开头
   `# pack-meta alias=…` / `gui=…` / `min_runtime=…`
-- 字体：`fonts/<语言>/` 四个 TTF，不覆盖 `fonts/` 根目录原版
-- 启动器界面翻译：`ui/<语言>.ini`
+- 字体：`PR2Localization/fonts/<语言>/` 四个 TTF，不覆盖 `fonts/` 根目录原版
+- 启动器界面翻译：`PR2Localization/ui/<语言>.ini`
 - 运行时版本：`src/injector-rs/pr2_common/src/lib.rs`；发行包根目录 `RUNTIME-VERSION`
 
 旧的 `launcher.ini`、`lang/aliases.ini` 已移除；旧语言包不再兼容。
