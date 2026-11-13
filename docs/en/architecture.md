@@ -6,7 +6,7 @@
 ## Current layering
 
 ```
-PR2LauncherGUI.exe   select language, show alias, check fonts, write back locale.ini
+PR2LauncherGUI.exe   select language, show alias, check fonts, write back locale.ini, end a hung PR2.exe from this folder
         │
         ▼
 PR2Launcher.exe      back up fonts, resolve font directory, inject DLL, launch PR2.exe

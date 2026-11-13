@@ -146,7 +146,7 @@ The Rust workspace lives in `src\injector-rs\`:
 | `pr2_common/src/lib.rs` | Shared paths, `locale.ini`, pack version checks, font completeness checks |
 | `pr2_text_source/src/lib.rs` | DLL. The three hooks, whole-table replacement, missed-translation capture |
 | `pr2_launcher/src/main.rs` | Launcher. Suspended start + remote injection + font backup/restore |
-| `pr2_launcher_gui/src/main.rs` | Win32 GUI. Language list, `ui/*.ini`, calls the launcher |
+| `pr2_launcher_gui/src/{main,gui,packs,process,strings}.rs` | Win32 GUI. Window/layout, pack list, launcher/kill process, `ui/*.ini` |
 | `ui/en.ini`, `ui/ja.ini`, `ui/zh.ini` | GUI translations, copied to `build\runtime\ui\` by the build script |
 
 The old C++ implementation (`pr2_text_source.cpp`, `pr2_text_pack.c`, `pr2_launcher.cpp`,

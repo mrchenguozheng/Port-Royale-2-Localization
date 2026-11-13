@@ -52,6 +52,10 @@ Notes:
 1. Select the target language;
 2. Click **Launch selected language**.
 
+If the game hangs on exit, click **End game process**. It only ends `PR2.exe`
+started from this folder and asks for confirmation first; it will not kill a
+Steam or other copy of the game.
+
 After a successful launch, the GUI writes the choice to:
 
 ```

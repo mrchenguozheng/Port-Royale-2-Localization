@@ -69,6 +69,9 @@ can hold several language subdirectories; the launcher selects one via `locale.i
 Players can also double-click `PR2LauncherGUI.exe`: pick a language from the list →
 "Launch selected language"; "Launch original" goes straight to English. The GUI merely
 calls `PR2Launcher.exe --lang=…`.
+If the game hangs on exit, use **End game process**: it only ends `PR2.exe`
+started from this folder, asks for confirmation first, and will not kill a Steam
+or other copy of the game.
 
 A language pack carries its own display name and GUI language:
 
