@@ -84,7 +84,7 @@ def pick_game_dir(explicit):
     for d in cand:
         if d and B.is_game_dir(d):
             return d
-    sys.exit("找不到游戏目录：用 --game-dir 指定，或先在 start.bat 里选一次。")
+    sys.exit("找不到游戏目录：用 --game-dir 指定，或先在 start.ps1 里选一次。")
 
 
 def main():
@@ -130,7 +130,7 @@ def main():
     # 2) 注入器产物必须已在 build\runtime\ 里
     missing = [n for n in B.FLAT_FILES if not os.path.isfile(os.path.join(B.RUNTIME, n))]
     if missing:
-        sys.exit("缺少注入器产物：%s\n先运行 build_injector.bat（需要 Rust rustup + i686-pc-windows-msvc）。"
+        sys.exit("缺少注入器产物：%s\n先运行 src\\build_injector.ps1（需要 Rust rustup + i686-pc-windows-msvc）。"
                  % "、".join(missing))
 
     # 3) 部署

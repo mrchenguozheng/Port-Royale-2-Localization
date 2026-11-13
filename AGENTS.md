@@ -1,6 +1,6 @@
 # AGENTS.md — 项目维护指南
 
-> 面向接手本仓库的 agent。先读本页，再读 [文档索引](docs/README.zh-CN.md) 和
+> 面向接手本仓库的 agent。先读本页，再读 [文档索引](docs/README.md) 和
 > [当前架构与文件契约](docs/架构与重构.md)。本页只写维护规则和验证入口，不重复全部
 > 玩家文档。
 
@@ -46,48 +46,48 @@ Rust 产物：
 
 ## 常用入口
 
-在仓库根目录执行：
+所有脚本都要求 **PowerShell 7（pwsh）**，在仓库根目录执行：
 
-```bat
-start.bat
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 ```
 
 启动本地工作台，打开安装/译文编辑页；它**不会自动编译**。
 
-```bat
-apply_patch.bat
-apply_patch.bat --langs ja
-apply_patch.bat --launch
+```powershell
+.\apply_patch.ps1
+.\apply_patch.ps1 --langs ja
+.\apply_patch.ps1 --launch
 ```
 
 归一化 → 校验 → 编译 → 部署 → 核对；默认处理日文和中文，使用上一次游戏目录。
 
-```bat
-check.bat
+```powershell
+.\check.ps1
 ```
 
 等价于：
 
-```bat
+```powershell
 python src\tools\check.py
 ```
 
 Rust 构建与测试：
 
-```bat
+```powershell
 cargo build --release --locked --target i686-pc-windows-msvc --manifest-path src\injector-rs\Cargo.toml
 cargo test --locked --target i686-pc-windows-msvc --manifest-path src\injector-rs\Cargo.toml
 ```
 
 Python 快速回归：
 
-```bat
+```powershell
 python -m unittest tests.test_quick -v
 ```
 
 提交前至少执行：
 
-```bat
+```powershell
 git diff --check
 ```
 
@@ -99,21 +99,20 @@ git diff --check
 2. **先读契约**：改 GUI/构建/语言包前读 `docs/架构与重构.md`；改译文前读
    `docs/译文与语言包.md`；改 API 前读 `docs/agent-api.md` 和 `src/editor/api/`。
 3. **做最小改动**：不要顺手重写无关模块；不要把历史重构细节重新塞回当前架构文档。
-4. **同步文档**：接口、文件路径、构建命令、支持范围或已知问题变化时，更新中英文相关文档。
+4. **同步文档**：接口、文件路径、构建命令、支持范围或已知问题变化时，更新中文文档及相关入口。
 5. **验证**：按改动范围跑对应检查；不能只凭截图、像素或字体宽度判断排版。
 6. **提交**：默认新建提交，不 amend、不 force push；用户要求提交时再 push。
 
 ## 文档维护规则
 
-- 文档索引只有两个入口：`docs/README.zh-CN.md` 和 `docs/README.md`。根目录新增文档必须
-  至少进入其中一个索引。
+- 文档索引只有 `docs/README.md` 一个入口。根目录新增文档必须进入这个索引。
 - 当前架构写“现在是什么、文件契约、边界、已知问题”；已完成的阶段重构、旧路由变化、
-  旧 C++ 文件对照写入 [历史重构记录](docs/历史重构记录.md) 或
-  [Refactoring History](docs/en/refactor-history.md)。
-- 核心流程维护中文和英文两套；专门的分析文档可以只保留中文，但索引要标明。
+  旧 C++ 文件对照写入 [历史重构记录](docs/历史重构记录.md)。
+- 文档只维护中文一套；唯一英文文件是根目录 `README.en.md`，只写项目入口和支持语言，
+  不复制完整文档。
 - 文档和脚本里不写本机绝对路径：游戏目录写 `<游戏目录>`，用户目录用环境变量。
 - 相对链接必须可解析；参考 `docs/agent-api.md` 当前 41 条路由的口径，路由变化时同时改
-  中英文文档和测试。
+  中文文档和测试。
 - 不要在文档里把“未验证”写成“已修复”，也不要把单次正常现象当成根因结论。
 
 ## 已知问题与验收口径

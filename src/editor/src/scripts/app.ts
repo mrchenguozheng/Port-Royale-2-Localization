@@ -51,7 +51,7 @@ export function initTabs() {
 export async function boot() {
   const initialPath = location.pathname;
   if (location.protocol === 'file:') {
-    showBootError('这是用文件方式打开的。请双击 start.bat，通过本地服务打开页面。');
+    showBootError('这是用文件方式打开的。请用 PowerShell 7 运行 pwsh -NoProfile -File .\\start.ps1，通过本地服务打开页面。');
     return;
   }
   setLoading(true);

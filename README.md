@@ -2,7 +2,9 @@
 
 《Port Royale 2》的本地化项目：**用外挂语言包替换界面文本，原版 `PR2.exe` 全程不改。**
 
-[English](README.en.md) · [中文文档索引](docs/README.zh-CN.md)
+[English](README.en.md) · [中文文档索引](docs/README.md)
+
+**Supported languages:** Simplified Chinese (`zh`), Japanese (`ja`); English (`en`) is the original game language and fallback. See [README.en.md](README.en.md#supported-languages).
 
 ---
 
@@ -46,10 +48,10 @@
 
 ## 开发者：构建与翻译
 
-需要 Rust（rustup + `i686-pc-windows-msvc` target）+ Python 3.11 以上（当前用 3.15）。
+需要 Rust（rustup + `i686-pc-windows-msvc` target）+ Python 3.11 以上（当前用 3.15）+ PowerShell 7（`pwsh`）。
 
-```
-start.bat
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 ```
 
 它启动本地工作台服务，打开浏览器到「安装与启动」页，**不自动编译**。
@@ -68,7 +70,7 @@ start.bat
 - **启动**：「设为游戏语言」写 `locale.ini`，「启动游戏（已注入）」按当前下拉语言启动；
 - **译文编辑**：和安装页同一个工作台，顶部页签切换。
 
-开发时改完译文，也可以直接双击 `apply_patch.bat`：归一化 → 校验 → 编译 → 部署 → 核对一次跑完。
+开发时改完译文，也可以直接在 PowerShell 7 运行 `pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1`：归一化 → 校验 → 编译 → 部署 → 核对一次跑完。
 
 按钮细节见[构建与安装](docs/构建与安装.md)。
 
@@ -76,8 +78,8 @@ start.bat
 
 ```
 pr2-localization/
-├─ start.bat                  开发入口：启动工作台
-├─ apply_patch.bat            归一化 → 校验 → 编译 → 部署
+├─ start.ps1                  开发入口：启动工作台
+├─ apply_patch.ps1            归一化 → 校验 → 编译 → 部署
 ├─ shared/                   编辑器与工具共用的存储/校验核心
 ├─ src/
 │  ├─ translations/          译文唯一手改层（编辑器保存到这里）
@@ -110,7 +112,7 @@ pr2-localization/
 
 不用碰注入器源码，流程是：
 
-1. 跑 `start.bat`，在「译文编辑」页点语言下拉旁的「＋」，用现成语言当模板；
+1. 在 PowerShell 7 运行 `pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1`，在「译文编辑」页点语言下拉旁的「＋」，用现成语言当模板；
 2. 逐条翻译并保存（写进 `src/translations/<代码>.toml`）；
 3. 创建语言时会自动生成 `presets/<代码>.toml`（donor 以模板语言的文件为模板），
    再按语种检查/替换 donor；
@@ -128,7 +130,7 @@ pr2-localization/
 
 | 文档 | 内容 |
 |---|---|
-| [文档索引](docs/README.zh-CN.md) | 按“玩家/开发/翻译/待定”分类，先查这里 |
+| [文档索引](docs/README.md) | 按“玩家/开发/翻译/待定”分类，先查这里 |
 | [玩家指南](docs/玩家指南.md) | 下载 zip、解压、启动、卸载、常见问题 |
 | [构建与安装](docs/构建与安装.md) | 安装页、构建/部署/启动、脚本一览 |
 | [新语言完整流程](docs/新语言完整流程.md) | 从导出字体到进游戏，按步骤做 |

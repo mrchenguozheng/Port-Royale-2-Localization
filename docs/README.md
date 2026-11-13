@@ -1,76 +1,72 @@
-# Documentation Index
+# 文档索引
 
-This is not the project introduction — it answers "which document do I need?".
-English translations cover the core workflow; specialist analysis documents remain
-Chinese-only for now. **Only these two languages are maintained** — the Japanese
-document set was removed on purpose; the Japanese *game* translation
-(`src/translations/ja.toml`) is unaffected.
+[项目 README](../README.md)
 
-[中文文档索引](README.zh-CN.md) · [Project README](../README.en.md)
+> **当前只支持 GOG 英文版 `1.1.2.3`。** 其他版本不在支持范围内。
 
-> **Supported game build: GOG English `1.1.2.3` only.** Other builds are out of scope.
+这不是项目介绍，而是“遇到问题该翻哪一份”。先看当前状态，再看历史/规范类文档。
 
-## Players
+**文档只维护中文一套。** 唯一英文入口是根目录 [README.en.md](../README.en.md)，只写项目说明和支持语言，不镜像完整文档。日文文档是有意删掉的；游戏里的日语译文
+（`src/translations/ja.toml`）不受影响。
 
-| Document | Contents |
+## 玩家
+
+| 文档 | 内容 |
 |---|---|
-| [Player guide](en/user-guide.md) | Download, extract, launch, uninstall, troubleshooting |
+| [玩家指南](玩家指南.md) | 下载 zip、解压、启动、卸载、常见问题 |
 
-## Build and release
+## 构建与发行
 
-| Document | When to read |
+| 文档 | 什么时候看 |
 |---|---|
-| [Release](en/release.md) | Per-language zips, package layout, font licenses, GitHub Releases |
-| [Build & Install](en/build-and-install.md) | Workbench, install wizard, build/deploy/launch, scripts |
-| [Fonts & distribution](en/fonts-and-distribution.md) | Whether Noto / stitched fonts may be redistributed |
-| [New language fonts](en/new-language-fonts.md) | Fonts and tools required for a new language |
+| [发行版](发行版.md) | 打 zip、发行包结构、字体许可、GitHub Release |
+| [构建与安装](构建与安装.md) | 安装页按钮、构建注入器、部署、启动 |
+| [字体与分发](字体与分发.md) | Noto / 缝合字体能不能分发 |
+| [新语言字体配置](新语言字体配置.md) | 新语言需要准备哪些字体和工具 |
 
-## Development
+## 开发与原理
 
-| Document | When to read |
+| 文档 | 什么时候看 |
 |---|---|
-| [Architecture](en/architecture.md) | Layers, file contracts, current boundaries, known issues |
-| [Agent maintenance guide](../AGENTS.md) | Boundaries, commands, documentation and acceptance rules for agents |
-| [Editor API contract](en/agent-api.md) | 41 HTTP routes for agent reads/writes, checks, build/deploy |
-| [Injector](en/injection.md) | How the DLL hooks text lookups and how the launcher injects it |
-| [Translations & packs](en/translation-and-packs.md) | TOML format, `hash = text`, editor workflow |
-| [Language rule interface](en/language-rules-interface.md) | Three parts: punctuation / segmenter / spacing; a new language is one file |
-| [New language](en/new-language.md) | Add a language from scratch |
-| [Language collaboration](en/language-collaboration.md) | Translator/maintainer split, handoff and verification |
+| [架构与重构](架构与重构.md) | 当前分层、文件契约、当前边界、已知问题 |
+| [AGENTS 维护指南](../AGENTS.md) | agent 接手项目时的边界、命令、文档和验收规则 |
+| [编辑器接口契约](agent-api.md) | agent 读写译文、校验、构建/部署用的 41 条 HTTP 路由 |
+| [注入组件](注入组件.md) | DLL 如何 hook 取字、启动器如何注入 |
+| [译文与语言包](译文与语言包.md) | 语言包格式、`hash = 译文`、编辑器工作流 |
+| [语言规则接口](语言规则接口.md) | 三段式：标点 / 分词器 / 补空格，新语言只写一个文件 |
+| [新语言完整流程](新语言完整流程.md) | 从零加一种语言，按步骤做 |
+| [新语言协作流程](新语言协作流程.md) | 译者与维护者如何分工、交接和验收 |
+| [开发依赖](开发依赖.md) | Python、fontTools、Rust 等 |
+| [翻译局限](翻译局限.md) | 哪些文本改不了、排版为什么只能实机看 |
 
-## Translation notes
+## 翻译规范
 
-| Document | Contents |
+| 文档 | 内容 |
 |---|---|
-| [Speaker tiers](en/speaker-tiers.md) | Which lines identify a speaker, which are guesses |
-| [Tone proposals](en/tone-proposal.md) | 41 confident speakers plus entries for review |
-| [Translation limits](en/translation-limits.md) | What cannot be fixed, verified coverage, hook trade-offs |
-| [Pending](en/pending.md) | Steam, untested French build, hook offsets |
+| [说话人分级](说话人分级.md) | 角色语气分级 |
+| [语体拟改清单](语体拟改清单.md) | 待统一语体的条目 |
+| [中文分词方案](中文分词方案.md) | 构建期按词补空格：字数预算、分词器优先级、不做什么 |
+| [语音清单](语音清单.md) / [语音映射](语音映射.md) | 语音资源与映射 |
+| [中文文本改动对比](中文文本改动对比.md) | 历史改动对比，供查证 |
 
-## Specialist / Chinese-only
+## CSV 数据
 
-These are detailed analysis documents kept in Chinese:
+分析、审校、语音等数据统一放在 [csv/](csv/README.md)，不混在文档根目录。
 
-| Document | Contents |
+## 待定与历史
+
+| 文档 | 内容 |
 |---|---|
-| [语音清单](语音清单.md) / [语音映射](语音映射.md) | Voice inventory and hash mapping |
-| [中文分词方案](中文分词方案.md) | Build-time word spacing: character budget, tokenizer priority, non-goals |
-| [中文文本改动对比](中文文本改动对比.md) | Historical Chinese text diffs |
-| [CSV data](csv/README.md) | Analysis, voice, review and generated CSV files |
+| [待定](待定.md) | Steam 版、字体覆盖等未完成事项 |
+| [历史重构记录](历史重构记录.md) | 已完成的阶段重构、旧路由变化和 C++ 迁移对照 |
 
-## History
+## 当前唯一的契约
 
-| Document | Contents |
-|---|---|
-| [Refactoring history](en/refactor-history.md) | Completed phases, old route changes and the C++ migration comparison |
+- 游戏语言：`PR2Packs/locale.ini` 的 `language=`
+- 语言包显示名/界面语言/最低运行时：`PR2Packs/<语言>.txt` 开头
+  `# pack-meta alias=…` / `gui=…` / `min_runtime=…`
+- 字体：`fonts/<语言>/` 四个 TTF，不覆盖 `fonts/` 根目录原版
+- 启动器界面翻译：`ui/<语言>.ini`
+- 运行时版本：`src/injector-rs/pr2_common/src/lib.rs`；发行包根目录 `RUNTIME-VERSION`
 
-## Current contracts
-
-- Game language: `PR2Packs/locale.ini` → `language=`
-- Pack display name / GUI language / minimum runtime: `PR2Packs/<lang>.txt`
-  header (`# pack-meta alias=…`, `gui=…`, `min_runtime=…`)
-- Fonts: four TTF files in `fonts/<lang>/`; never overwrite the originals in `fonts/`
-- Launcher UI translations: `ui/<lang>.ini`
-- Runtime version: `src/injector-rs/pr2_common/src/lib.rs`; `RUNTIME-VERSION` in release zips
-
-See [Architecture](en/architecture.md) for the full contract.
+旧的 `launcher.ini`、`lang/aliases.ini` 已移除；旧语言包不再兼容。

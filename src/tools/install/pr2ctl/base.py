@@ -44,13 +44,15 @@ PACK_DIR = "PR2Packs"
 GAME_EXE = "PR2.exe"
 #: 装好之后用它启动游戏。它挂起 PR2.exe、注入 DLL、再恢复执行。
 LAUNCHER = "PR2Launcher.exe"
-#: 编译注入器。子进程里跑，结果读它的输出。
-INJECTOR_BAT = os.path.join(SRC, "build_injector.bat")
+#: 编译注入器。子进程里跑 PowerShell 7，结果读它的输出。
+INJECTOR_PS1 = os.path.join(SRC, "build_injector.ps1")
 #: 译文编辑器（本地 Web）。它跟上面三条链路都无关 —— 不编译、不复制、
 #: 不启动游戏，只改 src\translations\*.toml，所以自己一个按钮。
 EDITOR_DIR = os.path.join(SRC, "editor")
-#: 独立入口（想不开工具窗口时双击用）。
-EDITOR_BAT = os.path.join(EDITOR_DIR, "StartEditor.bat")
+#: 独立入口（不想开工具窗口时运行）。
+EDITOR_PS1 = os.path.join(EDITOR_DIR, "StartEditor.ps1")
+#: 所有构建/启动脚本统一要求 PowerShell 7。
+PWSH = shutil.which("pwsh.exe") or shutil.which("pwsh")
 EDITOR_DIST = os.path.join(EDITOR_DIR, "dist")
 #: 编辑器从 8777 起往上找空端口，所以探测也按这个范围来 ——
 #: 这样才能找到「上一次 start 留下、还在跑」的那个实例并复用它。
