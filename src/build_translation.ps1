@@ -6,17 +6,30 @@
 #  reads at runtime: build\runtime\PR2Packs\<lang>.txt
 #
 #    .\src\build_translation.ps1
-#    .\src\build_translation.ps1 -NoPause
+#    .\src\build_translation.ps1 -Lang ja -NoPause
+#    .\src\build_translation.ps1 -Lang zh
 # ============================================================
 
 [CmdletBinding()]
 param(
+    [string]$Lang = 'zh',
     [switch]$NoPause,
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest
 )
 
-foreach ($arg in $Rest) {
+for ($i = 0; $i -lt $Rest.Count; $i++) {
+    $arg = $Rest[$i]
     if ($arg -eq '--no-pause') { $NoPause = $true }
+    if ($arg -eq '--lang' -and $i + 1 -lt $Rest.Count) {
+        $Lang = $Rest[$i + 1]
+        $i++
+    }
+}
+
+$Lang = $Lang.Trim()
+if (-not $Lang) {
+    Write-Host '[pack] ERROR: empty language code.'
+    exit 1
 }
 
 $ErrorActionPreference = 'Stop'
@@ -26,7 +39,6 @@ $Repo = Split-Path -Parent $Src
 $Tools = Join-Path $Src 'tools\pack'
 $Out = Join-Path $Repo 'build\runtime\PR2Packs'
 $Locale = Join-Path $Src 'locale.ini'
-$Lang = 'zh'
 
 function Wait-IfPaused {
     if (-not $NoPause -and $Host.Name -eq 'ConsoleHost') {

@@ -178,10 +178,16 @@ def make_release(lang, version, out_dir, mode, log=None, cache=True):
     build_pack(lang, stage, log)
     copy_runtime(stage, log)
     write_runtime_version(stage, log)
-    ui_dir = os.path.join(ROOT, "src", "injector", "ui")
-    if os.path.isdir(ui_dir):
-        shutil.copytree(ui_dir, os.path.join(stage, "ui"),
-                        dirs_exist_ok=True)
+    # 优先用运行时构建产物里的 ui/；没有时回退到 Rust 源码目录。
+    # 旧路径 src/injector/ui 不存在，静默跳过会让发行包缺 ui/*.ini。
+    ui_dir = os.path.join(RUNTIME, "ui")
+    if not os.path.isdir(ui_dir):
+        ui_dir = os.path.join(ROOT, "src", "injector-rs", "ui")
+    if not os.path.isdir(ui_dir):
+        raise FileNotFoundError("缺 ui 目录：%s（先构建注入器）" % ui_dir)
+    shutil.copytree(ui_dir, os.path.join(stage, "ui"),
+                    dirs_exist_ok=True)
+    log("复制 ui/")
     copy_fonts(lang, stage, mode, log, cache=cache)
     write_readme(lang, stage, mode)
     copy_license(stage, log)

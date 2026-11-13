@@ -55,6 +55,18 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 启动本地工作台，打开安装/译文编辑页；它**不会自动编译**。
 
 ```powershell
+.\build.ps1                         # 注入器 + 全部语言包（zh、ja）
+.\build.ps1 -Target Packs -Lang zh  # 只编中文语言包
+.\build.ps1 -Target Injector        # 只编 Rust 注入器
+
+.\release.ps1 -Version v1.0.0       # 构建运行时 + 生成 dist\PR2-<语言>-<版本>.zip
+.\release.ps1 -Version v1.0.0 -Tag -Push  # 出包并创建/推送 release-<版本> tag
+```
+
+日常入口在仓库根目录；`src\build_injector.ps1`、`src\build_translation.ps1`
+仍是低层实现，排查单步问题时才直接调用。
+
+```powershell
 .\apply_patch.ps1
 .\apply_patch.ps1 --langs ja
 .\apply_patch.ps1 --launch

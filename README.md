@@ -8,15 +8,15 @@
 
 ---
 
-## 玩家：拿到发行包直接启动
+## 快速开始（玩家）
 
 不需要安装器、不需要 Python、不需要编译。
 
-1. 从 Release 下载对应语言的 zip，例如 `PR2-zh-v0.5.0.zip`；
-2. **全部解压到 `PR2.exe` 所在的游戏根目录**；
-3. 双击 `PR2LauncherGUI.exe`；
-4. 在语言下拉里选目标语言；
-5. 点「以所选语言启动」。
+1. 确认是 **GOG 英文版 `1.1.2.3`**；
+2. 从 Release 下载对应语言的 zip，例如 `PR2-zh-v1.0.0.zip`；
+3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
+4. 双击 `PR2LauncherGUI.exe`；
+5. 在语言下拉里选目标语言，点「以所选语言启动」。
 
 启动成功后 GUI 会写 `PR2Packs\locale.ini`，下次打开默认选这个语言。
 
@@ -72,6 +72,21 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 
 开发时改完译文，也可以直接在 PowerShell 7 运行 `pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1`：归一化 → 校验 → 编译 → 部署 → 核对一次跑完。
 
+构建入口收成根目录两个脚本：
+
+```powershell
+.\build.ps1                         # 注入器 + 全部语言包（zh、ja）
+.\build.ps1 -Target Packs -Lang zh  # 只编中文语言包
+.\build.ps1 -Target Injector        # 只编 Rust 注入器
+
+.\release.ps1 -Version v1.0.0       # 构建运行时 + 生成 dist\PR2-<语言>-<版本>.zip
+.\release.ps1 -Version v1.0.0 -Tag  # 额外创建 release-v1.0.0 本地 tag
+.\release.ps1 -Version v1.0.0 -Tag -Push  # 再推送 tag
+```
+
+低层脚本仍在 `src\build_injector.ps1`、`src\build_translation.ps1`；日常不需要直接调用。
+脚本位置和参数见[构建与安装](docs/构建与安装.md#脚本位置)。
+
 按钮细节见[构建与安装](docs/构建与安装.md)。
 
 ### 仓库结构
@@ -79,6 +94,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 ```
 pr2-localization/
 ├─ start.ps1                  开发入口：启动工作台
+├─ build.ps1                  构建入口：注入器 + 语言包
+├─ release.ps1                发布入口：构建运行时 + 打 zip + 可选 tag
 ├─ apply_patch.ps1            归一化 → 校验 → 编译 → 部署
 ├─ shared/                   编辑器与工具共用的存储/校验核心
 ├─ src/
