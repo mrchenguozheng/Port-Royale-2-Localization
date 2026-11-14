@@ -38,22 +38,32 @@ MAP_DOC = os.path.join(ROOT, "docs", "界面映射.md")
 
 
 def load_cleared(path):
-    """从界面映射文档里取已实机确认的键：同一行既有 `[XXXX]` 又有 0x 键的算已确认。
+    """从界面映射文档里取已实机确认的键，支持三类写法。
 
-    文档是唯一来源：在文档里记下一条（标记 + 键），重编排查包时这条就不再带标记。
-    文档里没有标记的键（例如城镇表里没实机看过的那 41 条）不会被清掉。
+    1. 逐条：同一行既有 `[XXXX]` 又有 0x 键 —— 这一条已确认；
+    2. 整段：`- 整体清除：`0xfc51xxxx`（名表）` —— 该前缀下全部视为已确认（类别级）；
+    3. 例外：`- 整体保留：`0xfc512ea5`` —— 即使落在已清除的整段里也保留标记。
+    文档是唯一来源：文档里没有标记/没有整段声明的键，继续带标记。
     """
     if not path or not os.path.isfile(path):
         print("清除：找不到 %s，全部保留标记" % path)
-        return {}
-    cleared = {}
+        return {}, [], set()
+    cleared, prefixes, keep = {}, [], set()
     for line in io.open(path, encoding="utf-8"):
         line = line.rstrip("\n")
+        if "整体保留：" in line:
+            for kk in re.findall(r"0x([0-9a-fA-F]{8})", line):
+                keep.add("0x" + kk.upper())
+            continue
+        if "整体清除：" in line:
+            for pp in re.findall(r"0x([0-9a-fA-F]{4})xxxx", line):
+                prefixes.append("0x" + pp.upper())
+            continue
         mk = re.search(r"\[([0-9A-F]{3,8})\]", line)
         kk = re.search(r"0x([0-9a-fA-F]{8})", line)
         if mk and kk:
             cleared["0x" + kk.group(1).upper()] = mk.group(1)
-    return cleared
+    return cleared, prefixes, keep
 
 
 def pack_meta(lang):
@@ -128,15 +138,23 @@ def build(lang, clear_map=MAP_DOC):
         out_lines.insert(0, headline)
 
     # 已实机确认的条目按文档清单去掉标记，剩下的继续带标记
-    cleared = load_cleared(clear_map)
-    present, painted, stripped = set(), 0, []
+    cleared, prefixes, keep = load_cleared(clear_map)
+
+    def drop(key):
+        if key in keep:
+            return False
+        if key in cleared:
+            return True
+        return any(key.startswith(p) for p in prefixes)
+
+    present, stripped = set(), []
     for l in out_lines:
         m = MARK_ANY.match(l)
         if not m:
             continue
         key = "0x" + m.group(1)
         present.add(key)
-        if key in cleared:
+        if drop(key):
             stripped.append(key)
     missing = sorted(set(cleared) - present)
     if missing:
@@ -145,7 +163,7 @@ def build(lang, clear_map=MAP_DOC):
         new = []
         for l in out_lines:
             m = MARK_ANY.match(l)
-            if m and "0x" + m.group(1) in cleared:
+            if m and drop("0x" + m.group(1)):
                 new.append("0x%s = %s%s" % (m.group(1), m.group(2), l[m.end():]))
             else:
                 new.append(l)
