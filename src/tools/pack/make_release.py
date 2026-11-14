@@ -12,7 +12,7 @@
         packs/zh.txt
         packs/locale.ini
         fonts/NotoSansSC-Regular.ttf ...  # 实际字体文件（默认）
-        fonts/font-map.ini                # 逻辑名到实际文件名的映射
+        fonts/font-map.default.ini      # 默认逻辑名到实际文件名的映射
         ui/zh.ini
         logs/
       README.txt
@@ -23,7 +23,8 @@ GOG 版不带宿主 DLL；Steam 版带 Ascaron.Logging-2.6.dll 代理，安装�
 校验大小/哈希、备份、挂载和还原；校验不通过时不会覆盖原文件。
 发行包不包含游戏本体，也不包含缝合字体。想用原版字形的人可以走
 ``--fonts stitch``（仅自用/私有包，不要公开分发）。字体模式：
-``noto`` 默认静态 Noto，并附带 font-map.ini；``config`` 只带 font-map.ini；
+``noto`` 默认静态 Noto，并附带 font-map.default.ini；``config`` 只带默认映射；
+用户可另建 font-map.ini 覆盖它，解压升级不会覆盖这个文件。
 ``none`` 不带字体。
 
     python src\\tools\\pack\\make_release.py --lang zh --edition gog --version v1.0.0
@@ -91,10 +92,10 @@ def copy_font_map(stage, log, mode="noto"):
     src = os.path.join(SRC, name)
     if not os.path.isfile(src):
         raise FileNotFoundError("缺字体映射模板：%s" % src)
-    dst = os.path.join(stage, DATA_DIR, "fonts", "font-map.ini")
+    dst = os.path.join(stage, DATA_DIR, "fonts", "font-map.default.ini")
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.copy2(src, dst)
-    log("复制字体映射（配置优先）")
+    log("复制字体映射（默认 font-map.default.ini；不覆盖用户 font-map.ini）")
 
 
 def copy_fonts_flat(src_dir, flat_dir, log, expected=None):
@@ -149,7 +150,7 @@ def copy_fonts(lang, stage, mode, log, cache=True):
     copy_fonts_flat(src_lang, flat, log, expected=3)
     shutil.rmtree(src_lang)
     copy_font_map(stage, log, mode="noto")
-    log("复制 Noto 实际字体文件（由 font-map.ini 映射逻辑名）")
+    log("复制 Noto 实际字体文件（由 font-map.default.ini 映射逻辑名）")
 
 
 def write_runtime_version(stage, log):
@@ -163,10 +164,10 @@ def write_readme(lang, stage, mode, edition):
     label = LABELS.get(lang, lang)
     edition_label = "GOG 版" if edition == "gog" else "Steam 版"
     font_line = {
-        "noto": "字体：Noto Sans / Noto Serif 原始文件名（SIL OFL 1.1），完整静态字体；font-map.ini 负责映射四个逻辑名。",
-        "stitch": "字体：本地缝合版（沿用游戏原版文件名，font-map.ini 做同名映射；仅限自用，不要公开分发）。",
+        "noto": "字体：Noto Sans / Noto Serif 原始文件名（SIL OFL 1.1），完整静态字体；font-map.default.ini 负责映射四个逻辑名。",
+        "stitch": "字体：本地缝合版（沿用游戏原版文件名，font-map.default.ini 做同名映射；仅限自用，不要公开分发）。",
         "none": "字体：本包不含字体，也无法通过映射读取系统字体。",
-        "config": "字体：PR2Localization\\fonts\\font-map.ini 把逻辑名映射到 fonts 内的实际文件；本包不含字体，需要自己放入。",
+        "config": "字体：PR2Localization\\fonts\\font-map.default.ini 把逻辑名映射到 fonts 内的实际文件；本包不含字体，需要自己放入。",
     }[mode]
     if edition == "gog":
         install_step = """  2. GOG：双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
@@ -192,7 +193,9 @@ def write_readme(lang, stage, mode, edition):
     if mode == "config":
         font_help = """字体：
   本包不含字体文件。
-  PR2Localization\\fonts\\font-map.ini 把游戏请求的四个逻辑名
+  默认映射在 PR2Localization\\fonts\\font-map.default.ini；
+  要自定义时新建或编辑同目录的 font-map.ini（运行时优先读它），
+  把游戏请求的四个逻辑名
   （ARIAL.TTF、ELGRECO_.TTF、Tiepolo_black.ttf、Tiepolo_bold.ttf）
   映射到实际字体文件名。
   按当前语言包的 [zh] / [ja] 节读取，[fonts] 提供全局默认；支持 | 候选。
@@ -201,7 +204,7 @@ def write_readme(lang, stage, mode, edition):
   映射缺失或文件不存在时，回退到根目录原版 fonts\\...
 
   如果启动器提示“字体缺失”：
-  1. 确认 font-map.ini 里四个逻辑名都有映射。
+  1. 确认当前映射（font-map.ini 优先，否则 font-map.default.ini）里四个逻辑名都有映射。
   2. 确认映射到的实际 .ttf 文件都在 PR2Localization\\fonts\\ 下。
   3. 可以改用静态 .ttf 文件；多个候选用 | 分隔。不要使用 .ttc 或 -VF.ttf。
   4. 修改后重新启动游戏，字体映射只在启动时读取一次。"""
@@ -210,12 +213,14 @@ def write_readme(lang, stage, mode, edition):
   字体文件在 PR2Localization\\fonts\\；DLL 通过路径重定向读取，不覆盖根目录原版。
   实际字体保留自己的文件名（默认是 NotoSansSC / NotoSerifSC 的原始文件名），
   不改名为 ARIAL.TTF、ELGRECO_.TTF 等游戏逻辑名。
-  PR2Localization\\fonts\\font-map.ini 把四个逻辑名映射到这些实际文件；
-  两个逻辑名可以指向同一个字体文件。
+  默认映射在 PR2Localization\\fonts\\font-map.default.ini；
+  要自定义时新建或编辑同目录的 font-map.ini（运行时优先读它），
+  它把四个逻辑名映射到这些实际文件；两个逻辑名可以指向同一个字体文件。
+  解压升级只替换 font-map.default.ini，不会覆盖手工修改的 font-map.ini。
   不按语言单开子目录；同一次安装只放一个语言。
 
   如果启动器提示“字体缺失”：
-  1. 确认 font-map.ini 的四个逻辑名都指向 PR2Localization\\fonts\\ 下真实存在的文件。
+  1. 确认 font-map.ini（没有它时用默认文件）的四个逻辑名都指向 PR2Localization\\fonts\\ 下真实存在的文件。
   2. 从压缩包重新解压整个 PR2Localization 目录；只复制 packs 里的语言包不够。
   3. 实际字体文件平铺在 PR2Localization\\fonts\\，不要多包一层语言子目录。
   4. 检查杀毒软件是否隔离了字体文件。

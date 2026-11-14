@@ -15,6 +15,7 @@ pub const FONT_NAMES: [&str; 4] = [
     "Tiepolo_bold.ttf",
 ];
 pub const FONT_MAP_FILE: &str = "font-map.ini";
+pub const FONT_MAP_DEFAULT_FILE: &str = "font-map.default.ini";
 
 pub fn exe_path() -> PathBuf {
     let mut buf = [0u16; 260];
@@ -68,6 +69,9 @@ pub fn fonts_dir(root: &Path) -> PathBuf {
 /// 配置按语言分段，`[fonts]` 是全局默认，`[zh]` / `[ja]` 覆盖它。
 /// 值只写实际字体文件名，文件必须位于 `PR2Localization\fonts`；
 /// 多个候选用 `|` 分隔，取第一个存在的文件。
+///
+/// 发行包只携带 `font-map.default.ini`。运行时优先读取用户可编辑的
+/// `font-map.ini`；它不存在时才用默认文件，所以解压升级不会覆盖手工配置。
 pub struct FontMap {
     entries: HashMap<String, Vec<String>>,
 }
@@ -75,10 +79,15 @@ pub struct FontMap {
 fn font_map_candidates(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let data = data_dir(root);
-    for dir in [data.join("fonts"), root.join("fonts"), data.clone()] {
-        let path = dir.join(FONT_MAP_FILE);
-        if !out.iter().any(|p| p == &path) {
-            out.push(path);
+    let dirs = [data.join("fonts"), root.join("fonts"), data.clone()];
+    // 任何位置的显式 font-map.ini 都优先于默认文件，避免旧布局的默认
+    // 映射压过用户已经改过的配置。
+    for name in [FONT_MAP_FILE, FONT_MAP_DEFAULT_FILE] {
+        for dir in &dirs {
+            let path = dir.join(name);
+            if !out.iter().any(|p| p == &path) {
+                out.push(path);
+            }
         }
     }
     out
@@ -408,6 +417,41 @@ mod tests {
         );
         assert!(language_fonts_complete(&root, "zh"));
         assert!(!language_fonts_complete(&root, "ja"));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn font_map_prefers_user_file_and_falls_back_to_default() {
+        let root = temp_root();
+        let fonts = root.join(DATA_DIR).join("fonts");
+        let default_font = fonts.join("default-cjk.ttf");
+        let user_font = fonts.join("user-cjk.ttf");
+        fs::write(&default_font, b"fake").unwrap();
+        fs::write(&user_font, b"fake").unwrap();
+
+        let default_cfg = "[zh]\nARIAL.TTF=default-cjk.ttf\n";
+        let default_path = fonts.join(FONT_MAP_DEFAULT_FILE);
+        fs::write(&default_path, default_cfg).unwrap();
+
+        // 没有用户文件时，回退到 font-map.default.ini。
+        let map = FontMap::load(&root, "zh").unwrap();
+        assert_eq!(
+            map.lookup("fonts\\ARIAL.TTF").unwrap(),
+            default_font.to_string_lossy()
+        );
+
+        // 用户 font-map.ini 存在时优先，默认文件不再决定映射。
+        let user_cfg = "[zh]\nARIAL.TTF=user-cjk.ttf\n";
+        fs::write(fonts.join(FONT_MAP_FILE), user_cfg).unwrap();
+        let map = FontMap::load(&root, "zh").unwrap();
+        assert_eq!(
+            map.lookup("fonts\\ARIAL.TTF").unwrap(),
+            user_font.to_string_lossy()
+        );
+
+        // 候选顺序必须保证任何位置的手工 font-map.ini 都在默认文件之前。
+        let candidates = font_map_candidates(&root);
+        assert_eq!(candidates[0], fonts.join(FONT_MAP_FILE));
         let _ = fs::remove_dir_all(&root);
     }
 

@@ -129,6 +129,14 @@ if (Test-Path -LiteralPath $UiSrc -PathType Container) {
     }
 }
 
+$FontSrc = Join-Path $Src 'font-map.ini'
+$FontOut = Join-Path $DataOut 'fonts'
+New-Item -ItemType Directory -Force -Path $FontOut | Out-Null
+if (-not (Test-Path -LiteralPath $FontSrc -PathType Leaf)) {
+    Stop-WithError "缺字体映射模板：$FontSrc"
+}
+Copy-Item -LiteralPath $FontSrc -Destination (Join-Path $FontOut 'font-map.default.ini') -Force
+
 Write-Host ''
 Write-Host '[build] SUCCESS:'
 foreach ($srcName in $artifactMap.Keys) {

@@ -45,10 +45,13 @@ def deploy_steps(target, langs, edition=None):
     # 四个 TTF 平铺在 build\runtime\PR2Localization\fonts\；也兼容旧的语言子目录。
     # 复制到游戏 PR2Localization\fonts\，不覆盖根目录的原版字体。
     font_lang = _font_lang(target, langs)
-    cfg = os.path.join(RUNTIME, FONT_DIR, "font-map.ini")
+    cfg = os.path.join(RUNTIME, FONT_DIR, "font-map.default.ini")
+    if not os.path.isfile(cfg):
+        # 兼容旧构建目录：旧文件只能作为默认映射复制，不能覆盖用户配置。
+        cfg = os.path.join(RUNTIME, FONT_DIR, "font-map.ini")
     if os.path.isfile(cfg):
-        steps.append(("PR2Localization\\fonts\\font-map.ini", cfg,
-                      os.path.join(target, FONT_DIR, "font-map.ini")))
+        steps.append(("PR2Localization\\fonts\\font-map.default.ini", cfg,
+                      os.path.join(target, FONT_DIR, "font-map.default.ini")))
     font_src = os.path.join(RUNTIME, FONT_DIR)
     names = [n for n in sorted(os.listdir(font_src))
              if n.lower().endswith(".ttf")] if os.path.isdir(font_src) else []
