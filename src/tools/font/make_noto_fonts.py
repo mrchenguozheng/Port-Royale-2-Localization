@@ -43,6 +43,11 @@ LANGS = {
         "serif": ("NotoSerifJP", (700, 900)),
         "label": "Japanese",
     },
+    "ru": {
+        "sans": ("NotoSans", 400),
+        "serif": ("NotoSerif", (700, 900)),
+        "label": "Russian (Cyrillic)",
+    },
 }
 
 
@@ -69,6 +74,9 @@ def _font_dirs():
     local = os.environ.get("LOCALAPPDATA")
     if local:
         dirs.append(os.path.join(local, "Microsoft", "Windows", "Fonts"))
+    # 本机没装 Noto Sans/Serif（西里尔）时，允许把静态文件放在 build\cache\noto-src\，
+    # 不要求为了构建去安装系统字体；这个目录本身不进版本库。
+    dirs.append(os.path.join(ROOT, "build", "cache", "noto-src"))
     return [d for d in dirs if os.path.isdir(d)]
 
 

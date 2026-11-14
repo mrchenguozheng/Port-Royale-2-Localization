@@ -85,14 +85,36 @@ def _remove_manifest(target):
         pass
 
 
+def _is_gog(target):
+    """GOG 安装会带 goggame-*.info/.id/.script；Steam 安装没有这些。"""
+    try:
+        names = os.listdir(target)
+    except OSError:
+        return False
+    return any(n.lower().startswith("goggame-")
+               and n.lower().endswith((".info", ".id", ".script"))
+               for n in names)
+
+
 def detect_edition(target):
-    """根据 DLL 或 PR2.exe 哈希判断 Steam；其余按 GOG。"""
-    if os.path.isfile(os.path.join(target, HOST_DLL)):
-        return "steam"
+    """判断是 Steam 还是 GOG。
+
+    不能只看 ``Ascaron.Logging-2.6.dll`` 是否存在：GOG 版（例如法语
+    1.1.2.42）也带同名原版 DLL，按存在性判断会把 GOG 误认成 Steam，
+    进而把 Steam 宿主代理挂进 GOG 目录。顺序改为：
+
+    1. GOG 标记文件优先；
+    2. PR2.exe 的 SHA 在已知版本表里，就按表里的 id 判断；
+    3. 以上都不确定时，才退回“宿主 DLL 存在即 Steam”（未知 Steam 版本）。
+    """
+    if _is_gog(target):
+        return "gog"
     exe = os.path.join(target, GAME_EXE)
     sha = _sha256(exe)
     known = BUILD_BY_SHA.get(sha) if sha else None
-    if known and str(known.get("id", "")).startswith("steam"):
+    if known:
+        return "steam" if str(known.get("id", "")).startswith("steam") else "gog"
+    if os.path.isfile(os.path.join(target, HOST_DLL)):
         return "steam"
     return "gog"
 
