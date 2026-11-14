@@ -115,6 +115,38 @@ class TestLocaleAndOverrides(unittest.TestCase):
         with open(self.user_ini, encoding="utf-8") as fh:
             self.assertEqual(fh.read(), "language=\n")
 
+    def test_language_line_accepts_spaces_and_inline_comment(self):
+        with open(self.user_ini, "w", encoding="utf-8") as fh:
+            fh.write("# locale\nlanguage = ja ; selected in launcher\n")
+        self.assertEqual(pr2ctl.read_locale_language(self.target), "ja")
+
+    def test_write_replaces_spaced_language_without_duplicate(self):
+        with open(self.user_ini, "w", encoding="utf-8") as fh:
+            fh.write("# keep\nlanguage = zh\nother=1\n")
+        self.assertTrue(pr2ctl.write_ini_language(self.user_ini, "ja"))
+        with open(self.user_ini, encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+        self.assertEqual(lines[0], "# keep")
+        self.assertEqual(lines[1], "language=ja")
+        self.assertEqual(lines[2], "other=1")
+        self.assertEqual(
+            [line for line in lines if line.lower().startswith("language")],
+            ["language=ja"])
+
+    def test_write_appends_when_no_language_line(self):
+        with open(self.user_ini, "w", encoding="utf-8") as fh:
+            fh.write("other=1\n")
+        self.assertTrue(pr2ctl.write_ini_language(self.user_ini, "ja"))
+        with open(self.user_ini, encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), "other=1\nlanguage=ja\n")
+
+    def test_write_removes_duplicate_language_lines(self):
+        with open(self.user_ini, "w", encoding="utf-8") as fh:
+            fh.write("language=ja\nlanguage = zh\nother=1\n")
+        self.assertTrue(pr2ctl.write_ini_language(self.user_ini, "ko"))
+        with open(self.user_ini, encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), "language=ko\nother=1\n")
+
 
 if __name__ == "__main__":
     unittest.main()

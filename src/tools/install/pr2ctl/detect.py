@@ -97,17 +97,30 @@ def installed_langs(target):
     return sorted(out)
 
 
-def read_ini_language(ini_path):
-    """读一份 locale.ini 的 language= 值。读不到返回 None。
+def _parse_language_line(line):
+    """返回 (是否 language 行, 值)。
 
-    与 DLL 里的 IniGet 同义：认 "language=" 开头，忽略空值。
+    与 Rust 端 `pr2_common::language_line()` 同一规则：`=` 两侧允许空白，
+    值后的 `;` / `#` 视为行内注释；空值返回 ("", True)。
     """
+    stripped = line.strip().lstrip("\ufeff")
+    if not stripped or stripped.startswith(("#", ";")):
+        return False, ""
+    key, sep, value = stripped.partition("=")
+    if not sep or key.strip().lower() != "language":
+        return False, ""
+    value = value.split(";", 1)[0].split("#", 1)[0].strip()
+    return True, value
+
+
+def read_ini_language(ini_path):
+    """读一份 locale.ini 的 language= 值。读不到或空值返回 None。"""
     try:
         with open(ini_path, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
-                line = line.strip()
-                if line.startswith("language="):
-                    return line.split("=", 1)[1].strip() or None
+                matched, value = _parse_language_line(line)
+                if matched:
+                    return value or None
     except OSError:
         pass
     return None
@@ -140,18 +153,25 @@ def write_ini_language(ini_path, code):
         lines = []
 
     replaced = False
-    for i, line in enumerate(lines):
-        if line.strip().startswith("language="):
-            lines[i] = "language=%s" % code
-            replaced = True
-            break
+    out_lines = []
+    for line in lines:
+        matched, _value = _parse_language_line(line)
+        if matched:
+            if not replaced:
+                out_lines.append("language=%s" % code)
+                replaced = True
+            # 旧版本可能留下两行 language；写回时只保留第一行。
+            continue
+        out_lines.append(line)
     if not replaced:
-        lines.insert(0, "language=%s" % code)
+        out_lines.append("language=%s" % code)
 
     try:
-        os.makedirs(os.path.dirname(ini_path), exist_ok=True)
+        parent = os.path.dirname(ini_path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
         with open(ini_path, "w", encoding="utf-8", newline="\n") as f:
-            f.write("\n".join(lines) + "\n")
+            f.write("\n".join(out_lines) + "\n")
         return True
     except OSError:
         return False

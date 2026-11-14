@@ -24,13 +24,28 @@ const BUILTIN: &[(&str, &str)] = &[
         "confirm.kill",
         "Force-end %d PR2.exe process(es) from this folder?\nUnsaved game progress will be lost.",
     ),
-    ("error.no_launcher", "PR2Localization.exe not found in this folder."),
+    (
+        "error.no_launcher",
+        "PR2Localization.exe not found in this folder.",
+    ),
     ("error.no_language", "No language pack selected."),
-    ("error.no_game", "No running PR2.exe from this folder was found."),
-    ("error.launch_failed", "Failed to start PR2Localization.exe."),
+    (
+        "error.no_game",
+        "No running PR2.exe from this folder was found.",
+    ),
+    (
+        "error.launch_failed",
+        "Failed to start PR2Localization.exe.",
+    ),
     ("error.kill_failed", "Failed to end PR2.exe (error %lu)."),
-    ("error.exit_code", "Launcher exit code %lu; the game did not start."),
-    ("error.font_missing", "PR2Localization\\fonts\\ has no TTF fonts."),
+    (
+        "error.exit_code",
+        "Launcher exit code %lu; the game did not start.",
+    ),
+    (
+        "error.font_missing",
+        "PR2Localization\\fonts\\ has no TTF fonts.",
+    ),
     (
         "error.pack_too_new",
         "Language pack needs a newer launcher (runtime v%d, current v%d).",
@@ -50,9 +65,11 @@ impl Strings {
     pub fn load(root: &Path, ui: &str) -> Self {
         let mut values = HashMap::new();
         let dir = ui_dir(root);
-        read_ini(&dir.join(format!("{ui}.ini")), &mut values);
-        if values.is_empty() && ui != "en" {
-            read_ini(&dir.join("en.ini"), &mut values);
+        // 英文文件是基础层：新语言只翻译一部分 key 时，缺失项仍使用 en.ini
+        // 中的自定义文案，而不是直接落到 Rust 内置英文。
+        read_ini(&dir.join("en.ini"), &mut values);
+        if ui != "en" {
+            read_ini(&dir.join(format!("{ui}.ini")), &mut values);
         }
         Self { values }
     }
@@ -128,7 +145,11 @@ fn read_ini(path: &Path, out: &mut HashMap<String, String>) {
     let text = text.trim_start_matches('\u{feff}');
     for raw in text.lines() {
         let line = trim(raw);
-        if line.is_empty() || line.starts_with('#') || line.starts_with(';') || line.starts_with('[') {
+        if line.is_empty()
+            || line.starts_with('#')
+            || line.starts_with(';')
+            || line.starts_with('[')
+        {
             continue;
         }
         let Some((key, value)) = line.split_once('=') else {
@@ -171,6 +192,18 @@ fn unescape(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_root() -> std::path::PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pr2-ui-strings-{stamp}"));
+        fs::create_dir_all(pr2_common::ui_dir(&root)).unwrap();
+        root
+    }
 
     #[test]
     fn formats_numbers_and_strings() {
@@ -186,5 +219,23 @@ mod tests {
     #[test]
     fn unescapes_newlines() {
         assert_eq!(unescape("a\\nb"), "a\nb");
+    }
+
+    #[test]
+    fn partial_language_keeps_custom_english_base() {
+        let root = temp_root();
+        let dir = pr2_common::ui_dir(&root);
+        fs::write(
+            dir.join("en.ini"),
+            "[gui]\ntitle=English title\nbutton.launch=Start\n",
+        )
+        .unwrap();
+        fs::write(dir.join("ko.ini"), "[gui]\ntitle=한국어 제목\n").unwrap();
+
+        let strings = Strings::load(&root, "ko");
+        assert_eq!(strings.t("title"), "한국어 제목");
+        assert_eq!(strings.t("button.launch"), "Start");
+        assert_eq!(strings.t("subtitle"), "Port Royale 2 localization runtime");
+        let _ = fs::remove_dir_all(&root);
     }
 }

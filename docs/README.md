@@ -14,7 +14,7 @@
 - 语言：包内只放 `packs/locale.default.ini`；用户活动 `locale.ini` 存在时优先，
   空值也保留；部署/升级不覆盖，`packs/overrides/` 不删除。
 - 字体：实际字体平铺在 `PR2Localization/fonts/`；包内放 `font-map.default.ini`，
-  用户 `font-map.ini` 优先；不按语言开子目录，不覆盖根目录原版字体。
+  用户 `font-map.ini` 按项覆盖默认；不按语言开子目录，不覆盖根目录原版字体。
 - 运行时空值不表示“原版英文”：空值只会回到内置 `zh`；原版入口是
   `PR2Localization.exe --vanilla` 或 GUI「启动原版」。
 
@@ -67,7 +67,7 @@
 - 语言包元数据：`<语言>.txt` 开头的 `# pack-meta alias=…` / `gui=…` /
   `min_runtime=…`。
 - 字体：`PR2Localization/fonts/` 放实际字体和默认映射 `font-map.default.ini`；
-  用户 `font-map.ini` 优先；实际字体必须位于该目录，不读系统字体目录。
+  用户 `font-map.ini` 按项覆盖默认；实际字体必须位于该目录，不读系统字体目录。
 - 启动器界面翻译：`PR2Localization/ui/<语言>.ini`。
 - 运行时版本：`src/injector-rs/pr2_common/src/lib.rs`；发行包根目录 `RUNTIME-VERSION`。
 

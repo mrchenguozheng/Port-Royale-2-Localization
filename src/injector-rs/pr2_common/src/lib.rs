@@ -72,33 +72,79 @@ pub fn fonts_dir(root: &Path) -> PathBuf {
 /// 值只写实际字体文件名，文件必须位于 `PR2Localization\fonts`；
 /// 多个候选用 `|` 分隔，取第一个存在的文件。
 ///
-/// 发行包只携带 `font-map.default.ini`。运行时优先读取用户可编辑的
-/// `font-map.ini`；它不存在时才用默认文件，所以解压升级不会覆盖手工配置。
+/// 发行包只携带 `font-map.default.ini`。运行时先加载默认文件，再用用户可编辑的
+/// `font-map.ini` **按项覆盖**：用户只写一个逻辑名时，其余逻辑名仍保留默认映射。
+/// 要显式禁用某项，写 `ARIAL.TTF=none` 或 `ARIAL.TTF=-`。
 pub struct FontMap {
     entries: HashMap<String, Vec<String>>,
 }
 
-fn font_map_candidates(root: &Path) -> Vec<PathBuf> {
-    let mut out = Vec::new();
+fn font_map_dirs(root: &Path) -> [PathBuf; 3] {
     let data = data_dir(root);
-    let dirs = [data.join("fonts"), root.join("fonts"), data.clone()];
-    // 任何位置的显式 font-map.ini 都优先于默认文件，避免旧布局的默认
-    // 映射压过用户已经改过的配置。
-    for name in [FONT_MAP_FILE, FONT_MAP_DEFAULT_FILE] {
-        for dir in &dirs {
-            let path = dir.join(name);
-            if !out.iter().any(|p| p == &path) {
-                out.push(path);
-            }
-        }
-    }
-    out
+    [data.join("fonts"), root.join("fonts"), data]
 }
 
-fn font_map_path(root: &Path) -> Option<PathBuf> {
-    font_map_candidates(root)
+fn first_font_map(root: &Path, name: &str) -> Option<PathBuf> {
+    font_map_dirs(root)
         .into_iter()
+        .map(|dir| dir.join(name))
         .find(|path| path.is_file())
+}
+
+fn font_map_paths(root: &Path) -> Vec<PathBuf> {
+    let default = first_font_map(root, FONT_MAP_DEFAULT_FILE);
+    let user = first_font_map(root, FONT_MAP_FILE);
+    let mut paths = Vec::new();
+    if let Some(path) = default {
+        paths.push(path);
+    }
+    if let Some(path) = user {
+        if !paths.iter().any(|p| p == &path) {
+            paths.push(path);
+        }
+    }
+    paths
+}
+
+fn parse_font_map(
+    text: &str,
+    lang: &str,
+) -> (HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
+    let mut global: HashMap<String, Vec<String>> = HashMap::new();
+    let mut local: HashMap<String, Vec<String>> = HashMap::new();
+    let mut section = "fonts".to_string();
+
+    for raw in text.lines() {
+        let line = raw.trim().trim_start_matches('\u{feff}');
+        if line.is_empty() || line.starts_with(';') || line.starts_with('#') {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            section = line[1..line.len() - 1].trim().to_ascii_lowercase();
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let key = normalize_font_key(key);
+        if key.is_empty() {
+            continue;
+        }
+        let values: Vec<String> = value
+            .split('|')
+            .map(|v| v.trim().trim_matches('"').to_string())
+            .filter(|v| !v.is_empty())
+            .collect();
+        if values.is_empty() {
+            continue;
+        }
+        if section == "fonts" || section == "font" {
+            global.insert(key, values);
+        } else if !lang.is_empty() && section == lang {
+            local.insert(key, values);
+        }
+    }
+    (global, local)
 }
 
 fn expand_env(value: &str) -> String {
@@ -141,14 +187,21 @@ fn resolve_font_path(root: &Path, value: &str) -> Option<String> {
     if expanded.trim().is_empty() {
         return None;
     }
-    // 不把 .ttc 集合或 -VF.ttf 可变字体交给游戏字体读取器：两者都未验证/不接受。
+    // 显式禁用某一项；其余项仍可沿用默认映射。
     let lower = expanded.to_ascii_lowercase();
+    if lower == "none" || lower == "-" {
+        return None;
+    }
+    // 不把 .ttc 集合或 -VF.ttf 可变字体交给游戏字体读取器：两者都未验证/不接受。
     if lower.ends_with(".ttc") || lower.contains("-vf.ttf") {
         return None;
     }
     // 映射值只取文件名：实际字体必须位于 PR2Localization\fonts\，
     // 避免配置把游戏引到系统字体目录或字体目录之外。
-    let file_name = Path::new(&expanded).file_name()?.to_string_lossy().into_owned();
+    let file_name = Path::new(&expanded)
+        .file_name()?
+        .to_string_lossy()
+        .into_owned();
     if file_name.trim().is_empty() {
         return None;
     }
@@ -162,51 +215,31 @@ fn resolve_font_path(root: &Path, value: &str) -> Option<String> {
 
 impl FontMap {
     pub fn load(root: &Path, lang: &str) -> Option<FontMap> {
-        let path = font_map_path(root)?;
-        let text = fs::read_to_string(path).ok()?;
+        let paths = font_map_paths(root);
+        if paths.is_empty() {
+            return None;
+        }
         let lang = lang.to_ascii_lowercase();
-        let mut global: HashMap<String, Vec<String>> = HashMap::new();
-        let mut local: HashMap<String, Vec<String>> = HashMap::new();
-        let mut section = "fonts".to_string();
+        let mut merged: HashMap<String, Vec<String>> = HashMap::new();
 
-        for raw in text.lines() {
-            let line = raw.trim().trim_start_matches('\u{feff}');
-            if line.is_empty() || line.starts_with(';') || line.starts_with('#') {
-                continue;
-            }
-            if line.starts_with('[') && line.ends_with(']') {
-                section = line[1..line.len() - 1].trim().to_ascii_lowercase();
-                continue;
-            }
-            let Some((key, value)) = line.split_once('=') else {
+        // 顺序即优先级：默认全局 → 默认语言节 → 用户全局 → 用户语言节。
+        for path in paths {
+            let Ok(text) = fs::read_to_string(path) else {
                 continue;
             };
-            let key = normalize_font_key(key);
-            if key.is_empty() {
-                continue;
+            let (global, local) = parse_font_map(&text, &lang);
+            for (key, values) in global {
+                merged.insert(key, values);
             }
-            let values: Vec<String> = value
-                .split('|')
-                .map(|v| v.trim().trim_matches('"').to_string())
-                .filter(|v| !v.is_empty())
-                .collect();
-            if values.is_empty() {
-                continue;
-            }
-            if section == "fonts" || section == "font" {
-                global.insert(key, values);
-            } else if !lang.is_empty() && section == lang {
-                local.insert(key, values);
+            for (key, values) in local {
+                merged.insert(key, values);
             }
         }
 
-        for (key, values) in local {
-            global.insert(key, values);
-        }
         // 在加载时一次性解析字体的存在性。运行时 lookup 位于文件 API hook 内，
         // 这里若再访问文件系统会重新进入 hook，导致递归崩溃。
         let mut entries: HashMap<String, Vec<String>> = HashMap::new();
-        for (key, values) in global {
+        for (key, values) in merged {
             let resolved: Vec<String> = values
                 .iter()
                 .filter_map(|value| resolve_font_path(root, value))
@@ -277,25 +310,43 @@ pub fn read_locale_language(root: &Path) -> Option<String> {
     let user_path = locale_path(root);
     // 用户文件存在即优先；即使 language= 为空，也视为用户明确清空，
     // 不拿默认文件把它补回去。只有活动文件不存在时才回退默认文件。
-    if user_path.exists() {
+    if user_path.is_file() {
         return read_language_file(&user_path);
     }
     read_language_file(&locale_default_path(root))
 }
 
+/// 解析一行 `language = 代码`。
+///
+/// 返回 `None` 表示不是 language 行；返回 `Some(None)` 表示是 language 行但值为空。
+/// `=` 两侧允许空白，值后的 `;` / `#` 视为行内注释；这与 Python 端的
+/// `pr2ctl.detect.read_ini_language()` 使用同一套规则。
+fn language_line(line: &str) -> Option<Option<String>> {
+    let trimmed = line.trim().trim_start_matches('\u{feff}');
+    if trimmed.is_empty() || trimmed.starts_with(';') || trimmed.starts_with('#') {
+        return None;
+    }
+    let (key, value) = trimmed.split_once('=')?;
+    if !key.trim().eq_ignore_ascii_case("language") {
+        return None;
+    }
+    let value = value
+        .split(|c| c == ';' || c == '#')
+        .next()
+        .unwrap_or("")
+        .trim();
+    if value.is_empty() {
+        Some(None)
+    } else {
+        Some(Some(value.to_string()))
+    }
+}
+
 fn read_language_file(path: &Path) -> Option<String> {
     let text = fs::read_to_string(path).ok()?;
     for line in text.lines() {
-        let line = line.trim();
-        if let Some(rest) = line.strip_prefix("language") {
-            let rest = rest.trim_start();
-            if let Some(value) = rest.strip_prefix('=') {
-                let value = value.trim();
-                if !value.is_empty() {
-                    return Some(value.to_string());
-                }
-                return None;
-            }
+        if let Some(value) = language_line(line) {
+            return value;
         }
     }
     None
@@ -307,22 +358,24 @@ pub fn write_locale_language(root: &Path, lang: &str) -> bool {
         let _ = fs::create_dir_all(parent);
     }
     let old = fs::read_to_string(&path).unwrap_or_default();
-    let mut lines: Vec<String> = old.lines().map(str::to_string).collect();
+    let lines: Vec<String> = old.lines().map(str::to_string).collect();
+    let mut out_lines: Vec<String> = Vec::with_capacity(lines.len() + 1);
     let mut replaced = false;
-    for line in &mut lines {
-        if line.trim_start().starts_with("language") {
-            let rest = line.trim_start()["language".len()..].trim_start();
-            if rest.starts_with('=') {
-                *line = format!("language={lang}");
+    for line in lines {
+        if language_line(&line).is_some() {
+            if !replaced {
+                out_lines.push(format!("language={lang}"));
                 replaced = true;
-                break;
             }
+            // 旧版本可能留下两行 language；写回时只保留第一行。
+            continue;
         }
+        out_lines.push(line);
     }
     if !replaced {
-        lines.push(format!("language={lang}"));
+        out_lines.push(format!("language={lang}"));
     }
-    let mut out = lines.join("\n");
+    let mut out = out_lines.join("\n");
     out.push('\n');
     fs::write(path, out).is_ok()
 }
@@ -420,11 +473,7 @@ mod tests {
         let font = root.join(DATA_DIR).join("fonts").join("fake-cjk.ttf");
         fs::write(&font, b"fake").unwrap();
         let cfg = "[fonts]\nARIAL.TTF=fake-cjk.ttf\n[zh]\nELGRECO_.TTF=fake-cjk.ttf\nTiepolo_black.ttf=fake-cjk.ttf\nTiepolo_bold.ttf=fake-cjk.ttf\n";
-        fs::write(
-            root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE),
-            cfg,
-        )
-        .unwrap();
+        fs::write(root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE), cfg).unwrap();
 
         let map = FontMap::load(&root, "zh").unwrap();
         assert!(map.has_all());
@@ -460,6 +509,47 @@ mod tests {
     }
 
     #[test]
+    fn locale_accepts_spaces_and_writes_single_line() {
+        let root = temp_root();
+        let packs = root.join(DATA_DIR).join("packs");
+        fs::create_dir_all(&packs).unwrap();
+        let path = packs.join(LOCALE_FILE);
+        fs::write(&path, "# keep\nlanguage = ja ; selected in launcher\n").unwrap();
+
+        assert_eq!(read_locale_language(&root).as_deref(), Some("ja"));
+        assert!(write_locale_language(&root, "ko"));
+        let text = fs::read_to_string(&path).unwrap();
+        assert_eq!(text, "# keep\nlanguage=ko\n");
+    }
+
+    #[test]
+    fn locale_writer_appends_when_key_is_absent() {
+        let root = temp_root();
+        let packs = root.join(DATA_DIR).join("packs");
+        fs::create_dir_all(&packs).unwrap();
+        let path = packs.join(LOCALE_FILE);
+        fs::write(&path, "other=1\n").unwrap();
+
+        assert!(write_locale_language(&root, "ja"));
+        assert_eq!(fs::read_to_string(&path).unwrap(), "other=1\nlanguage=ja\n");
+    }
+
+    #[test]
+    fn locale_writer_removes_duplicate_language_lines() {
+        let root = temp_root();
+        let packs = root.join(DATA_DIR).join("packs");
+        fs::create_dir_all(&packs).unwrap();
+        let path = packs.join(LOCALE_FILE);
+        fs::write(&path, "language=ja\nlanguage = zh\nother=1\n").unwrap();
+
+        assert!(write_locale_language(&root, "ko"));
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "language=ko\nother=1\n"
+        );
+    }
+
+    #[test]
     fn font_map_prefers_user_file_and_falls_back_to_default() {
         let root = temp_root();
         let fonts = root.join(DATA_DIR).join("fonts");
@@ -468,18 +558,18 @@ mod tests {
         fs::write(&default_font, b"fake").unwrap();
         fs::write(&user_font, b"fake").unwrap();
 
-        let default_cfg = "[zh]\nARIAL.TTF=default-cjk.ttf\n";
+        let default_cfg = "[zh]\nARIAL.TTF=default-cjk.ttf\nELGRECO_.TTF=default-cjk.ttf\nTiepolo_black.ttf=default-cjk.ttf\nTiepolo_bold.ttf=default-cjk.ttf\n";
         let default_path = fonts.join(FONT_MAP_DEFAULT_FILE);
         fs::write(&default_path, default_cfg).unwrap();
 
-        // 没有用户文件时，回退到 font-map.default.ini。
+        // 没有用户文件时，使用默认文件。
         let map = FontMap::load(&root, "zh").unwrap();
         assert_eq!(
             map.lookup("fonts\\ARIAL.TTF").unwrap(),
             default_font.to_string_lossy()
         );
 
-        // 用户 font-map.ini 存在时优先，默认文件不再决定映射。
+        // 用户只覆盖一个逻辑名，其余三个仍沿用默认文件。
         let user_cfg = "[zh]\nARIAL.TTF=user-cjk.ttf\n";
         fs::write(fonts.join(FONT_MAP_FILE), user_cfg).unwrap();
         let map = FontMap::load(&root, "zh").unwrap();
@@ -487,10 +577,36 @@ mod tests {
             map.lookup("fonts\\ARIAL.TTF").unwrap(),
             user_font.to_string_lossy()
         );
+        assert_eq!(
+            map.lookup("fonts\\ELGRECO_.TTF").unwrap(),
+            default_font.to_string_lossy()
+        );
+        assert!(map.has_all());
 
-        // 候选顺序必须保证任何位置的手工 font-map.ini 都在默认文件之前。
-        let candidates = font_map_candidates(&root);
-        assert_eq!(candidates[0], fonts.join(FONT_MAP_FILE));
+        // 默认文件在前，用户文件在后。
+        let paths = font_map_paths(&root);
+        assert_eq!(paths[0], default_path);
+        assert_eq!(paths[1], fonts.join(FONT_MAP_FILE));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn font_map_user_none_disables_only_that_slot() {
+        let root = temp_root();
+        let fonts = root.join(DATA_DIR).join("fonts");
+        let font = fonts.join("default-cjk.ttf");
+        fs::write(&font, b"fake").unwrap();
+        let default_cfg = "[zh]\nARIAL.TTF=default-cjk.ttf\nELGRECO_.TTF=default-cjk.ttf\nTiepolo_black.ttf=default-cjk.ttf\nTiepolo_bold.ttf=default-cjk.ttf\n";
+        fs::write(fonts.join(FONT_MAP_DEFAULT_FILE), default_cfg).unwrap();
+        fs::write(fonts.join(FONT_MAP_FILE), "[zh]\nARIAL.TTF=none\n").unwrap();
+
+        let map = FontMap::load(&root, "zh").unwrap();
+        assert!(map.lookup("fonts\\ARIAL.TTF").is_none());
+        assert_eq!(
+            map.lookup("fonts\\ELGRECO_.TTF").unwrap(),
+            font.to_string_lossy()
+        );
+        assert!(!map.has_all());
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -500,11 +616,7 @@ mod tests {
         let collection = root.join(DATA_DIR).join("fonts").join("fake-cjk.ttc");
         fs::write(&collection, b"fake").unwrap();
         let cfg = "[zh]\nARIAL.TTF=fake-cjk.ttc\n";
-        fs::write(
-            root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE),
-            cfg,
-        )
-        .unwrap();
+        fs::write(root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE), cfg).unwrap();
         let map = FontMap::load(&root, "zh");
         assert!(map
             .map(|m| m.lookup("fonts\\ARIAL.TTF").is_none())
@@ -518,11 +630,7 @@ mod tests {
         let variable = root.join(DATA_DIR).join("fonts").join("fake-cjk-VF.ttf");
         fs::write(&variable, b"fake").unwrap();
         let cfg = "[zh]\nARIAL.TTF=fake-cjk-VF.ttf\n";
-        fs::write(
-            root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE),
-            cfg,
-        )
-        .unwrap();
+        fs::write(root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE), cfg).unwrap();
         let map = FontMap::load(&root, "zh");
         assert!(map
             .map(|m| m.lookup("fonts\\ARIAL.TTF").is_none())
@@ -536,11 +644,7 @@ mod tests {
         let outside = root.join("outside.ttf");
         fs::write(&outside, b"fake").unwrap();
         let cfg = format!("[zh]\nARIAL.TTF={}\n", outside.display());
-        fs::write(
-            root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE),
-            cfg,
-        )
-        .unwrap();
+        fs::write(root.join(DATA_DIR).join("fonts").join(FONT_MAP_FILE), cfg).unwrap();
         let map = FontMap::load(&root, "zh");
         assert!(map
             .map(|m| m.lookup("fonts\\ARIAL.TTF").is_none())

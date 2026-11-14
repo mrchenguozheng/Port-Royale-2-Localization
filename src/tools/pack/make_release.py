@@ -24,7 +24,7 @@ GOG 版不带宿主 DLL；Steam 版带 Ascaron.Logging-2.6.dll 代理，安装�
 发行包不包含游戏本体，也不包含缝合字体。想用原版字形的人可以走
 ``--fonts stitch``（仅自用/私有包，不要公开分发）。字体模式：
 ``noto`` 默认静态 Noto，并附带 font-map.default.ini；``config`` 只带默认映射；
-用户可另建 font-map.ini 覆盖它，解压升级不会覆盖这个文件。
+用户可另建 font-map.ini 按项覆盖它，解压升级不会覆盖这个文件。
 ``none`` 不带字体。
 
     python src\\tools\\pack\\make_release.py --lang zh --edition gog --version v1.0.0
@@ -326,6 +326,17 @@ def make_release(lang, version, out_dir, mode, edition, log=None, cache=True):
 
 
 def main():
+    import config_check
+
+    errors, warnings = config_check.check_repository()
+    for warning in warnings:
+        print("配置警告：%s" % warning)
+    if errors:
+        for error in errors:
+            print("配置错误：%s" % error)
+        print("拒绝出包：语言配置检查失败。")
+        return 1
+
     ap = argparse.ArgumentParser(description="生成按语言、按入口分发的 PR2 本地化发行包")
     ap.add_argument("--lang", action="append", required=True,
                     help="语言代码，可重复")

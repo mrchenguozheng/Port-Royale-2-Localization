@@ -37,7 +37,7 @@ GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析�
 - 缺字体时 GUI 会提示，把 zip 里的 `PR2Localization\fonts\` 重新解压完整即可；
   发行包默认把 Noto 实际字体文件（保留原始文件名）平铺进 `PR2Localization\fonts\`，
   同时附带 `font-map.default.ini`，由它映射游戏的四个逻辑字体名；
-  要自定义时新建或编辑同目录的 `font-map.ini`（运行时优先读取），解压升级不会覆盖它；
+  要自定义时新建或编辑同目录的 `font-map.ini`，只写需要覆盖的逻辑名（运行时在默认映射上按项叠加），解压升级不会覆盖它；
   也可用 `-Fonts config` 只带 `PR2Localization\fonts\font-map.default.ini`，此时必须自己把
   映射中写明的实际字体文件放进 `fonts`；映射不读取系统字体目录；
   非拉丁系默认使用 Noto 对应字体，只接受静态字重，不使用 `.ttc` 或 `-VF.ttf`。
@@ -192,7 +192,7 @@ pr2-localization/
   整串汉字超宽会被整条丢弃，只能逐条在游戏里实测。
 - **字体统一放在 `PR2Localization\fonts\`。** 实际字体文件（默认保留 Noto 原始文件名）平铺，
   不按语言子目录；同一次安装只放一个语言。四个游戏逻辑名由 `font-map.ini` 映射到这些文件，
-  发行包只带 `font-map.default.ini`；用户自定义的 `font-map.ini` 优先，解压升级不覆盖它。
+  发行包只带 `font-map.default.ini`；用户自定义的 `font-map.ini` 按项覆盖，解压升级不覆盖它。
   映射只接受 fonts 内的文件。开发用缝合版，发行用完整 Noto；部署时复制到游戏
   `PR2Localization\fonts\`，不覆盖根目录原版。译文新增生僻字时，
   构建会自动重缝，缺字就会显示空白。

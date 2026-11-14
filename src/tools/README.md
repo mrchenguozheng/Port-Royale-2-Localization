@@ -13,6 +13,7 @@ src/tools/
 ├─ translate.py / glossary.py / terms_check.py / placeholder_roles.py   共享核心
 ├─ extract_strings.py                                                  从 PR2.exe 重提基准原文
 ├─ check.py / lint_imports.py                                          质量检查
+├─ config_check.py                                                     语言配置一致性检查
 └─ paths.py    公共路径
 ```
 
@@ -28,6 +29,7 @@ src/tools/
 |---|---|
 | `pack/apply_patch.py` | 校验 → 编译 → 部署，一条命令跑完（`apply_patch.ps1` 调它） |
 | `check.py` | 跑全部静态检查与单测（`check.ps1` 调它） |
+| `config_check.py` | 检查 locale/packs/translations/ui/font-map 的语言配置是否互相对得上；`release.ps1` 出包前也会跑 |
 | `pack/new_lang.py` | 命令行新建语言（编辑器里也能建） |
 | `pack/compile_pack.py` | 把 `src/translations/*.toml` 排版后编译成 `build/runtime/PR2Localization/packs/*.txt`，引擎文本落在 `build/preview/engine_text/*.toml` |
 | `pack/check_breaks.py` | 编译后校验换行/占位符 |

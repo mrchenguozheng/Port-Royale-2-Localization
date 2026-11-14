@@ -58,7 +58,7 @@ Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
   只有活动文件不存在时才回退默认文件；发行包只带默认文件，解压/部署不覆盖活动文件。
 - `PR2Localization/fonts/` 放实际字体文件；默认保留 Noto 原始文件名，不按语言单开子目录，
   也不要覆盖游戏根目录 `fonts/` 的原版字体。四个游戏逻辑名由 `font-map.ini` 映射到这些文件；
-  发行包只带 `font-map.default.ini`，用户可另建 `font-map.ini` 覆盖默认映射，解压升级不覆盖它。
+  发行包只带 `font-map.default.ini`，用户可另建 `font-map.ini` 按项覆盖默认映射，解压升级不覆盖它。
   同一安装只放一个语言的字体；映射只接受 `fonts` 目录内的文件，不读系统字体；
 非拉丁系默认使用 Noto 对应字体，只接受静态字重，不使用 `.ttc` 或 `-VF.ttf`。
 - 译文里的 hash id、`%1` 等占位符、`@D$...$` 脚本变量、`<n>`、`<c>`、`<f:...>` 标签
@@ -107,6 +107,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 ```powershell
 python src\tools\check.py
 ```
+
+`check.py` 会先跑 `config_check.py` 检查 locale/packs/translations/ui/font-map 的语言配置，再跑单测。`release.ps1` 在构建前也会跑同一项配置检查；`make_release.py` 直接调用时也会先检查。
 
 Rust 构建与测试：
 
@@ -177,7 +179,7 @@ git diff --check
   先看 `.gitignore`，不要把生成物混进提交。
 - 字体分发遵守 [字体与分发](docs/字体与分发.md)：发行包可用完整 Noto，或只带
   `font-map.default.ini` 并把实际字体放进 `PR2Localization\fonts\`；用户自定义写
-  `font-map.ini`，运行时优先读取它。映射不接受系统字体路径。
+  `font-map.ini`，只写需要覆盖的项；运行时以默认文件为基础按项叠加。映射不接受系统字体路径。
   缝合字体只允许本机自用，不要上传、打包或提交。
 - 未经明确要求不要部署到真实游戏目录；部署属于会改变外部状态的操作，先确认目标目录。
 - 发现文档与代码不一致时，以代码和可复现实验为准，修文档或修代码，不要把错误口径

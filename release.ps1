@@ -116,6 +116,13 @@ Write-Host "[release] 入口：$($editions -join ', ')"
 Write-Host "[release] 输出：$OutDir"
 Write-Host "[release] 字体：$Fonts"
 
+Write-Host ''
+Write-Host '[release] 0/2 检查语言配置'
+& $Python (Join-Path $Src 'tools\config_check.py')
+if ($LASTEXITCODE -ne 0) {
+    throw "语言配置检查失败（退出码 $LASTEXITCODE）。"
+}
+
 if (-not $SkipInjector) {
     Write-Host ''
     Write-Host '[release] 1/2 构建注入器'
