@@ -64,11 +64,18 @@ def build_fonts(langs, out_dir=None, mode="stitch", log=None, force=False, cache
 
     if mode == "noto":
         import make_noto_fonts
+        import build_cyr_fonts
         for lang in langs:
             dst = os.path.join(out_dir or FONT_DIR, lang)
+            if lang == "ru":
+                log("生成俄语字体 %s …（正文 Liberation Sans，标题 Noto Serif 压缩）" % lang)
+                ok, msg = build_cyr_fonts.build(dst, log=log)
+                if not ok:
+                    return False, msg
+                continue
             log("生成 Noto 替换字体 %s …" % lang)
             make_noto_fonts.ensure_noto_fonts(lang, dst, log=log, cache=cache)
-        return True, "Noto 字体：%s" % "、".join(langs)
+        return True, "字体：%s" % "、".join(langs)
 
     import subset_fonts
     return subset_fonts.ensure_fonts(
