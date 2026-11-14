@@ -147,7 +147,8 @@ def copy_fonts(lang, stage, mode, log, cache=True):
     notice = os.path.join(src_lang, "NOTO-SOURCES.txt")
     if os.path.isfile(notice):
         shutil.move(notice, os.path.join(stage, "NOTO-SOURCES.txt"))
-    copy_fonts_flat(src_lang, flat, log, expected=3)
+    # 俄语是自建的四个字体（正文 + 标题三档）；其余语言仍是三个 Noto 静态字重。
+    copy_fonts_flat(src_lang, flat, log, expected=4 if lang == "ru" else 3)
     shutil.rmtree(src_lang)
     copy_font_map(stage, log, mode="noto")
     log("复制 Noto 实际字体文件（由 font-map.default.ini 映射逻辑名）")
