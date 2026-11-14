@@ -50,7 +50,9 @@ REFS = os.path.join(SRC, "orig")
 #: 文件名带来源与版本：references\en.gog_1.1.2.3.toml
 BASE = "en.gog_1.1.2.3"
 #: 只读参考语言：英法原文，不参与编辑，也不生成语言包
-REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42")
+REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42",
+                   "de.retail-1.0.0", "es.retail-1.0.0",
+                   "pl.retail-1.0.0", "ru.retail-1.0.0")
 
 #: 未翻译时的占位译文：hash | 英文前 N 个**单词**
 PLACEHOLDER_WORDS = 10

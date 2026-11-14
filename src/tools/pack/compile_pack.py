@@ -40,10 +40,12 @@ DEFAULT_OUT = os.path.join(ROOT, "build", "runtime", "PR2Localization", "packs")
 # 占位符与「占位文本」的判定只有一份，在 shared\core\validate.py。
 from shared.core.validate import has_bare_pipe, is_placeholder, tokens  # noqa: E402
 
-#: 只读参考语言：英文 / 法文原文。**不参与编辑，也不生成语言包**。
+#: 只读参考语言：英文 / 法文原文 + 四个零售包对照。**不参与编辑，也不生成语言包**。
 #: 实际名单以 translate.REFERENCE_LANGS 为准（这里是 import 不到时的兜底常量，
-#: 文件名带来源与版本：en.gog_1.1.2.3 / fr.gog_1.1.2.42）。
-REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42")
+#: 文件名带来源与版本：en.gog_1.1.2.3 / fr.gog_1.1.2.42 / *.retail-1.0.0）。
+REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42",
+                   "de.retail-1.0.0", "es.retail-1.0.0",
+                   "pl.retail-1.0.0", "ru.retail-1.0.0")
 
 # ---------------------------------------------------------------- 占位符
 #
@@ -138,7 +140,7 @@ def _default_lang():
 
 
 def load_pack_meta(lang):
-    """读取 src/packs/<语言>.toml 的 alias/gui；这是写进语言包的元数据。"""
+    """读取 src/packs/<语言>.toml 的 alias/min_runtime；这是写进语言包的元数据。"""
     p = os.path.join(SRC, "packs", lang + ".toml")
     if not os.path.isfile(p):
         return {}
@@ -146,7 +148,7 @@ def load_pack_meta(lang):
         doc = tomllib.load(open(p, "rb"))
     except Exception:
         return {}
-    return {k: str(doc[k]) for k in ("alias", "gui", "min_runtime")
+    return {k: str(doc[k]) for k in ("alias", "min_runtime")
             if doc.get(k)}
 
 
@@ -185,7 +187,7 @@ def build(lang, out_dir, strict):
     path = os.path.join(out_dir, "%s.txt" % lang)
     lines = []
     meta = load_pack_meta(lang)
-    for k in ("alias", "gui", "min_runtime"):
+    for k in ("alias", "min_runtime"):
         if meta.get(k):
             val = meta[k].replace("\n", " ").replace("\r", " ")
             lines.append("# pack-meta %s=%s\n" % (k, val))

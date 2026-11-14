@@ -64,11 +64,11 @@
 
 - 游戏语言：`PR2Localization/packs/locale.default.ini` 是发行默认；用户
   `locale.ini` 存在时优先，空值也保留。
-- 语言包元数据：`<语言>.txt` 开头的 `# pack-meta alias=…` / `gui=…` /
+- 语言包元数据：`<语言>.txt` 开头的 `# pack-meta alias=…` /
   `min_runtime=…`。
 - 字体：`PR2Localization/fonts/` 放实际字体和默认映射 `font-map.default.ini`；
   用户 `font-map.ini` 按项覆盖默认；实际字体必须位于该目录，不读系统字体目录。
-- 启动器界面翻译：`PR2Localization/ui/<语言>.ini`。
+- 启动器界面：固定 `PR2Localization/ui/ui.default.ini`；用户 `ui.ini` 按项覆盖。
 - 运行时版本：`src/injector-rs/pr2_common/src/lib.rs`；发行包根目录 `RUNTIME-VERSION`。
 
 旧的 `launcher.ini`、`lang/aliases.ini` 已移除；旧语言包不再兼容。

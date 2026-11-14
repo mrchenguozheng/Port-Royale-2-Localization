@@ -6,7 +6,6 @@ use pr2_common::{
     exe_dir, language_fonts_complete, read_locale_language, write_locale_language, RUNTIME_VERSION,
 };
 use windows_sys::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
-use windows_sys::Win32::Globalization::GetUserDefaultUILanguage;
 use windows_sys::Win32::Graphics::Gdi::{
     CreateFontW, DeleteObject, GetDC, GetDeviceCaps, GetStockObject, HDC, ReleaseDC, SetBkMode,
     SetTextColor, CLEARTYPE_QUALITY, COLOR_BTNFACE, DEFAULT_CHARSET, DEFAULT_PITCH, FF_DONTCARE,
@@ -21,7 +20,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowLongPtrW,
     LoadCursorW, MessageBoxW, PostQuitMessage, RegisterClassW, SendMessageW, SetWindowLongPtrW,
     SetWindowTextW, ShowWindow, TranslateMessage, BS_DEFPUSHBUTTON, BS_PUSHBUTTON, CB_ADDSTRING,
-    CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBN_SELCHANGE, CBS_DROPDOWNLIST, CREATESTRUCTW,
+    CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWNLIST, CREATESTRUCTW,
     CW_USEDEFAULT, GWLP_USERDATA, IDC_ARROW, IDYES, MB_ICONERROR, MB_ICONWARNING, MB_YESNO, MSG,
     SW_SHOW, WM_COMMAND, WM_CREATE, WM_CTLCOLORSTATIC, WM_DESTROY, WM_NCDESTROY, WM_SETFONT,
     WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP,
@@ -48,7 +47,6 @@ const ST_ETCHEDHORZ: u32 = 0x0010;
 
 struct AppInit {
     root: PathBuf,
-    default_ui: String,
     strings: Strings,
     dpi: u32,
 }
@@ -69,7 +67,6 @@ struct App {
     btn_kill: HWND,
     packs: Vec<Pack>,
     strings: Strings,
-    default_ui: String,
     dpi: u32,
     font_title: isize,
     font_normal: isize,
@@ -82,11 +79,9 @@ pub fn run() {
     }
     let dpi = dpi_for_system();
     let root = exe_dir();
-    let default_ui = ui_for_system();
-    let strings = Strings::load(&root, &default_ui);
+    let strings = Strings::load(&root);
     let init = Box::into_raw(Box::new(AppInit {
         root,
-        default_ui,
         strings,
         dpi,
     })) as *const c_void;
@@ -217,7 +212,6 @@ impl App {
             btn_kill: 0,
             packs: Vec::new(),
             strings: init.strings,
-            default_ui: init.default_ui,
             dpi,
             font_title: make_font(dpi, 16, FW_BOLD as i32),
             font_normal: make_font(dpi, 10, FW_NORMAL as i32),
@@ -424,13 +418,8 @@ impl App {
         }
     }
 
-    fn on_command(&mut self, id: i32, note: u32) {
+    fn on_command(&mut self, id: i32, _note: u32) {
         match id {
-            ID_LANG => {
-                if note == CBN_SELCHANGE {
-                    self.apply_language();
-                }
-            }
             ID_LAUNCH => self.launch(false),
             ID_VANILLA => self.launch(true),
             ID_REFRESH => self.load_packs(),
@@ -467,18 +456,7 @@ impl App {
                 SendMessageW(self.combo, CB_SETCURSEL, selected as WPARAM, 0);
             }
         }
-        self.apply_language();
-    }
-
-    fn apply_language(&mut self) {
-        let mut ui = self.default_ui.clone();
-        if let Some(pack) = self.selected_pack() {
-            if !pack.gui.is_empty() && safe_ui(&pack.gui) {
-                ui = pack.gui.clone();
-            }
-        }
-        self.strings = Strings::load(&self.root, &ui);
-        self.update_texts();
+        self.update_status();
     }
 
     fn selected_pack(&self) -> Option<&Pack> {
@@ -492,42 +470,6 @@ impl App {
 
     fn selected_code(&self) -> Option<String> {
         self.selected_pack().map(|p| p.code.clone())
-    }
-
-    fn update_texts(&self) {
-        unsafe {
-            SetWindowTextW(self.hwnd, wide(&self.strings.t("title")).as_ptr());
-            SetWindowTextW(self.title, wide(&self.strings.t("title")).as_ptr());
-            SetWindowTextW(
-                self.subtitle,
-                wide(&self.strings.t("subtitle")).as_ptr(),
-            );
-            SetWindowTextW(
-                self.label,
-                wide(&self.strings.t("label.language")).as_ptr(),
-            );
-            SetWindowTextW(
-                self.btn_launch,
-                wide(&self.strings.t("button.launch")).as_ptr(),
-            );
-            SetWindowTextW(
-                self.btn_vanilla,
-                wide(&self.strings.t("button.vanilla")).as_ptr(),
-            );
-            SetWindowTextW(
-                self.btn_refresh,
-                wide(&self.strings.t("button.refresh")).as_ptr(),
-            );
-            SetWindowTextW(
-                self.btn_kill,
-                wide(&self.strings.t("button.kill")).as_ptr(),
-            );
-            SetWindowTextW(
-                self.hint,
-                wide(&self.strings.t("hint.footer")).as_ptr(),
-            );
-        }
-        self.update_status();
     }
 
     fn update_status(&self) {
@@ -728,22 +670,6 @@ fn dpi_for_system() -> u32 {
 
 fn rgb(r: u8, g: u8, b: u8) -> u32 {
     r as u32 | ((g as u32) << 8) | ((b as u32) << 16)
-}
-
-fn ui_for_system() -> String {
-    let id = unsafe { GetUserDefaultUILanguage() };
-    match id & 0x3ff {
-        0x04 => "zh".to_string(),
-        0x11 => "ja".to_string(),
-        _ => "en".to_string(),
-    }
-}
-
-fn safe_ui(ui: &str) -> bool {
-    !ui.is_empty()
-        && ui
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
 fn wide(s: &str) -> Vec<u16> {

@@ -1,5 +1,4 @@
 alias = "简体中文"
-gui = "zh"
 min_runtime = 1
 origin = "community"
 ai_assisted = true

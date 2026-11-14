@@ -5,10 +5,10 @@
 检查仓库里的配置源，不检查运行中的游戏目录：
 
 - `src/locale.ini` 的语言代码与语法；
-- `src/packs/*.toml` 的 alias/gui/min_runtime 和可选的
+- `src/packs/*.toml` 的 alias/min_runtime 和可选的
   origin/ai_assisted/review_status/source_lang；
 - `src/translations/<code>.toml` 是否存在；
-- `src/injector-rs/ui/<gui>.ini` 是否存在、是否有重复键；
+- `src/injector-rs/ui/ui.default.ini` 是否存在、是否有重复键；
 - `src/font-map.ini` / `src/font-map-stitch.ini` 的逻辑名、坏行和禁用字体；
 - `src/data/placeholder_roles/<code>.toml` 是否存在且可解析。
 
@@ -36,7 +36,6 @@ FONT_NAMES = (
 )
 PACK_KEYS = (
     "alias",
-    "gui",
     "min_runtime",
     "origin",
     "ai_assisted",
@@ -92,17 +91,6 @@ def _check_packs(src, errors, warnings):
         alias = doc.get("alias")
         if alias is not None and (not isinstance(alias, str) or not alias.strip()):
             errors.append("src/packs/%s：alias 写成了空值" % name)
-        gui = doc.get("gui")
-        if gui is not None:
-            if not isinstance(gui, str) or not gui.strip():
-                errors.append("src/packs/%s：gui 写成了空值" % name)
-            elif not CODE_RE.match(gui):
-                errors.append("src/packs/%s：gui=%r 不是合法语言代码"
-                              % (name, gui))
-            elif not os.path.isfile(os.path.join(
-                    src, "injector-rs", "ui", gui + ".ini")):
-                errors.append("src/packs/%s：缺少 src/injector-rs/ui/%s.ini"
-                              % (name, gui))
         runtime = doc.get("min_runtime")
         if runtime is not None:
             if isinstance(runtime, bool) or not isinstance(runtime, int) or runtime < 1:
@@ -258,8 +246,8 @@ def _parse_ui(path, root, errors):
 
 def _check_ui(src, packs, errors):
     ui_dir = os.path.join(src, "injector-rs", "ui")
-    if not os.path.isfile(os.path.join(ui_dir, "en.ini")):
-        errors.append("src/injector-rs/ui/en.ini：基础英文文件不存在")
+    if not os.path.isfile(os.path.join(ui_dir, "ui.default.ini")):
+        errors.append("src/injector-rs/ui/ui.default.ini：默认界面文件不存在")
     if os.path.isdir(ui_dir):
         for name in sorted(os.listdir(ui_dir)):
             if name.lower().endswith(".ini"):

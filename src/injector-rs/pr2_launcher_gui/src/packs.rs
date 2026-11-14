@@ -6,7 +6,6 @@ use pr2_common::{pack_dir, valid_lang_code};
 pub struct Pack {
     pub code: String,
     pub label: String,
-    pub gui: String,
     pub min_runtime: u32,
 }
 
@@ -37,7 +36,7 @@ pub fn scan(root: &Path) -> Vec<Pack> {
             continue;
         }
 
-        let (alias, gui, min_runtime) = read_meta(&packs_dir.join(&name));
+        let (alias, min_runtime) = read_meta(&packs_dir.join(&name));
         let label = if alias.is_empty() {
             stem.to_string()
         } else {
@@ -46,19 +45,17 @@ pub fn scan(root: &Path) -> Vec<Pack> {
         packs.push(Pack {
             code: stem.to_string(),
             label,
-            gui,
             min_runtime,
         });
     }
     packs
 }
 
-fn read_meta(path: &Path) -> (String, String, u32) {
+fn read_meta(path: &Path) -> (String, u32) {
     let mut alias = String::new();
-    let mut gui = String::new();
     let mut min_runtime = 1u32;
     let Ok(data) = fs::read(path) else {
-        return (alias, gui, min_runtime);
+        return (alias, min_runtime);
     };
     let text = String::from_utf8_lossy(&data);
     let text = text.trim_start_matches('\u{feff}');
@@ -78,7 +75,6 @@ fn read_meta(path: &Path) -> (String, String, u32) {
         };
         match trim(key) {
             "alias" => alias = trim(value).chars().take(255).collect(),
-            "gui" => gui = trim(value).chars().take(15).collect(),
             "min_runtime" => {
                 if let Ok(n) = trim(value).parse::<u32>() {
                     min_runtime = min_runtime.max(n);
@@ -87,7 +83,7 @@ fn read_meta(path: &Path) -> (String, String, u32) {
             _ => {}
         }
     }
-    (alias, gui, min_runtime)
+    (alias, min_runtime)
 }
 
 fn trim(s: &str) -> &str {
@@ -104,11 +100,10 @@ mod tests {
         let path = std::env::temp_dir().join("pr2_pack_meta_test.txt");
         let _ = fs::write(
             &path,
-            "# pack-meta alias=简体中文\n# pack-meta gui=zh\n# pack-meta min_runtime=3\n0x1 = a\n",
+            "# pack-meta alias=简体中文\n# pack-meta min_runtime=3\n0x1 = a\n",
         );
-        let (alias, gui, min_runtime) = read_meta(&path);
+        let (alias, min_runtime) = read_meta(&path);
         assert_eq!(alias, "简体中文");
-        assert_eq!(gui, "zh");
         assert_eq!(min_runtime, 3);
         let _ = fs::remove_file(&path);
     }

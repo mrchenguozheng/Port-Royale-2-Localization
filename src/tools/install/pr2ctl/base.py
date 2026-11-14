@@ -52,6 +52,8 @@ DATA_DIR = "PR2Localization"
 PACK_DIR = os.path.join(DATA_DIR, "packs")
 FONT_DIR = os.path.join(DATA_DIR, "fonts")
 UI_DIR = os.path.join(DATA_DIR, "ui")
+UI_FILE = "ui.ini"
+UI_DEFAULT_FILE = "ui.default.ini"
 LOG_DIR = os.path.join(DATA_DIR, "logs")
 GAME_EXE = "PR2.exe"
 #: 装好之后用它启动游戏。它挂起 PR2.exe、注入 DLL、再恢复执行。

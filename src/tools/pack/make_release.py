@@ -13,7 +13,7 @@
         packs/locale.default.ini      # 默认语言；用户 locale.ini 优先
         fonts/NotoSansSC-Regular.ttf ...  # 实际字体文件（默认）
         fonts/font-map.default.ini      # 默认逻辑名到实际文件名的映射
-        ui/zh.ini
+        ui/ui.default.ini
         logs/
       README.txt
       OFL.txt

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::fs;
 use std::os::windows::ffi::OsStringExt;
@@ -18,6 +18,8 @@ pub const FONT_MAP_FILE: &str = "font-map.ini";
 pub const FONT_MAP_DEFAULT_FILE: &str = "font-map.default.ini";
 pub const LOCALE_FILE: &str = "locale.ini";
 pub const LOCALE_DEFAULT_FILE: &str = "locale.default.ini";
+pub const UI_FILE: &str = "ui.ini";
+pub const UI_DEFAULT_FILE: &str = "ui.default.ini";
 
 pub fn exe_path() -> PathBuf {
     let mut buf = [0u16; 260];
@@ -77,6 +79,9 @@ pub fn fonts_dir(root: &Path) -> PathBuf {
 /// 要显式禁用某项，写 `ARIAL.TTF=none` 或 `ARIAL.TTF=-`。
 pub struct FontMap {
     entries: HashMap<String, Vec<String>>,
+    /// 四个逻辑名都被显式写成 none / -：该语言使用游戏根目录原版字体，
+    /// 不重定向任何字体文件，也不算“字体缺失”。
+    originals: bool,
 }
 
 fn font_map_dirs(root: &Path) -> [PathBuf; 3] {
@@ -182,17 +187,22 @@ fn normalize_font_key(value: &str) -> String {
     name.trim_matches('"').to_ascii_lowercase()
 }
 
+fn is_disabled_font(value: &str) -> bool {
+    let lower = value.trim().trim_matches('"').to_ascii_lowercase();
+    lower == "none" || lower == "-"
+}
+
 fn resolve_font_path(root: &Path, value: &str) -> Option<String> {
     let expanded = expand_env(value.trim().trim_matches('"'));
     if expanded.trim().is_empty() {
         return None;
     }
     // 显式禁用某一项；其余项仍可沿用默认映射。
-    let lower = expanded.to_ascii_lowercase();
-    if lower == "none" || lower == "-" {
+    if is_disabled_font(&expanded) {
         return None;
     }
     // 不把 .ttc 集合或 -VF.ttf 可变字体交给游戏字体读取器：两者都未验证/不接受。
+    let lower = expanded.to_ascii_lowercase();
     if lower.ends_with(".ttc") || lower.contains("-vf.ttf") {
         return None;
     }
@@ -239,19 +249,34 @@ impl FontMap {
         // 在加载时一次性解析字体的存在性。运行时 lookup 位于文件 API hook 内，
         // 这里若再访问文件系统会重新进入 hook，导致递归崩溃。
         let mut entries: HashMap<String, Vec<String>> = HashMap::new();
+        let mut disabled: HashSet<String> = HashSet::new();
         for (key, values) in merged {
             let resolved: Vec<String> = values
                 .iter()
                 .filter_map(|value| resolve_font_path(root, value))
                 .collect();
             if !resolved.is_empty() {
-                entries.insert(key, resolved);
+                entries.insert(key.clone(), resolved);
+            } else if values.iter().all(|value| is_disabled_font(value)) {
+                disabled.insert(key);
             }
         }
         if entries.is_empty() {
+            let all_disabled = FONT_NAMES
+                .iter()
+                .all(|name| disabled.contains(&normalize_font_key(name)));
+            if all_disabled {
+                return Some(FontMap {
+                    entries,
+                    originals: true,
+                });
+            }
             return None;
         }
-        Some(FontMap { entries })
+        Some(FontMap {
+            entries,
+            originals: false,
+        })
     }
 
     /// 按游戏请求的文件名/路径取第一个实际存在的映射文件。
@@ -261,7 +286,7 @@ impl FontMap {
     }
 
     pub fn has_all(&self) -> bool {
-        FONT_NAMES.iter().all(|name| self.lookup(name).is_some())
+        self.originals || FONT_NAMES.iter().all(|name| self.lookup(name).is_some())
     }
 }
 
@@ -587,6 +612,23 @@ mod tests {
         let paths = font_map_paths(&root);
         assert_eq!(paths[0], default_path);
         assert_eq!(paths[1], fonts.join(FONT_MAP_FILE));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn font_map_all_none_means_original_fonts_are_complete() {
+        let root = temp_root();
+        let fonts = root.join(DATA_DIR).join("fonts");
+        fs::write(
+            fonts.join(FONT_MAP_DEFAULT_FILE),
+            "[es]\nARIAL.TTF=none\nELGRECO_.TTF=-\nTiepolo_black.ttf=none\nTiepolo_bold.ttf=none\n",
+        )
+        .unwrap();
+
+        let map = FontMap::load(&root, "es").unwrap();
+        assert!(map.has_all());
+        assert!(map.lookup("fonts\\ARIAL.TTF").is_none());
+        assert!(language_fonts_complete(&root, "es"));
         let _ = fs::remove_dir_all(&root);
     }
 

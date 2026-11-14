@@ -1,4 +1,4 @@
-use pr2_common::ui_dir;
+use pr2_common::{ui_dir, UI_DEFAULT_FILE, UI_FILE};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -62,15 +62,17 @@ pub struct Strings {
 }
 
 impl Strings {
-    pub fn load(root: &Path, ui: &str) -> Self {
+    pub fn load(root: &Path) -> Self {
         let mut values = HashMap::new();
         let dir = ui_dir(root);
-        // 英文文件是基础层：新语言只翻译一部分 key 时，缺失项仍使用 en.ini
-        // 中的自定义文案，而不是直接落到 Rust 内置英文。
-        read_ini(&dir.join("en.ini"), &mut values);
-        if ui != "en" {
-            read_ini(&dir.join(format!("{ui}.ini")), &mut values);
+        // 发行包只带 ui.default.ini；用户把要改的项抄进 ui.ini 即可按项覆盖，
+        // 不需要整份替换，升级也不会覆盖用户文件。
+        let has_default = read_ini(&dir.join(UI_DEFAULT_FILE), &mut values);
+        if !has_default {
+            // 兼容仍带旧 en.ini 的安装目录；新包不再生成多语言 UI 文件。
+            read_ini(&dir.join("en.ini"), &mut values);
         }
+        read_ini(&dir.join(UI_FILE), &mut values);
         Self { values }
     }
 
@@ -136,10 +138,10 @@ impl Strings {
     }
 }
 
-fn read_ini(path: &Path, out: &mut HashMap<String, String>) {
+fn read_ini(path: &Path, out: &mut HashMap<String, String>) -> bool {
     let data = match fs::read(path) {
         Ok(v) => v,
-        Err(_) => return,
+        Err(_) => return false,
     };
     let text = String::from_utf8_lossy(&data);
     let text = text.trim_start_matches('\u{feff}');
@@ -161,6 +163,7 @@ fn read_ini(path: &Path, out: &mut HashMap<String, String>) {
         }
         out.insert(key.to_string(), unescape(trim(value)));
     }
+    true
 }
 
 fn trim(s: &str) -> &str {
@@ -222,19 +225,19 @@ mod tests {
     }
 
     #[test]
-    fn partial_language_keeps_custom_english_base() {
+    fn user_file_overrides_selected_keys() {
         let root = temp_root();
         let dir = pr2_common::ui_dir(&root);
         fs::write(
-            dir.join("en.ini"),
-            "[gui]\ntitle=English title\nbutton.launch=Start\n",
+            dir.join("ui.default.ini"),
+            "[gui]\ntitle=默认标题\nbutton.launch=启动\n",
         )
         .unwrap();
-        fs::write(dir.join("ko.ini"), "[gui]\ntitle=한국어 제목\n").unwrap();
+        fs::write(dir.join("ui.ini"), "[gui]\ntitle=我的标题\n").unwrap();
 
-        let strings = Strings::load(&root, "ko");
-        assert_eq!(strings.t("title"), "한국어 제목");
-        assert_eq!(strings.t("button.launch"), "Start");
+        let strings = Strings::load(&root);
+        assert_eq!(strings.t("title"), "我的标题");
+        assert_eq!(strings.t("button.launch"), "启动");
         assert_eq!(strings.t("subtitle"), "Port Royale 2 localization runtime");
         let _ = fs::remove_dir_all(&root);
     }

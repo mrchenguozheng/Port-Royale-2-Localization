@@ -49,7 +49,11 @@ import translate as T          # 复用语言列表与基准文件，别再抄�
 
 #: 表头里用的语言显示名（代码 -> 中文名），以后加语言在这里补一行。
 LANG_NAMES = {"zh": "中文", "ja": "日本語", "fr": "法语", "test_en": "English",
-              "en.gog_1.1.2.3": "English", "fr.gog_1.1.2.42": "法语（原版）"}
+              "en.gog_1.1.2.3": "English", "fr.gog_1.1.2.42": "法语（原版）",
+              "de.retail-1.0.0": "德语（零售参考）",
+              "es.retail-1.0.0": "西语（零售参考）",
+              "pl.retail-1.0.0": "波兰语（零售参考）",
+              "ru.retail-1.0.0": "俄语（零售参考）"}
 
 
 def lang_name(code):
@@ -155,7 +159,7 @@ def main():
     ap.add_argument("--lang", action="append", default=[],
                     help="语言代码，可重复；默认所有可编辑语言")
     ap.add_argument("--with", dest="extra", action="append", default=[],
-                    help="并排对照的其它语言（默认带 src\\orig 里的法文原本）")
+                    help="并排对照的其它语言（默认只带英语/法语的原文参考）")
     ap.add_argument("--csv", action="store_true", help="同时导出 .csv")
     ap.add_argument("--out", default=OUT_DIR, help="输出目录（默认 build\\preview\\glossary）")
     args = ap.parse_args()
@@ -170,7 +174,7 @@ def main():
     if not langs:
         raise SystemExit("translations\\ 下没有可编辑的译文")
 
-    extra_codes = args.extra or [c for c in T.REFERENCE_LANGS
+    extra_codes = args.extra or [c for c in T.PRIMARY_REFERENCE_LANGS
                                  if c != T.BASE_LANG and os.path.isfile(T.lang_path(c))]
     others = []
     for c in extra_codes:

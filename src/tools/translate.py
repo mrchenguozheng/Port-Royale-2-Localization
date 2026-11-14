@@ -71,7 +71,15 @@ REFERENCES_DIR = os.path.join(SRC, "orig")
 BASE_LANG = "en.gog_1.1.2.3"
 
 #: 只读参考语言：参与 id 顺序与占位符校验，但不提供译文。
-REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42")
+#: 英语/法语是主参考；零售包只作补充对照，不优先采用。
+PRIMARY_REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42")
+RETAIL_REFERENCE_LANGS = (
+    "de.retail-1.0.0",
+    "es.retail-1.0.0",
+    "pl.retail-1.0.0",
+    "ru.retail-1.0.0",
+)
+REFERENCE_LANGS = PRIMARY_REFERENCE_LANGS + RETAIL_REFERENCE_LANGS
 #: 法文原文的字段名（合并结果里 lang 字段就是文件名，没有短键别名）。
 FR_LANG = "fr.gog_1.1.2.42"
 
@@ -222,8 +230,13 @@ def cmd_status(args):
     es = entries(doc)
     total = len(es)
     done = sum(1 for e in es if not PH_RE.match(e.get(field, "")))
-    print("[%s] 共 %d 条，已译 %d 条（%.1f%%），待译 %d 条"
-          % (field, total, done, 100.0 * done / max(1, total), total - done))
+    same = sum(1 for e in es if e.get(field, "") == e.get(BASE_LANG, ""))
+    extra = ""
+    if field != BASE_LANG:
+        extra = "，其中与英文原文相同 %d 条（尚未改写）" % same
+    print("[%s] 共 %d 条，已译 %d 条（%.1f%%），待译 %d 条%s"
+          % (field, total, done, 100.0 * done / max(1, total), total - done,
+             extra))
 
 
 def main():

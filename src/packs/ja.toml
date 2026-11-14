@@ -1,5 +1,4 @@
 alias = "日本語"
-gui = "ja"
 min_runtime = 1
 origin = "community"
 source_lang = "en.gog_1.1.2.3"

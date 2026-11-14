@@ -25,7 +25,7 @@ class TestReleaseManifest(unittest.TestCase):
         self._write("PR2Localization/fonts/NotoSansSC-Regular.ttf", b"font")
         self._write("PR2Localization/fonts/font-map.default.ini",
                     "[zh]\nARIAL.TTF=NotoSansSC-Regular.ttf\n")
-        self._write("PR2Localization/ui/zh.ini", "[ui]\ntitle=测试\n")
+        self._write("PR2Localization/ui/ui.default.ini", "[gui]\ntitle=测试\n")
 
     def tearDown(self):
         import shutil

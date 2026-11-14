@@ -58,7 +58,8 @@ def deploy_steps(target, langs, edition=None):
 
     ui_src = os.path.join(RUNTIME, UI_DIR)
     if os.path.isdir(ui_src):
-        for name in sorted(os.listdir(ui_src)):
+        # 只装默认界面；用户自己的 ui.ini 是覆盖层，升级时不碰。
+        for name in (UI_DEFAULT_FILE,):
             src = os.path.join(ui_src, name)
             if os.path.isfile(src):
                 steps.append(("PR2Localization\\ui\\%s" % name, src,
