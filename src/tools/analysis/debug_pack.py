@@ -22,6 +22,7 @@
 同文条目（de_index 里的 dup 簇）在画面上仍是同一句，只能记到簇一级。
 """
 
+import glob
 import io
 import os
 import re
@@ -34,35 +35,56 @@ ROOT = os.path.dirname(SRC)
 GAME = r"C:\Program Files (x86)\GOG Galaxy\Games\Port Royale 2"
 MARK = re.compile(r"^0x[0-9A-F]{8} = (?:<[^>\n]*>)*\[[0-9A-F]{4,8}\] ")
 MARK_ANY = re.compile(r"^0x([0-9A-F]{8}) = ((?:<[^>\n]*>)*)\[([0-9A-F]{3,8})\] ?")
-MAP_DOC = os.path.join(ROOT, "docs", "界面映射.md")
+MAP_DIR = os.path.join(ROOT, "docs", "界面映射")
+MAP_DOC = os.path.join(ROOT, "docs", "界面映射.md")   # 拆卷前的单文件，只作兼容
 
 
-def load_cleared(path):
-    """从界面映射文档里取已实机确认的键，支持三类写法。
+def map_sources(target=None):
+    """返回作为“已查清清单”的 md 文件列表。
+
+    默认：`docs/界面映射/` 下全部 *.md（拆卷后的正本），外加旧单文件（若还在）。
+    传目录 → 该目录下全部 *.md；传文件 → 只有它。
+    """
+    if target is None:
+        out = []
+        if os.path.isdir(MAP_DIR):
+            out += sorted(glob.glob(os.path.join(MAP_DIR, "*.md")))
+        if os.path.isfile(MAP_DOC):
+            out.append(MAP_DOC)
+        return out
+    if os.path.isdir(target):
+        return sorted(glob.glob(os.path.join(target, "*.md")))
+    return [target] if os.path.isfile(target) else []
+
+
+def load_cleared(sources):
+    """从界面映射的分卷里取已实机确认的键，支持三类写法。
 
     1. 逐条：同一行既有 `[XXXX]` 又有 0x 键 —— 这一条已确认；
     2. 整段：`- 整体清除：`0xfc51xxxx`（名表）` —— 该前缀下全部视为已确认（类别级）；
     3. 例外：`- 整体保留：`0xfc512ea5`` —— 即使落在已清除的整段里也保留标记。
     文档是唯一来源：文档里没有标记/没有整段声明的键，继续带标记。
+    推断行（标记列写 —）不算确认。
     """
-    if not path or not os.path.isfile(path):
-        print("清除：找不到 %s，全部保留标记" % path)
+    if not sources:
+        print("清除：找不到界面映射，全部保留标记")
         return {}, [], set()
     cleared, prefixes, keep = {}, [], set()
-    for line in io.open(path, encoding="utf-8"):
-        line = line.rstrip("\n")
-        if "整体保留：" in line:
-            for kk in re.findall(r"0x([0-9a-fA-F]{8})", line):
-                keep.add("0x" + kk.upper())
-            continue
-        if "整体清除：" in line:
-            for pp in re.findall(r"0x([0-9a-fA-F]{4})xxxx", line):
-                prefixes.append("0x" + pp.upper())
-            continue
-        mk = re.search(r"\[([0-9A-F]{3,8})\]", line)
-        kk = re.search(r"0x([0-9a-fA-F]{8})", line)
-        if mk and kk:
-            cleared["0x" + kk.group(1).upper()] = mk.group(1)
+    for path in sources:
+        for line in io.open(path, encoding="utf-8"):
+            line = line.rstrip("\n")
+            if "整体保留：" in line:
+                for kk in re.findall(r"0x([0-9a-fA-F]{8})", line):
+                    keep.add("0x" + kk.upper())
+                continue
+            if "整体清除：" in line:
+                for pp in re.findall(r"0x([0-9a-fA-F]{4})xxxx", line):
+                    prefixes.append("0x" + pp.upper())
+                continue
+            mk = re.search(r"\[([0-9A-F]{3,8})\]", line)
+            kk = re.search(r"0x([0-9a-fA-F]{8})", line)
+            if mk and kk:
+                cleared["0x" + kk.group(1).upper()] = mk.group(1)
     return cleared, prefixes, keep
 
 
@@ -112,7 +134,7 @@ def ensure_fonts(lang, code):
     print("字体：已写 %s 的 [%s] 段（%d 条映射）" % (os.path.basename(user), code, len(block)))
 
 
-def build(lang, clear_map=MAP_DOC):
+def build(lang, sources=None):
     alias, _ = pack_meta(lang)
     code = lang + "-debug"
     out = os.path.join(ROOT, "build", "debug", code)
@@ -137,8 +159,9 @@ def build(lang, clear_map=MAP_DOC):
     if not done:
         out_lines.insert(0, headline)
 
-    # 已实机确认的条目按文档清单去掉标记，剩下的继续带标记
-    cleared, prefixes, keep = load_cleared(clear_map)
+    # 已实机确认的条目按界面映射清单去掉标记，剩下的继续带标记
+    sources = map_sources() if sources is None else sources
+    cleared, prefixes, keep = load_cleared(sources)
 
     def drop(key):
         if key in keep:
@@ -173,9 +196,8 @@ def build(lang, clear_map=MAP_DOC):
 
     total = sum(1 for l in out_lines if l.startswith("0x"))
     marked = sum(1 for l in out_lines if MARK.match(l))
-    print("产物 %s：条目 %d、带标记 %d、按 %s 去掉标记 %d 条、%d 字节"
-          % (path, total, marked, os.path.basename(clear_map) if clear_map else "-",
-             total - marked, os.path.getsize(path)))
+    print("产物 %s：条目 %d、带标记 %d、按界面映射（%d 份清单）去掉标记 %d 条、%d 字节"
+          % (path, total, marked, len(sources), total - marked, os.path.getsize(path)))
     if marked + len(stripped) != total:
         raise SystemExit("计数不符：带标记 %d + 已去标记 %d ≠ 条目 %d"
                          % (marked, len(stripped), total))
@@ -193,12 +215,12 @@ def main():
     lang = "de"
     if "--lang" in sys.argv:
         lang = sys.argv[sys.argv.index("--lang") + 1]
-    clear_map = MAP_DOC
+    sources = None                      # None = docs/界面映射/ 全部 md
     if "--no-clear" in sys.argv:
-        clear_map = None
+        sources = []                    # 空列表 = 一份清单都不读，全部保留标记
     if "--clear-map" in sys.argv:
-        clear_map = os.path.abspath(sys.argv[sys.argv.index("--clear-map") + 1])
-    build(lang, clear_map)
+        sources = map_sources(os.path.abspath(sys.argv[sys.argv.index("--clear-map") + 1]))
+    build(lang, sources)
 
 
 if __name__ == "__main__":
