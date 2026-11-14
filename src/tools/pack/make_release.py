@@ -170,6 +170,12 @@ def write_readme(lang, stage, mode, edition):
         "none": "字体：本包不含字体，也无法通过映射读取系统字体。",
         "config": "字体：PR2Localization\\fonts\\font-map.default.ini 把逻辑名映射到 fonts 内的实际文件；本包不含字体，需要自己放入。",
     }[mode]
+    if mode == "noto" and lang == "ru":
+        # 俄语不是直接挂 Noto：正文是与 Arial 度量一致的 Liberation Sans，
+        # 标题是按原版度量压缩并改名的 Noto Serif 衍生文件。
+        font_line = ("字体：正文 PR2CyrBody-Regular.ttf（Liberation Sans 未修改副本），"
+                     "标题 PR2CyrDisplay-Head / -Black / -Bold.ttf（由 Noto Serif 按原版度量"
+                     "压缩并改名）；均为 SIL OFL 1.1，font-map.default.ini 映射四个逻辑名。")
     if edition == "gog":
         install_step = """  2. GOG：双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
      本包是 GOG 版，刻意不包含 VERSION.dll；不要直接双击 PR2.exe。
@@ -228,7 +234,36 @@ def write_readme(lang, stage, mode, edition):
   5. 确认 PR2Localization\\packs\\<语言>.txt、PR2Localization\\fonts\\、
      locale.ini（或缺失时的 locale.default.ini）的语言代码一致。
   仍要启动会回退原版拉丁字体，中文可能缺字。"""
-    if mode in ("noto", "stitch"):
+        if lang == "ru":
+            font_help = """字体：
+  字体文件在 PR2Localization\\fonts\\；DLL 通过路径重定向读取，不覆盖根目录原版。
+  四个实际字体与游戏请求的四个逻辑名一一对应（正文一份、标题三份）：
+    ARIAL.TTF         → PR2CyrBody-Regular.ttf（Liberation Sans，OFL 1.1）
+    ELGRECO_.TTF      → PR2CyrDisplay-Head.ttf
+    Tiepolo_black.ttf → PR2CyrDisplay-Black.ttf
+    Tiepolo_bold.ttf  → PR2CyrDisplay-Bold.ttf
+  标题三份是 Noto Serif 按原版各槽位度量压缩后的衍生文件，族名已改为
+  PR2 Cyrillic Display *，不改名为 ARIAL.TTF 等游戏逻辑名。
+  默认映射在 PR2Localization\\fonts\\font-map.default.ini；要自定义时新建或编辑
+  同目录的 font-map.ini（运行时优先读它）。
+  解压升级只替换 font-map.default.ini，不会覆盖手工修改的 font-map.ini。
+  不按语言单开子目录；同一次安装只放一个语言。
+
+  如果启动器提示“字体缺失”：
+  1. 确认 font-map.ini（没有它时用默认文件）的四个逻辑名都指向 PR2Localization\\fonts\\ 下真实存在的文件。
+  2. 从压缩包重新解压整个 PR2Localization 目录；只复制 packs 里的语言包不够。
+  3. 实际字体文件平铺在 PR2Localization\\fonts\\，不要多包一层语言子目录。
+  4. 检查杀毒软件是否隔离了字体文件。
+  5. 确认 PR2Localization\\packs\\ru.txt、PR2Localization\\fonts\\、
+     locale.ini（或缺失时的 locale.default.ini）的语言代码一致。
+  仍要启动会回退原版拉丁字体，俄语会显示成方框或缺字。"""
+    if mode == "noto" and lang == "ru":
+        license_help = """字体许可：
+  正文 Liberation Sans 与标题所用的 Noto Serif 都是 SIL Open Font License 1.1，
+  详见同目录 OFL.txt 或 https://openfontlicense.org/
+  Liberation Sans 为未修改副本；标题字体是 Noto Serif 的压缩衍生版本，
+  已改族名（PR2 Cyrillic Display *），不沿用 Noto 的保留字体名。"""
+    elif mode in ("noto", "stitch"):
         license_help = """字体许可：
   Noto 字体使用 SIL Open Font License 1.1，详见同目录 OFL.txt
   或 https://openfontlicense.org/"""

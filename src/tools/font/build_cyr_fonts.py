@@ -161,6 +161,7 @@ def _scale_font(src, dst, sx, sy, family, charset=None, win_asc=None, win_desc=N
                            (16, family), (17, "Regular")):
         font["name"].setName(value, name_id, 3, 1, 0x409)
     font.save(dst)
+    font.close()
     return dst
 
 
@@ -202,6 +203,7 @@ def build(out, noto_dir=None, log=None, charset=None):
             return False, "缺少 Noto 源文件：%s" % src
         noto = TTFont(src, lazy=True)
         avg = _avg_advance(noto, charset) if charset else 0.0
+        noto.close()
         if not avg:
             return False, "无法测量 %s 的平均 advance（用字表为空）" % src_name
         sx = target_avg / avg
@@ -218,6 +220,7 @@ def build(out, noto_dir=None, log=None, charset=None):
         font = TTFont(os.path.join(out, name), lazy=True)
         cmap = font.getBestCmap()
         missing = sorted(ch for ch in charset if ord(ch) not in cmap)
+        font.close()
         missing_total += len(missing)
         log("%s 用字 %d 缺字 %d %s" % (name, len(charset), len(missing),
                                       "".join(missing[:12])))
