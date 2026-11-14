@@ -1,0 +1,6 @@
+alias = "Deutsch"
+min_runtime = 1
+origin = "community"
+ai_assisted = true
+review_status = "preview"
+source_lang = "en.gog_1.1.2.3"
