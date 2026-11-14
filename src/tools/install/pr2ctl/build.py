@@ -169,6 +169,13 @@ def run_build(langs, events):
             events.put(("build_failed", ""))
             return
 
+        # 发行/部署用默认文件；保留已有活动配置，升级不覆盖用户选择。
+        default_out = os.path.join(PACK_OUT, LOCALE_DEFAULT_FILE)
+        if not os.path.isfile(default_out) and os.path.isfile(LOCALE_INI):
+            shutil.copy2(LOCALE_INI, default_out)
+            events.put(("line", "已按 %s 建立 %s\\locale.default.ini"
+                        % (os.path.basename(LOCALE_INI), PACK_DIR)))
+
         # 字体：语言包编完后统一检查一次。译文里出现新字而字体没跟上，
         # 游戏里就画成空白 —— 所以并进同一个构建动作，别让人单记一步。
         try:

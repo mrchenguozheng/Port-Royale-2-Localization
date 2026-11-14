@@ -141,12 +141,18 @@ def main():
     print("   " + msg.replace("\n", "\n   "))
 
     # 4) locale.ini：默认不动，只有显式 --locale 才改
-    ini = os.path.join(target, B.PACK_DIR, "locale.ini")
     if args.locale:
         B.set_game_language(target, args.locale)
         primary = args.locale
     else:
-        primary = B.read_ini_language(ini) or B.get_language() or langs[0]
+        primary = B.read_locale_language(target)
+        has_locale = (
+            os.path.isfile(os.path.join(target, B.PACK_DIR, B.LOCALE_FILE))
+            or os.path.isfile(os.path.join(target, B.PACK_DIR,
+                                          B.LOCALE_DEFAULT_FILE))
+        )
+        if primary is None and not has_locale:
+            primary = B.get_language() or langs[0]
         print("   保持游戏语言：%s（要改加 --locale <代码>）" % (primary or "（空）"))
 
     # 5) 比对：构建产物 vs 游戏目录里实际文件
@@ -164,7 +170,7 @@ def main():
         same = sha256(src) == sha256(dst)
         print("   %-24s %s" % (name, "一致" if same else "不一致"))
         bad += 0 if same else 1
-    print("   %-24s %s" % ("locale.ini language", B.read_ini_language(ini) or "（空）"))
+    print("   %-24s %s" % ("locale language", B.read_locale_language(target) or "（空）"))
     if bad:
         sys.exit("\n[失败] %d 个文件与构建产物不一致" % bad)
 

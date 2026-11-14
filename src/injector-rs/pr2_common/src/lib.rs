@@ -16,6 +16,8 @@ pub const FONT_NAMES: [&str; 4] = [
 ];
 pub const FONT_MAP_FILE: &str = "font-map.ini";
 pub const FONT_MAP_DEFAULT_FILE: &str = "font-map.default.ini";
+pub const LOCALE_FILE: &str = "locale.ini";
+pub const LOCALE_DEFAULT_FILE: &str = "locale.default.ini";
 
 pub fn exe_path() -> PathBuf {
     let mut buf = [0u16; 260];
@@ -264,11 +266,25 @@ pub fn override_path(root: &Path, lang: &str) -> PathBuf {
 }
 
 pub fn locale_path(root: &Path) -> PathBuf {
-    pack_dir(root).join("locale.ini")
+    pack_dir(root).join(LOCALE_FILE)
+}
+
+pub fn locale_default_path(root: &Path) -> PathBuf {
+    pack_dir(root).join(LOCALE_DEFAULT_FILE)
 }
 
 pub fn read_locale_language(root: &Path) -> Option<String> {
-    let text = fs::read_to_string(locale_path(root)).ok()?;
+    let user_path = locale_path(root);
+    // 用户文件存在即优先；即使 language= 为空，也视为用户明确清空，
+    // 不拿默认文件把它补回去。只有活动文件不存在时才回退默认文件。
+    if user_path.exists() {
+        return read_language_file(&user_path);
+    }
+    read_language_file(&locale_default_path(root))
+}
+
+fn read_language_file(path: &Path) -> Option<String> {
+    let text = fs::read_to_string(path).ok()?;
     for line in text.lines() {
         let line = line.trim();
         if let Some(rest) = line.strip_prefix("language") {
@@ -278,6 +294,7 @@ pub fn read_locale_language(root: &Path) -> Option<String> {
                 if !value.is_empty() {
                     return Some(value.to_string());
                 }
+                return None;
             }
         }
     }
@@ -417,6 +434,28 @@ mod tests {
         );
         assert!(language_fonts_complete(&root, "zh"));
         assert!(!language_fonts_complete(&root, "ja"));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn locale_prefers_user_file_and_falls_back_to_default() {
+        let root = temp_root();
+        let packs = root.join(DATA_DIR).join("packs");
+        fs::create_dir_all(&packs).unwrap();
+        let default_path = packs.join(LOCALE_DEFAULT_FILE);
+        let user_path = packs.join(LOCALE_FILE);
+        fs::write(&default_path, "language=zh\n").unwrap();
+
+        assert_eq!(read_locale_language(&root).as_deref(), Some("zh"));
+
+        fs::write(&user_path, "language=\n").unwrap();
+        assert_eq!(read_locale_language(&root), None);
+
+        fs::write(&user_path, "language=ja\n").unwrap();
+        assert_eq!(read_locale_language(&root).as_deref(), Some("ja"));
+
+        let _ = fs::remove_file(&user_path);
+        assert_eq!(read_locale_language(&root).as_deref(), Some("zh"));
         let _ = fs::remove_dir_all(&root);
     }
 

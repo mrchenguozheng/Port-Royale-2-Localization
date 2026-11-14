@@ -35,7 +35,9 @@ ROOT = os.path.dirname(SRC)                              # 仓库根
 BUILD = os.path.join(ROOT, "build")
 RUNTIME = os.path.join(BUILD, "runtime")
 PACK_OUT = os.path.join(RUNTIME, "PR2Localization", "packs")
-LOCALE_INI = os.path.join(SRC, "locale.ini")
+LOCALE_FILE = "locale.ini"
+LOCALE_DEFAULT_FILE = "locale.default.ini"
+LOCALE_INI = os.path.join(SRC, LOCALE_FILE)
 
 # 直接复制进游戏目录的文件。名字以 PR2Localization 开头，
 # 和游戏原版文件区分。Steam 的宿主 DLL 由 steam_host.py 单独处理：

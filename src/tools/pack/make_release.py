@@ -10,7 +10,7 @@
       PR2LocalizationCore.dll
       PR2Localization/
         packs/zh.txt
-        packs/locale.ini
+        packs/locale.default.ini      # 默认语言；用户 locale.ini 优先
         fonts/NotoSansSC-Regular.ttf ...  # 实际字体文件（默认）
         fonts/font-map.default.ini      # 默认逻辑名到实际文件名的映射
         ui/zh.ini
@@ -69,7 +69,7 @@ def build_pack(lang, stage, log):
     from build_artifacts import compile_pack
     if compile_pack(lang, out, no_fonts=True, on_line=log) != 0:
         raise RuntimeError("语言包编译失败：%s" % lang)
-    with open(os.path.join(out, "locale.ini"), "w",
+    with open(os.path.join(out, "locale.default.ini"), "w",
               encoding="utf-8", newline="\n") as fh:
         fh.write("language=%s\n" % lang)
 
@@ -183,9 +183,9 @@ def write_readme(lang, stage, mode, edition):
   3. 挂载成功后从 Steam 正常启动游戏；需要临时指定语言时，可用
      PR2LocalizationGUI.exe 启动。"""
     if edition == "gog":
-        uninstall_line = "  删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll\n  和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。"
+        uninstall_line = "  删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll\n  和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。\n  如果保留过 PR2Localization\\packs\\overrides\\，卸载前先复制出来。"
     else:
-        uninstall_line = "  先运行 .\\PR2HostMount.ps1 -Action Restore 还原 Ascaron.Logging-2.6.dll，\n  再删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll、\n  PR2HostMount.ps1 和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。"
+        uninstall_line = "  先运行 .\\PR2HostMount.ps1 -Action Restore 还原 Ascaron.Logging-2.6.dll，\n  再删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll、\n  PR2HostMount.ps1 和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。\n  如果保留过 PR2Localization\\packs\\overrides\\，卸载前先复制出来。"
     if edition == "gog":
         support_line = "支持游戏版本：GOG 英文 1.1.2.3 已实测。本包只用于 GOG；Steam 请下载 Steam 版。"
     else:
@@ -225,7 +225,7 @@ def write_readme(lang, stage, mode, edition):
   3. 实际字体文件平铺在 PR2Localization\\fonts\\，不要多包一层语言子目录。
   4. 检查杀毒软件是否隔离了字体文件。
   5. 确认 PR2Localization\\packs\\<语言>.txt、PR2Localization\\fonts\\、
-     locale.ini 的语言代码一致。
+     locale.ini（或缺失时的 locale.default.ini）的语言代码一致。
   仍要启动会回退原版拉丁字体，中文可能缺字。"""
     if mode in ("noto", "stitch"):
         license_help = """字体许可：
@@ -234,6 +234,10 @@ def write_readme(lang, stage, mode, edition):
     else:
         license_help = """字体许可：
   本包不包含字体文件，不附带 OFL.txt。"""
+    locale_help = """语言设置：
+  默认语言在 PR2Localization\\packs\\locale.default.ini；
+  已有 locale.ini（GUI 选语言时写入）优先，解压升级不会覆盖它。
+  packs\\overrides\\ 是本机临时译文覆盖目录，安装/升级不会删除。"""
     text = """Port Royale 2 本地化 - %s（%s）
 
 %s
@@ -249,6 +253,8 @@ def write_readme(lang, stage, mode, edition):
 
 %s
 
+%s
+
 卸载：
 %s
 
@@ -258,7 +264,8 @@ def write_readme(lang, stage, mode, edition):
   - %s
 
 %s
-""" % (label, edition_label, support_line, install_step, lang, font_help, uninstall_line, font_line, license_help)
+""" % (label, edition_label, support_line, install_step, lang, font_help,
+       locale_help, uninstall_line, font_line, license_help)
     with open(os.path.join(stage, "README.txt"), "w",
               encoding="utf-8", newline="\n") as fh:
         fh.write(text)

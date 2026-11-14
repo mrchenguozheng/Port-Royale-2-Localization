@@ -65,7 +65,7 @@
 
 ## 当前唯一的契约
 
-- 游戏语言：`PR2Localization/packs/locale.ini` 的 `language=`
+- 游戏语言：`PR2Localization/packs/locale.default.ini` 的默认值；用户 `locale.ini` 存在时优先，空值也保留
 - 语言包显示名/界面语言/最低运行时：`PR2Localization/packs/<语言>.txt` 开头
   `# pack-meta alias=…` / `gui=…` / `min_runtime=…`
 - 字体：`PR2Localization/fonts/` 放实际字体文件和默认映射 `font-map.default.ini`；

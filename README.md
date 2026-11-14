@@ -87,7 +87,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 也可以直接点下面的卡片：
 
 - **构建与部署**：编译注入器、编译语言包、部署到游戏目录；
-- **启动**：「设为游戏语言」写 `locale.ini`，「启动游戏（已注入）」按当前下拉语言启动；
+- **语言**：「设为游戏语言」写 `PR2Localization/packs/locale.ini`；发行包只带 `locale.default.ini`，已有活动文件不覆盖；
 - **译文编辑**：和安装页同一个工作台，顶部页签切换。
 
 开发时改完译文，也可以直接在 PowerShell 7 运行 `pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1`：归一化 → 校验 → 编译 → 部署 → 核对一次跑完。
@@ -144,7 +144,7 @@ pr2-localization/
 |---|---|
 | `PR2Localization.exe` | 启动器。挂起方式启动 `PR2.exe`，注入 DLL 后恢复执行（构建产物） |
 | `PR2LocalizationCore.dll` | 主逻辑。hook 引擎取字的三条路径，把译文替换进去（构建产物） |
-| `PR2Localization\packs\` | 语言包目录。`<语言>.txt` + `locale.ini`，可直接改文本 |
+| `PR2Localization\packs\` | 语言包目录。`<语言>.txt` + `locale.default.ini`（发行默认）；用户 `locale.ini` 优先 |
 | `PR2Localization\fonts\` | 本地化字体；缺字会显示空白 |
 
 ## 加一种语言

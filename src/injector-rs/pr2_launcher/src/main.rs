@@ -53,7 +53,7 @@ fn run() -> Result<(), i32> {
         } else if arg == "--help" || arg == "-h" {
             println!("[PR2Loc] 用法: PR2Localization.exe [--lang=<代码>] [--vanilla]");
             println!("[PR2Loc]   --lang     这一次启动用哪个语言包，");
-            println!("[PR2Loc]              优先于 PR2Localization\\packs\\locale.ini 的 language=，不写文件。");
+            println!("[PR2Loc]              优先于 PR2Localization\\packs\\locale.ini（或 locale.default.ini）的 language=，不写文件。");
             println!("[PR2Loc]   --vanilla  恢复原版字体后直接启动 PR2.exe，不注入。");
             return Ok(());
         }

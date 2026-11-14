@@ -113,6 +113,19 @@ def read_ini_language(ini_path):
     return None
 
 
+def read_locale_language(target):
+    """游戏当前语言：优先用户 locale.ini，不存在再读 locale.default.ini。
+
+    用户文件存在但 language= 为空时返回 None，不拿默认值补齐 ——
+    空值是用户明确清空，部署和运行时都必须保留。
+    """
+    user_ini = os.path.join(target, PACK_DIR, LOCALE_FILE)
+    if os.path.isfile(user_ini):
+        return read_ini_language(user_ini)
+    return read_ini_language(os.path.join(target, PACK_DIR,
+                                          LOCALE_DEFAULT_FILE))
+
+
 def write_ini_language(ini_path, code):
     """把 language= 写成 code，保留文件里其他行。
 
@@ -181,13 +194,19 @@ def patch_report(path):
     packs = installed_langs(path)
     out.append(("PR2Localization\\packs\\", "%d 个语言包" % len(packs) if packs else "无",
                 "、".join(packs) if packs else "还没有复制语言包"))
-    ini = os.path.join(path, PACK_DIR, "locale.ini")
+    ini = os.path.join(path, PACK_DIR, LOCALE_FILE)
+    default_ini = os.path.join(path, PACK_DIR, LOCALE_DEFAULT_FILE)
     if os.path.isfile(ini):
         out.append(("PR2Localization\\packs\\locale.ini",
                     read_ini_language(ini) or "无 language=",
                     "决定游戏加载哪个包"))
+    elif os.path.isfile(default_ini):
+        out.append(("PR2Localization\\packs\\locale.default.ini",
+                    read_ini_language(default_ini) or "无 language=",
+                    "默认语言；建 locale.ini 可覆盖"))
     else:
-        out.append(("PR2Localization\\packs\\locale.ini", "无", "复制后才会生成"))
+        out.append(("PR2Localization\\packs\\locale.default.ini",
+                    "无", "复制后才会生成"))
     fonts_dir = os.path.join(path, "fonts")
     orig_dir = os.path.join(ROOT, "assets", "fonts", "original")
     for name in ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf"):

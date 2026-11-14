@@ -2,6 +2,7 @@
 """pr2ctl.deploy —— 把构建产物复制进游戏目录。"""
 
 from .base import *  # noqa: F401,F403
+from .detect import read_locale_language
 from . import steam_host
 
 
@@ -14,20 +15,9 @@ def _font_lang(target, langs):
     """部署哪一套字体：优先游戏当前 locale，否则选中的第一个语言。"""
     if not langs:
         return None
-    ini = os.path.join(target, PACK_DIR, "locale.ini")
-    try:
-        with open(ini, encoding="utf-8", errors="replace") as fh:
-            for line in fh:
-                if "=" not in line:
-                    continue
-                k, v = line.split("=", 1)
-                if k.strip().lower() == "language":
-                    cur = v.strip()
-                    if cur in langs:
-                        return cur
-                    break
-    except OSError:
-        pass
+    cur = read_locale_language(target)
+    if cur in langs:
+        return cur
     return langs[0]
 
 
@@ -76,10 +66,15 @@ def deploy_steps(target, langs, edition=None):
 
     steps.append(("PR2Localization\\logs\\", None, os.path.join(target, LOG_DIR)))
     steps.append(("%s\\" % PACK_DIR, None, os.path.join(target, PACK_DIR)))
-    wanted = ["locale.ini"]
-    if langs:
-        wanted += ["%s.txt" % c for c in langs]
-    for name in wanted:
+    # locale.ini 是用户可写设置：只复制默认文件，已有 locale.ini 保持不动。
+    locale_src = os.path.join(PACK_OUT, LOCALE_DEFAULT_FILE)
+    if not os.path.isfile(locale_src):
+        # 兼容旧构建目录：旧 locale.ini 只能作为默认值复制。
+        locale_src = os.path.join(PACK_OUT, LOCALE_FILE)
+    if os.path.isfile(locale_src):
+        steps.append(("%s\\%s" % (PACK_DIR, LOCALE_DEFAULT_FILE), locale_src,
+                      os.path.join(target, PACK_DIR, LOCALE_DEFAULT_FILE)))
+    for name in (["%s.txt" % c for c in langs] if langs else []):
         src = os.path.join(PACK_OUT, name)
         if os.path.isfile(src):
             steps.append(("%s\\%s" % (PACK_DIR, name), src,
@@ -126,12 +121,13 @@ def prune_stale_pack(target, langs):
     """删掉游戏目录 PR2Localization\\packs\\ 里本次不装的文件，返回删掉的名字。
 
     只删多出来的，不动要留的 —— 整个 rmtree 会让「内容相同就跳过」
-    永远生效不了，语言包每次都被重写。
+    永远生效不了，语言包每次都被重写。用户活动 locale.ini、发行默认
+    locale.default.ini 和本机 overrides 目录始终保留。
     """
     dst_pack = os.path.join(target, PACK_DIR)
     if not os.path.isdir(dst_pack):
         return []
-    keep = {"locale.ini"}
+    keep = {LOCALE_FILE, LOCALE_DEFAULT_FILE, "overrides"}
     if langs:
         keep |= {"%s.txt" % c for c in langs}
     removed = []

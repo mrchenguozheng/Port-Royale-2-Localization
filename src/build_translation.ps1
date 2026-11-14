@@ -94,6 +94,11 @@ if (-not (Test-Path -LiteralPath $LocaleOut -PathType Leaf)) {
     Copy-Item -LiteralPath $Locale -Destination $LocaleOut -Force
 }
 
+$LocaleDefaultOut = Join-Path $Out 'locale.default.ini'
+if (-not (Test-Path -LiteralPath $LocaleDefaultOut -PathType Leaf)) {
+    Copy-Item -LiteralPath $Locale -Destination $LocaleDefaultOut -Force
+}
+
 Write-Host ''
 Write-Host '[pack] SUCCESS:'
 Get-ChildItem -LiteralPath $Out | ForEach-Object { Write-Host $_.Name }

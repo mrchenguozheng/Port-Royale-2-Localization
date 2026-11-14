@@ -53,7 +53,9 @@ Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
 - `src/translations/<语言>.toml` 是**唯一手改层**；不要直接改 `build/` 下的产物。
 - 运行时语言包是 `PR2Localization/packs/<语言>.txt`，格式为 `0x... = text` 一行一条；不要把旧的
   `|` 换行兜底重新加回来。需要换行时用引擎标签/已有规则，不要自行发明格式。
-- `PR2Localization/packs/locale.ini` 的 `language=` 是游戏默认语言，也是 GUI 的唯一语言状态。
+- `PR2Localization/packs/locale.default.ini` 是发行包默认语言；用户选择写在
+  `PR2Localization/packs/locale.ini`。活动文件存在即优先（`language=` 为空也算用户明确清空），
+  只有活动文件不存在时才回退默认文件；发行包只带默认文件，解压/部署不覆盖活动文件。
 - `PR2Localization/fonts/` 放实际字体文件；默认保留 Noto 原始文件名，不按语言单开子目录，
   也不要覆盖游戏根目录 `fonts/` 的原版字体。四个游戏逻辑名由 `font-map.ini` 映射到这些文件；
   发行包只带 `font-map.default.ini`，用户可另建 `font-map.ini` 覆盖默认映射，解压升级不覆盖它。
