@@ -67,7 +67,7 @@ Steam 版不再尝试 `VERSION.dll` 自然加载：`PR2.exe` 静态导入
 
 ## 开发者：构建与翻译
 
-需要 Rust（rustup + `i686-pc-windows-msvc` target）+ Python 3.11 以上（当前用 3.15）+ PowerShell 7（`pwsh`）+ Visual Studio 2022 C++ 工具链（编译 Steam 宿主代理）。
+需要 Rust（rustup + `i686-pc-windows-msvc` target）+ Python 3.11 以上（当前用 3.15）+ PowerShell 7（`pwsh`）+ MSVC 链接器（Rust 32 位 target 需要；项目不含 C++ 源码）。
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1

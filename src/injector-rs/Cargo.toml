@@ -6,6 +6,7 @@ members = [
     "pr2_launcher",
     "pr2_launcher_gui",
     "pr2_proxy",
+    "pr2_host_proxy",
 ]
 
 [workspace.package]

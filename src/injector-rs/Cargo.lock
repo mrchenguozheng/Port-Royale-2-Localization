@@ -75,6 +75,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "pr2_host_proxy"
+version = "0.1.0"
+dependencies = [
+ "pr2_common",
+ "windows-sys",
+]
+
+[[package]]
 name = "pr2_launcher"
 version = "0.1.0"
 dependencies = [

@@ -4,15 +4,14 @@
 #
 #  Builds the native programs from src\injector-rs:
 #    PR2LocalizationCore.dll, PR2Localization.exe,
-#    PR2LocalizationGUI.exe, PR2LocalizationProxy.dll
+#    PR2LocalizationGUI.exe, PR2LocalizationProxy.dll,
+#    pr2_host_proxy.dll
 #  and copies them into build\runtime\ with the deployed names:
 #    PR2LocalizationCore.dll
 #    PR2Localization.exe
 #    PR2LocalizationGUI.exe
 #    VERSION.dll            (legacy proxy; Steam packages no longer ship it)
-#
-#  Also builds the Steam host proxy from src\host-proxy:
-#    Ascaron.Logging-2.6.dll
+#    Ascaron.Logging-2.6.dll (Steam host proxy)
 #
 #  Runtime data lives under build\runtime\PR2Localization\:
 #    packs\ fonts\ ui\ logs\
@@ -20,6 +19,7 @@
 #  Requires rustup + the i686-pc-windows-msvc target:
 #    rustup target add i686-pc-windows-msvc
 #  The workspace .cargo\config.toml pins that target.
+#  The MSVC linker is required by that Rust target; there is no C++ source.
 #
 #    .\src\build_injector.ps1
 #    .\src\build_injector.ps1 -NoPause
@@ -95,20 +95,13 @@ try {
 
 if ($code -ne 0) { Stop-WithError 'FAILED. See the errors above.' }
 
-$HostProxyBuild = Join-Path $Src 'host-proxy\build.ps1'
-if (Test-Path -LiteralPath $HostProxyBuild -PathType Leaf) {
-    Write-Host ''
-    Write-Host '[build] 编译 Steam 宿主代理'
-    & $HostProxyBuild -NoPause
-    if ($LASTEXITCODE -ne 0) { Stop-WithError '宿主代理编译失败。' }
-}
-
 $Out = Join-Path $RustDir 'target\i686-pc-windows-msvc\release'
 $artifactMap = @{
     'PR2LocalizationCore.dll' = 'PR2LocalizationCore.dll'
     'PR2Localization.exe' = 'PR2Localization.exe'
     'PR2LocalizationGUI.exe' = 'PR2LocalizationGUI.exe'
     'PR2LocalizationProxy.dll' = 'VERSION.dll'
+    'pr2_host_proxy.dll' = 'Ascaron.Logging-2.6.dll'
 }
 foreach ($srcName in $artifactMap.Keys) {
     if (-not (Test-Path -LiteralPath (Join-Path $Out $srcName) -PathType Leaf)) {

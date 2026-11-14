@@ -26,9 +26,8 @@
 
 | 路径 | 作用 |
 |---|---|
-| `src/injector-rs/` | Rust workspace：`pr2_common`、`pr2_proxy`、`pr2_text_source`、`pr2_launcher`、`pr2_launcher_gui` |
+| `src/injector-rs/` | Rust workspace：`pr2_common`、`pr2_proxy`、`pr2_text_source`、`pr2_launcher`、`pr2_launcher_gui`、`pr2_host_proxy` |
 | `src/injector-rs/ui/` | GUI 界面翻译 `zh.ini` / `en.ini` / `ja.ini` |
-| `src/host-proxy/` | Steam 宿主代理 C++ 源码与 MSVC 构建脚本（产物 `Ascaron.Logging-2.6.dll`） |
 | `src/translations/` | 唯一手改译文层：`zh.toml`、`ja.toml` 等 |
 | `src/editor/` | 最小译文编辑器：Astro 前端 + `server.py` + `api/` 分域模块 |
 | `src/tools/` | 语言包编译、字体、部署、校验和分析工具 |
@@ -42,6 +41,7 @@ Rust 产物：
 - `PR2Localization.exe`
 - `PR2LocalizationGUI.exe`
 - `PR2LocalizationProxy.dll`（旧 `VERSION.dll` 代理构建；Steam 发行包已不再使用）
+- `pr2_host_proxy.dll`（日志宿主代理；部署名 `Ascaron.Logging-2.6.dll`）
 
 Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
 `src/tools/install/PR2HostMount.ps1`。代理不是游戏原文件；原版备份为
