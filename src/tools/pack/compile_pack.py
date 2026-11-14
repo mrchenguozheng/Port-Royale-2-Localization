@@ -25,6 +25,7 @@ src\orig\ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
 import argparse
 import io
 import os
+import re
 import sys
 import tomllib
 
@@ -152,7 +153,36 @@ def load_pack_meta(lang):
             if doc.get(k)}
 
 
-def build(lang, out_dir, strict):
+LEAD_TAGS = re.compile(r"(?:<[^>]*>)*")
+
+
+def mark_map(keys):
+    """给每个 id 造一个尽量短且唯一的标记，形如 [D6E4]。
+
+    逐条取“能区分自己”的最短尾数：多数是 4~6 位，只有重号的那两条才用到 8 位。
+    4 位在 3548 条上会撞（3465/3548），所以不能统一按 4 位写死。
+    """
+    raw = [k.replace("0x", "").upper() for k in keys]
+    out = {}
+    for k in keys:
+        r = k.replace("0x", "").upper()
+        for n in range(4, 9):
+            tail = r[-n:]
+            if sum(1 for x in raw if x[-n:] == tail) == 1:
+                out[k] = "[%s] " % tail
+                break
+    if len(out) != len(set(keys)):
+        raise SystemExit("标记无法唯一化")
+    return out
+
+
+def add_mark(txt, mark):
+    """标记插在行首标签之后，避免破坏 <ts:>/<f:fonts/> 的解析。"""
+    m = LEAD_TAGS.match(txt)
+    return txt[:m.end()] + mark + txt[m.end():]
+
+
+def build(lang, out_dir, strict, marks=False):
     # 参考原文**不参与编译**：生成 en.txt / fr.txt 交给引擎等于用「原始英文」
     # 覆盖游戏，等于没汉化。所以直接拒绝，而不是打个警告继续跑。
     # 名单问 translate —— 那里是唯一一份（src\orig\en.gog_1.1.2.3 之类）。
@@ -192,6 +222,7 @@ def build(lang, out_dir, strict):
             val = meta[k].replace("\n", " ").replace("\r", " ")
             lines.append("# pack-meta %s=%s\n" % (k, val))
     n = n_ph = 0
+    mk = mark_map([x.get("id", "").lower() for x in doc.get("s", []) if x.get("id")]) if marks else {}
 
     for s in doc.get("s", []):
         h = s.get("id", "").lower()
@@ -215,8 +246,9 @@ def build(lang, out_dir, strict):
         # patch.js 的合并逻辑按大写规范化 hash，产物若写成小写，
         # 用户手改过的条目就识别不出来，合并会静默失效（测试 test_patch.js
         # 会抓到）。小写 id 只存在于 src\translations\*.toml 里作为内部键。
+        out_txt = add_mark(txt, mk[h]) if marks and h in mk else txt
         lines.append("%s = %s\n" % (h.upper().replace("0X", "0x"),
-                                    to_engine(txt)))
+                                    to_engine(out_txt)))
         n += 1
         if is_placeholder(txt):
             n_ph += 1
@@ -246,7 +278,8 @@ def build(lang, out_dir, strict):
         f.write("".join(lines))
 
     print("已生成 %s" % path)
-    print("  条目 %d 条，其中占位未翻译 %d 条" % (n, n_ph))
+    print("  条目 %d 条，其中占位未翻译 %d 条%s"
+          % (n, n_ph, "，已加排查标记" if marks else ""))
     if warnings:
         print("\n警告 %d 条：" % len(warnings))
         for w in warnings[:20]:
@@ -271,11 +304,13 @@ def main():
     ap.add_argument("--strict", action="store_true", help="有错误时返回非零")
     ap.add_argument("--no-fonts", action="store_true",
                     help="只编语言包，不检查/重建字体（批量编译时由调用方统一做）")
+    ap.add_argument("--marks", action="store_true",
+                    help="给每条正文加 [XXXX] 排查标记（开发用，正常包不要加）")
     a = ap.parse_args()
     lang = a.lang
     if not lang:
         lang = _default_lang()
-    code = build(lang, a.out, a.strict)
+    code = build(lang, a.out, a.strict, a.marks)
 
     # 编完语言包顺手检查字体：译文里出现新字（比如新补的「嫩」）时，
     # 字体不重缝就会画成空白。字体出错不算构建失败 —— 语言包本身没问题。
