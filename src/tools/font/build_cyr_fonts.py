@@ -45,11 +45,15 @@ RU_TOML = os.path.join(ROOT, "src", "translations", "ru.toml")
 TARGET_CAP = 0.614
 #: Noto Serif 静态字重的 cap height（em）。
 NOTO_CAP = 0.714
+#: 原版 Tiepolo 的纵向度量（em）：hhea / OS/2 typo / win。行盒高度也要跟原版一致，
+#: 否则字形缩小了行盒没缩，标题在按钮里会显得偏下、行距也偏大。
+TARGET_ASCENT = 0.791
+TARGET_DESCENT = -0.292
 
-#: 每个标题逻辑字体：Noto 源文件、原版平均 advance、输出名、字重名。
+#: 每个标题逻辑字体：Noto 源文件、原版平均 advance、输出名、字重名、原版 win 上下沿。
 DISPLAY = [
-    ("NotoSerif-Black.ttf", 0.517, "PR2CyrDisplay-Black.ttf", "Black"),
-    ("NotoSerif-Bold.ttf", 0.496, "PR2CyrDisplay-Bold.ttf", "Bold"),
+    ("NotoSerif-Black.ttf", 0.517, "PR2CyrDisplay-Black.ttf", "Black", 0.869, 0.295),
+    ("NotoSerif-Bold.ttf", 0.496, "PR2CyrDisplay-Bold.ttf", "Bold", 0.856, 0.295),
 ]
 
 BODY_SRC = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts",
@@ -97,7 +101,7 @@ def _cap_height(font):
     return font["glyf"][gname].yMax / font["head"].unitsPerEm
 
 
-def _scale_font(src, dst, sx, sy, family):
+def _scale_font(src, dst, sx, sy, family, charset=None, win_asc=None, win_desc=None):
     from fontTools.ttLib import TTFont
     from fontTools.ttLib.tables import ttProgram
 
@@ -125,6 +129,27 @@ def _scale_font(src, dst, sx, sy, family):
     for tag in ("cvt ", "fpgm", "prep"):
         if tag in font:
             del font[tag]
+
+    # 纵向度量按原版 Tiepolo 写回；win 上下沿取原版值，但不得小于实际字形范围，
+    # 否则缩放后的 ё / й 一类会顶到裁剪区。
+    upm = font["head"].unitsPerEm
+    cmap = font.getBestCmap()
+    names = [cmap[ord(ch)] for ch in (charset or ()) if ord(ch) in cmap]
+    if not names:
+        names = set(glyf.keys())
+    top = max(glyf[n].yMax for n in names)
+    bottom = min(glyf[n].yMin for n in names)
+    font["hhea"].ascent = int(round(TARGET_ASCENT * upm))
+    font["hhea"].descent = int(round(TARGET_DESCENT * upm))
+    font["hhea"].lineGap = 0
+    os2 = font["OS/2"]
+    os2.sTypoAscender = int(round(TARGET_ASCENT * upm))
+    os2.sTypoDescender = int(round(TARGET_DESCENT * upm))
+    os2.sTypoLineGap = 0
+    win_asc_px = max(int(round((win_asc or TARGET_ASCENT) * upm)), top)
+    win_desc_px = max(int(round((win_desc or -TARGET_DESCENT) * upm)), -bottom)
+    os2.usWinAscent = win_asc_px
+    os2.usWinDescent = win_desc_px
 
     for name_id, value in ((1, family), (2, "Regular"),
                            (4, family + " Regular"), (6, family.replace(" ", "") + "-Regular"),
@@ -166,7 +191,7 @@ def build(out, noto_dir=None, log=None, charset=None):
     sy = TARGET_CAP / NOTO_CAP
     sx_used = {}
 
-    for src_name, target_avg, out_name, weight in DISPLAY:
+    for src_name, target_avg, out_name, weight, win_asc, win_desc in DISPLAY:
         src = os.path.join(noto_dir, src_name)
         if not os.path.isfile(src):
             return False, "缺少 Noto 源文件：%s" % src
@@ -177,7 +202,8 @@ def build(out, noto_dir=None, log=None, charset=None):
         sx = target_avg / avg
         sx_used[out_name] = sx
         _scale_font(src, os.path.join(out, out_name), sx, sy,
-                    "PR2 Cyrillic Display " + weight)
+                    "PR2 Cyrillic Display " + weight,
+                    charset=charset, win_asc=win_asc, win_desc=win_desc)
         log("标题 %s ← %s  sx=%.3f sy=%.3f" % (out_name, src_name, sx, sy))
 
     missing_total = 0
