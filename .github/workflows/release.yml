@@ -1,13 +1,24 @@
 name: Release
 
-# Only release-* tags trigger a build. Normal version tags such as v0.9.0 do not.
+# Tag release-v* builds and publishes the four GOG/Steam packages.
+# Manual runs build the same artifacts but keep them as workflow artifacts.
 on:
   push:
     tags:
       - "release-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, for example v1.0.0"
+        required: true
+        default: "v1.0.0"
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 env:
   PYTHONUTF8: "1"
@@ -23,44 +34,85 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install fontTools
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: i686-pc-windows-msvc
+
+      - name: Install Python dependencies
         run: python -m pip install --disable-pip-version-check fonttools
 
-      - name: Install Noto CJK fonts
+      - name: Download Noto variable fonts
         shell: pwsh
         run: |
           $dir = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts"
           New-Item -ItemType Directory -Force -Path $dir | Out-Null
           $fonts = @{
-            "NotoSansSC-VF.ttf"   = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
-            "NotoSerifSC-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf"
-            "NotoSansJP-VF.ttf"   = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf"
-            "NotoSerifJP-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf"
+            "NotoSansSC-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
+            "NotoSerifSC-VF.ttf" = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf"
+            "NotoSansJP-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf"
+            "NotoSerifJP-VF.ttf" = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf"
           }
           foreach ($name in $fonts.Keys) {
-            Invoke-WebRequest -Uri $fonts[$name] -OutFile (Join-Path $dir $name)
+            $out = Join-Path $dir $name
+            curl.exe --fail --location --retry 3 --retry-delay 3 --silent --show-error --output $out $fonts[$name]
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $out) -or (Get-Item -LiteralPath $out).Length -lt 1024) {
+              throw "字体下载失败：$name"
+            }
+            Write-Host "$name $((Get-Item -LiteralPath $out).Length) B"
           }
 
-      - name: Build injector
-        shell: cmd
-        run: src\build_injector.bat --no-pause
+      - name: Derive version
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:EVENT_NAME -eq "workflow_dispatch") {
+            $version = $env:INPUT_VERSION
+          } elseif ($env:REF_NAME -match '^release-(v[0-9].*)$') {
+            $version = $Matches[1]
+          } else {
+            throw "无法从触发事件推导版本"
+          }
+          if ($version -notmatch '^v[0-9]') { throw "版本号必须以 v 开头：$version" }
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "VERSION=$version"
 
-      - name: Derive version from tag
+      - name: Build release packages
+        shell: pwsh
+        run: .\release.ps1 -Version $env:VERSION -Edition all -Lang @('zh','ja') -NoPause
+
+      - name: Verify release assets
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".Replace("release-", "")
-          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $expected = @(
+            "dist/PR2-zh-gog-$env:VERSION.zip",
+            "dist/PR2-zh-steam-$env:VERSION.zip",
+            "dist/PR2-ja-gog-$env:VERSION.zip",
+            "dist/PR2-ja-steam-$env:VERSION.zip"
+          )
+          foreach ($path in $expected) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "缺少发行包：$path" }
+            $sha = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+            Write-Host "$path $sha"
+          }
 
-      - name: Build game packs
-        run: |
-          python src\tools\pack\make_release.py --lang zh --version $env:VERSION
-          python src\tools\pack\make_release.py --lang ja --version $env:VERSION
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PR2-${{ env.VERSION }}
+          path: dist/*.zip
+          if-no-files-found: error
 
-      - name: Publish release
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/release-v')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            dist/PR2-zh-${{ env.VERSION }}.zip
-            dist/PR2-ja-${{ env.VERSION }}.zip
+            dist/PR2-zh-gog-${{ env.VERSION }}.zip
+            dist/PR2-zh-steam-${{ env.VERSION }}.zip
+            dist/PR2-ja-gog-${{ env.VERSION }}.zip
+            dist/PR2-ja-steam-${{ env.VERSION }}.zip

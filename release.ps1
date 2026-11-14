@@ -64,7 +64,8 @@ $ReleaseScript = Join-Path $Src 'tools\pack\make_release.py'
 $BuildScript = Join-Path $Repo 'build.ps1'
 
 function Get-PwshPath {
-    $cmd = Get-Command pwsh.exe -CommandType Application -ErrorAction SilentlyContinue
+    $cmd = Get-Command pwsh.exe -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
     if ($cmd) { return $cmd.Source }
 
     $local = Join-Path $PSHOME 'pwsh.exe'
