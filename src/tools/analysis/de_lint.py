@@ -39,6 +39,8 @@ BANNED = {
     "Blühende Wirtschaft": "Blütezeit",
     "Kraweel": "（无对应，德语无此词）",
     "Anheuerung": "anheuern（动词）",
+    "Zustand der Stadt": "Status der Stadt（船况仍用 Zustand）",
+    "je %1 von ": "je %1 der Waren ",
 }
 # 状态下降口径（八档定案 sunk）
 STATUS_BAD = re.compile(r"Status (?:fällt|gefallen|fiel)")
