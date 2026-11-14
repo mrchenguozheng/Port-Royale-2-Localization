@@ -5,7 +5,8 @@
 检查仓库里的配置源，不检查运行中的游戏目录：
 
 - `src/locale.ini` 的语言代码与语法；
-- `src/packs/*.toml` 的 alias/gui/min_runtime；
+- `src/packs/*.toml` 的 alias/gui/min_runtime 和可选的
+  origin/ai_assisted/review_status/source_lang；
 - `src/translations/<code>.toml` 是否存在；
 - `src/injector-rs/ui/<gui>.ini` 是否存在、是否有重复键；
 - `src/font-map.ini` / `src/font-map-stitch.ini` 的逻辑名、坏行和禁用字体；
@@ -33,8 +34,17 @@ FONT_NAMES = (
     "Tiepolo_black.ttf",
     "Tiepolo_bold.ttf",
 )
-PACK_KEYS = ("alias", "gui", "min_runtime")
+PACK_KEYS = (
+    "alias",
+    "gui",
+    "min_runtime",
+    "origin",
+    "ai_assisted",
+    "review_status",
+    "source_lang",
+)
 CODE_RE = re.compile(r"^[A-Za-z0-9_-]{1,63}$")
+SOURCE_LANG_RE = re.compile(r"^[A-Za-z0-9_.-]{1,63}$")
 
 
 def _rel(path, root):
@@ -98,6 +108,26 @@ def _check_packs(src, errors, warnings):
             if isinstance(runtime, bool) or not isinstance(runtime, int) or runtime < 1:
                 errors.append("src/packs/%s：min_runtime 必须是 >=1 的整数"
                               % name)
+        origin = doc.get("origin")
+        if origin is not None and (not isinstance(origin, str) or not origin.strip()):
+            errors.append("src/packs/%s：origin 不能是空值" % name)
+        ai_assisted = doc.get("ai_assisted")
+        if ai_assisted is not None and not isinstance(ai_assisted, bool):
+            errors.append("src/packs/%s：ai_assisted 必须是 true/false" % name)
+        review_status = doc.get("review_status")
+        if review_status is not None and (
+                not isinstance(review_status, str) or not review_status.strip()):
+            errors.append("src/packs/%s：review_status 不能是空值" % name)
+        source_lang = doc.get("source_lang")
+        if source_lang is not None:
+            if (not isinstance(source_lang, str)
+                    or not SOURCE_LANG_RE.match(source_lang)):
+                errors.append("src/packs/%s：source_lang 不是合法参考语言名"
+                              % name)
+            elif not os.path.isfile(os.path.join(
+                    src, "orig", source_lang + ".toml")):
+                errors.append("src/packs/%s：缺少 src/orig/%s.toml"
+                              % (name, source_lang))
         unknown = sorted(set(doc) - set(PACK_KEYS))
         if unknown:
             warnings.append("src/packs/%s：未识别字段 %s"

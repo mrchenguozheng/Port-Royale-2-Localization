@@ -107,6 +107,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 ```
 
 低层脚本仍在 `src\build_injector.ps1`、`src\build_translation.ps1`；日常不需要直接调用。
+每个 zip 根目录带 `manifest.json`，记录目标 exe、参考原文、翻译来源/AI 标记和逐文件
+SHA-256；出包前自校验，失败不出包。
 脚本位置和参数见[构建与安装](docs/构建与安装.md#脚本位置)。
 
 按钮细节见[构建与安装](docs/构建与安装.md)。

@@ -28,5 +28,30 @@ class TestConfigCheck(unittest.TestCase):
         self.assertTrue(any("未知逻辑名" in e for e in errors))
 
 
+    def test_pack_provenance_fields_are_known(self):
+        errors, warnings = [], []
+        config_check._check_packs(os.path.join(ROOT, "src"), errors, warnings)
+        self.assertEqual(errors, [])
+        self.assertFalse(any("未识别字段" in w for w in warnings))
+
+    def test_pack_rejects_bad_ai_assisted_and_source_lang(self):
+        tmp = tempfile.mkdtemp(prefix="pr2-config-pack-")
+        src = os.path.join(tmp, "src")
+        os.makedirs(os.path.join(src, "packs"))
+        os.makedirs(os.path.join(src, "orig"))
+        with open(os.path.join(src, "orig", "en.gog_1.1.2.3.toml"),
+                  "w", encoding="utf-8") as fh:
+            fh.write("")
+        with open(os.path.join(src, "packs", "zh.toml"),
+                  "w", encoding="utf-8") as fh:
+            fh.write('alias = "简体中文"\n'
+                     "ai_assisted = \"yes\"\n"
+                     'source_lang = "../outside"\n')
+        errors, _warnings = [], []
+        config_check._check_packs(src, errors, _warnings)
+        self.assertTrue(any("ai_assisted" in e for e in errors))
+        self.assertTrue(any("source_lang" in e for e in errors))
+
+
 if __name__ == "__main__":
     unittest.main()

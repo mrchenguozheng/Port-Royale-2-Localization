@@ -246,6 +246,10 @@ def write_readme(lang, stage, mode, edition):
   1. 把本压缩包里的全部文件解压到游戏根目录（和 PR2.exe 同一层）。
 %s
 
+发布清单：
+  manifest.json 记录目标 exe、参考原文、翻译来源/AI 标记和逐文件 SHA-256；
+  只用于审计和校验，运行时不会读取它。
+
 确认是否生效：
   游戏启动后检查 PR2Localization\\logs\\runtime.log 第一行是否为：
     [text] pack '%s' from <游戏目录>\\PR2Localization\\packs: ... overrides
@@ -320,6 +324,12 @@ def make_release(lang, version, out_dir, mode, edition, log=None, cache=True):
     copy_fonts(lang, stage, mode, log, cache=cache)
     write_readme(lang, stage, mode, edition)
     copy_license(stage, log, mode)
+    import release_manifest
+    release_manifest.write_release_manifest(stage, lang, version, edition, mode)
+    ok, manifest_errors = release_manifest.verify_release_manifest(stage)
+    if not ok:
+        raise RuntimeError("发布清单校验失败：%s" % "；".join(manifest_errors))
+    log("写入并校验 manifest.json（目标 exe、来源、逐文件 SHA-256）")
     zip_path = make_zip(stage, out_dir)
     log("完成：%s" % zip_path)
     return zip_path
