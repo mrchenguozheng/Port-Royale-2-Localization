@@ -80,16 +80,16 @@ def _check_packs(src, errors, warnings):
         packs[code] = doc
 
         alias = doc.get("alias")
-        if not isinstance(alias, str) or not alias.strip():
-            errors.append("src/packs/%s：alias 必须是非空字符串" % name)
+        if alias is not None and (not isinstance(alias, str) or not alias.strip()):
+            errors.append("src/packs/%s：alias 写成了空值" % name)
         gui = doc.get("gui")
-        if not isinstance(gui, str) or not gui.strip():
-            errors.append("src/packs/%s：gui 必须是非空字符串" % name)
-        else:
-            if not CODE_RE.match(gui):
+        if gui is not None:
+            if not isinstance(gui, str) or not gui.strip():
+                errors.append("src/packs/%s：gui 写成了空值" % name)
+            elif not CODE_RE.match(gui):
                 errors.append("src/packs/%s：gui=%r 不是合法语言代码"
                               % (name, gui))
-            if not os.path.isfile(os.path.join(
+            elif not os.path.isfile(os.path.join(
                     src, "injector-rs", "ui", gui + ".ini")):
                 errors.append("src/packs/%s：缺少 src/injector-rs/ui/%s.ini"
                               % (name, gui))
