@@ -1309,6 +1309,12 @@ fn redirect_font_path(input: &str) -> Option<String> {
     // 最后才回退到原版 fonts\...。
     if let Some(map) = font_map() {
         if let Some(mapped) = map.lookup(rest) {
+            // 游戏字体层只接受相对游戏根目录的路径；映射表解析出的是
+            // fonts_dir(root) 的绝对路径，这里在交给 fopen/CreateFile 前转回相对路径。
+            let root = exe_dir();
+            if let Ok(rel) = Path::new(&mapped).strip_prefix(&root) {
+                return Some(rel.to_string_lossy().replace('/', "\\"));
+            }
             return Some(mapped);
         }
     }
@@ -1374,7 +1380,13 @@ unsafe fn install_font_log_hooks() {
     let mut fcrt = 0usize;
     for m in enum_modules() {
         let module = module_name(m);
-        if module.eq_ignore_ascii_case("d3d8.dll") {
+        // Walhalla.dll 的 IAT 被改写会在启动早期访问违规，GOG 实测如此；
+        // 这里跳过它，不把字体 hook 装进该模块。Core 自身也不需要被 hook，
+        // 否则 Core 写日志时的文件调用会重新进入自己的 hook。
+        if module.eq_ignore_ascii_case("d3d8.dll")
+            || module.eq_ignore_ascii_case("PR2LocalizationCore.dll")
+            || module.eq_ignore_ascii_case("Walhalla.dll")
+        {
             continue;
         }
         if patch_iat_in(

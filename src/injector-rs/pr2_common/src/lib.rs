@@ -66,10 +66,9 @@ pub fn fonts_dir(root: &Path) -> PathBuf {
 /// `PR2Localization\fonts\font-map.ini`（旧布局为 `fonts\font-map.ini`）。
 ///
 /// 配置按语言分段，`[fonts]` 是全局默认，`[zh]` / `[ja]` 覆盖它。
-/// 值可以是绝对路径、相对游戏根目录的路径，或带 `%WINDIR%` 等环境变量的路径；
+/// 值只写实际字体文件名，文件必须位于 `PR2Localization\fonts`；
 /// 多个候选用 `|` 分隔，取第一个存在的文件。
 pub struct FontMap {
-    root: PathBuf,
     entries: HashMap<String, Vec<String>>,
 }
 
@@ -193,22 +192,28 @@ impl FontMap {
         for (key, values) in local {
             global.insert(key, values);
         }
-        if global.is_empty() {
+        // 在加载时一次性解析字体的存在性。运行时 lookup 位于文件 API hook 内，
+        // 这里若再访问文件系统会重新进入 hook，导致递归崩溃。
+        let mut entries: HashMap<String, Vec<String>> = HashMap::new();
+        for (key, values) in global {
+            let resolved: Vec<String> = values
+                .iter()
+                .filter_map(|value| resolve_font_path(root, value))
+                .collect();
+            if !resolved.is_empty() {
+                entries.insert(key, resolved);
+            }
+        }
+        if entries.is_empty() {
             return None;
         }
-        Some(FontMap {
-            root: root.to_path_buf(),
-            entries: global,
-        })
+        Some(FontMap { entries })
     }
 
     /// 按游戏请求的文件名/路径取第一个实际存在的映射文件。
     pub fn lookup(&self, logical: &str) -> Option<String> {
         let key = normalize_font_key(logical);
-        let values = self.entries.get(&key)?;
-        values
-            .iter()
-            .find_map(|value| resolve_font_path(&self.root, value))
+        self.entries.get(&key)?.first().cloned()
     }
 
     pub fn has_all(&self) -> bool {
@@ -417,8 +422,10 @@ mod tests {
             cfg,
         )
         .unwrap();
-        let map = FontMap::load(&root, "zh").unwrap();
-        assert!(map.lookup("fonts\\ARIAL.TTF").is_none());
+        let map = FontMap::load(&root, "zh");
+        assert!(map
+            .map(|m| m.lookup("fonts\\ARIAL.TTF").is_none())
+            .unwrap_or(true));
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -433,8 +440,10 @@ mod tests {
             cfg,
         )
         .unwrap();
-        let map = FontMap::load(&root, "zh").unwrap();
-        assert!(map.lookup("fonts\\ARIAL.TTF").is_none());
+        let map = FontMap::load(&root, "zh");
+        assert!(map
+            .map(|m| m.lookup("fonts\\ARIAL.TTF").is_none())
+            .unwrap_or(true));
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -449,8 +458,10 @@ mod tests {
             cfg,
         )
         .unwrap();
-        let map = FontMap::load(&root, "zh").unwrap();
-        assert!(map.lookup("fonts\\ARIAL.TTF").is_none());
+        let map = FontMap::load(&root, "zh");
+        assert!(map
+            .map(|m| m.lookup("fonts\\ARIAL.TTF").is_none())
+            .unwrap_or(true));
         let _ = fs::remove_dir_all(&root);
     }
 
