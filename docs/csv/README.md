@@ -17,8 +17,8 @@ CSV 是分析和人工审校的附属数据，不是游戏运行需要的文件�
 
 | 文件 | 生成方式 | 用途 |
 |---|---|---|
-| `voice/voice-inventory.csv` | 由语音文件 `ffprobe` 统计 | 语音文件清单；[语音清单](../语音清单.md) 引用 |
-| `voice/voice-hash-map.csv` | `python src/tools/voice_match.py` | 语音与文本 hash 的映射；[语音映射](../语音映射.md) 引用 |
+| `voice/voice-inventory.csv` | 由语音文件 `ffprobe` 统计 | 语音文件清单；[语音与映射](../语音与映射.md) 引用 |
+| `voice/voice-hash-map.csv` | `python src/tools/voice_match.py` | 语音与文本 hash 的映射；[语音与映射](../语音与映射.md) 引用 |
 
 ## review/：人工审校
 
