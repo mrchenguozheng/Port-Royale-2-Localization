@@ -31,7 +31,7 @@ def two_chars(run):
 class TestZhText(unittest.TestCase):
     def test_punctuation_converted(self):
         zh = lang_rules.get("zh")
-        self.assertEqual(zh.normalize("你好,世界!"), "你好， 世界！")
+        self.assertEqual(zh.normalize("你好,世界!"), "你好，世界！")
 
     def test_placeholder_kept(self):
         zh = lang_rules.get("zh")
@@ -88,8 +88,8 @@ class TestZhSpace(unittest.TestCase):
                          "胡安·德·塞普尔维达来了")
 
     def test_collect_runs(self):
-        runs = zh_space.collect_runs(["短句", "这是一个足够长的中文句子用来收集"])
-        self.assertEqual(runs, ["这是一个足够长的中文句子用来收集"])
+        runs = zh_space.collect_runs(["短句", "这是一个足够长的中文句子用来收集并测试断行"])
+        self.assertEqual(runs, ["这是一个足够长的中文句子用来收集并测试断行"])
         self.assertEqual(zh_space.collect_runs(["胡安·德·塞普尔维达到来这里看看"]), [])
 
     def test_fallback_wrap(self):
@@ -99,15 +99,30 @@ class TestZhSpace(unittest.TestCase):
         self.assertNotIn("  ", out)
         self.assertEqual(zh_space.fallback_wrap("短句"), "短句")
 
+    def test_compact_leaves_short_text_alone(self):
+        """紧凑排版：不到预算就一个字都不动，标点旁也不插空格。"""
+        whole = lambda run: [run]
+        self.assertEqual(zh_space.compact("我刚听说，一艘船沉了。", whole),
+                         "我刚听说，一艘船沉了。")
+
+    def test_compact_breaks_on_particle_not_mid_word(self):
+        """超预算时才断，且断点落在停顿字「的」后面，不切「英格兰/船」。"""
+        lookup = lambda run: ["一艘", "满载", "移民", "的",
+                              "英格兰", "船", "沉了"]
+        out = zh_space.compact("我刚听说，一艘满载移民的英格兰船沉了。", lookup, 10)
+        self.assertTrue(out.startswith("我刚听说，"))
+        self.assertIn(" ", out)
+        self.assertNotIn("英格兰 船", out)
+
 
 class TestSpecInterface(unittest.TestCase):
     """三段式接口：语言只声明 spec，engine_text 不认语言。"""
 
     def test_zh_spec_parts(self):
         sp = lang_rules.get_spec("zh")
-        self.assertEqual((sp.code, sp.spacing.mode), ("zh", "group"))
+        self.assertEqual((sp.code, sp.spacing.mode), ("zh", "compact"))
         self.assertIn(sp.segmenter.name, ("spacy", "jieba", "none"))
-        self.assertEqual(sp.punct.normalize("你好,世界!"), "你好， 世界！")
+        self.assertEqual(sp.punct.normalize("你好,世界!"), "你好，世界！")
 
     def test_ja_spec_parts(self):
         sp = lang_rules.get_spec("ja")

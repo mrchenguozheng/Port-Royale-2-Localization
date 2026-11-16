@@ -12,6 +12,17 @@
 （这一点记在 `docs/翻译局限.md`，别再拿 px 做决定）。所以这里用「每组最多
 若干字」的预算：确定、可复现、机器之间不会因为字体文件不同而分叉。
 
+预算取 16 字。理由是「与英文原文的换行机会相当」而不是像素：英文同一条
+长句约 60~80 字符折成两行，一个汉字约占两个英文字符宽，16 字对应约 32
+字符，仍比英文单行保守。这是推测值——偏小只是多断几处，偏大才可能溢出，
+所以宁可小不能大；真要校准只能实机量，而按定则不做像素判据。
+
+排版策略：默认不留空格（`compact()`）
+------------------------------------
+旧路径 `spaced()` 逢词就插空格，全表 1719 条带空格、1214 条的空格紧贴标点
+（「我刚听说， 一艘满载移民的 英格兰船沉了。」）。现在只在「一段连续汉字
+长到超过预算」时才动手，标点不插空格。`ZhGroupSpacing` 保留为可回退的旧路径。
+
 分词器优先，兜底才机械切
 ------------------------
 * 首选 spaCy + zh_core_web_sm（OOV 比 jieba 好：「私掠者」「总督府」
@@ -50,7 +61,7 @@ BIND_LEFT = set("的地得了着过是在和与及或而但也都不没把被给
 BIND_RIGHT = set("一二三四五六七八九十每各半几这那些")
 
 #: 默认每组最多多少字（预算，不是像素）
-MAX_CHARS = 10
+MAX_CHARS = 16
 #: 只处理这么长以上的汉字串：= MAX_CHARS + 1。
 #: 必须比 MAX_CHARS 大 1 而且不能再高 —— 只要一个片段会被切成两组，
 #: 它就必须进分词器；否则 lookup 拿不到词表，只能按单字成组，
@@ -232,3 +243,133 @@ def fallback_wrap(text, min_run=MIN_RUN, step=MAX_CHARS):
 
     return re.sub(r"[\u4e00-\u9fff]{%d,}" % min_run,
                   lambda m: split_run(m.group(0)), text)
+
+
+#: 断在它后面最自然：优先「…移民的 / 英格兰船沉了」，而不是「…英格兰 / 船沉了」。
+STOP_TAIL = set("的地得了着过们呢吧啊呀，、；：！？…")
+
+#: 这些字开头多半是补语（「打听/到」「拿/出来」），断在它前面会把词拆开。
+COMPLEMENT = set("到给出去起上下成开遍完掉")
+
+#: 中文正文里可以贴着空格的两个字符集（汉字与中文标点）。
+_TIGHT = "[\u4e00-\u9fff，。！？；：、…—（）()「」『』【】《》·]"
+_TIGHT_SPACE = re.compile(r"(?<=%s)\s+|\s+(?=%s)" % (_TIGHT, _TIGHT))
+
+
+def load_user_words(words):
+    """把已知专名/术语塞进 jieba 词典，免得切在词中间（「皇家 / 港」）。
+
+    只对已 import 过的 jieba 生效：spaCy 路径下返回 0，不强行拉起另一个分词器。
+    返回加进去的条数，供 CLI 展示。
+    """
+    if not words:
+        return 0
+    try:
+        import jieba
+    except ImportError:
+        return 0
+    n = 0
+    for w in words:
+        if w and len(w) > 1 and re.search(r"[\u4e00-\u9fff]", w):
+            jieba.add_word(w, freq=100000)
+            n += 1
+    return n
+
+
+def _words(run, lookup):
+    words = [w for w in lookup(run) if w]
+    return bind(words) if words else [run]
+
+
+def _groups(run, lookup, budget=MAX_CHARS):
+    """在 ≤budget 的前提下挑断点：优先落在停顿字后，其次才按预算硬填。
+
+    用动态规划而不是贪心。贪心会把「一艘满载移民的英格兰」塞满 10 字，
+    断点落到「…英格兰 / 船沉了」（词中间，难看）；DP 允许这组只装 7 字就停，
+    让断点落在「…移民的 / 英格兰船沉了」。
+    """
+    words = _words(run, lookup)
+    n = len(words)
+    if n <= 1:
+        return run
+    pre = [0]
+    for w in words:
+        pre.append(pre[-1] + len(w))
+    INF = 1 << 30
+    dp = [INF] * (n + 1)
+    back = [0] * (n + 1)
+    dp[0] = 0
+    for i in range(n):
+        if dp[i] >= INF:
+            continue
+        j = i
+        while j < n and (j == i or pre[j + 1] - pre[i] <= budget):
+            j += 1
+            cost = dp[i] + 1 + _break_cost(words, i, j, n)
+            if cost < dp[j]:
+                dp[j] = cost
+                back[j] = i
+    if dp[n] >= INF:
+        return run
+    cuts, k = [], n
+    while k:
+        cuts.append(k)
+        k = back[k]
+    cuts.reverse()
+    out, prev = [], 0
+    for cp in cuts:
+        out.append("".join(words[prev:cp]))
+        prev = cp
+    return " ".join(out)
+
+
+def _break_cost(words, i, j, n):
+    """这一组的收尾代价：断点越不像自然停顿，代价越高。
+
+    * 末尾就结束 → 0；
+    * 下一个词以补语字开头（「打听 / 到」）→ 6，最不愿这样断；
+    * 组太短（孤字 4、两字 2）→ 加上去，免得出现「你的 / 船队」；
+    * 断在「的/了/，」后面 → 0，这是最自然的停顿。
+    """
+    size = sum(len(w) for w in words[i:j])
+    cost = 0
+    if size == 1:
+        cost += 4
+    elif size == 2 and j < n:
+        cost += 2
+    if j == n:
+        return cost
+    if words[j][0] in COMPLEMENT:
+        return cost + 6
+    if words[j - 1][-1] in STOP_TAIL:
+        return cost
+    return cost + 2
+
+
+def compact(text, lookup, max_chars=MAX_CHARS):
+    """中文紧凑排版：正文默认不留空格，只在会撑爆控件的片段里断行。
+
+    与 `spaced()` 的区别：`spaced()` 逢词就插空格（全表 1719 条带空格，
+    其中 1214 条的空格紧贴标点，「我刚听说， 一艘…」）；这里只在
+    「一段连续汉字长到超过预算」时才动手，标点本身不插空格——
+    中文标点自带停顿，加空格是英文排版的习惯。
+    """
+    names = []
+
+    def keep(m):
+        names.append(m.group(0))
+        return "\x00%d\x00" % (len(names) - 1)
+
+    text = NAME.sub(keep, text)
+    parts = TAG.split(text)
+    out = []
+    for i, p in enumerate(parts):
+        if i % 2 == 1:
+            out.append(p)
+            continue
+        p = _TIGHT_SPACE.sub("", p)
+        out.append(CJK_RUN.sub(
+            lambda m: (m.group(0) if len(m.group(0)) <= max_chars
+                       else _groups(m.group(0), lookup, max_chars)), p))
+    text = "".join(out)
+    return re.sub(r"\x00(\d+)\x00", lambda m: names[int(m.group(1))], text)
