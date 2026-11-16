@@ -21,5 +21,6 @@ fonttools>=4.0
 # 可选：中文分词（text/zh_space.py，构建期按词补空格用）。
 #   没有分词器时会退回「按字数机械切」，照样能构建，只是可能切在词中间。
 #   首选 spaCy + zh_core_web_sm（需 Python 3.11，用 PR2_SPACY_PYTHON 指向那个解释器），
-#   其次 jieba（纯 Python）。本机目前已装 janome 0.5.2 / jieba 0.42.1。
+#   其次 jieba（纯 Python）。本机目前已装 janome 0.5.2 / fugashi 1.5.2 /
+#   unidic-lite 1.0.8 / jieba 0.42.1（2026-11-16 补齐 janome 与 fugashi）。
 # jieba
