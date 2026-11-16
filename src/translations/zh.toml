@@ -1895,7 +1895,7 @@
 "0xff624273" = "国际产品经理"
 "0xff819106" = "俘获三支英格兰贸易船队：登上它们的船，把它们并入你的船队。"
 "0xff8d2f23" = "你好，@A$USER$。我想大量采购@G$Goods$，比如@a$Amount$。我出单价@g$Price$。你有兴趣吗？"
-"0xff8d2f24" = "你好，@A$USER$。你能给我送来@a$Amount$的@G$Goods$吗？我愿意支付@g$TotalPrice$，也就是单价@g$Price$。怎么样？"
+"0xff8d2f24" = "你好，@A$USER$。你能给我送来@a$Amount$单位的@G$Goods$吗？我愿意支付@g$TotalPrice$，也就是单价@g$Price$。怎么样？"
 "0xff8d2f25" = "你好，@A$USER$。你愿意给我供应@a$Amount$的@G$Goods$吗？我按每单位@g$Price$付给你，总计@g$TotalPrice$。你有兴趣吗？"
 "0xff9105ab" = "海图"
 "0xff9806b7" = "成就"
