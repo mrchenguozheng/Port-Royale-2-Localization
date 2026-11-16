@@ -30,3 +30,18 @@ fr_fortune = "财富"
 # Normal（0x02e0acdf 难度中档 / 0x22385c1c 夹在 Ship 与 Gold 之间）：
 # 德语、法语两处都写作 Normal，没有任何参考语言把这两个义项分开，因此不进本表——
 # 不给它自造义项名。判读见 09 卷第三十节。
+
+# ---- 定夺过、但仍可能被后来者改回去的三条（297 批） ----
+
+# en: plague of rats。7 条全译「鼠患」，不写「鼠疫」。注意与 plague（瘟疫）是两个概念：
+# 0xe53c68dd 鼠患 / 0xcb9b3a82 鼠患爆发 / 0xd1afec1a %1爆发鼠患
+en_plague_of_rats  = "鼠患"
+
+# en: quality of life。11 条全译「生活品质」，不写「生活质量」（全表 0 处）。
+# 0xdacb8ff6 你城镇的生活品质 / 0xc88c67fb 与 0xc557fe31 句中使用
+en_quality_of_life = "生活品质"
+
+# en: Accuracy。船长四项技能之一（Trading experience / Accuracy / Charisma /
+# Swordsmanship）@0x31b9fe94，德语 Treffsicherheit 对得上，法语作 Militaire 属偏离、
+# 记不改。锁「精准」，不写「准确度」（「准确」7 处都是罗盘、方位、位置，另一个词）。
+en_accuracy        = "精准"
