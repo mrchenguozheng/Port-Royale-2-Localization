@@ -1,0 +1,49 @@
+# 术语表骨架：由 table_sync 从 zh 生成，键集合与源表一致。
+# 值为空 = 待译；填完把引号里的内容补上即可，键与注释不要改。
+# 术语锁定：<语言>_<原词> → 该语言译词。
+#
+# 键一律 ASCII 小写、以语言前缀开头（en_ / de_ / fr_），原形大小写与重音写在注释里。
+# 英文词只收「同一语境里只有一个义项」的；同词两义改用**把义项分开的那门参考语言**
+# 做键 —— 哪门语言分得开就用哪门，分不开的不进表。
+#
+# 用法：译文里写 [term:en_business]，展开查这张表；查不到直接 MarkError，构建失败。
+
+en_business = "Betriebe"        # en: business / businesses
+en_tools = "Werkzeuge"        # en: tools
+
+# General：英文两义，德语分开（Allgemein / General）；法语两处都是 Général，帮不上忙。
+# 设置页 0xd1b2a54f 德语 Allgemein
+de_allgemein = "Allgemein"
+# 人物头衔 0xf3da810c / 0x070bef26 德语 General
+de_general = "General"
+
+# normal：德语两处都是 normal；法语分开（normal / Medium）。
+# 0x00c0bb39 法语 normal
+fr_normal = "normal"
+# 0x28ef24c1 法语 Medium（画质三档的中档）
+fr_medium = "Mittel"
+
+# Wealth：德语两处都是 Wohlstand；法语分开（Aisé / Fortune）。
+# 0xd2d0a578 城镇状态 法语 Aisé
+fr_aise = "Wohlstand"
+# 0xfaa28418 统计项 法语 Fortune
+fr_fortune = "Vermögen"
+
+# Normal（0x02e0acdf 难度中档 / 0x22385c1c 夹在 Ship 与 Gold 之间）：
+# 德语、法语两处都写作 Normal，没有任何参考语言把这两个义项分开，因此不进本表——
+# 不给它自造义项名。判读见 09 卷第三十节。
+
+# ---- 定夺过、但仍可能被后来者改回去的三条（297 批） ----
+
+# en: plague of rats。7 条全译「鼠患」，不写「鼠疫」。注意与 plague（瘟疫）是两个概念：
+# 0xe53c68dd 鼠患 / 0xcb9b3a82 鼠患爆发 / 0xd1afec1a %1爆发鼠患
+en_plague_of_rats = "Rattenplage"
+
+# en: quality of life。11 条全译「生活品质」，不写「生活质量」（全表 0 处）。
+# 0xdacb8ff6 你城镇的生活品质 / 0xc88c67fb 与 0xc557fe31 句中使用
+en_quality_of_life = "Lebensqualität"
+
+# en: Accuracy。船长四项技能之一（Trading experience / Accuracy / Charisma /
+# Swordsmanship）@0x31b9fe94，德语 Treffsicherheit 对得上，法语作 Militaire 属偏离、
+# 记不改。锁「精准」，不写「准确度」（「准确」7 处都是罗盘、方位、位置，另一个词）。
+en_accuracy = "Treffsicherheit"
