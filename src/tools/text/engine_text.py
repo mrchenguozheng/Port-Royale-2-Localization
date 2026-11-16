@@ -42,7 +42,7 @@ sys.path.insert(0, HERE)
 ROOT = os.path.dirname(os.path.dirname(TOOLS))
 OUT_DIR = os.path.join(ROOT, "build", "preview", "engine_text")
 
-from text import lang_rules, toml_io  # noqa: E402
+from text import lang_rules, marks, toml_io  # noqa: E402
 from text.lang_rules import spec as specs  # noqa: E402
 
 def header(lang):
@@ -58,16 +58,19 @@ def build(lang, doc, order=None):
     """{id: 译文} → {id: 引擎文本}。不写文件。
 
     只认 spec，不认语言：三段式接口统一走 lang_rules.spec.build_texts。
+    标注（[ref:…] / [lit:…]）在这里最先展开——语言规则完全看不到它们。
     """
-    order = list(order or doc)
-    out, _stats, _seg = specs.build_texts(lang_rules.get_spec(lang), doc, order)
-    return out
+    return build_full(lang, doc, order)[0]
 
 
 def build_full(lang, doc, order=None):
     """同 build，但把统计和分词器名一起带出来（CLI 用）。"""
     order = list(order or doc)
-    return specs.build_texts(lang_rules.get_spec(lang), doc, order)
+    plain = marks.expand_doc(lang, doc)
+    marks_n = sum(1 for h in order if plain.get(h) != doc.get(h))
+    out, stats, seg = specs.build_texts(lang_rules.get_spec(lang), plain, order)
+    stats["marks"] = marks_n
+    return out, stats, seg
 
 
 def out_path(lang):
@@ -105,9 +108,10 @@ def main():
     order, out, stats, seg = generate(a.lang)
 
     if a.stats:
-        print("生成 %d 条｜标点改动 %d｜连词 %d｜人名 %d｜补空格 %d｜分词器 %s" % (
-            len(order), stats["punct"], stats["conj"], stats["name"], stats["space"],
-            seg or "无（机械兜底）"))
+        print("生成 %d 条｜标注展开 %d｜标点改动 %d｜连词 %d｜人名 %d｜补空格 %d｜"
+              "分词器 %s" % (
+                  len(order), stats.get("marks", 0), stats["punct"], stats["conj"],
+                  stats["name"], stats["space"], seg or "无（机械兜底）"))
 
     if a.check:
         old = toml_io.read_doc_loose(out_path(a.lang))

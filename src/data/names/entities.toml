@@ -1,0 +1,35 @@
+# 专名实体清单：哪些东西算「专名」由这张表统一决定，全语言共用一份。
+# 只登记身份，不写任何译文——译名在 names/<lang>.toml 里各自填。
+#
+# kind 只用来分类，不参与判定：
+#   town / person / ship / company / vendor / place
+# note 写「为什么必须和别的名字区分开」，别写「见某某文档」。
+
+["Port Royale"]
+kind = "town"
+note = "主角母港，译名固定为「皇家港」"
+
+["Charleston"]
+kind = "town"
+note = "地图上在 Fort Caroline 东北方，不能与 Charles Towne 合并"
+
+["Charles Towne"]
+kind = "town"
+note = "地图上在 Cat Island 与 Turk Islands 之间"
+
+["Tortuga"]
+kind = "town"
+note = "剧本 8「托尔图加的麻烦」即此城"
+
+["Cartagena"]
+kind = "town"
+
+["Havana"]
+kind = "town"
+
+["Margarita"]
+kind = "town"
+
+["Miles Sound System"]
+kind = "vendor"
+note = "版权声明，不译；compile_pack 的 KEEP_ORIGINAL 也会强制保留"

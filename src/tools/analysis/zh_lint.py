@@ -43,6 +43,9 @@ LATIN = re.compile(r"[A-Za-z]")
 
 KEEP = {"0xfc512ea5"}
 
+sys.path.insert(0, os.path.dirname(HERE))
+from text import marks as MK  # noqa: E402
+
 
 def norm_font(v):
     """把原文里坏掉的标签归一到合法写法（英文 0x103b68ea 的 `<.<n>` 是笔误）。"""
@@ -120,6 +123,10 @@ def main(argv):
             if len(outs) > 1 and len(src) > 8:
                 W.append((sorted(keys)[0], "同原文异译 %d 种" % len(outs),
                           " / ".join(sorted(outs))[:120]))
+
+    # 内联标注（[ref:…] / [lit:…]）：未定义引用、缺形态、方括号写错、死条目
+    for p in MK.check_doc(lang, tr, entities=MK.load_entities()):
+        E.append(("标注", "标注", p))
 
     lines = []
     lines.append("# %s 机械复核（判据见 09 卷已落卷定则）\n" % lang)
