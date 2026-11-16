@@ -5,8 +5,9 @@
 依次跑：
 1. 跨模块引用检查（lint_imports.py）
 2. 语言配置检查（config_check.py）
-3. 规则单元测试（tests/）
-4. （已移除：译文层只有一份，不再做「生成物 vs 手改文本」一致性检查）
+3. 中文规范复核（analysis/zh_lint.py，E 级非 0 即失败）
+4. 规则单元测试（tests/）
+5. （已移除：译文层只有一份，不再做「生成物 vs 手改文本」一致性检查）
 
     python src/tools/check.py
 """
@@ -33,6 +34,7 @@ def main():
     steps = [
         ("跨模块引用", [PY, os.path.join("src", "tools", "lint_imports.py")]),
         ("语言配置", [PY, os.path.join("src", "tools", "config_check.py")]),
+        ("中文规范", [PY, os.path.join("src", "tools", "analysis", "zh_lint.py")]),
         ("规则单测", [PY, "-m", "unittest", "discover", "-s", "tests", "-q"]),
     ]
     for title, cmd in steps:
