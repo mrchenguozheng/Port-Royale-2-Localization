@@ -2932,7 +2932,7 @@
 "0x24e18ac4" = "<f:fonts/Tiepolo_bold14x14aaFH.res>"
 "0x24ec3366" = "太好了！你的船队已经武装齐备，可以去追查黑胡子的一支海盗船队了。<n><n>「事件」窗口每天都会给些提示，前提是它所在的位置在海上。找海盗可不容易，因为每次抢商船得手，他们都会退回藏身处。<n><n>记住，一支海盗船队最多能有五艘战舰。要是你觉得船队不够强，就去加强它。反正你已经知道怎么弄到钱了。<n><n><n><f:fonts/ELGRECO_26x26aaFHk.res>剧本目标<f:fonts/Tiepolo_bold14x14aaFHk.res><n><n><c>完成@T$TOWN$总督交给你的任务。"
 "0x250c7a12" = "在@D$Date$之前交付@a$Amount$。你可以在市场交货，每交付一<gs:TEXTFLUSS_KEINEHOEHE><g:INTEXT_FASS_800x600.screen>@G$Goods$，当场就能拿到@g$GoldPerBarrel$。"
-"0x250c7a13" = "太好了。请把@a$Amount$送到市场。在那里，每交付一<gs:TEXTFLUSS_KEINEHOEHE><g:INTEXT_FASS_800x600.screen>桶就能拿到@g$GoldPerBarrel$，一直到@D$Date$。"
+"0x250c7a13" = "太好了。请把@a$Amount$单位送到市场。在那里，每交付一<gs:TEXTFLUSS_KEINEHOEHE><g:INTEXT_FASS_800x600.screen>就能拿到@g$GoldPerBarrel$，一直到@D$Date$。"
 "0x250c7a14" = "请到市场去找我的特使。在@D$Date$之前交给他@a$Amount$的@G$Goods$，他会给你一个好价钱。"
 "0x2540ea42" = "附加文本（编年史）"
 "0x2546beb9" = "哦，@N$OwnerName$派你来找我？这位老船长我确实认识，他肯定能教会你船员一些东西。可我为什么要帮你呢？算了，我不刁难你——我知道你找我也花了些工夫。你帮我个小忙，我就告诉你那船长退隐何处。"
