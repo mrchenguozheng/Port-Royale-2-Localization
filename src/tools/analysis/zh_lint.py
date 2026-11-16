@@ -76,7 +76,10 @@ def main(argv):
     if "--lang" in argv:
         lang = argv[argv.index("--lang") + 1]
     en = tomllib.load(open(EN, "rb"))
-    tr = tomllib.load(open(TR % lang, "rb"))
+    tr_raw = tomllib.load(open(TR % lang, "rb"))
+    # 规则比对一律用展开后的文本：否则 [ref:Tortuga]的麻烦 与字面「托尔图加的麻烦」
+    # 会被当成同原文异译。标注本身的检查另走 check_doc（用带标注原文）。
+    tr = MK.expand_doc(lang, tr_raw)
     zh_mode = lang == "zh"
 
     E, W = [], []
@@ -125,7 +128,7 @@ def main(argv):
                           " / ".join(sorted(outs))[:120]))
 
     # 内联标注（[ref:…] / [lit:…]）：未定义引用、缺形态、方括号写错、死条目
-    for p in MK.check_doc(lang, tr, entities=MK.load_entities()):
+    for p in MK.check_doc(lang, tr_raw, entities=MK.load_entities()):
         E.append(("标注", "标注", p))
 
     lines = []
