@@ -39,7 +39,8 @@ if ROOT not in sys.path:
 DEFAULT_OUT = os.path.join(ROOT, "build", "runtime", "PR2Localization", "packs")
 
 # 占位符与「占位文本」的判定只有一份，在 shared\core\validate.py。
-from shared.core.validate import has_bare_pipe, is_placeholder, tokens  # noqa: E402
+from shared.core.validate import (  # noqa: E402
+    has_bare_pipe, is_identifier, is_placeholder, tokens)
 
 #: 只读参考语言：英文 / 法文原文 + 四个零售包对照。**不参与编辑，也不生成语言包**。
 #: 实际名单以 translate.REFERENCE_LANGS 为准（这里是 import 不到时的兜底常量，
@@ -56,6 +57,12 @@ REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42",
 # "%2u" 出来会少一位（全量里只有 1 条 0x33c2c533 用到 %02u）。
 
 
+#: 英文原文本身是开发残留标识符（`IDM_CONTEST_01_2004_LOG_06_TEXT` 这类）。
+#: 这类键的英文侧从来不是句子，占位符比对没有基准：德语零售版里
+#: `LOG_06_TEXT` 带 `@g$PirateGold$`，中文照译就会判成「多了占位符」。
+#: 判定放在 shared\core\validate.py（zh_lint 用的是同一份）。
+
+
 def check_placeholders(h, en, txt, errors, warnings):
     """比对译文与原文的占位符集合。
 
@@ -67,6 +74,8 @@ def check_placeholders(h, en, txt, errors, warnings):
         所以这里只报错误、不自动改，把判断权交给译者。
     占位符的顺序不算错 —— 各语言语序不同，位置可以自由调整。
     """
+    if is_identifier(en):
+        return True          # 英文是标识符，没有可比对的基准
     a, b = tokens(en), tokens(txt)
     miss, extra = a - b, b - a
     if miss:

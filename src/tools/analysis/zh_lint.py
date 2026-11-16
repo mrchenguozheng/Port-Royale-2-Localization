@@ -44,6 +44,9 @@ LATIN = re.compile(r"[A-Za-z]")
 KEEP = {"0xfc512ea5"}
 
 sys.path.insert(0, os.path.dirname(HERE))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+from shared.core.validate import is_identifier  # noqa: E402
 from text import marks as MK  # noqa: E402
 
 
@@ -94,7 +97,7 @@ def main(argv):
                 E.append((k, "模板不一致", "EN=%s | %s=%s" % (tpl_set(src), lang, tpl_set(v))))
             continue
 
-        if src is not None and tpl_set(v) != tpl_set(src):
+        if src is not None and not is_identifier(src) and tpl_set(v) != tpl_set(src):
             E.append((k, "模板不一致", "EN=%s | %s=%s" % (tpl_set(src), lang, tpl_set(v))))
         if not str(v).strip():
             E.append((k, "空值", repr(v)))

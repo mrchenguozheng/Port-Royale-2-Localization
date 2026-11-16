@@ -98,6 +98,19 @@ def is_placeholder(text):
     return bool(RE_PLACEHOLDER.match(text or ""))
 
 
+#: 英文原文是开发残留标识符（`IDM_CONTEST_01_2004_LOG_06_TEXT` 这类）。
+#: 这些键的英文侧从来不是句子，占位符、标签的比对都没有基准 ——
+#: 德语零售版里 `LOG_06_TEXT` 带 `@g$PirateGold$`，中文照译就会被判成
+#: 「多了占位符」「模板不一致」。只认「首字母大写 + 全大写 ASCII/数字/下划线
+#: 且够长」，不猜别的形状，短标签（OK／CTRL）不会落进来。
+RE_IDENTIFIER = re.compile(r"^[A-Z][A-Z0-9_]{7,}$")
+
+
+def is_identifier(text):
+    """原文是不是开发残留标识符。是则跳过「拿原文当模板」的比对。"""
+    return bool(RE_IDENTIFIER.match(str(text or "")))
+
+
 def has_bare_pipe(text):
     """是否还有旧写法 `|` 换行（`<|>` 这种字面竖线不算）。
 
