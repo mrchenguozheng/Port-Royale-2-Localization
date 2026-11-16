@@ -28,3 +28,21 @@ default = "Miles Sound System"
 
 ["Port Royal"]
 default = "皇家港"
+
+["Guadeloupe"]
+default = "瓜德罗普"
+
+["St. Juan"]
+default = "圣胡安"
+
+["Biloxi"]
+default = "比洛克西"
+
+["St. Augustine"]
+default = "圣奥古斯丁"
+
+["Grand Bahama"]
+default = "大巴哈马"
+
+["Turk Islands"]
+default = "特克群岛"

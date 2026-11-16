@@ -37,3 +37,27 @@ note = "版权声明，不译；compile_pack 的 KEEP_ORIGINAL 也会强制保�
 ["Port Royal"]
 kind = "place"
 note = "牙买加旧首府（1661—1692 为英属牙买加首都），与游戏城镇 Port Royale 同名不同实体；中文都作「皇家港」，标注用来固定来源"
+
+["Guadeloupe"]
+kind = "town"
+note = "城镇；竞赛模式任务的城市列名之一"
+
+["St. Juan"]
+kind = "town"
+note = "城镇；竞赛模式任务的城市列名之一"
+
+["Biloxi"]
+kind = "town"
+note = "城镇；副王驻地，与皇家港同列"
+
+["St. Augustine"]
+kind = "town"
+note = "城镇；竞赛模式任务的城市列名之一"
+
+["Grand Bahama"]
+kind = "town"
+note = "城镇；海盗落脚点叙述里出现"
+
+["Turk Islands"]
+kind = "town"
+note = "城镇；既是群岛也是城镇名，译文统一"
