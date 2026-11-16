@@ -4,3 +4,6 @@
 src/translations/zh.toml linguist-generated=true
 *.ttf binary
 *.woff2 binary
+# hunspell 词典按字节原样保存：行尾若被转成 CRLF，词条会带上 \r 而全部查不中
+src/data/qa/dict/*.dic -text
+src/data/qa/dict/*.aff -text
