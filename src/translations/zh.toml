@@ -2146,7 +2146,7 @@
 "0x0705d55e" = "无法载入贸易路线。"
 "0x070bef26" = "将军"
 "0x070c60f9" = "多谢你了。请给我带来@a$Amount$的@G$Goods$。你要在@D$Date$之前把货物送到市场。在那里，每送到一<gs:TEXTFLUSS_KEINEHOEHE><g:INTEXT_FASS_800x600.screen>，你就能拿到@g$GoldPerBarrel$。"
-"0x070c60fa" = "请把@a$Amount$的@G$Goods$交给市场里的我的特使。期限是@D$Date$。交货后，每送到一<gs:TEXTFLUSS_KEINEHOEHE><g:INTEXT_FASS_800x600.screen>，你就能拿到@g$GoldPerBarrel$。"
+"0x070c60fa" = "请把@a$Amount$单位的@G$Goods$交给市场里的我的特使。期限是@D$Date$。交货后，每送到一<gs:TEXTFLUSS_KEINEHOEHE><g:INTEXT_FASS_800x600.screen>，你就能拿到@g$GoldPerBarrel$。"
 "0x070c60fb" = "驶往属于@n$FoeNation$的城镇去收购@G$Goods$。在@D$Date$之前把@a$Amount$桶送到我城镇的市场。每送到一<gs:TEXTFLUSS_KEINEHOEHE><g:INTEXT_FASS_800x600.screen>，你就能拿到@g$GoldPerBarrel$。"
 "0x0710eed4" = "<n><n>关闭这个窗口时，剧本即告结束。"
 "0x0711985e" = "独臂海盗"
