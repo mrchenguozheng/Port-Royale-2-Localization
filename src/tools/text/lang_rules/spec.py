@@ -125,7 +125,12 @@ def build_texts(spec, doc, order=None):
             interim[hid] = ""
             continue
         a = spec.spacing.pre_punct(raw)
-        b = spec.punct.normalize(a) if spec.punct else a
+        if spec.punct:
+            # 日期格式串走 date_format 分支：不插变量空格，否则「%3 年 %2%1 日」
+            # 会出现年、日带空格而月份紧贴的混排。
+            b = spec.punct.normalize(a, date_format=date_format(hid))
+        else:
+            b = a
         stats["punct"] += int(b != a)
         c, meta = spec.spacing.before(b)
         interim[hid] = c
