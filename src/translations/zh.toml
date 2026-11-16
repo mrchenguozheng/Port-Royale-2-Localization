@@ -1842,7 +1842,7 @@
 "0xfd69d24a" = "%1:%2:%3"
 "0xfd6d4abb" = "你采取的行动使你无法成功完成本剧本。<n><n>请遵循事件窗口里的说明。"
 "0xfd9349ac" = "没收"
-"0xfda0635d" = "<ts:0><ts:110><f:fonts/Tiepolo_black14x14aaFHk.res>左键<f:fonts/Tiepolo_bold14x14aaFH.res><t>齐射<n><f:fonts/Tiepolo_black14x14aaFHk.res>右键<f:fonts/Tiepolo_bold14x14aaFH.res><t>设定航向<n><f:fonts/Tiepolo_black14x14aaFHk.res>1,2,3<f:fonts/Tiepolo_bold14x14aaFH.res><t>选择弹药<n><f:fonts/Tiepolo_black14x14aaFHk.res>4<f:fonts/Tiepolo_bold14x14aaFH.res><t>准备登船t<n><f:fonts/Tiepolo_black14x14aaFHk.res>%1<f:fonts/Tiepolo_bold14x14aaFH.res><t>开炮"
+"0xfda0635d" = "<ts:0><ts:110><f:fonts/Tiepolo_black14x14aaFHk.res>左键<f:fonts/Tiepolo_bold14x14aaFH.res><t>齐射<n><f:fonts/Tiepolo_black14x14aaFHk.res>右键<f:fonts/Tiepolo_bold14x14aaFH.res><t>设定航向<n><f:fonts/Tiepolo_black14x14aaFHk.res>1,2,3<f:fonts/Tiepolo_bold14x14aaFH.res><t>选择弹药<n><f:fonts/Tiepolo_black14x14aaFHk.res>4<f:fonts/Tiepolo_bold14x14aaFH.res><t>准备登船<n><f:fonts/Tiepolo_black14x14aaFHk.res>%1<f:fonts/Tiepolo_bold14x14aaFH.res><t>开炮"
 "0xfda277f4" = "%1已经满了，再也没有空间可以建造仓库。如果你仍想在这座城镇站稳脚跟，可以试着说服当地一位商人拆掉他自己的一处产业。<n><n>如果某种商品在城里的价格长期维持在低位，也就是说该商品出现了过剩，对应的产业就会被拆除。要造成这种局面，你必须先开始囤积该产品，然后在城镇市场卖出足够多的量，把价格压到低位。<n><n>本地生产的商品每天一次送到城镇市场。如果价格目前处于最低水平，该产业就会削减工人编制。点击该产业即可查看这一点。一旦有 30 名工人被裁减，该产业就会被拆除。"
 "0xfda5ded4" = "因发现金矿，这座城镇日益繁荣"
 "0xfdaf6463" = "我必须再次感谢你，你为我国做了这么多。作为奖赏，我把城镇%1剩下的土地也给你。现在你拥有整个区域了。"
