@@ -3,60 +3,60 @@
 
 # ["Port Royale"] town：加勒比海城镇；自由模式可自选母港，不是固定母港
 ["Port Royale"]
-default = ""
+default = "Порт-Рояль"
 
 # ["Charleston"] town：地图上在 Fort Caroline 东北方，不能与 Charles Towne 合并
 ["Charleston"]
-default = ""
+default = "Чарльстон"
 
 # ["Charles Towne"] town：地图上在 Cat Island 与 Turk Islands 之间
 ["Charles Towne"]
-default = ""
+default = "Чарльз-Таун"
 
 # ["Tortuga"] town：剧本 8「托尔图加的麻烦」即此城
 ["Tortuga"]
-default = ""
+default = "Тортуга"
 
 # ["Cartagena"] town
 ["Cartagena"]
-default = ""
+default = "Картахена"
 
 # ["Havana"] town
 ["Havana"]
-default = ""
+default = "Гавана"
 
 # ["Margarita"] town
 ["Margarita"]
-default = ""
+default = "Маргарита"
 
 # ["Miles Sound System"] vendor：版权声明，不译；compile_pack 的 KEEP_ORIGINAL 也会强制保留
 ["Miles Sound System"]
-default = ""
+default = "Miles Sound System"
 
 # ["Port Royal"] place：牙买加旧首府（1661—1692 为英属牙买加首都），与游戏城镇 Port Royale 同名不同实体；中文都作「皇家港」，标注用来固定来源
 ["Port Royal"]
-default = ""
+default = "Порт-Рояль"
 
 # ["Guadeloupe"] town：城镇；竞赛模式任务的城市列名之一
 ["Guadeloupe"]
-default = ""
+default = "Гваделупа"
 
 # ["St. Juan"] town：城镇；竞赛模式任务的城市列名之一
 ["St. Juan"]
-default = ""
+default = "Сан-Хуан"
 
 # ["Biloxi"] town：城镇；副王驻地，与皇家港同列
 ["Biloxi"]
-default = ""
+default = "Билокси"
 
 # ["St. Augustine"] town：城镇；竞赛模式任务的城市列名之一
 ["St. Augustine"]
-default = ""
+default = "Сент-Огастин"
 
 # ["Grand Bahama"] town：城镇；海盗落脚点叙述里出现
 ["Grand Bahama"]
-default = ""
+default = "Гранд-Багама"
 
 # ["Turk Islands"] town：城镇；既是群岛也是城镇名，译文统一
 ["Turk Islands"]
-default = ""
+default = "Теркс-Айленд"
