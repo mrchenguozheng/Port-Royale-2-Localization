@@ -124,10 +124,17 @@ def term_parts(arg):
 
 
 def _resolve_term(arg, terms, hid, lang):
-    """查术语表；缺条目就报错，与 ref 缺译名同样硬失败。"""
+    """查术语表；缺条目或只留了空占位都报错，与 ref 缺译名同样硬失败。
+
+    空占位（`key = ""`）是新语言骨架同步出来的待译行：报「未译」而不是
+    「没有这个词条」，排错时能分清是表没同步还是词还没定。
+    """
     word = term_parts(arg)
     value = terms.get(word)
     if not value:
+        if word in terms:
+            raise MarkError("%s：terms/%s.toml 的 %r 还是空占位（表里有这一行，译词没填）"
+                            % (hid, lang, word))
         raise MarkError("%s：terms/%s.toml 里没有 %r（先定这个词的译法）"
                         % (hid, lang, word))
     return value
@@ -145,9 +152,15 @@ def _resolve(arg, table, hid, lang):
         if form != "default":
             raise MarkError("%s：%r 只有默认写法，没有形态 %r"
                             % (hid, name, form))
+        if not entry:
+            raise MarkError("%s：names/%s.toml 的 %r 还是空占位（译名没填）"
+                            % (hid, lang, name))
         return entry
     value = entry.get(form)
     if not value:
+        if form in entry:
+            raise MarkError("%s：%r 的形态 %r 还是空占位（译名没填）"
+                            % (hid, name, form))
         raise MarkError("%s：%r 在 names/%s.toml 里没有形态 %r"
                         % (hid, name, lang, form))
     return value
@@ -269,14 +282,18 @@ def used_terms(doc):
 
 
 def _dead_entries(problems, label, table, used, doc):
-    """表里有、但既没被标注引用、译词也没在正文出现过的条目。"""
+    """表里有、但既没被标注引用、译词也没在正文出现过的条目。
+
+    空占位（骨架同步出来的待译行）不算死条目：它本来就还没译，
+    既不引用也不出现是正常状态，报它只会淹掉真正拼错的键。
+    """
     for name in sorted(set(table) - used):
         value = table[name]
-        if isinstance(value, dict):
-            values = list(value.values())
-        else:
-            values = [value]
-        if any(v and any(v in (t or "") for t in doc.values()) for v in values):
+        values = list(value.values()) if isinstance(value, dict) else [value]
+        filled = [v for v in values if isinstance(v, str) and v.strip()]
+        if not filled:
+            continue
+        if any(any(v in (t or "") for t in doc.values()) for v in filled):
             continue
         problems.append(
             "%s 的 %r 既没被引用、译词也没在正文出现过（拼错或该删）"
