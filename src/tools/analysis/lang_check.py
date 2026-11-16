@@ -33,6 +33,9 @@ from text import marks as MK  # noqa: E402
 #: LanguageTool 的语言码；这里没有的语言跳过语法检查（日文、中文不在 LT 覆盖内）
 LT_CODE = {"de": "de-DE", "fr": "fr", "es": "es", "ru": "ru-RU", "nl": "nl", "pt": "pt-PT"}
 
+#: 字母串：任何非 ASCII 标点、非数字、非中日韩的字母（法语重音、西语 ñ、俄语西里尔都靠它）
+ANY_WORD = re.compile(r"[^\W\d_\u4e00-\u9fff\u3400-\u4dbf\u3040-\u30ff\uac00-\ud7af]{2,}")
+
 #: 引擎占位与标签：等长替换成下划线，既让 LT 不把它们当单词，又不打乱 offset
 MASK = re.compile(r"%[0-9]+|@[a-zA-Z]\$[^$]*\$|<[^>]*>|\[[^\]]*\]")
 
@@ -59,9 +62,20 @@ def grammar(lang, tr):
     tool = language_tool_python.LanguageTool(code)
     keys = [k for k in tr if mask(str(tr[k])).strip("_ ")]
     hits = []
-    BATCH = 40
-    for i in range(0, len(keys), BATCH):
-        chunk = [(k, mask(str(tr[k]))) for k in keys[i:i + BATCH]]
+    # 按字符数切批：百科长文单独成批，否则一批几万字 LanguageTool 会跑几分钟到几十分钟
+    BATCH_CHARS = 3000
+    batches, cur, cur_chars = [], [], 0
+    for k in keys:
+        n = len(str(tr[k]))
+        if cur and cur_chars + n > BATCH_CHARS:
+            batches.append(cur)
+            cur, cur_chars = [], 0
+        cur.append(k)
+        cur_chars += n
+    if cur:
+        batches.append(cur)
+    for bi, batch in enumerate(batches):
+        chunk = [(k, mask(str(tr[k]))) for k in batch]
         joined = "\n".join(t for _, t in chunk)
         spans, pos = [], 0
         for k, t in chunk:
@@ -71,8 +85,8 @@ def grammar(lang, tr):
             off = m.offset
             for k, s, e in spans:
                 if s <= off < e:
-                    hits.append((k, m.rule_id, m.message.split("\n")[0][:110],
-                                 (m.replacements[0] if m.replacements else "")[:60]))
+                    hits.append((k, m.rule_id, m.context.replace("\n", " ")[:80],
+                                 (m.replacements[0] if m.replacements else "")[:40]))
                     break
     return len(keys), hits
 
@@ -91,7 +105,7 @@ def split_head(w, vocab, link=("s", "n", "en", "er", "es", "e")):
 
 #: 本地 hunspell 词典（src/data/qa/dict/<base>.aff + .dic）。有就用它，它带变形与复合词规则，
 #: 比纯频率表准得多；没有就退回 pyspellchecker。
-HUNSPELL = {"de": "de_DE_frami"}
+HUNSPELL = {"de": "de_DE_frami", "fr": "fr_FR", "es": "es_ES", "ru": "ru_RU"}
 
 
 def spell(lang, tr, allow):
@@ -114,7 +128,7 @@ def spell(lang, tr, allow):
         return w.lower() not in sp.unknown([w.lower()])
 
     words, per_key = {}, {}
-    WORD = re.compile(r"[A-Za-zÄÖÜäöüßÄ]{2,}")
+    WORD = ANY_WORD
     for k, v in tr.items():
         for w in WORD.findall(mask(str(v))):
             if w.lower() in allow or w in allow:
@@ -138,10 +152,10 @@ def build_allow(lang, tr):
         for v in tbl.values():
             if isinstance(v, dict):
                 v = v.get("default", "")
-            for w in re.findall(r"[A-Za-zÄÖÜäöüß]{2,}", str(v)):
+            for w in ANY_WORD.findall(str(v)):
                 allow.add(w.lower())
     for v in tr.values():
-        for w in re.findall(r"[A-Za-zÄÖÜäöüß]{2,}", str(v)):
+        for w in ANY_WORD.findall(str(v)):
             if w.isupper() and len(w) <= 5:      # STRG、OK、CTRL 这类键名与缩写
                 allow.add(w.lower())
     return allow
