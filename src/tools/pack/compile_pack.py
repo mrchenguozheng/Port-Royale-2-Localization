@@ -60,7 +60,7 @@ REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42",
 #: 英文原文本身是开发残留标识符（`IDM_CONTEST_01_2004_LOG_06_TEXT` 这类）。
 #: 这类键的英文侧从来不是句子，占位符比对没有基准：德语零售版里
 #: `LOG_06_TEXT` 带 `@g$PirateGold$`，中文照译就会判成「多了占位符」。
-#: 判定放在 shared\core\validate.py（zh_lint 用的是同一份）。
+#: 判定放在 shared\core\validate.py（text_lint 用的是同一份）。
 
 
 def check_placeholders(h, en, txt, errors, warnings):

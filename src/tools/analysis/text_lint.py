@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # coding: utf-8
-"""zh_lint.py —— 把复查里已经定下的中文定则做成可重跑的检查。
+"""text_lint.py —— 把复查里已经定下的译文定则做成可重跑的检查。
+
+原名 zh_lint.py，因检查范围早已扩到六语（模板、占位、标注、空值、同原文异译
+对所有语言都适用，只有标点与引号几类是中文专有），更名为 text_lint.py。
 
 判据全部来自 docs/界面映射/09-推断-连续键区.md 里已经落卷的结论，
 这里只负责机械复核，不做判断。分级：
@@ -15,9 +18,9 @@
   · 千分位 `1,000` 不算半角逗号
   · 含 `%` 或 `<` 的引擎格式串不算「连续空格」
 
-    python src/tools/analysis/zh_lint.py            # 摘要
-    python src/tools/analysis/zh_lint.py --all      # 打印全部命中
-    python src/tools/analysis/zh_lint.py --lang de  # 换一门语言跑模板类检查
+    python src/tools/analysis/text_lint.py            # 摘要
+    python src/tools/analysis/text_lint.py --all      # 打印全部命中
+    python src/tools/analysis/text_lint.py --lang de  # 换一门语言跑模板类检查
 
 退出码：有 E 级命中时返回 1。
 """
@@ -146,7 +149,7 @@ def main(argv):
 
     text = "\n".join(lines) + "\n"
     print(text)
-    out = os.path.join(ROOT, "build", "qa", "zh_lint_%s.txt" % lang)
+    out = os.path.join(ROOT, "build", "qa", "text_lint_%s.txt" % lang)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     io.open(out, "w", encoding="utf-8", newline="").write(text)
     print("报告：%s" % os.path.relpath(out, ROOT))
