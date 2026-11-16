@@ -7,7 +7,7 @@
 
 ["Port Royale"]
 kind = "town"
-note = "主角母港，译名固定为「皇家港」"
+note = "加勒比海城镇；自由模式可自选母港，不是固定母港"
 
 ["Charleston"]
 kind = "town"

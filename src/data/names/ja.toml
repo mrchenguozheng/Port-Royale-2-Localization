@@ -1,7 +1,7 @@
 # 译名表骨架：键与 src/data/names/entities.toml 一致，由 table_sync 生成。
 # 值空 = 待译；值写成原文本身 = 决定不译（例如厂商名）。
 
-# ["Port Royale"] town：主角母港，译名固定为「皇家港」
+# ["Port Royale"] town：加勒比海城镇，自由模式可自选母港
 ["Port Royale"]
 default = "ポートロワイヤル"
 
