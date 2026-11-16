@@ -33,3 +33,7 @@ kind = "town"
 ["Miles Sound System"]
 kind = "vendor"
 note = "版权声明，不译；compile_pack 的 KEEP_ORIGINAL 也会强制保留"
+
+["Port Royal"]
+kind = "place"
+note = "牙买加旧首府（1661—1692 为英属牙买加首都），与游戏城镇 Port Royale 同名不同实体；中文都作「皇家港」，标注用来固定来源"
