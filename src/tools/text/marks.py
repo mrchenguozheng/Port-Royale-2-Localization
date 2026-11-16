@@ -9,6 +9,8 @@
     [ref:Charleston]            查 src/data/names/<lang>.toml，换成该语言的译名
     [ref:Charleston|gen]        指名形态（俄语格变化用；该语言没存这个形态就报错）
     [lit:%2 %1日]               字面照写，原文保留
+    [term:business|产业]        术语：译词原样输出，锚词 business 供 lint 核对原文
+    [term:产业]                 只有译词、不写锚词（纯注释，lint 只检查非空）
 
 为什么不用成对标记
 ------------------
@@ -42,7 +44,7 @@ ENTITIES = os.path.join(NAMES_DIR, "entities.toml")
 #: 这个键是字符清单，方括号是被展示的字符本身，整条豁免。
 EXEMPT_KEYS = {"0x11f0398f"}
 
-KEYWORDS = ("ref", "lit")
+KEYWORDS = ("ref", "lit", "term")
 
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
@@ -78,6 +80,14 @@ def _split_form(arg):
         return arg, "default"
     name, form = arg.split("|", 1)
     return name, (form or "default")
+
+
+def term_parts(arg):
+    """`锚词|译词` → (锚词, 译词)。没写 `|` 时锚词为空，只当纯注释。"""
+    if "|" not in arg:
+        return "", arg
+    src, word = arg.split("|", 1)
+    return src.strip(), word
 
 
 def _resolve(arg, table, hid, lang):
@@ -121,6 +131,8 @@ def expand(text, table, lang, hid=""):
                             % (hid, key, " / ".join(KEYWORDS)))
         if key == "ref":
             out.append(_resolve(arg, table, hid, lang))
+        elif key == "term":
+            out.append(term_parts(arg)[1])
         else:
             out.append(arg)
         i = m.end()
@@ -190,8 +202,12 @@ def used_names(doc):
     return used
 
 
-def check_doc(lang, doc, entities=None):
-    """返回问题列表（空 = 通过）。构建前和 lint 共用这一份判据。"""
+def check_doc(lang, doc, entities=None, source=None):
+    """返回问题列表（空 = 通过）。构建前和 lint 共用这一份判据。
+
+    `source` 传英文原文表时，`[term:business|产业]` 的锚词会在该键原文里核对；
+    不传就只检查译词非空（构建期不需要原文也能展开）。
+    """
     problems = []
     entities = load_entities() if entities is None else entities
     table = load_names(lang)
@@ -205,6 +221,17 @@ def check_doc(lang, doc, entities=None):
             problems.append(str(e))
             continue
         for key, arg in marks:
+            if key == "term":
+                src, word = term_parts(arg)
+                if not word:
+                    problems.append("%s：term 的译词为空" % hid)
+                if src and source is not None:
+                    body = source.get(hid) or ""
+                    if src.casefold() not in body.casefold():
+                        problems.append(
+                            "%s：term 锚词 %r 不在原文里（原文：%r）"
+                            % (hid, src, body[:80]))
+                continue
             if key == "ref":
                 name, form = _split_form(arg)
                 if name and name not in entities:

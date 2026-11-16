@@ -66,6 +66,23 @@ class TestExpand(unittest.TestCase):
         self.assertEqual(M.expand("[ref:Havana]与[ref:Charleston]", TABLE, "es"),
                          "哈瓦那与查尔斯顿")
 
+    def test_term_with_anchor(self):
+        self.assertEqual(M.expand("[term:business|产业]破产", TABLE, "zh"), "产业破产")
+
+    def test_term_plain(self):
+        self.assertEqual(M.expand("一家[term:产业]", TABLE, "zh"), "一家产业")
+
+    def test_term_anchor_mismatch(self):
+        doc = {"0x00000001": "[term:business|产业]"}
+        src = {"0x00000001": "Tools for sale."}
+        problems = M.check_doc("zh", doc, entities={}, source=src)
+        self.assertTrue(any("锚词" in p for p in problems), problems)
+
+    def test_term_anchor_ok(self):
+        doc = {"0x00000001": "[term:business|产业]"}
+        src = {"0x00000001": "Your own Businesses produce."}
+        self.assertEqual(M.check_doc("zh", doc, entities={}, source=src), [])
+
 
 class TestDoc(unittest.TestCase):
     def test_exempt_key(self):
