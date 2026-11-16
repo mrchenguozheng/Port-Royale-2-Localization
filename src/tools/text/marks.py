@@ -9,8 +9,8 @@
     [ref:Charleston]            查 src/data/names/<lang>.toml，换成该语言的译名
     [ref:Charleston|gen]        指名形态（俄语格变化用；该语言没存这个形态就报错）
     [lit:%2 %1日]               字面照写，原文保留
-    [term:business|产业]        术语：译词原样输出，锚词 business 供 lint 核对原文
-    [term:产业]                 只有译词、不写锚词（纯注释，lint 只检查非空）
+    [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
+    [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
 
 为什么不用成对标记
 ------------------
@@ -46,6 +46,10 @@ TERMS_DIR = os.path.join(ROOT, "src", "data", "terms")
 EXEMPT_KEYS = {"0x11f0398f"}
 
 KEYWORDS = ("ref", "lit", "term")
+
+#: term 参数允许的语言前缀。目前只有三种对照语言有原文表：英文（主原文）、
+#: 德语零售版、法语 GOG 版。加语言时同时确认 src/orig 里有对应文件。
+TERM_PREFIXES = ("en", "de", "fr")
 
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
@@ -97,12 +101,25 @@ def _split_form(arg):
 
 
 def term_parts(arg):
-    """术语参数：就是一个英文锚词。`|` 是 ref 的形态分隔符，这里不许出现。"""
+    """术语参数：`<语言>_<原词>`，例如 en_business / de_general / fr_medium。
+
+    语言前缀是必需的：英文同词两义时（General、normal、Wealth），靠换成「把义项分开的
+    那门语言」来区分，所以键必须自带语言，不能只有英文原词。键一律 ASCII 小写，
+    原形大小写与重音写在 terms 表的注释里。
+    """
     word = arg.strip()
     if not word:
         raise MarkError("term 参数为空")
     if "|" in word:
-        raise MarkError("term 只写英文锚词，不写译词（译词在 terms/<lang>.toml）")
+        raise MarkError("term 不写译词（译词在 terms/<lang>.toml）；`|` 是 ref 的形态分隔符")
+    if word != word.lower():
+        raise MarkError("term 参数要 ASCII 小写：%r（原形写进 terms 表的注释里）" % word)
+    if "_" not in word:
+        raise MarkError("term 参数要写成 <语言>_<原词>，例如 en_business / de_general")
+    lang = word.split("_", 1)[0]
+    if lang not in TERM_PREFIXES:
+        raise MarkError("term 参数的语言前缀 %r 不在 %s 里"
+                        % (lang, " / ".join(TERM_PREFIXES)))
     return word
 
 

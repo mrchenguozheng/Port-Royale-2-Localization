@@ -68,24 +68,33 @@ class TestExpand(unittest.TestCase):
 
     def test_term(self):
         self.assertEqual(
-            M.expand("一家[term:business]可雇用", TABLE, "zh",
-                     terms={"business": "产业"}),
+            M.expand("一家[term:en_business]可雇用", TABLE, "zh",
+                     terms={"en_business": "产业"}),
             "一家产业可雇用")
 
     def test_term_missing(self):
         with self.assertRaises(M.MarkError):
-            M.expand("[term:tools]", TABLE, "zh", terms={"business": "产业"})
+            M.expand("[term:en_tools]", TABLE, "zh", terms={"en_business": "产业"})
+
+    def test_term_needs_lang_prefix(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[term:business]", TABLE, "zh", terms={"en_business": "产业"})
+
+    def test_term_unknown_prefix(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[term:xx_business]", TABLE, "zh", terms={"en_business": "产业"})
 
     def test_term_form_forbidden(self):
-        # `|` 是 ref 的形态分隔符，term 只接受英文锚词
+        # `|` 是 ref 的形态分隔符，term 只接受 <语言>_<原词>
         with self.assertRaises(M.MarkError):
-            M.expand("[term:business|产业]", TABLE, "zh", terms={"business": "产业"})
+            M.expand("[term:en_business|产业]", TABLE, "zh",
+                     terms={"en_business": "产业"})
 
     def test_term_dead_entry(self):
-        doc = {"0x00000001": "[term:business]"}
+        doc = {"0x00000001": "[term:en_business]"}
         problems = M.check_doc("zh", doc, entities={},
-                               terms={"business": "产业", "tools": "工具"})
-        self.assertTrue(any("tools" in p for p in problems), problems)
+                               terms={"en_business": "产业", "en_tools": "工具"})
+        self.assertTrue(any("en_tools" in p for p in problems), problems)
 
 
 class TestDoc(unittest.TestCase):
