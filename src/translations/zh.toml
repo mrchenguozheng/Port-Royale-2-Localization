@@ -1883,7 +1883,7 @@
 "0xff062e68" = "仓库"
 "0xff075dec" = "选项"
 "0xff095c25" = "瘟疫爆发了。"
-"0xff0dd628" = "%1（%2结点）"
+"0xff0dd628" = "%1（%2节）"
 "0xff20b243" = "编年史"
 "0xff2140da" = "在@D$Date$之前把@a$Amount$的@G$Goods$送到@T$TOWN$。每桶<gs:TEXTFLUSS_KEINEHOEHE><g:INTEXT_FASS_800x600.screen>都能在市集上拿到@g$GoldPerBarrel$。"
 "0xff26a17e" = "你没有按时交付货物。"
