@@ -40,6 +40,7 @@ TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT = os.path.dirname(os.path.dirname(TOOLS))
 NAMES_DIR = os.path.join(ROOT, "src", "data", "names")
 ENTITIES = os.path.join(NAMES_DIR, "entities.toml")
+TERMS_DIR = os.path.join(ROOT, "src", "data", "terms")
 
 #: 这个键是字符清单，方括号是被展示的字符本身，整条豁免。
 EXEMPT_KEYS = {"0x11f0398f"}
@@ -75,6 +76,19 @@ def load_names(lang):
         return tomllib.load(f)
 
 
+def terms_path(lang):
+    return os.path.join(TERMS_DIR, "%s.toml" % lang)
+
+
+def load_terms(lang):
+    """某语言的术语表：{英文锚词: 该语言译词}。文件不存在就当空表（全缺）。"""
+    path = terms_path(lang)
+    if not os.path.isfile(path):
+        return {}
+    with io.open(path, "rb") as f:
+        return tomllib.load(f)
+
+
 def _split_form(arg):
     if "|" not in arg:
         return arg, "default"
@@ -83,11 +97,23 @@ def _split_form(arg):
 
 
 def term_parts(arg):
-    """`锚词|译词` → (锚词, 译词)。没写 `|` 时锚词为空，只当纯注释。"""
-    if "|" not in arg:
-        return "", arg
-    src, word = arg.split("|", 1)
-    return src.strip(), word
+    """术语参数：就是一个英文锚词。`|` 是 ref 的形态分隔符，这里不许出现。"""
+    word = arg.strip()
+    if not word:
+        raise MarkError("term 参数为空")
+    if "|" in word:
+        raise MarkError("term 只写英文锚词，不写译词（译词在 terms/<lang>.toml）")
+    return word
+
+
+def _resolve_term(arg, terms, hid, lang):
+    """查术语表；缺条目就报错，与 ref 缺译名同样硬失败。"""
+    word = term_parts(arg)
+    value = terms.get(word)
+    if not value:
+        raise MarkError("%s：terms/%s.toml 里没有 %r（先定这个词的译法）"
+                        % (hid, lang, word))
+    return value
 
 
 def _resolve(arg, table, hid, lang):
@@ -110,8 +136,14 @@ def _resolve(arg, table, hid, lang):
     return value
 
 
-def expand(text, table, lang, hid=""):
-    """展开一条标注文本，返回纯文本。写错一律抛 MarkError。"""
+def expand(text, table, lang, hid="", terms=None):
+    """展开一条标注文本，返回纯文本。写错一律抛 MarkError。
+
+    `table` 是 names 表（ref 用），`terms` 是术语表（term 用）。两者都按「缺条目即失败」
+    处理，调用方不传就按 lang 现读，和 ref 的行为完全一致。
+    """
+    if terms is None:
+        terms = load_terms(lang)
     out = []
     i = 0
     n = len(text)
@@ -123,8 +155,8 @@ def expand(text, table, lang, hid=""):
             continue
         m = _MARK.match(text, i)
         if not m:
-            raise MarkError("%s：第 %d 个字符处的 `[` 不成标记（要写成 [ref:…] 或 "
-                            "[lit:…]）" % (hid, i + 1))
+            raise MarkError("%s：第 %d 个字符处的 `[` 不成标记（要写成 [ref:…] / "
+                            "[lit:…] / [term:…]）" % (hid, i + 1))
         key, arg = m.group(1), m.group(2)
         if key not in KEYWORDS:
             raise MarkError("%s：未知标注关键字 %r（只有 %s）"
@@ -132,7 +164,7 @@ def expand(text, table, lang, hid=""):
         if key == "ref":
             out.append(_resolve(arg, table, hid, lang))
         elif key == "term":
-            out.append(term_parts(arg)[1])
+            out.append(_resolve_term(arg, terms, hid, lang))
         else:
             out.append(arg)
         i = m.end()
@@ -174,6 +206,7 @@ def expand_doc(lang, doc):
     if not has_marks(doc):
         return dict(doc)
     table = load_names(lang)
+    terms = load_terms(lang)
     out = {}
     for hid, text in doc.items():
         if not text:
@@ -182,7 +215,7 @@ def expand_doc(lang, doc):
         if hid in EXEMPT_KEYS:
             out[hid] = text
             continue
-        out[hid] = expand(text, table, lang, hid)
+        out[hid] = expand(text, table, lang, hid, terms=terms)
     return out
 
 
@@ -202,15 +235,47 @@ def used_names(doc):
     return used
 
 
-def check_doc(lang, doc, entities=None, source=None):
+def used_terms(doc):
+    """译文里实际引用到的术语锚词集合。"""
+    used = set()
+    for hid, text in doc.items():
+        if not text or hid in EXEMPT_KEYS:
+            continue
+        try:
+            marks = scan(text)
+        except MarkError:
+            continue
+        for key, arg in marks:
+            if key == "term":
+                used.add(arg.strip())
+    return used
+
+
+def _dead_entries(problems, label, table, used, doc):
+    """表里有、但既没被标注引用、译词也没在正文出现过的条目。"""
+    for name in sorted(set(table) - used):
+        value = table[name]
+        if isinstance(value, dict):
+            values = list(value.values())
+        else:
+            values = [value]
+        if any(v and any(v in (t or "") for t in doc.values()) for v in values):
+            continue
+        problems.append(
+            "%s 的 %r 既没被引用、译词也没在正文出现过（拼错或该删）"
+            % (label, name))
+
+
+def check_doc(lang, doc, entities=None, terms=None):
     """返回问题列表（空 = 通过）。构建前和 lint 共用这一份判据。
 
-    `source` 传英文原文表时，`[term:business|产业]` 的锚词会在该键原文里核对；
-    不传就只检查译词非空（构建期不需要原文也能展开）。
+    ref 查 names 表、term 查 terms 表，两边都是「缺条目即失败 + 死条目提醒」，
+    调用方不需要额外提供原文。
     """
     problems = []
     entities = load_entities() if entities is None else entities
     table = load_names(lang)
+    terms = load_terms(lang) if terms is None else terms
     for hid in sorted(doc):
         text = doc[hid] or ""
         if not text or hid in EXEMPT_KEYS:
@@ -222,15 +287,10 @@ def check_doc(lang, doc, entities=None, source=None):
             continue
         for key, arg in marks:
             if key == "term":
-                src, word = term_parts(arg)
-                if not word:
-                    problems.append("%s：term 的译词为空" % hid)
-                if src and source is not None:
-                    body = source.get(hid) or ""
-                    if src.casefold() not in body.casefold():
-                        problems.append(
-                            "%s：term 锚词 %r 不在原文里（原文：%r）"
-                            % (hid, src, body[:80]))
+                try:
+                    _resolve_term(arg, terms, hid, lang)
+                except MarkError as e:
+                    problems.append(str(e))
                 continue
             if key == "ref":
                 name, form = _split_form(arg)
@@ -246,14 +306,9 @@ def check_doc(lang, doc, entities=None, source=None):
     if used:
         # 死条目：既没被标注引用、译名也没在正文任何一条里出现，才报。
         # 这样表可以先建好、译文再逐步改标注，不会因为「暂时还没引用」而卡住。
-        for name in sorted(set(table) - used):
-            if name not in entities:
-                continue
-            entry = table[name]
-            values = entry.values() if isinstance(entry, dict) else [entry]
-            if any(v and any(v in (t or "") for t in doc.values()) for v in values):
-                continue
-            problems.append(
-                "names/%s.toml 的 %r 既没被引用、译名也没在正文出现过（拼错或该删）"
-                % (lang, name))
+        names_table = {k: v for k, v in table.items() if k in entities}
+        _dead_entries(problems, "names/%s.toml" % lang, names_table, used, doc)
+    used_t = used_terms(doc)
+    if used_t:
+        _dead_entries(problems, "terms/%s.toml" % lang, terms, used_t, doc)
     return problems

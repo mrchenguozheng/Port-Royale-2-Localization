@@ -66,22 +66,26 @@ class TestExpand(unittest.TestCase):
         self.assertEqual(M.expand("[ref:Havana]与[ref:Charleston]", TABLE, "es"),
                          "哈瓦那与查尔斯顿")
 
-    def test_term_with_anchor(self):
-        self.assertEqual(M.expand("[term:business|产业]破产", TABLE, "zh"), "产业破产")
+    def test_term(self):
+        self.assertEqual(
+            M.expand("一家[term:business]可雇用", TABLE, "zh",
+                     terms={"business": "产业"}),
+            "一家产业可雇用")
 
-    def test_term_plain(self):
-        self.assertEqual(M.expand("一家[term:产业]", TABLE, "zh"), "一家产业")
+    def test_term_missing(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[term:tools]", TABLE, "zh", terms={"business": "产业"})
 
-    def test_term_anchor_mismatch(self):
-        doc = {"0x00000001": "[term:business|产业]"}
-        src = {"0x00000001": "Tools for sale."}
-        problems = M.check_doc("zh", doc, entities={}, source=src)
-        self.assertTrue(any("锚词" in p for p in problems), problems)
+    def test_term_form_forbidden(self):
+        # `|` 是 ref 的形态分隔符，term 只接受英文锚词
+        with self.assertRaises(M.MarkError):
+            M.expand("[term:business|产业]", TABLE, "zh", terms={"business": "产业"})
 
-    def test_term_anchor_ok(self):
-        doc = {"0x00000001": "[term:business|产业]"}
-        src = {"0x00000001": "Your own Businesses produce."}
-        self.assertEqual(M.check_doc("zh", doc, entities={}, source=src), [])
+    def test_term_dead_entry(self):
+        doc = {"0x00000001": "[term:business]"}
+        problems = M.check_doc("zh", doc, entities={},
+                               terms={"business": "产业", "tools": "工具"})
+        self.assertTrue(any("tools" in p for p in problems), problems)
 
 
 class TestDoc(unittest.TestCase):

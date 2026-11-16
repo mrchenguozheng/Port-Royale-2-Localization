@@ -130,8 +130,8 @@ def main(argv):
                 W.append((sorted(keys)[0], "同原文异译 %d 种" % len(outs),
                           " / ".join(sorted(outs))[:120]))
 
-    # 内联标注（[ref:…] / [lit:…] / [term:…]）：未定义引用、缺形态、方括号写错、死条目、锚词不符
-    for p in MK.check_doc(lang, tr_raw, entities=MK.load_entities(), source=en):
+    # 内联标注（[ref:…] / [lit:…] / [term:…]）：未定义引用、缺形态、方括号写错、死条目
+    for p in MK.check_doc(lang, tr_raw, entities=MK.load_entities()):
         E.append(("标注", "标注", p))
 
     lines = []
