@@ -95,6 +95,16 @@ class TestCheckText(unittest.TestCase):
         out = V.check_text("甲<n>乙<n>丙", "甲 | 乙", lang="zh")
         self.assertEqual([x["level"] for x in out], ["error"])
 
+    def test_identifier_copy_is_error(self):
+        # 英文原文是开发残留标识符（IDM_…）时，译文原样照抄就是没翻译：
+        # 玩家会直接看到这串字符。它没有占位符基准，但必须拦住。
+        ident = "IDM_CONTEST_01_2004_LOG_00_TEXT"
+        out = V.check_text(ident, ident, lang="zh")
+        self.assertEqual([x["level"] for x in out], ["error"])
+        # 短标签本来就该照抄（OK／ESC／F1），不能一起报
+        for s in ("OK", "ESC", "F1", "CTRL"):
+            self.assertEqual(V.check_text(s, s, lang="zh"), [], s)
+
 
 class TestSingleImplementation(unittest.TestCase):
     """调用方必须复用同一份规则，不能各留一份。"""

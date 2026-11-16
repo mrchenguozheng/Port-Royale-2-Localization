@@ -157,6 +157,12 @@ def check_text(text, english, lang="en"):
         return [{"level": "warn", "text": msg["empty"]}]
     if PH_RE.match(text):
         return [{"level": "warn", "text": msg["placeholder"]}]
+    # 开发标识符占位（`IDM_CONTEST_01_2004_LOG_00_TEXT`）：英文原文就是这串，
+    # 译文原样照抄时不能算「已翻译」—— 玩家会直接看到标识符。
+    # 只判「与原文逐字相同」，避免误伤 OK／ESC／F1 这类本来就该照抄的短标签
+    # （它们的原文同样不是句子，但长度不够进 is_identifier）。
+    if is_identifier(text) and str(text) == str(english or "").strip():
+        return [{"level": "error", "text": msg["placeholder"]}]
 
     out = []
     if has_bare_pipe(text):

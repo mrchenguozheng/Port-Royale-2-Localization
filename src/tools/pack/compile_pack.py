@@ -246,8 +246,14 @@ def build(lang, out_dir, strict, marks=False):
             txt = eng
         # 占位译文跳过校验：它只有前 10 个字符，占位符必然不全。
         # 这不是放水 —— 它本来就没翻译，翻译后自然会进入校验。
-        if not is_placeholder(txt):
-            check_placeholders(h, s.get(T.BASE_LANG, ""), txt, errors, warnings)
+        # 开发标识符占位（译文 = 英文的 `IDM_...` 串）同理：原文不是句子，
+        # 没有比对基准，但它**必须报错**（玩家会直接看到这串标识符）。
+        en_ref = s.get(T.BASE_LANG, "") or ""
+        ident_ph = is_identifier(txt) and txt.strip() == en_ref.strip()
+        if ident_ph:
+            errors.append("%s 仍是开发标识符占位（%s），没有翻译" % (h, txt))
+        if not is_placeholder(txt) and not ident_ph:
+            check_placeholders(h, en_ref, txt, errors, warnings)
         if has_bare_pipe(txt):
             fatal.append("%s 含未转换的 |（换行请写 <n>）" % h)
             continue
@@ -259,7 +265,7 @@ def build(lang, out_dir, strict, marks=False):
         lines.append("%s = %s\n" % (h.upper().replace("0X", "0x"),
                                     to_engine(out_txt)))
         n += 1
-        if is_placeholder(txt):
+        if is_placeholder(txt) or ident_ph:
             n_ph += 1
 
     if fatal:
