@@ -27,6 +27,9 @@ JA_PARTICLES = [
     "から", "まで", "より", "など", "ほど", "ばかり", "だけ", "しか", "こそ",
     "さえ", "でも", "って", "ので", "のに", "けど",
     "は", "が", "を", "に", "で", "と", "も", "へ", "や", "か", "ね", "よ",
+    # 「の」也留断点：本机没有 janome/fugashi，实际一直走这条正则，
+    # 不加它就会攒出几十 em 的不可分块（界面框按空格断行，整行会被挤掉）。
+    "の",
 ]
 JA_HEAD = r"\u4e00-\u9fff\u3400-\u4dbf\u30a1-\u30fa\u30fc"
 JA_TAIL = r"\u4e00-\u9fff\u3400-\u4dbf\u30a1-\u30fa\u30fc「『（【〈〔"
@@ -112,7 +115,10 @@ def space_particles_analyzer(text, tagger=None):
             res.append(surf)
             if not pos.startswith("助詞"):
                 continue
-            if surf == "の" or "連体化" in pos:
+            # 「の」后也留一个断点：日语排版允许在「の」后折行，而引擎按空格断行，
+            # 不留这一处就会攒出几十 em 的不可分块（界面框里会被挤掉整行）。
+            # 其余连体助词照旧跳过，避免把「〜の」以外的结构切碎。
+            if "連体化" in pos and surf != "の":
                 continue
             if "接続助詞" in pos or "終助詞" in pos or "間投助詞" in pos:
                 continue
