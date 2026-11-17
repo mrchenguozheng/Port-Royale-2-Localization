@@ -251,6 +251,8 @@ def _ref_target(arg, doc, hid=""):
 #: `[riddle:]` 的字段名。`;` 分字段：`answer=` 谜底（`|` 是「或」），
 #: `group=` 同组其余副本的键（`+` 连接），`clue=` 线索（`,` 分隔、`+` 同标签并值）。
 ANS_FIELDS = ("answer", "group", "clue")
+#: 能省掉 `answer=` 的两个前缀：`town:城`、`direction:方位`。它们本身就是类型声明。
+_TYPE_ANSWER_PREFIXES = tuple(k + ":" for k in ("town", "direction"))
 
 #: answer 的类型前缀。正常**不写**：值在方位键里就是方位，否则按城镇查 entities.toml。
 #: 只有城名与方位键撞名（目前 0 例）才需要 `town:` / `direction:` 消歧。
@@ -287,26 +289,37 @@ ANS_ABBREV = {
 }
 _CARDINAL_1 = {"N": "north", "E": "east", "S": "south", "W": "west"}
 _ABBREV_LOWER = frozenset(k.lower() for k in ANS_ABBREV)
+_CARDINAL_LOWER = frozenset(k.lower() for k in _CARDINAL_1)
 
 
-def _dir_word(text, hid, raw):
-    """把一个方位写法归一成正向方位键；不认识的抛错，报错里给出全部合法写法。"""
+def _dir_word(text, hid, raw, allow_cardinal=False):
+    """把一个方位写法归一成正向方位键；不认识的抛错，报错里给出全部合法写法。
+
+    `allow_cardinal` 只在明写了 `direction:` 时打开：那时单字母 N/E/S/W 一定是方向，
+    不会和城名抢。裸值不打开——裸的 `N` 既可能是缩写的 north，也可能是没登记的地名，
+    不猜。
+    """
     if text in ANS_DIRECTIONS:
         return text
     if text in ANS_ABBREV:
         return ANS_ABBREV[text]
+    if allow_cardinal and text in _CARDINAL_1:
+        return _CARDINAL_1[text]
+    if allow_cardinal and text in _CARDINAL_LOWER:
+        raise MarkError("%s：谜底 %r 的单字母缩写要大写（%s）"
+                        % (hid, raw, text.upper()))
     if text.lower() in _ABBREV_LOWER:
         raise MarkError("%s：谜底 %r 的缩写要全大写（%s），小写会被当成普通词"
                         % (hid, raw, text.upper()))
     if text in _CARDINAL_1:
-        raise MarkError("%s：谜底 %r 里的 %s 不设缩写，写全 %s"
+        raise MarkError("%s：谜底 %r 里的 %s 只在明写 direction: 时才许缩写，写全 %s"
                         % (hid, raw, text, _CARDINAL_1[text]))
     opts = " / ".join(sorted(ANS_DIRECTIONS))
     raise MarkError("%s：谜底 %r 里的 %r 不是方位词（写全 %s，或缩写 NE/SE/SW/NW）"
                     % (hid, raw, text, opts))
 
 
-def _canon_answer(value, hid):
+def _canon_answer(value, hid, allow_cardinal=False):
     """把否定方位归一成 `-方位`，把大写缩写归一成完整方位词。
 
     收 `-east`（规范）与 `not east`（自然英语）；`not_east` 明确不再接受。
@@ -314,14 +327,15 @@ def _canon_answer(value, hid):
     `-east` / `east`，所以同一谜底不会因为写法不同分裂成两串文本。
 
     形状写错的一律报错：`-`、`--east`、`-not_east`、`-East`、`not`、`not-`、
-    `not East`、`not eastnorth`、`ne`（小写缩写）、`N`（正方位缩写）；全角/长破折号
-    开头的先单独报字符问题，因为肉眼几乎看不出，落进「未知谜底」会把人引去查拼写。
+    `not East`、`not eastnorth`、`ne`（小写缩写）、裸 `N`（单字母只许在 direction: 下）；
+    全角/长破折号开头的先单独报字符问题，因为肉眼几乎看不出，落进「未知谜底」
+    会把人引去查拼写。
     """
     if value[:1] in _DASH_LOOKALIKES:
         raise MarkError("%s：谜底 %r 开头那个是长破折号/全角减号，不是半角 ASCII 减号"
                         "（改成 -north 这种写法，全角字符肉眼几乎看不出）" % (hid, value))
     if value.startswith("-"):
-        return "-" + _dir_word(value[1:], hid, value)
+        return "-" + _dir_word(value[1:], hid, value, allow_cardinal)
     if value.startswith("not_"):
         raise MarkError("%s：谜底 %r 用了 not_ 写法（下划线不再接受）——写 -north 或 "
                         "not north" % (hid, value))
@@ -330,15 +344,17 @@ def _canon_answer(value, hid):
                         % (hid, value))
     m = _NEG_WORD_RX.match(value)
     if m:
-        return "-" + _dir_word(m.group(1), hid, value)
+        return "-" + _dir_word(m.group(1), hid, value, allow_cardinal)
     if value == "not":
         raise MarkError("%s：谜底写成了光秃秃的 not（后面要跟方位词）" % hid)
     if value in ANS_ABBREV:
         return ANS_ABBREV[value]
-    if value.lower() in _ABBREV_LOWER:
+    if allow_cardinal:
+        return _dir_word(value, hid, value, True)
+    if value in _ABBREV_LOWER:
         raise MarkError("%s：谜底 %r 的缩写要全大写（%s）" % (hid, value, value.upper()))
     if value in _CARDINAL_1:
-        raise MarkError("%s：谜底 %r 里的 %s 不设缩写，写全 %s"
+        raise MarkError("%s：谜底 %r 里的 %s 只在明写 direction: 时才许缩写，写全 %s"
                         % (hid, value, value, _CARDINAL_1[value]))
     return value
 
@@ -367,7 +383,7 @@ def _answer_items(raw, hid):
         if not value:
             raise MarkError("%s：answer 的 %s 项缺值" % (hid, kind))
         if kind == "direction":
-            value = _canon_answer(value, hid)
+            value = _canon_answer(value, hid, allow_cardinal=True)
             if value not in ANS_KEYS:
                 raise MarkError("%s：answer 的 direction 值 %r 不是方位键（正向 north…、"
                                 "否定 -north 或 not north）" % (hid, value))
@@ -402,18 +418,21 @@ def _group_tokens(raw, hid):
 
 
 def _split_ans(arg, hid="", warns=None):
-    """`[riddle:answer=城|城;group=0x…+0x…;clue=direction:东,count:四座+第三座]`
+    """`[riddle:answer=城|城;group=00000001+00000002;clue=direction:东,count:四座+第三座]`
     → ([(类型|None, 值)…], [同组其余副本的键…], [(类型|None, 词)…])。
 
     `answer` 里 `|` 是「或」（多个候选），`group` 里 `+` 连接同组其余副本的键，
     `clue` 里 `,` 是「并列」（全部必须成立）、`+` 是「同一个标签下的多个值」
     （展开后等价于把该项重复几遍）。
-    `answer` 正常不写类型前缀（值在方位键里算方位，否则按城镇查表），
+    `answer` 正常不写类型前缀（值在方位键里算方位，否则按城镇查表）；明写了
+    `town:` / `direction:` 时可以连 `answer=` 一起省掉，直接写
+    `[riddle:town:Vera Cruz;clue=…]` / `[riddle:direction:SE;clue=…]`——两个前缀本身
+    就是类型声明，猜谜底的那一步不需要再猜。
     `clue` 的每一项必须写成 `<标签>:<正文>`：标签是七个已知类型就按类型校验，
     `_` 开头的自造标签静默通过，字母开头的自造标签只当关键词并往 `warns` 记一条
     （多半是拼错）。
-    裸写、标签含大写/数字开头、已知类型缺值、`+` 两侧缺值、缺字段、字段重名、
-    全角逗号、group 列了自己或键形不对，一律失败。
+    裸写、标签含大写/数字开头、已知类型缺值、`+` 两侧缺值、缺谜底、字段重名、
+    谜底写两处、全角逗号、group 列了自己或键形不对，一律失败。
     """
     fields = {}
     for part in arg.split(";"):
@@ -421,12 +440,23 @@ def _split_ans(arg, hid="", warns=None):
         if not part:
             raise MarkError("%s：ans 里有空字段（多打了 `;`？）" % hid)
         if "=" not in part:
-            raise MarkError("%s：ans 的字段要写成 answer=… / group=… / clue=…，收到 %r"
+            # 省略 answer= 的写法：字段位置直接写 `town:城` 或 `direction:方位`。
+            # 只有这两种类型能这么写——它们本身就是「这个值是哪种谜底」的声明，
+            # 省掉一层 `answer=` 不影响任何判断；其余无 `=` 的片段仍报错。
+            if part.startswith(_TYPE_ANSWER_PREFIXES):
+                if "answer" in fields:
+                    raise MarkError("%s：ans 写了 answer= 又写了 %r（谜底只能一处）"
+                                    % (hid, part))
+                fields["answer"] = part
+                continue
+            raise MarkError("%s：ans 的字段要写成 answer=… / group=… / clue=…，"
+                            "或者直接写 town:城 / direction:方位（收到 %r）"
                             % (hid, part))
         name, _, value = part.partition("=")
         name, value = name.strip(), value.strip()
         if name not in ANS_FIELDS:
-            raise MarkError("%s：ans 没有字段 %r（只有 %s）"
+            raise MarkError("%s：ans 没有字段 %r（只有 %s；省略 answer= 时可直接写 "
+                            "town:城 / direction:方位）"
                             % (hid, name, " / ".join(ANS_FIELDS)))
         if name in fields:
             raise MarkError("%s：ans 的 %s 字段写了两遍" % (hid, name))
@@ -434,7 +464,8 @@ def _split_ans(arg, hid="", warns=None):
 
     if "answer" not in fields:
         raise MarkError(
-            "%s：ans 缺 answer 字段（写成 [riddle:answer=城;clue=direction:东,…]）" % hid)
+            "%s：ans 缺 answer 字段（写成 answer=城，或者直接写 town:城 / "
+            "direction:方位；线索用 clue=direction:东,…）" % hid)
     answers = _answer_items(fields["answer"], hid)
     group = _group_tokens(fields["group"], hid) if "group" in fields else []
 

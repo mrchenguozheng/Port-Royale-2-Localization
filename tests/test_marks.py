@@ -340,11 +340,57 @@ class TestAnswerMark(unittest.TestCase):
             self.assertIn("大写", str(ctx.exception))
 
     def test_cardinal_single_letter_is_rejected(self):
-        # 正方位不设缩写：写 N/E/S/W 会让人以为一套简写都成立
+        # 裸值不设单字母缩写：裸的 N 也可能是没登记的地名，不猜
         for bad in ("N", "E", "S", "W", "-N"):
-            with self.assertRaises(M.MarkError):
+            with self.assertRaises(M.MarkError) as ctx:
                 M.expand("[riddle:answer=%s;clue=direction:东]north 侧只有水。" % bad,
                          TABLE, "zh")
+            self.assertIn("direction", str(ctx.exception))
+
+    def test_cardinal_single_letter_under_direction_is_accepted(self):
+        # 明写 direction: 时单字母一定是方向，N/E/S/W 及其否定形态都收
+        for spelling, key in (("direction:N", "north"), ("direction:E", "east"),
+                              ("direction:S", "south"), ("direction:W", "west"),
+                              ("direction:-N", "not north"), ("direction:-E", "not east")):
+            doc = {"0x00000001": "[riddle:answer=%s;clue=direction:north]north 侧只有水。"
+                                 % spelling}
+            problems = M.check_doc("zh", doc, entities={}, terms={})
+            self.assertEqual(problems, [], spelling)
+
+    def test_lowercase_cardinal_under_direction_is_rejected(self):
+        for bad in ("direction:n", "direction:-s"):
+            with self.assertRaises(M.MarkError) as ctx:
+                M.expand("[riddle:answer=%s;clue=direction:north]north 侧只有水。" % bad,
+                         TABLE, "zh")
+            self.assertIn("大写", str(ctx.exception))
+
+    def test_answer_field_may_be_omitted_with_type(self):
+        # 省略 answer=：字段位置直接写 town:城 / direction:方位
+        doc = {"0x00000001": "[riddle:town:Vera Cruz;clue=count:三座]三座城镇，X 在最西。",
+               "0x00000002": "[riddle:direction:SE;clue=count:三座]三座城镇，去东南。"}
+        problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
+        self.assertEqual(problems, [])
+
+    def test_typed_field_with_group_is_fine(self):
+        # 省略 answer= 后 group/clue 照旧；group 只列其余副本，8 位不带 0x
+        doc = {"0x00000001": "[riddle:town:Vera Cruz;group=00000002;clue=count:三座]三座城镇。",
+               "0x00000002": "[riddle:town:Vera Cruz;group=00000001;clue=count:三座]三座城镇。"}
+        self.assertEqual(M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={}), [])
+
+    def test_answer_and_typed_field_conflict(self):
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:answer=Vera Cruz;town:Havana;clue=count:三座]", TABLE, "zh")
+        self.assertIn("一处", str(ctx.exception))
+
+    def test_two_typed_answer_fields_conflict(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[riddle:town:Vera Cruz;town:Havana;clue=count:三座]", TABLE, "zh")
+
+    def test_bare_untyped_field_is_error(self):
+        # 不带 town:/direction: 的裸字段位置不认（否则「哪个是谜底」失去依据）
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:Vera Cruz;clue=count:三座]", TABLE, "zh")
+        self.assertIn("town:", str(ctx.exception))
 
     def test_abbrev_normalizes_to_same_candidate(self):
         # NE 与 northeast 归一后是同一个候选，写两遍算重复
