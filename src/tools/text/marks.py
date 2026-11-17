@@ -16,18 +16,20 @@
     [lit:%2 %1日]               字面照写，原文保留
     [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
     [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
-    [ans:name=Corpus Christi;clue=荒凉,遗弃]
+    [ans:name=town:Corpus Christi;clue=feature:荒凉,feature:遗弃]
                                 诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
-                                `name=` 是谜底，`|` 分隔「或」的多个候选；
-                                `clue=` 是**谜面里能推出这个谜底的线索词**，用英文逗号
-                                `,` 分隔（全角「，」不收），至少一条。展开时逐条核对
-                                它们真的出现在谜面里——写不出
-                                线索就说明这条谜面根本推不到这个答案（或线索该改）。
+                                字段：`name=` 谜底，`clue=` 线索；`;` 分字段。
+                                两个字段的每一项都是 `<类型>:<值>`：
+                                `name` 的类型是 town / direction / kw，`|` 分隔「或」的候选；
+                                `clue` 的类型是 pun / direction / count / feature /
+                                produce / history / exclude，`,` 分隔并列项，
+                                值必须是**谜面正文里逐字出现的片段**。展开时逐条核对——
+                                写不出线索就说明这条谜面根本推不到这个答案（或线索该改）。
                                 谜底/线索都不生成本文，也不许把答案照抄成 town，
                                 否则既泄底又冻死用词（见 09 卷第六十三、六十四节）
-                                谜底也可以只写方位（`east`/`southeast`…，见 ANS_DIRECTIONS）：
-                                那批谜面只说朝向，写不出城名（09 卷第七十二节）。
-                                字段语法见 09 卷第七十八节（`;` 分字段、`|` 是或、`,` 分线索）。
+                                谜底也可以只写方位（`direction:east`），那批谜面只说朝向，
+                                写不出城名（09 卷第七十二节）。
+                                字段语法见 09 卷第七十八、七十九节。
 
 为什么不用成对标记
 ------------------
@@ -234,16 +236,36 @@ def _ref_target(arg, doc, hid=""):
     return key, target
 
 
-#: `[ans:]` 的字段名。`;` 分字段，`name=` 里 `|` 是「或」，`clue=` 里 `,` 分线索。
-#: 只收这两个字段：写错的字段名会被报出来，不会静默忽略。
+#: `[ans:]` 的字段名。`;` 分字段；两个字段都吃「`<类型>:<值>`」的项：
+#: `name=` 里 `|` 是「或」，`clue=` 里 `,` 是「并列」。
 ANS_FIELDS = ("name", "clue")
+
+#: name 的类型：城镇查 entities.toml，方位查 ANS_DIRECTIONS，kw 是关键词谜底（不取值）。
+ANS_NAME_KINDS = ("town", "direction", ANS_KEYWORD)
+
+#: clue 的类型：说明这条谜面的信息属于哪一类，也决定译者必须保住什么。
+ANS_CLUE_KINDS = ("pun", "direction", "count", "feature", "produce", "history", "exclude")
+
+
+def _ans_item(part, kinds, what, hid):
+    """`<类型>:<值>` → (类型, 值)。类型写错、漏冒号都失败。"""
+    if ":" not in part:
+        raise MarkError("%s：ans 的 %s 项要写成 <类型>:<值>，收到 %r"
+                        % (hid, what, part))
+    kind, _, value = part.partition(":")
+    kind, value = kind.strip(), value.strip()
+    if kind not in kinds:
+        raise MarkError("%s：ans 的 %s 类型 %r 不认识（只有 %s）"
+                        % (hid, what, kind, " / ".join(kinds)))
+    return kind, value
 
 
 def _split_ans(arg, hid=""):
-    """`[ans:name=实体|实体;clue=线索,线索]` → ([实体…], [线索])。
+    """`[ans:name=town:城|town:城;clue=direction:东,count:四座]`
+    → ([(类型, 值)…], [(类型, 词)…])。
 
-    `name` 里 `|` 是「或」（多个候选），`clue` 里 `,` 分隔线索。
-    缺 name、缺 clue、字段名写错、字段重名、全角逗号，一律失败。
+    `name` 里 `|` 是「或」（多个候选），`clue` 里 `,` 是「并列」（全部必须成立）。
+    缺字段、字段重名、类型写错、name 候选为空、clue 项为空、全角逗号，一律失败。
     """
     fields = {}
     for part in arg.split(";"):
@@ -263,43 +285,65 @@ def _split_ans(arg, hid=""):
         fields[name] = value
 
     if "name" not in fields:
-        raise MarkError("%s：ans 缺 name 字段（写成 [ans:name=实体;clue=线索,…]）"
-                        % hid)
+        raise MarkError(
+            "%s：ans 缺 name 字段（写成 [ans:name=town:城;clue=direction:东,…]）" % hid)
     raw = fields["name"]
     if not raw:
         raise MarkError("%s：ans 的 name 为空" % hid)
-    names = [n.strip() for n in raw.split("|")]
-    if any(not n for n in names):
+    parts = [p.strip() for p in raw.split("|")]
+    if any(not p for p in parts):
         raise MarkError("%s：ans 的 name 里有空的候选（`|` 两侧都要写）" % hid)
+    names = []
+    for part in parts:
+        kind, value = _ans_item(part, ANS_NAME_KINDS, "name", hid)
+        if kind == ANS_KEYWORD:
+            if value:
+                raise MarkError("%s：kw 不取值（写成 name=kw:）" % hid)
+            names.append((kind, ""))
+            continue
+        if not value:
+            raise MarkError("%s：name 的 %s 缺值" % (hid, kind))
+        if kind == "direction" and value not in ANS_DIRECTIONS | ANS_NEGATIVE:
+            raise MarkError("%s：name 的 direction 值 %r 不是方位键（见 ANS_DIRECTIONS）"
+                            % (hid, value))
+        names.append((kind, value))
     if len(set(names)) != len(names):
         raise MarkError("%s：ans 的 name 有重复候选" % hid)
 
     clue_raw = fields.get("clue", "")
     if "，" in clue_raw:
         raise MarkError("%s：ans 的线索用英文逗号 `,` 分隔，不要用全角「，」" % hid)
-    clues = [c.strip() for c in clue_raw.split(",")]
-    clues = [c for c in clues if c]
+    clues = []
+    for part in clue_raw.split(","):
+        part = part.strip()
+        if not part:
+            raise MarkError("%s：ans 的 clue 里有空项（多打了 `,`？）" % hid)
+        kind, value = _ans_item(part, ANS_CLUE_KINDS, "clue", hid)
+        if not value:
+            raise MarkError("%s：clue 的 %s 项缺值（要写谜面里出现的原词）"
+                            % (hid, kind))
+        clues.append((kind, value))
     if not clues:
         raise MarkError(
-            "%s：ans 只有谜底 %r，没有 clue 字段（谜面里能推出它的词要逐条写进来）"
-            % (hid, raw))
+            "%s：ans 只有谜底 %r，没有 clue（谜面里能推出它的词要逐条写进来，"
+            "并标上类型）" % (hid, raw))
     return names, clues
 
 
 def _check_ans(arg, body, hid=""):
     """核对谜底与线索：线索必须逐条出现在谜面正文里。返回候选名单。写错抛 MarkError。"""
     names, clues = _split_ans(arg, hid)
-    if ANS_KEYWORD in names and len(clues) < 2:
+    if any(kind == ANS_KEYWORD for kind, _ in names) and len(clues) < 2:
         raise MarkError(
             "%s：谜底是关键词组合（%s），至少写两条线索——一条算不上组合，"
             "也定位不到地方" % (hid, ANS_KEYWORD))
     text = (body or "").casefold()
-    missing = [c for c in clues if c.casefold() not in text]
+    missing = [v for _, v in clues if v.casefold() not in text]
     if missing:
         raise MarkError(
             "%s：ans 的谜底是 %r，但线索 %s 没出现在谜面里（谜面推不出这个答案，"
-            "或者线索该换）" % (hid, "|".join(names),
-                                " / ".join(repr(c) for c in missing)))
+            "或者线索该换）" % (hid, "|".join(v for _, v in names),
+                                " / ".join(repr(v) for v in missing)))
     return names
 
 
@@ -500,8 +544,10 @@ def check_doc(lang, doc, entities=None, terms=None):
                 except MarkError as e:
                     problems.append(str(e))
                     continue
-                for name in names:
-                    if name not in entities and name not in ANS_KEYS:
+                for kind, name in names:
+                    if kind != "town":
+                        continue        # 方位/kw 不进 names 表，没什么可登记可引用
+                    if name not in entities:
                         problems.append(
                             "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
                             % (hid, name))

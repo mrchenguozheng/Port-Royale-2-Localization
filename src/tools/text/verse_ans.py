@@ -173,15 +173,31 @@ def cmd_apply():
             register_entity(ans, tid, rows)
             print("登记实体 %s（城镇行 %s）" % (ans, tid))
 
+        if ans == MK.ANS_KEYWORD:
+            name_item = "%s:" % MK.ANS_KEYWORD       # kw 不取值，写成 name=kw:
+        elif ans in MK.ANS_KEYS:
+            name_item = "direction:%s" % ans          # 方位键与 not_<方位> 都算方位
+        else:
+            name_item = "town:%s" % ans
+
         wanted, ok = {}, True
         for lang in LANGS:
             clues = split_clues((g.get("clues") or {}).get(lang, ""), lang)
+            kinds = (g.get("kinds") or {}).get(lang, [])
+            if len(kinds) != len(clues):
+                raise SystemExit("%s 的线索 %d 条，kinds 给了 %d 条（逐语对齐）"
+                                 % (lang, len(clues), len(kinds)))
+            bad = [k for k in kinds if k not in MK.ANS_CLUE_KINDS]
+            if bad:
+                raise SystemExit("%s 的 kinds 里有不认识的值 %s（只有 %s）"
+                                 % (lang, bad, " / ".join(MK.ANS_CLUE_KINDS)))
             text = ANS_MARK.sub("", rows[lang].get(ids[0], ""))
             for c in clues:
                 if c.casefold() not in text.casefold():
                     raise SystemExit("%s 的线索「%s」没出现在谜面里（%s）"
                                      "——谜面推不出这个谜底，或者线索该换" % (lang, c, ids[0]))
-            wanted[lang] = "[ans:name=%s;clue=%s]" % (ans, ",".join(clues))
+            clue_text = ",".join("%s:%s" % (k, c) for k, c in zip(kinds, clues))
+            wanted[lang] = "[ans:name=%s;clue=%s]" % (name_item, clue_text)
 
         already = [ANS_MARK.match(rows[lang].get(k, "")) for k in ids for lang in LANGS]
         if [m.group(0) if m else None for m in already] == \
