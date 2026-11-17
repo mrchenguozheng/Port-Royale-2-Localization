@@ -267,7 +267,7 @@ meaning = "天数"
 codes = ["I"]
 refs_en = 8
 refs_all = 56
-example = "太好了！你在@I$Days$天内恢复了[ref:Tortuga]的人口。"
+example = "太好了！你在@I$Days$天内恢复了[town:Tortuga]的人口。"
 in_original = true
 
 [var.DebrisPos]
@@ -532,7 +532,7 @@ meaning = "人口"
 codes = ["I"]
 refs_en = 6
 refs_all = 42
-example = "干得漂亮！[ref:Tortuga]的瘟疫已经结束，人口恢复到了@I$Pop$。<n>你在@I$Days$天内完成了这项任务。"
+example = "干得漂亮！[town:Tortuga]的瘟疫已经结束，人口恢复到了@I$Pop$。<n>你在@I$Days$天内完成了这项任务。"
 in_original = true
 
 [var.Pos]
@@ -621,7 +621,7 @@ meaning = "起始资金"
 codes = ["g"]
 refs_en = 1
 refs_all = 7
-example = "[ref:Tortuga]正在发生一些怪事。由于过去发生的一连串事件，如今几乎没有任何商人敢踏入这座城镇。你的任务是尽你所能供应货物，以扶持[ref:Tortuga]。<n><n>但你手上的启动资金并不算可观。你手头有@"
+example = "[town:Tortuga]正在发生一些怪事。由于过去发生的一连串事件，如今几乎没有任何商人敢踏入这座城镇。你的任务是尽你所能供应货物，以扶持[town:Tortuga]。<n><n>但你手上的启动资金并不算可观。你手头"
 in_original = true
 
 [var.StartTown]

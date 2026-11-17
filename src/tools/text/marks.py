@@ -6,8 +6,10 @@
 
 语法只有一种形状，全部自闭合，没有闭合符：
 
-    [ref:Charleston]            查 src/data/names/<lang>.toml，换成该语言的译名
-    [ref:Charleston|gen]        指名形态（俄语格变化用；该语言没存这个形态就报错）
+    [town:Charleston]           查 src/data/names/<lang>.toml，换成该语言的译名
+    [town:Charleston|gen]       指名形态（俄语格变化用；该语言没存这个形态就报错）
+                                （`ref` 不再查名字表：它留给「同一条文本的跨键引用」，
+                                见 09 卷第七十六节）
     [lit:%2 %1日]               字面照写，原文保留
     [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
     [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
@@ -16,7 +18,7 @@
                                 `,` 分隔（全角「，」不收），至少一条。展开时逐条核对
                                 它们真的出现在谜面里——写不出
                                 线索就说明这条谜面根本推不到这个答案（或线索该改）。
-                                谜底/线索都不生成本文，也不许把答案照抄成 ref，
+                                谜底/线索都不生成本文，也不许把答案照抄成 town，
                                 否则既泄底又冻死用词（见 09 卷第六十三、六十四节）
                                 谜底也可以只写方位（`east`/`southeast`…，见 ANS_DIRECTIONS）：
                                 那批谜面只说朝向，写不出城名（09 卷第七十二节）。
@@ -54,7 +56,8 @@ TERMS_DIR = os.path.join(ROOT, "src", "data", "terms")
 #: 这个键是字符清单，方括号是被展示的字符本身，整条豁免。
 EXEMPT_KEYS = {"0x11f0398f"}
 
-KEYWORDS = ("ref", "lit", "term", "ans")
+#: `ref` 暂时不在名单里：改名后它留着给「跨键引用同一条文本」，实现那一批再加回来。
+KEYWORDS = ("town", "lit", "term", "ans")
 
 #: term 参数允许的语言前缀。目前只有三种对照语言有原文表：英文（主原文）、
 #: 德语零售版、法语 GOG 版。加语言时同时确认 src/orig 里有对应文件。
@@ -143,7 +146,7 @@ def term_parts(arg):
     if not word:
         raise MarkError("term 参数为空")
     if "|" in word:
-        raise MarkError("term 不写译词（译词在 terms/<lang>.toml）；`|` 是 ref 的形态分隔符")
+        raise MarkError("term 不写译词（译词在 terms/<lang>.toml）；`|` 是 town 的形态分隔符")
     if word != word.lower():
         raise MarkError("term 参数要 ASCII 小写：%r（原形写进 terms 表的注释里）" % word)
     if "_" not in word:
@@ -173,10 +176,10 @@ def _resolve_term(arg, terms, hid, lang):
 
 
 def _resolve(arg, table, hid, lang):
-    """把 ref 的参数解析成落地字符串；缺少条目或形态就报错，绝不回退。"""
+    """把 town 的参数解析成落地字符串；缺少条目或形态就报错，绝不回退。"""
     name, form = _split_form(arg)
     if not name:
-        raise MarkError("%s：ref 参数为空" % hid)
+        raise MarkError("%s：town 参数为空" % hid)
     entry = table.get(name)
     if entry is None:
         raise MarkError("%s：names/%s.toml 里没有 %r" % (hid, lang, name))
@@ -251,13 +254,13 @@ def expand(text, table, lang, hid="", terms=None):
             continue
         m = _MARK.match(text, i)
         if not m:
-            raise MarkError("%s：第 %d 个字符处的 `[` 不成标记（要写成 [ref:…] / "
+            raise MarkError("%s：第 %d 个字符处的 `[` 不成标记（要写成 [town:…] / "
                             "[lit:…] / [term:…] / [ans:…]）" % (hid, i + 1))
         key, arg = m.group(1), m.group(2)
         if key not in KEYWORDS:
             raise MarkError("%s：未知标注关键字 %r（只有 %s）"
                             % (hid, key, " / ".join(KEYWORDS)))
-        if key == "ref":
+        if key == "town":
             out.append(_resolve(arg, table, hid, lang))
         elif key == "term":
             out.append(_resolve_term(arg, terms, hid, lang))
@@ -284,7 +287,7 @@ def scan(text):
             continue
         m = _MARK.match(text, i)
         if not m:
-            raise MarkError("第 %d 个字符处的 `[` 不成标记（要写成 [ref:…] 或 "
+            raise MarkError("第 %d 个字符处的 `[` 不成标记（要写成 [town:…] 或 "
                             "[lit:…]）" % (i + 1))
         if m.group(1) not in KEYWORDS:
             raise MarkError("第 %d 个字符处是未知标注关键字 %r（只有 %s）"
@@ -330,7 +333,7 @@ def used_names(doc):
         except MarkError:
             continue
         for key, arg in marks:
-            if key == "ref":
+            if key == "town":
                 used.add(_split_form(arg)[0])
     return used
 
@@ -391,7 +394,7 @@ def _dead_entries(problems, label, table, used, doc, lang):
 def check_doc(lang, doc, entities=None, terms=None):
     """返回问题列表（空 = 通过）。构建前和 lint 共用这一份判据。
 
-    ref 查 names 表、term 查 terms 表，两边都是「缺条目即失败 + 死条目提醒」，
+    town 查 names 表、term 查 terms 表，两边都是「缺条目即失败 + 死条目提醒」，
     调用方不需要额外提供原文。
     """
     problems = []
@@ -430,7 +433,7 @@ def check_doc(lang, doc, entities=None, terms=None):
                         % (hid, name))
                 ans_used.add(name)
                 continue
-            if key == "ref":
+            if key == "town":
                 name, form = _split_form(arg)
                 if name and name not in entities:
                     problems.append(

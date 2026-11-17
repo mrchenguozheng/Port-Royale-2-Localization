@@ -43,7 +43,7 @@ TPL = re.compile(r"%[0-9]+|@[a-zA-Z]\$[^$]*\$|<(?:n|c|t|ts:[0-9]+|gs:[^>]*|r|b)>
 FONT = re.compile(r"<f:([^>]*)>")
 HAN = re.compile(r"[\u4e00-\u9fff]")
 LATIN = re.compile(r"[A-Za-z]")
-MARK_ANY = re.compile(r"\[(?:ref|lit|term):?")
+MARK_ANY = re.compile(r"\[(?:town|lit|term):?")
 ANS_MARK = re.compile(r"\[ans:")
 # 站内变量 @x$Name$：x 是格式码。同一个变量在整份语料里几乎只有一种码，出现孤例多半是
 # 原文笔误被逐语照抄（0xca4930dc 的 @A$Amount$ 就是：同文件 55 处 @a$Amount$）。
@@ -162,11 +162,11 @@ def main(argv):
                 W.append((sorted(keys)[0], "同原文异译 %d 种" % len(outs),
                           " / ".join(sorted(outs))[:120]))
 
-    # 内联标注（[ref:…] / [lit:…] / [term:…]）：未定义引用、缺形态、方括号写错、死条目
+    # 内联标注（[town:…] / [lit:…] / [term:…]）：未定义引用、缺形态、方括号写错、死条目
     for p in MK.check_doc(lang, tr_raw, entities=MK.load_entities()):
         E.append(("标注", "标注", p))
 
-    # 诗谜整片不许挂 ref/lit/term：谜面的用词由韵脚和字数决定，这几种标注会把词冻成
+    # 诗谜整片不许挂 town/lit/term：谜面的用词由韵脚和字数决定，这几种标注会把词冻成
     # 表里的写法，谜语也被提前泄底（`Holy August` 的双关就没了）。诗里只写自由文本，
     # 谜底另走 [ans:实体]——只给翻译人看，展开为空。
     _g, _ig, verse = TC.load_terms()

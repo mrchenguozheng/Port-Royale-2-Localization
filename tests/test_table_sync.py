@@ -105,7 +105,7 @@ class TestPlaceholderSemantics(SyncBase):
 
     def test_empty_name_reports_untranslated(self):
         with self.assertRaises(M.MarkError) as cm:
-            M.expand("[ref:Tortuga]", {"Tortuga": {"default": ""}}, "ko", "0x1")
+            M.expand("[town:Tortuga]", {"Tortuga": {"default": ""}}, "ko", "0x1")
         self.assertIn("空占位", str(cm.exception))
 
     def test_placeholder_is_not_dead_entry(self):

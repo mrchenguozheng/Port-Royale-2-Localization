@@ -165,7 +165,7 @@ class TestVerseHasNoMarks(unittest.TestCase):
             doc, _od = toml_io.read_doc(
                 os.path.join(ROOT, "src", "translations", "%s.toml" % lang))
             for k in vids:
-                if re.search(r"\[(?:ref|lit|term):?", doc.get(k, "") or ""):
+                if re.search(r"\[(?:town|lit|term):?", doc.get(k, "") or ""):
                     bad.append((lang, k))
         self.assertEqual(bad, [])
 

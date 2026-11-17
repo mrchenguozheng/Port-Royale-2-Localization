@@ -58,7 +58,7 @@ def build(lang, doc, order=None):
     """{id: 译文} → {id: 引擎文本}。不写文件。
 
     只认 spec，不认语言：三段式接口统一走 lang_rules.spec.build_texts。
-    标注（[ref:…] / [lit:…]）在这里最先展开——语言规则完全看不到它们。
+    标注（[town:…] / [lit:…]）在这里最先展开——语言规则完全看不到它们。
     """
     return build_full(lang, doc, order)[0]
 

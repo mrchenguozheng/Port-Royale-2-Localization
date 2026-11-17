@@ -38,7 +38,7 @@
 四类不算漂移的差异（都归到 EXACT／MORPH，不报错）：
 
 - **大小写与重音**：`Café` 在句中写作 `café`、`Eglise` 写作 `église`；
-- **标注**：基准形与译文都先展开成纯文本（`[ref:Tortuga]` → 托尔图加），否则比的是标注拼写；
+- **标注**：基准形与译文都先展开成纯文本（`[town:Tortuga]` → 托尔图加），否则比的是标注拼写；
 - **冠词**：基准形带着标签上的冠词（fr `l'Angleterre`、es `el mercado`），句子里不带；
 - **专名条目**：`Captain Bean`、`Edward England`、`Admiral De Ruyter` 里的 Captain／England
   是名字的一部分，不是术语本身，整条跳过。
@@ -162,11 +162,11 @@ def term_table(lang):
     return _TERM_CACHE[lang]
 
 
-MARK_RX = re.compile(r"\[(term|ref|lit):")
+MARK_RX = re.compile(r"\[(term|town|lit):")
 
 
 def resolve_marks(want, lang):
-    """基准形里可能写着标注（`[term:en_tools]`、`[ref:Tortuga]`），先换成实际文字再比。
+    """基准形里可能写着标注（`[term:en_tools]`、`[town:Tortuga]`），先换成实际文字再比。
 
     换不出来（缺条目／空占位／名字表里没有）就返回 None，这条规则不查——拿标注本身去
     正文里搜只会造出假阳性（ru 的 102 条里绝大多数就是这一类）。
@@ -369,7 +369,7 @@ def fold_spaced(s):
 
 def check_lang(lang, groups, en, doc):
     """返回 {"missing": [...], "morph": [...]}。"""
-    # 先把译文的标注展开成纯文本：基准形解析出的是文字（`[ref:Tortuga]` → 托尔图加），
+    # 先把译文的标注展开成纯文本：基准形解析出的是文字（`[town:Tortuga]` → 托尔图加），
     # 两边都必须是文字才能比，否则就变成「标注拼写是否一致」。
     try:
         from text import marks as MK

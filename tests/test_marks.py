@@ -22,26 +22,26 @@ class TestExpand(unittest.TestCase):
         self.assertEqual(M.expand("普通一句。", TABLE, "zh"), "普通一句。")
 
     def test_ref(self):
-        self.assertEqual(M.expand("[ref:Charleston]遭到围攻。", TABLE, "zh"),
+        self.assertEqual(M.expand("[town:Charleston]遭到围攻。", TABLE, "zh"),
                          "查尔斯顿遭到围攻。")
 
     def test_ref_form(self):
-        self.assertEqual(M.expand("в [ref:Havana|gen]", TABLE, "ru"),
+        self.assertEqual(M.expand("в [town:Havana|gen]", TABLE, "ru"),
                          "в Хаваны")
 
     def test_ref_form_missing(self):
         with self.assertRaises(M.MarkError):
-            M.expand("[ref:Havana|dat]", TABLE, "ru")
+            M.expand("[town:Havana|dat]", TABLE, "ru")
 
     def test_ref_unknown(self):
         with self.assertRaises(M.MarkError):
-            M.expand("[ref:Nowhere]", TABLE, "zh")
+            M.expand("[town:Nowhere]", TABLE, "zh")
 
     def test_string_entry_only_default(self):
-        self.assertEqual(M.expand("[ref:Miles Sound System]", TABLE, "zh"),
+        self.assertEqual(M.expand("[town:Miles Sound System]", TABLE, "zh"),
                          "Miles Sound System")
         with self.assertRaises(M.MarkError):
-            M.expand("[ref:Miles Sound System|gen]", TABLE, "zh")
+            M.expand("[town:Miles Sound System|gen]", TABLE, "zh")
 
     def test_lit(self):
         self.assertEqual(M.expand("[lit:%2 %1日]", TABLE, "zh"), "%2 %1日")
@@ -52,7 +52,7 @@ class TestExpand(unittest.TestCase):
 
     def test_unclosed(self):
         with self.assertRaises(M.MarkError):
-            M.expand("半个 [ref:Charleston", TABLE, "zh")
+            M.expand("半个 [town:Charleston", TABLE, "zh")
 
     def test_bare_bracket(self):
         with self.assertRaises(M.MarkError):
@@ -60,10 +60,10 @@ class TestExpand(unittest.TestCase):
 
     def test_nested_arg(self):
         with self.assertRaises(M.MarkError):
-            M.expand("[lit:a[ref:Charleston]b]", TABLE, "zh")
+            M.expand("[lit:a[town:Charleston]b]", TABLE, "zh")
 
     def test_two_marks(self):
-        self.assertEqual(M.expand("[ref:Havana]与[ref:Charleston]", TABLE, "es"),
+        self.assertEqual(M.expand("[town:Havana]与[town:Charleston]", TABLE, "es"),
                          "哈瓦那与查尔斯顿")
 
     def test_term(self):
@@ -85,7 +85,7 @@ class TestExpand(unittest.TestCase):
             M.expand("[term:xx_business]", TABLE, "zh", terms={"en_business": "产业"})
 
     def test_term_form_forbidden(self):
-        # `|` 是 ref 的形态分隔符，term 只接受 <语言>_<原词>
+        # `|` 是 town 的形态分隔符，term 只接受 <语言>_<原词>
         with self.assertRaises(M.MarkError):
             M.expand("[term:en_business|产业]", TABLE, "zh",
                      terms={"en_business": "产业"})
@@ -205,7 +205,7 @@ class TestDoc(unittest.TestCase):
         self.assertEqual(M.expand_doc("zh", doc), doc)
 
     def test_used_names(self):
-        doc = {"0x00000001": "[ref:Charleston]与[ref:Havana|gen]",
+        doc = {"0x00000001": "[town:Charleston]与[town:Havana|gen]",
                "0x00000002": "无标注"}
         self.assertEqual(M.used_names(doc), {"Charleston", "Havana"})
 
