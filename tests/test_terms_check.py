@@ -49,11 +49,21 @@ class TestJudge(unittest.TestCase):
         self.assertEqual(lvl, "EXACT")
 
     def test_suffix_changed_form_is_morph_not_error(self):
-        # Lagerhaus → Lagerhäuser：词面不再是子串（变音改写词尾），靠词根认出来
-        lvl, frag = TC.judge("zwei Lagerhäuser", ["Lagerhaus"],
-                             self.stems("Lagerhaus"))
+        # Marino → Marineros：词面不再是子串（中间插了 er），靠词根认出来
+        lvl, frag = TC.judge("los Marineros:", ["Marino"], self.stems("Marino"))
         self.assertEqual(lvl, "MORPH")
-        self.assertTrue(frag.startswith("Lagerh"))
+        self.assertTrue(frag.startswith("Marin"))
+
+    def test_accent_and_case_are_not_drift(self):
+        # Eglise / église、Café / café 是同一个词，只是重音与句首位置不同
+        lvl, _ = TC.judge("une église au bord", ["Eglise"], self.stems("Eglise"))
+        self.assertEqual(lvl, "EXACT")
+
+    def test_article_on_baseline_is_optional(self):
+        # 基准形带着标签上的冠词，句子里反而不带
+        ok = ["l'Angleterre"] + TC.article_variants("l'Angleterre")
+        lvl, _ = TC.judge("en Angleterre", ok, [])
+        self.assertEqual(lvl, "EXACT")
 
     def test_adjective_of_proper_noun_is_morph(self):
         # Spanien 在句里作形容词 spanischen，首字母小写也要认
@@ -65,7 +75,12 @@ class TestJudge(unittest.TestCase):
         self.assertEqual(lvl, "MISSING")
 
     def test_cjk_has_no_stem(self):
-        self.assertEqual(self.stems("贸易路线"), [])
+        # 汉字不取词根：build_rules 对 zh/ja 不生成 stem，de 才生成
+        en = {"0x1": "Router", "0x2": "Route"}
+        doc = {"0x1": "贸易路线", "0x2": "贸易路线"}
+        groups = [{"name": "路线", "ids": ["0x1"]}]
+        self.assertEqual(TC.build_rules(groups, en, doc, "zh")[0][2], [])
+        self.assertTrue(TC.build_rules(groups, en, doc, "de")[0][2])
         lvl, _ = TC.judge("贸易航线", ["贸易路线"], [])
         self.assertEqual(lvl, "MISSING")
 
