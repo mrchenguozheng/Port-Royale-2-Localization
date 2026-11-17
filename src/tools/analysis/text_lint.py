@@ -172,7 +172,7 @@ def main(argv):
 
     # 诗谜整片不许挂 town/lit/term：谜面的用词由韵脚和字数决定，这几种标注会把词冻成
     # 表里的写法，谜语也被提前泄底（`Holy August` 的双关就没了）。诗里只写自由文本，
-    # 谜底另走 [ans:实体]——只给翻译人看，展开为空。
+    # 谜底另走 [riddle:实体]——只给翻译人看，展开为空。
     _g, _ig, verse = TC.load_terms()
     vids = sorted(TC.verse_ids(verse, en), key=lambda x: int(x, 16))
     for k in vids:
