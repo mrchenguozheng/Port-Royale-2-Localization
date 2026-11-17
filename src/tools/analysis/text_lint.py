@@ -50,13 +50,17 @@ ANS_MARK = re.compile(r"\[ans:")
 VAR_CODE = re.compile(r"@([A-Za-z])\$([A-Za-z0-9_]+)\$")
 # 这几个变量的码本来就是一词多形：Pos 的 d/l/r/M 是方位，USER 的 A/s 是称呼与署名。
 VAR_CODE_MULTI = {"Pos", "USER"}
+# 已知与主流不一致、但暂随原文的键：0xca4930dc 的 @A$Amount$。同一变量全文 55 处写 @a$，
+# 只有这一行（英文原文起、各语照抄）写 @A$。引擎是否区分这个字母没有证据，先不改原文口气；
+# 等实机对照后再决定，豁免只收这一个键。
+VAR_CODE_ORIG = {"0xca4930dc"}
 
 KEEP = {"0xfc512ea5"}
 
 sys.path.insert(0, os.path.dirname(HERE))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
-from shared.core.validate import is_identifier, SCRIPT_FIX  # noqa: E402
+from shared.core.validate import is_identifier  # noqa: E402
 from text import marks as MK  # noqa: E402
 import terms_check as TC  # noqa: E402
 
@@ -67,7 +71,7 @@ def norm_font(v):
 
 
 def tpl_set(v):
-    return sorted(SCRIPT_FIX.get(t, t) for t in TPL.findall(norm_font(v)))
+    return sorted(TPL.findall(norm_font(v)))
 
 
 def half_width_punct(v):
@@ -109,7 +113,7 @@ def main(argv):
         if k in KEEP:
             continue
         for m in VAR_CODE.finditer(norm_font(v)):
-            if m.group(2) in VAR_CODE_MULTI:
+            if k in VAR_CODE_ORIG or m.group(2) in VAR_CODE_MULTI:
                 continue
             per = codes.get(m.group(2)) or {}
             top = max(per.values()) if per else 0

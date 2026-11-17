@@ -47,26 +47,27 @@ class TestIdentifierExemption(unittest.TestCase):
         self.assertTrue(V.is_identifier("IDM_CONTEST_01_2004_LOG_00_HDR"))
 
 
-class TestVariableCodeFix(unittest.TestCase):
-    """原文自身的变量码笔误：0xca4930dc 的 @A$Amount$ 不该逼译文跟着错。
+class TestVariableCodeCase(unittest.TestCase):
+    """变量码按字面比：大写小写是两个不同引用，不做归一。
 
-    同一变量在 12 个语料文件里 55 处写 @a$Amount$，`A` 这个码只用于 @A$USER$；
-    德语零售版这一行写的是 @a$。归一之后，译文写 a 不算「少了占位符」，
-    写 A 也不算「多了占位符」——真正的守门员是 text_lint 的「变量码孤例」。
+    0xca4930dc 的 @A$Amount$ 与全文 55 处的 @a$Amount$ 不一致，但引擎是否区分这个字母
+    没有证据（见 09 卷 67.7），所以译文一律跟原文同形，比对也不替原文做主。
     """
 
-    def test_original_typo_normalized_both_sides(self):
+    def test_original_typo_not_normalized(self):
         en = "I have to ship @A$Amount$ of @G$Goods$."
         zh = "我得运 @a$Amount$ 的 @G$Goods$。"
-        self.assertEqual(V.tokens(en), V.tokens(zh))
+        self.assertNotEqual(V.tokens(en), V.tokens(zh))
         errors, warnings = [], []
-        ok = C.check_placeholders("0xca4930dc", en, zh, errors, warnings)
-        self.assertTrue(ok)
-        self.assertEqual((errors, warnings), ([], []))
+        C.check_placeholders("0xca4930dc", en, zh, errors, warnings)
+        # 大小写不同 = 少一个、多一个：少了进警告，多了进错误，不做归一
+        self.assertIn("少了占位符", warnings[0])
+        self.assertIn("多了占位符", errors[0])
 
-    def test_other_variable_names_stay_case_sensitive(self):
-        # 归一表只收这一条：别的变量名后面真出现大小写差异，仍是两个不同引用
-        self.assertNotEqual(V.tokens("@A$Price$"), V.tokens("@a$Price$"))
+    def test_same_form_passes(self):
+        en = "I have to ship @A$Amount$ of @G$Goods$."
+        zh = "我得运 @A$Amount$ 的 @G$Goods$。"
+        self.assertEqual(V.tokens(en), V.tokens(zh))
 
 
 if __name__ == "__main__":
