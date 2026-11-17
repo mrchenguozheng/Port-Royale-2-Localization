@@ -111,3 +111,9 @@ default = "Port d'Espagne"
 
 ["Gibraltar"]
 default = "Gibraltar"
+
+["San Thoma"]
+default = "San Thoma"
+
+["Martinique"]
+default = "Martinique"

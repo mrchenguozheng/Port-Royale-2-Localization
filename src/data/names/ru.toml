@@ -111,3 +111,9 @@ default = "Порт-оф-Спейн"
 
 ["Gibraltar"]
 default = "Гибралтар"
+
+["San Thoma"]
+default = "Сент-Тома"
+
+["Martinique"]
+default = "Мартиника"

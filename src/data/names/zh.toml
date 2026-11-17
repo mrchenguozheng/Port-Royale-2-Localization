@@ -97,3 +97,9 @@ default = "西班牙港"
 
 ["Gibraltar"]
 default = "直布罗陀"
+
+["San Thoma"]
+default = "圣托马斯"
+
+["Martinique"]
+default = "马提尼克"

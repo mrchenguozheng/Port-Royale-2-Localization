@@ -304,21 +304,27 @@ def cmd_apply():
         for k in ids:
             assert k in en, "队列里的 %s 不在英文原文里" % k
 
-        if ans in MK.ANS_KEYS:
-            pass            # 方位谜底不进 entities.toml：它不是专名，也没有译名可登记
-        elif not os.path.isfile(ENTITIES) or ans not in toml_io.read_doc(ENTITIES)[0]:
-            tid = towns.get(ans.lower())
+        # `|` 是并列成立的候选（certainty=either）：每个候选都是独立的谜底值，
+        # 各自过登记/城镇表校验；方位候选不登记实体。
+        cands = [c.strip() for c in ans.split("|")]
+        assert cands and all(cands), "谜底「%s」的 | 两侧不能空" % ans
+        for cand in cands:
+            if cand in MK.ANS_KEYS:
+                continue        # 方位谜底不进 entities.toml：它不是专名，也没有译名可登记
+            if os.path.isfile(ENTITIES) and cand in toml_io.read_doc(ENTITIES)[0]:
+                continue
+            tid = towns.get(cand.lower())
             if not tid:
                 raise SystemExit("谜底「%s」既不在 entities.toml、城镇表，也不是方位键"
                                  "（正向 north…、否定 -north…，见 marks.ANS_DIRECTIONS）"
-                                 % ans)
-            register_entity(ans, tid, rows)
-            print("登记实体 %s（城镇行 %s）" % (ans, tid))
+                                 % cand)
+            register_entity(cand, tid, rows)
+            print("登记实体 %s（城镇行 %s）" % (cand, tid))
 
-        # 谜底字段：方位与城名默认写 answer=（靠值推断）；只有城名恰好与方位键同名
-        # （目前 0 例）才改写成 town= 字段，把类型说明白。
+        # 谜底字段：方位与城名默认写 answer=（靠值推断）；只有单候选的城名恰好与方位键
+        # 同名（目前 0 例）才改写成 town= 字段，把类型说明白。
         answer_field = "answer"
-        if ans in MK.ANS_KEYS and towns.get(ans.lower()):
+        if len(cands) == 1 and ans in MK.ANS_KEYS and towns.get(ans.lower()):
             answer_field = "town"
 
         wanted = {}

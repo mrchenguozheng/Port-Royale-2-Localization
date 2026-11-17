@@ -106,7 +106,7 @@ kinds = {zh = ["count", "feature"], de = ["count", "feature"], es = ["count", "f
 # 11  X lies on the island, it’s really quite small. But look to t
 #     Selket 表 H1 给两个候选：San Juan 或 St. Thome；此处取 San Juan
 ids = ["0x35f49050", "0x35f490bf"]
-ans = "San Juan"
+ans = "San Juan|San Thoma"
 clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "югу"}
 kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}
 
@@ -164,7 +164,7 @@ kinds = {zh = ["count", "feature", "direction"], de = ["count", "feature", "dire
 # 19  On its sands, the sea is home to towns for which no one care
 #     Selket 表 H18 给两个候选：Guadeloupe 或 Martinique；此处取 Guadeloupe
 ids = ["0x35f490c0"]
-ans = "Guadeloupe"
+ans = "Guadeloupe|Martinique"
 clues = {zh = "无人关心,精良的货品", de = "niemand kümmert,feine Waren", es = "a nadie le importa,mercancías selectas", fr = "n'intéressent personne,biens de qualité", ja = "誰も顧みない,良い品", ru = "Забытый город,прекрасные товары"}
 kinds = {zh = ["feature", "produce"], de = ["feature", "produce"], es = ["feature", "produce"], fr = ["feature", "produce"], ja = ["feature", "produce"], ru = ["feature", "produce"]}
 
