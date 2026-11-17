@@ -21,19 +21,19 @@ class TestExpand(unittest.TestCase):
     def test_plain(self):
         self.assertEqual(M.expand("普通一句。", TABLE, "zh"), "普通一句。")
 
-    def test_ref(self):
+    def test_town(self):
         self.assertEqual(M.expand("[town:Charleston]遭到围攻。", TABLE, "zh"),
                          "查尔斯顿遭到围攻。")
 
-    def test_ref_form(self):
+    def test_town_form(self):
         self.assertEqual(M.expand("в [town:Havana|gen]", TABLE, "ru"),
                          "в Хаваны")
 
-    def test_ref_form_missing(self):
+    def test_town_form_missing(self):
         with self.assertRaises(M.MarkError):
             M.expand("[town:Havana|dat]", TABLE, "ru")
 
-    def test_ref_unknown(self):
+    def test_town_unknown(self):
         with self.assertRaises(M.MarkError):
             M.expand("[town:Nowhere]", TABLE, "zh")
 
@@ -65,6 +65,37 @@ class TestExpand(unittest.TestCase):
     def test_two_marks(self):
         self.assertEqual(M.expand("[town:Havana]与[town:Charleston]", TABLE, "es"),
                          "哈瓦那与查尔斯顿")
+
+    def test_ref_expands_target(self):
+        doc = {"0xa": "[town:Charleston]遭到围攻。", "0xb": "[ref:0xa]"}
+        self.assertEqual(M.expand("[ref:0xa]", TABLE, "zh", "0xb", doc=doc),
+                         "查尔斯顿遭到围攻。")
+
+    def test_ref_needs_doc(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[ref:0xa]", TABLE, "zh", "0xb")
+
+    def test_ref_target_missing(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[ref:0xb]", TABLE, "zh", "0xc", doc={"0xa": "一句。"})
+
+    def test_ref_target_empty(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[ref:0xa]", TABLE, "zh", "0xb", doc={"0xa": ""})
+
+    def test_ref_self(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[ref:0xa]", TABLE, "zh", "0xa", doc={"0xa": "[ref:0xa]"})
+
+    def test_ref_only_one_level(self):
+        doc = {"0xa": "[ref:0xb]", "0xb": "[ref:0xa]"}
+        with self.assertRaises(M.MarkError):
+            M.expand("[ref:0xa]", TABLE, "zh", "0xc", doc=doc)
+
+    def test_ref_chain_caught_by_check_doc(self):
+        doc = {"0x1": "[ref:0x2]", "0x2": "[ref:0x1]"}
+        problems = M.check_doc("zh", doc)
+        self.assertTrue(any("只许一层" in p for p in problems), problems)
 
     def test_term(self):
         self.assertEqual(

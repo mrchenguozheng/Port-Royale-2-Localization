@@ -8,6 +8,9 @@
 
     [town:Charleston]           查 src/data/names/<lang>.toml，换成该语言的译名
     [town:Charleston|gen]       指名形态（俄语格变化用；该语言没存这个形态就报错）
+    [ref:0x0746253d]            本条与目标键是同一句：展开取目标键在本语言的译文
+                                （目标须存在、非空、不是自己，且**目标不得再含 ref**——
+                                只许一层，禁 A→B→C）
                                 （`ref` 不再查名字表：它留给「同一条文本的跨键引用」，
                                 见 09 卷第七十六节）
     [lit:%2 %1日]               字面照写，原文保留
@@ -56,8 +59,9 @@ TERMS_DIR = os.path.join(ROOT, "src", "data", "terms")
 #: 这个键是字符清单，方括号是被展示的字符本身，整条豁免。
 EXEMPT_KEYS = {"0x11f0398f"}
 
-#: `ref` 暂时不在名单里：改名后它留着给「跨键引用同一条文本」，实现那一批再加回来。
-KEYWORDS = ("town", "lit", "term", "ans")
+#: `ref` 只做跨键引用（refid）：本条与目标键是同一句，展开取目标键译文。
+#: **只允许一层**——目标键本身不得再含 `[ref:…]`，禁链式展开。
+KEYWORDS = ("ref", "town", "lit", "term", "ans")
 
 #: term 参数允许的语言前缀。目前只有三种对照语言有原文表：英文（主原文）、
 #: 德语零售版、法语 GOG 版。加语言时同时确认 src/orig 里有对应文件。
@@ -88,6 +92,8 @@ ANS_KEYS = ANS_DIRECTIONS | ANS_NEGATIVE | {ANS_KEYWORD}
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
 _ANS_SPAN = re.compile(r"\[ans:[^\[\]]*\]")
+#: 判断「目标键自己又挂了 ref」用：只看 ref，别的标注不算第二层。
+_REF_MARK = re.compile(r"\[ref:")
 
 
 class MarkError(Exception):
@@ -201,6 +207,30 @@ def _resolve(arg, table, hid, lang):
     return value
 
 
+def _ref_target(arg, doc, hid=""):
+    """校验并取出 `[ref:键]` 的目标原文。只许一层：目标不得再含 ref。
+
+    `doc` 是本语言整份译文（键 → 原文），ref 查的是它，不是名字表。
+    """
+    key = (arg or "").strip()
+    if not key:
+        raise MarkError("%s：ref 参数为空（写成 [ref:目标键]）" % hid)
+    if doc is None:
+        raise MarkError("%s：ref 要查同语言的整份译文，调用方没提供 doc" % hid)
+    if key not in doc:
+        raise MarkError("%s：ref 的目标键 %r 不在本语言译文里" % (hid, key))
+    if key == hid:
+        raise MarkError("%s：ref 指向自己（%r）" % (hid, key))
+    target = doc.get(key) or ""
+    if not target.strip():
+        raise MarkError("%s：ref 的目标键 %r 还是空占位（目标没译完就不许引用）"
+                        % (hid, key))
+    if _REF_MARK.search(target):
+        raise MarkError("%s：ref 只许一层，目标键 %r 自己也含 ref（禁 A→B→C）"
+                        % (hid, key))
+    return key, target
+
+
 def _split_ans(arg, hid=""):
     """`[ans:实体|线索,线索]` → (实体名, [线索])。谜底与线索都缺即失败。"""
     entity, _, clues_raw = arg.partition("|")
@@ -234,11 +264,12 @@ def _check_ans(arg, body, hid=""):
     return entity
 
 
-def expand(text, table, lang, hid="", terms=None):
+def expand(text, table, lang, hid="", terms=None, doc=None):
     """展开一条标注文本，返回纯文本。写错一律抛 MarkError。
 
-    `table` 是 names 表（ref 用），`terms` 是术语表（term 用）。两者都按「缺条目即失败」
-    处理，调用方不传就按 lang 现读，和 ref 的行为完全一致。
+    `table` 是 names 表（town 用），`terms` 是术语表（term 用），`doc` 是本语言整份
+    译文（ref 用）。前两者缺省按 lang 现读；`doc` 不给就不要写 ref——那是调用方的错，
+    会明确报「没提供 doc」，不会静默跳过。
     """
     if terms is None:
         terms = load_terms(lang)
@@ -262,6 +293,9 @@ def expand(text, table, lang, hid="", terms=None):
                             % (hid, key, " / ".join(KEYWORDS)))
         if key == "town":
             out.append(_resolve(arg, table, hid, lang))
+        elif key == "ref":
+            key_id, target = _ref_target(arg, doc, hid)
+            out.append(expand(target, table, lang, key_id, terms=terms, doc=doc))
         elif key == "term":
             out.append(_resolve_term(arg, terms, hid, lang))
         elif key == "ans":
@@ -318,7 +352,7 @@ def expand_doc(lang, doc):
         if hid in EXEMPT_KEYS:
             out[hid] = text
             continue
-        out[hid] = expand(text, table, lang, hid, terms=terms)
+        out[hid] = expand(text, table, lang, hid, terms=terms, doc=doc)
     return out
 
 
@@ -394,8 +428,8 @@ def _dead_entries(problems, label, table, used, doc, lang):
 def check_doc(lang, doc, entities=None, terms=None):
     """返回问题列表（空 = 通过）。构建前和 lint 共用这一份判据。
 
-    town 查 names 表、term 查 terms 表，两边都是「缺条目即失败 + 死条目提醒」，
-    调用方不需要额外提供原文。
+    town 查 names 表、term 查 terms 表、ref 查本语言译文（只许一层），两边都是
+    「缺条目即失败 + 死条目提醒」，调用方不需要额外提供原文。
     """
     problems = []
     entities = load_entities() if entities is None else entities
@@ -432,6 +466,13 @@ def check_doc(lang, doc, entities=None, terms=None):
                         "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
                         % (hid, name))
                 ans_used.add(name)
+                continue
+            if key == "ref":
+                # 只校验结构，不展开：目标键自身的标注在它自己那一轮里查。
+                try:
+                    _ref_target(arg, doc, hid)
+                except MarkError as e:
+                    problems.append(str(e))
                 continue
             if key == "town":
                 name, form = _split_form(arg)

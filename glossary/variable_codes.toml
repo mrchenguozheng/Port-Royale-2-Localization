@@ -10,7 +10,7 @@
 [meta]
 title = "PR2 文本变量码表"
 references_en = 770
-references_all = 5396
+references_all = 5388
 names = 67
 codes = 19
 confidence_legend = "confirmed / inferred / unknown"
@@ -114,7 +114,7 @@ display = "查船型名表后替换"
 conf = "confirmed"
 evidence = "5 处，只配 ShipType"
 refs_en = 5
-refs_all = 35
+refs_all = 34
 names = ["ShipType"]
 
 [code.T]
@@ -123,7 +123,7 @@ display = "查本地化城镇名表后替换"
 conf = "confirmed"
 evidence = "169 处，全部配城镇类变量名（Town/TOWN/TargetTown/DestTown…）"
 refs_en = 169
-refs_all = 1183
+refs_all = 1177
 names = ["ContactTown", "DestTown", "HostileTown", "MsgTown0", "MsgTown1", "SampleTown", "StartTown", "TOWN", "TargetTown", "Town"]
 
 [code.a]
@@ -168,7 +168,7 @@ display = "查国家名表后替换"
 conf = "confirmed"
 evidence = "86 处，只配 Nation/DestNation/FoeNation/HostileNation/TargetNation…"
 refs_en = 86
-refs_all = 602
+refs_all = 601
 names = ["DestNation", "FoeNation", "HostileNation", "Nation", "Nation1", "Nation2", "TargetNation"]
 
 [code.r]
@@ -386,7 +386,7 @@ in_original = true
 meaning = "敌对国"
 codes = ["n"]
 refs_en = 40
-refs_all = 280
+refs_all = 279
 example = "针对那起绑架，你什么都没做。我别无选择，只能接受@n$HostileNation$的条件。"
 in_original = true
 
@@ -612,7 +612,7 @@ in_original = true
 meaning = "船型名"
 codes = ["S"]
 refs_en = 5
-refs_all = 35
+refs_all = 34
 example = "你保证了运输船队安全前往欧洲，我非常感激。因此我要把一艘@S$ShipType$送给你。她正在港口等你。"
 in_original = true
 
@@ -692,7 +692,7 @@ in_original = true
 meaning = "城镇名"
 codes = ["T"]
 refs_en = 40
-refs_all = 280
+refs_all = 274
 example = "在接下来的 30天内去@T$Town$的市场领取你的奖励。"
 in_original = true
 
