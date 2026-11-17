@@ -832,16 +832,16 @@ class TestCertaintyAndSource(unittest.TestCase):
         self.bad("source=retail-xx", "语言码")
 
     def test_quoted_url_both_quote_styles(self):
-        self.assertEqual(self.ok("source=steam:'https://steamcommunity.com/app/1/x'"),
+        self.assertEqual(self.ok("source=url:'https://steamcommunity.com/app/1/x'"),
                          "He went north in August.")
-        self.assertEqual(self.ok('source=steam:"https://steamcommunity.com/app/1/x"'),
+        self.assertEqual(self.ok('source=url:"https://example.com/a"'),
                          "He went north in August.")
 
     def test_url_unquoted_rejected(self):
-        self.bad("source=steam:https://steamcommunity.com/app/1", "要用引号包起来")
+        self.bad("source=url:https://example.com/a", "要用引号包起来")
 
     def test_https_scheme_may_be_omitted(self):
-        self.assertEqual(self.ok("source=steam:'//steamcommunity.com/app/1/x'"),
+        self.assertEqual(self.ok("source=url:'//steamcommunity.com/app/1/x'"),
                          "He went north in August.")
 
     def test_http_scheme_may_not_be_omitted(self):
@@ -849,18 +849,23 @@ class TestCertaintyAndSource(unittest.TestCase):
         self.assertEqual(self.ok("source=url:'//example.com/a'"), "He went north in August.")
         self.bad("source=url:'https://example.com'", "只写了域名")
 
-    def test_steam_must_be_steamcommunity(self):
-        self.bad("source=steam:'https://example.com/a'", "steamcommunity.com")
+    def test_any_domain_accepted(self):
+        # 域名不再是分类依据：steam / 论坛 / wiki 都走 url
+        for host in ("steamcommunity.com/app/1/x", "forum.example.org/thread/2",
+                     "wiki.example.net/page"):
+            self.assertEqual(self.ok("source=url:'https://%s'" % host),
+                             "He went north in August.")
 
-    def test_forum_rejects_steamcommunity(self):
-        self.bad("source=forum:'https://steamcommunity.com/app/1/x'", "写 steam")
+    def test_steam_forum_categories_removed(self):
+        self.bad("source=steam:'https://steamcommunity.com/app/1/x'", "没有类别")
+        self.bad("source=forum:'https://example.com/a'", "没有类别")
 
     def test_bare_url_item_equals_url(self):
         self.assertEqual(self.ok("source='https://example.com/a?b=1'"), "He went north in August.")
 
     def test_semicolon_inside_quotes_is_rejected(self):
         # 引号内一律按字面，但 `;` 例外：它必须写 %3B，否则字段边界无从判断
-        self.bad("source=forum:'https://example.com/a;jsessionid=1'", "`;`")
+        self.bad("source=url:'https://example.com/a;jsessionid=1'", "`;`")
 
     def test_ampersand_and_plus_are_equivalent(self):
         self.assertEqual(self.ok("source=original-en&original-fr"), "He went north in August.")

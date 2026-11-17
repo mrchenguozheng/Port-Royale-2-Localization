@@ -284,8 +284,9 @@ ANS_ORIGINALS = ("original-en", "original-fr")
 #: `retail-xx` / `fan-xx` 里允许的语言码：以 `src/orig` 里有原文表的语言为准。
 ANS_SOURCE_LANGS = ("de", "en", "es", "fr", "pl", "ru")
 
-#: 带指向的三类来源，以及只记类别、不带指向的 `cargo` / `map`。
-ANS_SOURCE_URLS = ("steam", "forum", "url")
+#: 带指向的网页来源：只有一个 `url`（`steam` / `forum` 已合并进来——那两个类别只是
+#: 用域名互相排斥，而域名本来就写在 URL 里，分类等于让人多记一个词）。
+ANS_SOURCE_URLS = ("url",)
 ANS_SOURCE_BARE = ("cargo", "map")
 
 #: 弯引号/全角引号：`_wide_char` 认不出它们（NFKC 不变），只在这些字符进到 source 时点名。
@@ -545,12 +546,11 @@ def _unquote(raw, hid, what="URL"):
     return inner
 
 
-def _check_url(raw, category, hid):
-    """校验带引号的 URL，返回去掉引号与 `https:` 省略形式之后的完整串。"""
+def _check_url(raw, hid):
+    """校验带引号的 URL，返回去掉引号、补齐 `https:` 省略形式之后的完整串。"""
     url = _unquote(raw, hid)
     if any(c.isspace() for c in url) or ";" in url:
-        raise MarkError("%s：%s 的 URL 里不能有空白或裸 `;`（`;` 写 %%3B）"
-                        % (hid, category))
+        raise MarkError("%s：URL 里不能有空白或裸 `;`（`;` 写 %%3B）" % hid)
     if url.startswith("//"):
         url = "https:" + url
     if url.startswith("https://"):
@@ -558,20 +558,12 @@ def _check_url(raw, category, hid):
     elif url.startswith("http://"):
         rest = url[len("http://"):]
     else:
-        raise MarkError("%s：%s 的 URL 要以 https:// 开头（https 可省写 //）；http:// 不能省"
-                        % (hid, category))
+        raise MarkError("%s：URL 要以 https:// 开头（https 可省写 //）；http:// 不能省" % hid)
     host, sep, path = rest.partition("/")
     if not host or "." not in host:
-        raise MarkError("%s：%s 的 URL 缺少域名（收到 %r）" % (hid, category, url))
+        raise MarkError("%s：URL 缺少域名（收到 %r）" % (hid, url))
     if not sep or not path.strip():
-        raise MarkError("%s：%s 的 URL 只写了域名，没有路径（收到 %r）"
-                        % (hid, category, url))
-    if category == "steam" and not url.startswith("https://steamcommunity.com/"):
-        raise MarkError("%s：steam 的 URL 必须是 steamcommunity.com 的帖子（收到 %r）"
-                        % (hid, url))
-    if category == "forum" and host.endswith("steamcommunity.com"):
-        raise MarkError("%s：forum 专指非 steam 的论坛帖；steamcommunity 的写 steam:'…'"
-                        % hid)
+        raise MarkError("%s：URL 只写了域名，没有路径（收到 %r）" % (hid, url))
     return url
 
 
@@ -627,7 +619,7 @@ def _check_manual(tail, hid):
 def _check_source_item(item, hid):
     """解析一个来源项，返回 (类别, 目标)。写错抛 MarkError。"""
     if item[:1] in _QUOTE_PAIRS:
-        return ("url", _check_url(item, "url", hid))
+        return ("url", _check_url(item, hid))
     cat, sep, tail = item.partition(":")
     cat, tail = cat.strip(), tail.strip()
     if not sep:
@@ -651,9 +643,9 @@ def _check_source_item(item, hid):
         return (cat.split("-", 1)[0], cat if not tail else (cat, tail))
     if cat in ANS_SOURCE_URLS:
         if not tail:
-            raise MarkError("%s：%s 后面要跟引号包的 URL（%s:'https://…'）"
-                            % (hid, cat, cat))
-        return (cat, _check_url(tail, cat, hid))
+            raise MarkError("%s：url 后面要跟引号包的网址（url:'https://…'；也可以裸写 "
+                            "'https://…'）" % hid)
+        return ("url", _check_url(tail, hid))
     if cat == "manual":
         if not tail:
             raise MarkError("%s：manual 后面要写 路径@sha256-<12 位>" % hid)
