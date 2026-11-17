@@ -29,7 +29,7 @@
 # （Steam 帖 steamcommunity.com/app/12470/discussions/0/1354868867712622875/，
 # 帖子正文标题 "Port Royal 2 - Three Part Treasure Quests"，作者 Darinthal 转录 Selket 原文）。
 # 剩余 5 组：07/12/25/29 在该表里查不到（保留方位谜底），05 早有城名。
-# 谜底取值支持三类：城名、正向方位、否定方位 not_*（`kw` 关键词谜底已删，0 组用过）。
+# 谜底取值支持三类：城名、正向方位、否定方位 -方位（`kw` 关键词谜底已删，0 组用过）。
 
 [[group]]
 # 01  The town that you seek is a desolate place, far flung from a
@@ -77,7 +77,7 @@ kinds = {zh = ["exclude"], de = ["exclude"], es = ["exclude"], fr = ["exclude"],
 # 07  Once long ago did other people here live, with their great t
 #     Selket 表只有东南版（H2，谜底 Cancun）；西南版不在表里，保留否定谜底
 ids = ["0x35f48fe5"]
-ans = "not_southwest"
+ans = "-southwest"
 clues = {zh = "西南", de = "Südwesten", es = "suroeste", fr = "sud-ouest", ja = "南西", ru = "юго-запад"}
 kinds = {zh = ["exclude"], de = ["exclude"], es = ["exclude"], fr = ["exclude"], ja = ["exclude"], ru = ["exclude"]}
 
@@ -114,7 +114,7 @@ kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["dire
 # 12  Here in the island chain, you’ll see a break. To the west th
 #     不在 Selket 的 27 条里；谜面只排除北边，保留否定谜底
 ids = ["0x35f49051"]
-ans = "not_north"
+ans = "-north"
 clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "север"}
 kinds = {zh = ["exclude"], de = ["exclude"], es = ["exclude"], fr = ["exclude"], ja = ["exclude"], ru = ["exclude"]}
 

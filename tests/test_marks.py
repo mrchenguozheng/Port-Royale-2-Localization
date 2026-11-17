@@ -301,9 +301,21 @@ class TestAnswerMark(unittest.TestCase):
         self.assertTrue(any("eastnorth" in p for p in problems), problems)
 
     def test_negative_direction_answer_is_a_key(self):
-        # 「往东南去航是白费力气」只能排除东南，写 not_southeast 不替原文补正向
-        doc = {"0x00000001": "[riddle:answer=not_southeast;clue=exclude:东南]往东南去航是白费力气。"}
+        # 「往东南去航是白费力气」只能排除东南，写 -southeast 不替原文补正向
+        doc = {"0x00000001": "[riddle:answer=-southeast;clue=exclude:东南]往东南去航是白费力气。"}
         self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
+
+    def test_old_not_prefix_is_error(self):
+        # 旧写法 `not_southeast` 不再被认作方位：报未知值，不悄悄收下
+        doc = {"0x00000001": "[riddle:answer=not_southeast;clue=exclude:东南]往东南去航是白费力气。"}
+        problems = M.check_doc("zh", doc, entities={}, terms={})
+        self.assertTrue(any("not_southeast" in p for p in problems), problems)
+
+    def test_lone_dash_is_error(self):
+        for bad in ("-", "--east", "-not_east", "-eastnorth", "-East"):
+            with self.assertRaises(M.MarkError):
+                M.expand("[riddle:answer=%s;clue=exclude:东南]往东南去航是白费力气。" % bad,
+                         TABLE, "zh")
 
     def test_kw_answer_is_gone(self):
         # `kw` 谜底已删：谜底只能指到城镇或方位，写 kw 既不是方位键也没登记，
@@ -343,10 +355,10 @@ class TestAnswerMark(unittest.TestCase):
 
     def test_alternative_mixing_town_and_direction(self):
         # 候选可以是不同类型：一座城或「不是北边」，两种都能解释谜面
-        doc = {"0x00000001": "[riddle:answer=San Juan|direction:not_north;clue=direction:北]"
+        doc = {"0x00000001": "[riddle:answer=San Juan|direction:-north;clue=direction:北]"
                              "X 在北边什么也没有的地方。"}
         problems = M.check_doc("zh", doc, entities={"San Juan": {}}, terms={})
-        self.assertFalse(any("not_north" in p for p in problems), problems)
+        self.assertEqual(problems, [])
 
     def test_old_pipe_syntax_now_means_alternatives(self):
         # 旧写法 `[riddle:实体|线索]` 现在会被读成「两个候选、没有 clue」，必须报缺 clue，
@@ -379,6 +391,11 @@ class TestAnswerGroup(unittest.TestCase):
     C = "0x00000003"
     D = "0x00000004"
 
+    @staticmethod
+    def _b(key):
+        """group 里写的是 8 位十六进制，不带 0x。"""
+        return key[2:]
+
     def _doc(self, a, b, c=None, d=None):
         doc = {self.A: a, self.B: b}
         if c is not None:
@@ -391,61 +408,79 @@ class TestAnswerGroup(unittest.TestCase):
 
     def test_symmetric_pair_passes(self):
         doc = self._doc(
-            "[riddle:answer=Vera Cruz;group=%s%s" % (self.B, self.S),
-            "[riddle:answer=Vera Cruz;group=%s%s" % (self.A, self.S))
+            "[riddle:answer=Vera Cruz;group=%s%s" % (self._b(self.B), self.S),
+            "[riddle:answer=Vera Cruz;group=%s%s" % (self._b(self.A), self.S))
         self.assertEqual(M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={}), [])
 
     def test_three_copies_pass(self):
         doc = self._doc(
-            "[riddle:answer=Vera Cruz;group=%s+%s%s" % (self.B, self.C, self.S),
-            "[riddle:answer=Vera Cruz;group=%s+%s%s" % (self.A, self.C, self.S),
-            "[riddle:answer=Vera Cruz;group=%s+%s%s" % (self.A, self.B, self.S))
+            "[riddle:answer=Vera Cruz;group=%s+%s%s"
+            % (self._b(self.B), self._b(self.C), self.S),
+            "[riddle:answer=Vera Cruz;group=%s+%s%s"
+            % (self._b(self.A), self._b(self.C), self.S),
+            "[riddle:answer=Vera Cruz;group=%s+%s%s"
+            % (self._b(self.A), self._b(self.B), self.S))
         self.assertEqual(M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={}), [])
 
     def test_self_not_allowed(self):
-        # 自己列自己等于把「其余副本」变成「含本条的组」，hid 比对靠调用方传键
+        # 自己列自己等于把「其余副本」变成「含本条的组」，比对时本条键要去掉 0x
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[riddle:answer=Vera Cruz;group=%s%s" % (self.A, self.S),
+            M.expand("[riddle:answer=Vera Cruz;group=%s%s" % (self._b(self.A), self.S),
                      TABLE, "zh", self.A)
         self.assertIn("自己", str(ctx.exception))
 
+    def test_unordered_keys_are_error(self):
+        # 升序是为了让「同组几条」一眼可比，也让人手写与 --apply 的结果一致
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:answer=Vera Cruz;group=%s+%s%s"
+                     % (self._b(self.C), self._b(self.B), self.S), TABLE, "zh", self.A)
+        self.assertIn("升序", str(ctx.exception))
+
+    def test_0x_prefix_is_error(self):
+        # 有 0x 就比 8 位多两个字符，且大小写会分叉
+        with self.assertRaises(M.MarkError):
+            M.expand("[riddle:answer=Vera Cruz;group=%s;clue=count:三座]X。"
+                     % self.B, TABLE, "zh", self.A)
+
     def test_bad_key_form_is_error(self):
         with self.assertRaises(M.MarkError):
-            M.expand("[riddle:answer=Vera Cruz;group=0xZZZ%s" % self.S, TABLE, "zh")
+            M.expand("[riddle:answer=Vera Cruz;group=ZZZ%s" % self.S, TABLE, "zh", self.A)
 
     def test_empty_token_is_error(self):
         # `+` 两侧都要有键：多打一个 `+` 就是空项
-        for bad in ("%s+" % self.A, "+%s" % self.A, "%s++%s" % (self.A, self.B)):
+        for bad in ("%s+" % self._b(self.A), "+%s" % self._b(self.A),
+                    "%s++%s" % (self._b(self.A), self._b(self.B))):
             with self.assertRaises(M.MarkError):
                 M.expand("[riddle:answer=Vera Cruz;group=%s%s" % (bad, self.S), TABLE, "zh")
 
     def test_asymmetric_is_reported(self):
         # A 列了 B，B 没列 A：一条链断在半路，翻译时看不出这组有几条
         doc = self._doc(
-            "[riddle:answer=Vera Cruz;group=%s%s" % (self.B, self.S),
+            "[riddle:answer=Vera Cruz;group=%s%s" % (self._b(self.B), self.S),
             "[riddle:answer=Vera Cruz%s" % self.S)
         problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
         self.assertTrue(any("对称" in p for p in problems), problems)
 
     def test_member_set_mismatch_is_reported(self):
         doc = self._doc(
-            "[riddle:answer=Vera Cruz;group=%s+%s%s" % (self.B, self.C, self.S),
-            "[riddle:answer=Vera Cruz;group=%s%s" % (self.A, self.S),
-            "[riddle:answer=Vera Cruz;group=%s%s" % (self.A, self.S))
+            "[riddle:answer=Vera Cruz;group=%s+%s%s"
+            % (self._b(self.B), self._b(self.C), self.S),
+            "[riddle:answer=Vera Cruz;group=%s%s" % (self._b(self.A), self.S),
+            "[riddle:answer=Vera Cruz;group=%s%s" % (self._b(self.A), self.S))
         problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
         self.assertTrue(any("组员集合" in p for p in problems), problems)
 
     def test_answer_mismatch_is_reported(self):
         doc = self._doc(
-            "[riddle:answer=Vera Cruz;group=%s%s" % (self.B, self.S),
-            "[riddle:answer=Santa Marta;group=%s%s" % (self.A, self.S))
+            "[riddle:answer=Vera Cruz;group=%s%s" % (self._b(self.B), self.S),
+            "[riddle:answer=Santa Marta;group=%s%s" % (self._b(self.A), self.S))
         problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}, "Santa Marta": {}},
                                terms={})
         self.assertTrue(any("不一致" in p for p in problems), problems)
 
     def test_member_without_riddle_is_reported(self):
         doc = self._doc(
-            "[riddle:answer=Vera Cruz;group=%s%s" % (self.B, self.S),
+            "[riddle:answer=Vera Cruz;group=%s%s" % (self._b(self.B), self.S),
             "普通一句，没有标注。")
         problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
         self.assertTrue(any("没有 riddle" in p for p in problems), problems)
@@ -453,8 +488,8 @@ class TestAnswerGroup(unittest.TestCase):
     def test_alternatives_must_match_across_copies(self):
         # `|` 是「这一组答案还没定」：副本之间必须写同一串候选
         doc = self._doc(
-            "[riddle:answer=Vera Cruz|Santa Marta;group=%s%s" % (self.B, self.S),
-            "[riddle:answer=Vera Cruz;group=%s%s" % (self.A, self.S))
+            "[riddle:answer=Vera Cruz|Santa Marta;group=%s%s" % (self._b(self.B), self.S),
+            "[riddle:answer=Vera Cruz;group=%s%s" % (self._b(self.A), self.S))
         problems = M.check_doc("zh", doc,
                                entities={"Vera Cruz": {}, "Santa Marta": {}}, terms={})
         self.assertTrue(any("不一致" in p for p in problems), problems)

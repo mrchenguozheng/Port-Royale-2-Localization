@@ -89,15 +89,17 @@ ANS_DIRECTIONS = frozenset({
     "south", "southwest", "west", "northwest",
 })
 
-#: 第三种谜底：否定朝向 `not_<方位>`。谜面明写「往东南去航是白费力气」「北边什么
+#: 第三种谜底：否定朝向 `-<方位>`。谜面明写「往东南去航是白费力气」「北边什么
 #: 也没有」这种**只能排除一个方向**的句子用它——原文明写的是「不是那边」，
-#: 硬填成一个正向方位就是替原文做主。写 `not_north` 表示「不是北边」。
-ANS_NEGATIVE = frozenset("not_" + d for d in ANS_DIRECTIONS)
+#: 硬填成一个正向方位就是替原文做主。写 `-north` 表示「不是北边」。
+#: 用减号而不是 `not_` 前缀：没有下划线可忘，比 not_north 短 4 个字符，
+#: 且不会让人把它当专名。`-` 后面必须紧跟方位词，`-`、`--east`、`-not_east` 都报错。
+ANS_NEGATIVE = frozenset("-" + d for d in ANS_DIRECTIONS)
 
 #: `[riddle:]` 里允许不登记实体的全部谜底取值：只有方位（正向与否定）。
-#: 早先还有第四种谜底 `kw`（关键词组合），一条都没用上就删了——它靠 `name=kw:`
-#: 带一个空值表达「这不是专名」，既不比方位表清楚，也和「谜底要能指到具体地方」
-#: 的初衷相反。真拿不准的时候谜底留空，而不是拿关键词凑。
+#: 早先还有第四种谜底 `kw`（关键词组合），一条都没用上就删了——它靠空值表达
+#: 「这不是专名」，既不比方位表清楚，也和「谜底要能指到具体地方」的初衷相反。
+#: 真拿不准的时候谜底留空，而不是拿关键词凑。
 ANS_KEYS = ANS_DIRECTIONS | ANS_NEGATIVE
 
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
@@ -253,13 +255,30 @@ ANS_FIELDS = ("answer", "group", "clue")
 #: 只有城名与方位键撞名（目前 0 例）才需要 `town:` / `direction:` 消歧。
 ANS_NAME_KINDS = ("town", "direction")
 
-#: group 列的是「同组其余副本」的文本键：完整 0x 形式，与 [ref:] 一致。
+#: group 列的是「同组其余副本」的文本键：8 位小写十六进制、**不带 0x**，
+#: 且必须按十六进制升序排列。实测量过：去掉 0x 后 8 位仍全表唯一，
+#: 只留末 6 位会撞（`0x1db7f908` 与 `0xfdb7f908` 末 6 位都是 `b7f908`）。
 #: 一条诗谜最多三个同谜底副本（13 组 Vera Cruz），所以最多列三个键；
 #: 单副本的组不写这个字段。
-ANS_KEY_RX = re.compile(r"^0x[0-9a-f]{8}$")
+ANS_KEY_RX = re.compile(r"^[0-9a-f]{8}$")
 
 #: clue 的类型：说明这条谜面的信息属于哪一类，也决定译者必须保住什么。
 ANS_CLUE_KINDS = ("pun", "direction", "count", "feature", "produce", "history", "exclude")
+
+
+def _check_bare_answer(value, hid):
+    """裸值以减号开头就只能是「否定方位」：减号后必须紧跟 ANS_DIRECTIONS 里的词。
+
+    这一层只拦住形状写错的（`-`、`--east`、`-not_east`、`-East`）；写对形状的裸值
+    仍交给 check_doc 判「是不是登记过的城镇」。旧写法 `not_southeast` 没有减号，
+    会落到 check_doc 报未知值——不会悄悄被当成城名收下。
+    """
+    if not value.startswith("-"):
+        return
+    if value[1:] not in ANS_DIRECTIONS:
+        opts = " / ".join("-" + d for d in sorted(ANS_DIRECTIONS))
+        raise MarkError("%s：谜底 %r 的减号后面不是方位词（否定方位写成 %s；"
+                        "旧写法 not_north 已废）" % (hid, value, opts))
 
 
 def _answer_items(raw, hid):
@@ -274,6 +293,7 @@ def _answer_items(raw, hid):
     items = []
     for part in parts:
         if ":" not in part:
+            _check_bare_answer(part, hid)
             items.append((None, part))
             continue
         kind, _, value = part.partition(":")
@@ -295,18 +315,26 @@ def _answer_items(raw, hid):
 
 
 def _group_tokens(raw, hid):
-    """`group=` → 同组其余副本的键。`+` 连接，完整 0x 形式，不许把自己列进去。"""
+    """`group=` → 同组其余副本的键（8 位小写十六进制、不带 0x、按升序排列）。
+
+    `hid` 是本文键（`0x` 形式），比对时去掉前缀；键列表必须升序，写乱了就是错——
+    排序是为了让「同组几条」一眼可比，也让手写与自动生成的结果一致。
+    """
     toks = [t.strip() for t in raw.split("+")]
     if any(not t for t in toks):
         raise MarkError("%s：ans 的 group 里 `+` 两侧都要写键（收到 %r）" % (hid, raw))
+    self_bare = hid[2:] if hid.startswith("0x") else hid
     for t in toks:
         if not ANS_KEY_RX.match(t):
-            raise MarkError("%s：group 的键 %r 不是文本键（要写 0x 加 8 位小写十六进制）"
+            raise MarkError("%s：group 的键 %r 不是 8 位小写十六进制（不带 0x）"
                             % (hid, t))
-        if t == hid:
+        if t == self_bare:
             raise MarkError("%s：group 里列了本条自己（只列同组其余副本）" % hid)
     if len(set(toks)) != len(toks):
         raise MarkError("%s：ans 的 group 里有重复的键" % hid)
+    if toks != sorted(toks):
+        raise MarkError("%s：group 的键要按十六进制升序排列（收到 %s）"
+                        % (hid, "+".join(toks)))
     return toks
 
 
@@ -623,7 +651,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                         else:
                             problems.append(
                                 "%s：谜底 %r 既不是方位键，也没登记在 entities.toml"
-                                "（先决定它算不算专名；方位键只有 %s）"
+                                "（先决定它算不算专名；方位只能写 %s 或 -方位）"
                                 % (hid, value, " / ".join(sorted(ANS_DIRECTIONS))))
                     elif kind == "town" and value not in entities:
                         problems.append(
@@ -658,21 +686,22 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
         sig_g, toks = ans_groups[hid_g]
         if not toks:
             continue
-        members = set(toks) | {hid_g}
+        members = {"0x" + t for t in toks} | {hid_g}
         for t in toks:
-            if t not in ans_groups:
+            t_key = "0x" + t
+            if t_key not in ans_groups:
                 problems.append(
                     "%s：group 里的 %s 没有 riddle 标注（同组每条都要标）" % (hid_g, t))
                 continue
-            sig_t, toks_t = ans_groups[t]
+            sig_t, toks_t = ans_groups[t_key]
             if sig_t != sig_g:
                 problems.append(
                     "%s：group 里的 %s 谜底是 %r，本条是 %r——同组副本不一致"
                     % (hid_g, t, sig_t, sig_g))
-            if hid_g not in toks_t:
+            if hid_g not in {"0x" + x for x in toks_t}:
                 problems.append(
                     "%s：group 里的 %s 没反过来列出本条（互指必须对称）" % (hid_g, t))
-            elif set(toks_t) | {t} != members:
+            elif {"0x" + x for x in toks_t} | {t_key} != members:
                 problems.append(
                     "%s：与 %s 的组员集合不一致（两边都要列全整组其余副本）"
                     % (hid_g, t))

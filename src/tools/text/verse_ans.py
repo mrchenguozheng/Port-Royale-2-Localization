@@ -13,10 +13,9 @@
     python src\\tools\\text\\verse_ans.py --apply    # 把填好的组写进六语译文
 
 --apply 的判据：
-  · name 必须是 entities.toml 里的实体键；若它是城镇表里的城名但还没登记，就顺带把
-    六语译名从译文行里取出来，登记进 entities.toml 与 names/<lang>.toml；
-  · 或者 name 是 marks.ANS_KEYS 里的键：方位（north/east/southeast…）或否定方位
-    （not_north/not_southeast…）。这类不登记实体、不查译名；
+  · answer 正常不写类型前缀：值在 marks.ANS_KEYS 里就是方位，否则按城镇查 entities；
+    方位包括正向（north/east/southeast…）与否定（-north/-southeast…，减号表示
+    「不是那边」）。这两类不登记实体、不查译名；
   · 六语线索都不能空，只收英文逗号，每条线索都要出现在该语言自己的谜面正文里；
   · 已经标成同值的组直接跳开（可重复跑），标成别的值则报错，不覆盖。
 """
@@ -202,11 +201,12 @@ def cmd_apply():
             tid = towns.get(ans.lower())
             if not tid:
                 raise SystemExit("谜底「%s」既不在 entities.toml、城镇表，也不是方位键"
-                                 "（方位键见 marks.ANS_DIRECTIONS）" % ans)
+                                 "（正向 north…、否定 -north…，见 marks.ANS_DIRECTIONS）"
+                                 % ans)
             register_entity(ans, tid, rows)
             print("登记实体 %s（城镇行 %s）" % (ans, tid))
 
-        # answer 正常不写前缀：方位键直接写（east / not_north），其余按城镇查表。
+        # answer 正常不写前缀：方位键直接写（east / -north），其余按城镇查表。
         # 只有当城名恰好与方位键同名（目前 0 例）才补 town: 消歧。
         answer_item = ans
         if ans in MK.ANS_KEYS and towns.get(ans.lower()):
@@ -223,10 +223,11 @@ def cmd_apply():
                                      "——谜面推不出这个谜底，或者线索该换" % (lang, c, ids[0]))
             clue_part = clue_text(clues, kinds, lang)
             for k in ids:
-                # group 只列同组其余副本：单副本的组不写这个字段
+                # group 只列同组其余副本（8 位小写十六进制、不带 0x、升序）
                 group_part = ""
                 if len(ids) > 1:
-                    others = "+".join(sorted(x for x in ids if x != k))
+                    others = "+".join(sorted(
+                        x[2:] if x.startswith("0x") else x for x in ids if x != k))
                     group_part = ";group=%s" % others
                 wanted[(lang, k)] = "[riddle:answer=%s%s;clue=%s]" % (
                     answer_item, group_part, clue_part)
