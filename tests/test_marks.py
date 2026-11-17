@@ -674,6 +674,28 @@ class TestAnswerGroup(unittest.TestCase):
                         "[riddle:direction=north%s" % same)
         self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
 
+    def test_direction_part_of_answer_does_not_participate(self):
+        # `answer=` 里的方位候选拆开后不比对：`San Juan|-north` 与 `San Juan` 同组不算不一致
+        same = self._g(self.A, self.B) + self.S
+        doc = self._doc("[riddle:answer=San Juan|-north%s" % same,
+                        "[riddle:answer=San Juan%s" % same)
+        self.assertEqual(M.check_doc("zh", doc, entities={"San Juan": {}}, terms={}), [])
+
+    def test_all_direction_answers_skip_comparison(self):
+        # 整条谜底都是方位：比较为空，不参与
+        same = self._g(self.A, self.B) + self.S
+        doc = self._doc("[riddle:answer=-north%s" % same,
+                        "[riddle:answer=-southwest%s" % same)
+        self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
+
+    def test_town_part_of_answer_still_compared(self):
+        same = self._g(self.A, self.B) + self.S
+        doc = self._doc("[riddle:answer=San Juan|-north%s" % same,
+                        "[riddle:answer=Havana|-north%s" % same)
+        problems = M.check_doc("zh", doc, entities={"San Juan": {}, "Havana": {}},
+                               terms={})
+        self.assertTrue(any("answer 不一致" in p for p in problems), problems)
+
     def test_member_without_riddle_is_reported(self):
         doc = self._doc(
             "[riddle:answer=Vera Cruz%s%s" % (self._g(self.A, self.B), self.S),

@@ -776,6 +776,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                     problems.append(str(e))
                     continue
                 sig = []
+                cmp_sig = []
                 for kind, value in answers:
                     # 城名比对不计大小写、变音符号和多余空白；对上了就用登记名本身
                     # 作为规范值（组内比对、死条目统计都用它）。
@@ -816,7 +817,14 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                     if kind == "town" and value in entities:
                         ans_used.add(value)
                     sig.append(value)
-                ans_groups[hid] = (field, "|".join(sig), group)
+                    # 比对用的部分：`answer=` 里夹着的方位候选不参与组内比对（`|` 拆开后
+                    # 逐项看类型），只有 town 部分参与。`town=` 整字段参与，`direction=`
+                    # 整字段不参与。
+                    if field == "answer" and kind == "town":
+                        cmp_sig.append(value)
+                    elif field == "town":
+                        cmp_sig.append(value)
+                ans_groups[hid] = (field, "|".join(sig), "|".join(cmp_sig), group)
                 # 同文索引：同一段谜面在数据里出现多次时，用来反向查「谁漏写了 group」。
                 riddle_bodies.setdefault(_fold(_ANS_SPAN.sub("", text)), []).append(hid)
                 continue
@@ -842,7 +850,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
     # 按 answer 自动归并会把两个不同的寻宝组合成一个。
     group_sets = {}
     for hid_g in sorted(ans_groups):
-        toks = ans_groups[hid_g][2]
+        toks = ans_groups[hid_g][3]
         group_sets.setdefault(frozenset("0x" + t for t in toks), []).append(hid_g)
     for whole, hids in sorted(group_sets.items()):
         for hid_g in hids:
@@ -853,17 +861,19 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                         % (hid_g, t_key[2:]))
         present = [h for h in whole if h in ans_groups]
         for hid_g in present:
-            if frozenset("0x" + t for t in ans_groups[hid_g][2]) != whole:
+            if frozenset("0x" + t for t in ans_groups[hid_g][3]) != whole:
                 problems.append(
                     "%s：与本组的组员集合不一致（group 列全组含自己，两边要一模一样）"
                     % hid_g)
-        # 组内谜底按字段比：answer 一律相同、town 一律相同；只有 direction 的成员不参与
-        # 比对（同一组副本可以用不同的方位写法，方位又不是专名）。
+        # 组内谜底按字段比：answer 里只比城镇那几项（`|` 里的方位候选不参与）、
+        # town 整字段比；只有 direction 的成员不参与（方位不是专名，各写各的也算合法）。
+        # 比较为空（整条谜底全是方位）的成员同样不参与。
         for field in ("answer", "town"):
-            vals = {ans_groups[h][1] for h in present if ans_groups[h][0] == field}
+            vals = {ans_groups[h][2] for h in present
+                    if ans_groups[h][0] == field and ans_groups[h][2]}
             if len(vals) > 1:
                 problems.append(
-                    "%s：同组 %s 不一致（%s）——同组的 %s 必须一样"
+                    "%s：同组 %s 不一致（%s）——同组的 %s 必须一样（方位部分不参与比对）"
                     % (" / ".join(sorted(present)), field,
                        " / ".join(sorted(vals)), field))
     # 反向查漏：`group` 只从声明方出发，若整组都写错成「各写各的」，集合比对能抓；
@@ -877,17 +887,19 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
             continue
         bad_sig = False
         for field in ("answer", "town"):
-            vals = {ans_groups[h][1] for h in members if ans_groups[h][0] == field}
+            vals = {ans_groups[h][2] for h in members
+                    if ans_groups[h][0] == field and ans_groups[h][2]}
             if len(vals) > 1:
                 problems.append(
                     "%s 的谜面逐字相同，%s 却不一样（%s）——同文副本的 %s 必须一样"
+                    "（方位部分不参与比对）"
                     % (" / ".join(members), field, " / ".join(sorted(vals)), field))
                 bad_sig = True
         if bad_sig:
             continue
         whole = set(members)
         bad = [h for h in members
-               if frozenset("0x" + t for t in ans_groups[h][2]) != whole]
+               if frozenset("0x" + t for t in ans_groups[h][3]) != whole]
         if bad:
             problems.append(
                 "%s 的谜面逐字相同，group 却没列成同一组（%s 的声明对不上这 %d 条）——"
