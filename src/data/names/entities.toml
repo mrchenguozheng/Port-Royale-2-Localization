@@ -42,10 +42,6 @@ note = "牙买加旧首府（1661—1692 为英属牙买加首都），与游戏
 kind = "town"
 note = "城镇；竞赛模式任务的城市列名之一"
 
-["St. Juan"]
-kind = "town"
-note = "城镇；竞赛模式任务的城市列名之一"
-
 ["Biloxi"]
 kind = "town"
 note = "城镇；副王驻地，与皇家港同列"
@@ -88,7 +84,7 @@ note = "诗谜谜底；登记来给 [riddle:] 用"
 
 ["San Juan"]
 kind = "town"
-note = "诗谜谜底；登记来给 [riddle:] 用"
+note = "城镇；诗谜谜底，也出现在竞赛模式任务的城市列名里。德语零售版把其中三条列名写作 St. Juan（六份基线里只有德语如此），按同一城镇处理，不再单列实体"
 
 ["Vera Cruz"]
 kind = "town"

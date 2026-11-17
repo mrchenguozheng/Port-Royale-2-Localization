@@ -41,10 +41,6 @@ default = "ポートロイヤル"
 ["Guadeloupe"]
 default = "グアドループ"
 
-# ["St. Juan"] town：城镇；竞赛模式任务的城市列名之一
-["St. Juan"]
-default = "サンフアン"
-
 # ["Biloxi"] town：城镇；副王驻地，与皇家港同列
 ["Biloxi"]
 default = "ビロクシ"
