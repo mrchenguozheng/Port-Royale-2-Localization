@@ -73,10 +73,11 @@ def attention_ids(lang):
         if any(p.get("level") in ("error", "warn") for p in probs):
             bad.append(r["id"])
     try:
-        groups, ignore = terms_check.load_terms()
+        groups, ignore, verse = terms_check.load_terms()
         if groups:
             en = {r["id"]: r.get(T.BASE_LANG, "") for r in rows}
-            doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in ignore}
+            skip = set(ignore) | terms_check.verse_ids(verse, en)
+            doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in skip}
             for x in terms_check.check_lang(lang, groups, en, doc)["missing"]:
                 if x["id"] not in bad:
                     bad.append(x["id"])
@@ -413,13 +414,14 @@ def get_terms(req):
     # 术语一致性：术语表（glossary\terms.toml）当规则用。
     # 返回 {id: ["术语：Frigate 应为「巡防舰」", …]}，前端标在行上。
     lang = (query.get("lang") or [""])[0] or (T.target_langs() or ["zh"])[0]
-    groups, ignore = terms_check.load_terms()
+    groups, ignore, verse = terms_check.load_terms()
     if not groups:
         return req.send_json({"count": 0, "issues": {},
                                "note": "没有术语表"})
     rows = load_all()
     en = {r["id"]: r.get(T.BASE_LANG, "") for r in rows}
-    doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in ignore}
+    skip = set(ignore) | terms_check.verse_ids(verse, en)
+    doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in skip}
     issues = filter_term_issues(terms_check.check_lang(lang, groups, en, doc)["missing"])
     out = {}
     for x in issues:

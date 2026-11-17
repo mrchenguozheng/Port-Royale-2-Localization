@@ -75,12 +75,24 @@ CJK_LANGS = {"zh", "ja"}
 
 
 def load_terms():
-    """返回 (各组, 整体跳过的 id 列表)。"""
+    """返回 (各组, 整体跳过的 id 列表, 诗谜区间)。"""
     if not os.path.isfile(TERMS):
-        return [], []
+        return [], [], []
     with open(TERMS, "rb") as f:
         doc = tomllib.load(f)
-    return doc.get("group", []), [x.lower() for x in doc.get("ignore", [])]
+    return (doc.get("group", []),
+            [x.lower() for x in doc.get("ignore", [])],
+            doc.get("verse", []))
+
+
+def verse_ids(verse, en):
+    """把诗谜区间展开成 id 列表：藏宝谜语是押韵的，用词由韵脚和字数决定，
+    术语一致性对它不适用，整片不查。"""
+    out = set()
+    for pair in verse:
+        lo, hi = (int(x, 16) for x in pair)
+        out.update(k.lower() for k in en if lo <= int(k, 16) <= hi)
+    return out
 
 
 def pick_ids(group, en):
@@ -419,18 +431,19 @@ def main():
     ap.add_argument("--show-morph", action="store_true", help="列出词形差")
     args = ap.parse_args()
 
-    groups, ignore = load_terms()
+    groups, ignore, verse = load_terms()
     if not groups:
         raise SystemExit("没有术语表：%s" % TERMS)
     en = T.load_toml()["s"]
     en = {r["id"]: r.get(T.BASE_LANG, "") for r in en}
+    skip = set(ignore) | verse_ids(verse, en)
 
     langs = args.lang or T.target_langs()
     out = {}
     total = 0
     for lang in langs:
         doc = {r["id"]: r.get(lang, "") for r in T.load_toml()["s"]}
-        doc = {k: v for k, v in doc.items() if k not in ignore}
+        doc = {k: v for k, v in doc.items() if k not in skip}
         res = check_lang(lang, groups, en, doc)
         out[lang] = res
         total += len(res["missing"])

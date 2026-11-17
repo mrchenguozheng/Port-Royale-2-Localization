@@ -118,5 +118,15 @@ class TestAltScope(unittest.TestCase):
         self.assertEqual(TC.alt_for(group, "0x1", "zh"), ["载入", "读取"])
 
 
+class TestVerseSkip(unittest.TestCase):
+    def test_range_expands_to_ids_inside_it(self):
+        en = {"0x0f": "", "0x10": "", "0x12": "", "0x13": ""}
+        self.assertEqual(TC.verse_ids([["0x10", "0x12"]], en),
+                         {"0x10", "0x12"})
+
+    def test_empty_verse_list_skips_nothing(self):
+        self.assertEqual(TC.verse_ids([], {"0x10": ""}), set())
+
+
 if __name__ == "__main__":
     unittest.main()
