@@ -46,3 +46,54 @@ default = "大巴哈马"
 
 ["Turk Islands"]
 default = "特克群岛"
+
+["Corpus Christi"]
+default = "科珀斯克里斯蒂"
+
+["New Orleans"]
+default = "新奥尔良"
+
+["Pensacola"]
+default = "彭萨科拉"
+
+["Fort Caroline"]
+default = "卡罗琳堡"
+
+["Cancun"]
+default = "坎昆"
+
+["Gibara"]
+default = "吉巴拉"
+
+["San Juan"]
+default = "圣胡安"
+
+["Vera Cruz"]
+default = "韦拉克鲁斯"
+
+["Roatán"]
+default = "罗阿坦"
+
+["Cayman"]
+default = "开曼"
+
+["Santo Domingo"]
+default = "圣多明各"
+
+["Providence"]
+default = "普罗维登斯"
+
+["Santa Marta"]
+default = "圣玛尔塔"
+
+["Maracaibo"]
+default = "马拉开波"
+
+["Caracas"]
+default = "加拉加斯"
+
+["Port of Spain"]
+default = "西班牙港"
+
+["Gibraltar"]
+default = "直布罗陀"

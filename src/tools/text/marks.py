@@ -398,6 +398,7 @@ def check_doc(lang, doc, entities=None, terms=None):
     entities = load_entities() if entities is None else entities
     table = load_names(lang)
     terms = load_terms(lang) if terms is None else terms
+    ans_used = set()
     for hid in sorted(doc):
         text = doc[hid] or ""
         if not text or hid in EXEMPT_KEYS:
@@ -427,6 +428,7 @@ def check_doc(lang, doc, entities=None, terms=None):
                     problems.append(
                         "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
                         % (hid, name))
+                ans_used.add(name)
                 continue
             if key == "ref":
                 name, form = _split_form(arg)
@@ -438,10 +440,11 @@ def check_doc(lang, doc, entities=None, terms=None):
                     _resolve(arg, table, hid, lang)
                 except MarkError as e:
                     problems.append(str(e))
-    used = used_names(doc)
+    used = used_names(doc) | ans_used
     if used:
         # 死条目：既没被标注引用、译名也没在正文任何一条里出现，才报。
         # 这样表可以先建好、译文再逐步改标注，不会因为「暂时还没引用」而卡住。
+        # 谜底算「用」：诗里写的是 X，谜底那座城的名字本来就不该出现在正文里。
         names_table = {k: v for k, v in table.items() if k in entities}
         _dead_entries(problems, "names/%s.toml" % lang, names_table, used, doc, lang)
     used_t = used_terms(doc)

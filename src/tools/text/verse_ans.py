@@ -35,7 +35,19 @@ ENTITIES = os.path.join(ROOT, "src", "data", "names", "entities.toml")
 NAMES_DIR = os.path.join(ROOT, "src", "data", "names")
 TRANS = os.path.join(ROOT, "src", "translations")
 LANGS = ("zh", "de", "es", "fr", "ja", "ru")
-TOWN_RANGE = ("0xc77f4c7a", "0xc77f4e47")
+#: 城镇名在英文表里分 8 段，段间留空，合起来 76 条 = staedte.ini 的段数。
+#: 早先只认了第一段（50 镇），Maracaibo / Caracas / Gibraltar / Port of Spain 这些
+#: 落在后面的段里，查不到就等于「不在城镇表」。
+TOWN_RANGES = (
+    ("0xc77f4c7a", "0xc77f4c83"),   # 01–10
+    ("0xc77f4ceb", "0xc77f4cf4"),   # 11–20
+    ("0xc77f4d5c", "0xc77f4d65"),   # 21–30
+    ("0xc77f4dcd", "0xc77f4dd6"),   # 31–40
+    ("0xc77f4e3e", "0xc77f4e47"),   # 41–50
+    ("0xc77f4eaf", "0xc77f4eb8"),   # 51–60
+    ("0xc77f4f20", "0xc77f4f29"),   # 61–70
+    ("0xc77f4f91", "0xc77f4f96"),   # 71–76
+)
 ANS_MARK = re.compile(r"^\[ans:[^\[\]]*\]")
 REF_ROW = re.compile(r"^\[ref:([^\[\]]*)\]$")
 
@@ -54,10 +66,11 @@ def load_rows():
 def town_ids():
     """城名（小写）→ 城镇表里的 id。"""
     en, _rows = load_rows()
-    lo, hi = (int(x, 16) for x in TOWN_RANGE)
+    spans = [(int(a, 16), int(b, 16)) for a, b in TOWN_RANGES]
     out = {}
     for k in en:
-        if lo <= int(k, 16) <= hi:
+        n = int(k, 16)
+        if any(lo <= n <= hi for lo, hi in spans):
             name = en[k].strip()
             if name:
                 out.setdefault(name.lower(), k)

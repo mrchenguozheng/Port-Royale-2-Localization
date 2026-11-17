@@ -60,3 +60,54 @@ default = "Гранд-Багама"
 # ["Turk Islands"] town：城镇；既是群岛也是城镇名，译文统一
 ["Turk Islands"]
 default = "Теркс-Айленд"
+
+["Corpus Christi"]
+default = "Корпус-Кристи"
+
+["New Orleans"]
+default = "Новый Орлеан"
+
+["Pensacola"]
+default = "Пенсакола"
+
+["Fort Caroline"]
+default = "Форт-Каролина"
+
+["Cancun"]
+default = "Канкун"
+
+["Gibara"]
+default = "Гибара"
+
+["San Juan"]
+default = "Сан-Хуан"
+
+["Vera Cruz"]
+default = "Веракрус"
+
+["Roatán"]
+default = "Роатан"
+
+["Cayman"]
+default = "Кайман"
+
+["Santo Domingo"]
+default = "Санто-Доминго"
+
+["Providence"]
+default = "Провиденс"
+
+["Santa Marta"]
+default = "Санта-Марта"
+
+["Maracaibo"]
+default = "Маракайбо"
+
+["Caracas"]
+default = "Каракас"
+
+["Port of Spain"]
+default = "Порт-оф-Спейн"
+
+["Gibraltar"]
+default = "Гибралтар"

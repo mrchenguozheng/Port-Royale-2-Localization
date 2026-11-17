@@ -169,6 +169,13 @@ class TestAnswerMark(unittest.TestCase):
         doc = {"0x00000001": "[ans:southeast|东南]望向东南，第三座便是。"}
         self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
 
+    def test_answer_counts_as_used_name(self):
+        # 谜底那座城的名字在诗里被替换成 X，正文本来就没有它；
+        # 按「死条目」报会误伤，故谜底算一次引用
+        doc = {"0x00000001": "[ans:San Juan|东南]X 在一座岛上，但望向东南。"}
+        problems = M.check_doc("zh", doc, entities={"San Juan": {}}, terms={})
+        self.assertFalse(any("既没被引用" in p for p in problems), problems)
+
     def test_wrong_direction_answer_still_passes_but_key_must_be_known(self):
         doc = {"0x00000001": "[ans:eastnorth|东南]望向东南，第三座便是。"}
         problems = M.check_doc("zh", doc, entities={}, terms={})

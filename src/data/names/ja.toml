@@ -60,3 +60,54 @@ default = "グランドバハマ"
 # ["Turk Islands"] town：城镇；既是群岛也是城镇名，译文统一
 ["Turk Islands"]
 default = "ターク諸島"
+
+["Corpus Christi"]
+default = "コーパスクリスティ"
+
+["New Orleans"]
+default = "ニューオーリンズ"
+
+["Pensacola"]
+default = "ペンサコーラ"
+
+["Fort Caroline"]
+default = "キャロライン砦"
+
+["Cancun"]
+default = "カンクン"
+
+["Gibara"]
+default = "ヒバラ"
+
+["San Juan"]
+default = "サンフアン"
+
+["Vera Cruz"]
+default = "ベラクルス"
+
+["Roatán"]
+default = "ロアタン"
+
+["Cayman"]
+default = "ケイマン"
+
+["Santo Domingo"]
+default = "サントドミンゴ"
+
+["Providence"]
+default = "プロビデンス"
+
+["Santa Marta"]
+default = "サンタマルタ"
+
+["Maracaibo"]
+default = "マラカイボ"
+
+["Caracas"]
+default = "カラカス"
+
+["Port of Spain"]
+default = "ポートオブスペイン"
+
+["Gibraltar"]
+default = "ジブラルタル"

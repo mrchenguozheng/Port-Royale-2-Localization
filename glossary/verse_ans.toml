@@ -11,37 +11,34 @@
 #
 # 谜面本身不要改：加 [ans:] 只在行首加标注，正文一字不动。
 #
-# 29 组全部已标，谜底分四类：
-#   城名 05 圣奥古斯丁；
-#   正向方位 03/04/09/13/14/18/25/27/29（谜面明写目的地朝向）；
-#   否定方位 06/07/12（原文只说「往东南/西南去航是白费力气」「北边什么也没有」，
-#                 只能排除一个方向，不能替原文补成正向）；
-#   关键词组合 `kw` 01/02/08/10/15/16/17/19/21/22/23/24/28（谜面一个罗盘词都没有，
-#                 只能拿能定位它的关键词当谜底，至少两条，逐门校验在谜面里）。
-# 路标方位 11/20/26 也按方位判（东南那座更大的岛 / 半岛自北伸来）。
+# 29 组谜底现状（2026-11-17）：24 组是城名，来源是 Selket 整理的「三线索寻宝」表
+# （Steam 帖 steamcommunity.com/app/12470/discussions/0/1354868867712622875/，
+# 帖子正文标题 "Port Royal 2 - Three Part Treasure Quests"，作者 Darinthal 转录 Selket 原文）。
+# 剩余 5 组：07/12/25/29 在该表里查不到（保留方位谜底），05 早有城名。
+# 谜底取值仍支持四类：城名、正向方位、否定方位 not_*、关键词组合 kw（当前 0 组使用，留作兜底）。
 
 [[group]]
 # 01  The town that you seek is a desolate place, far flung from a
 ids = ["0x35f48f6c", "0x35f48f74", "0x35f48f75"]
-ans = "kw"
+ans = "Corpus Christi"
 clues = {zh = "荒凉,遗弃", de = "verlassen,öde", es = "desolado,abandonado", fr = "désolé,disgrâce", ja = "荒れ果てた,見捨てられた", ru = "отвергнут,забыт"}
 
 [[group]]
 # 02  A river from the wilds at the headland divides There lies a 
 ids = ["0x35f48f6d"]
-ans = "kw"
+ans = "New Orleans"
 clues = {zh = "河流,海角", de = "Fluss,Vorgebirge", es = "río,cabo", fr = "fleuve,continent", ja = "川,岬", ru = "речка,утесу"}
 
 [[group]]
 # 03  Four towns sit on the bay together. Sail to the east, in the
 ids = ["0x35f48f6e"]
-ans = "east"
+ans = "Pensacola"
 clues = {zh = "东", de = "Osten", es = "este", fr = "l'est", ja = "東", ru = "восток"}
 
 [[group]]
 # 04  Not the most northerly town can it be, but further north onl
 ids = ["0x35f48f6f", "0x35f48f71"]
-ans = "north"
+ans = "Fort Caroline"
 clues = {zh = "北", de = "Nördlich", es = "norte", fr = "nord", ja = "北", ru = "север"}
 
 [[group]]
@@ -53,11 +50,12 @@ clues = {zh = "圣奥古斯丁,北", de = "August,Norden", es = "Agustín,norte"
 [[group]]
 # 06  Once long ago did other people here live, with their great t
 ids = ["0x35f48fe4"]
-ans = "not_southeast"
+ans = "Cancun"
 clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
 
 [[group]]
 # 07  Once long ago did other people here live, with their great t
+#     Selket 表只有东南版（H2，谜底 Cancun）；西南版不在表里，保留否定谜底
 ids = ["0x35f48fe5"]
 ans = "not_southwest"
 clues = {zh = "西南", de = "Südwesten", es = "suroeste", fr = "sud-ouest", ja = "南西", ru = "юго-запад"}
@@ -65,29 +63,31 @@ clues = {zh = "西南", de = "Südwesten", es = "suroeste", fr = "sud-ouest", ja
 [[group]]
 # 08  The distance from X to Nombre is not far, you have plenty of
 ids = ["0x35f48fe6"]
-ans = "kw"
+ans = "Havana"
 clues = {zh = "朗姆酒,雪茄", de = "Rum,Zigarre", es = "ron,cigarro", fr = "rhum,cigares", ja = "ラム酒,葉巻", ru = "Сигары,ром"}
 
 [[group]]
 # 09  If off the cliffs to the north you should teeter, then in X 
 ids = ["0x35f4904e"]
-ans = "north"
+ans = "Gibara"
 clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "север"}
 
 [[group]]
 # 10  Three little islands this area surround, but only on one are
 ids = ["0x35f4904f"]
-ans = "kw"
+ans = "Turk Islands"
 clues = {zh = "三座小岛,缆绳", de = "Drei kleine Inseln,Seile", es = "Tres pequeñas islas,cuerdas", fr = "Trois petites îles,cordes", ja = "三つの小島,ロープ", ru = "Три острова,канаты"}
 
 [[group]]
 # 11  X lies on the island, it’s really quite small. But look to t
+#     Selket 表 H1 给两个候选：San Juan 或 St. Thome；此处取 San Juan
 ids = ["0x35f49050", "0x35f490bf"]
-ans = "southeast"
+ans = "San Juan"
 clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "югу"}
 
 [[group]]
 # 12  Here in the island chain, you’ll see a break. To the west th
+#     不在 Selket 的 27 条里；谜面只排除北边，保留否定谜底
 ids = ["0x35f49051"]
 ans = "not_north"
 clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "север"}
@@ -95,77 +95,80 @@ clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = 
 [[group]]
 # 13  In a large bay lie some towns, there are three. X refers to 
 ids = ["0x35f49052", "0x35f490c1", "0x35f490c2", "0x35f49130"]
-ans = "west"
+ans = "Vera Cruz"
 clues = {zh = "西", de = "westlichste", es = "occidental", fr = "ouest", ja = "西", ru = "западн"}
 
 [[group]]
 # 14  In a large bay lie some towns, there are three. X refers to 
 ids = ["0x35f49053"]
-ans = "south"
+ans = "Roatán"
 clues = {zh = "南", de = "südlichste", es = "meridional", fr = "sud", ja = "南", ru = "юге"}
 
 [[group]]
 # 15  A bay holds two islands, one large and one small. The town o
 ids = ["0x35f49054"]
-ans = "kw"
+ans = "Roatán"
 clues = {zh = "两个岛,较大", de = "zwei Inseln,großen", es = "dos islas,más grande", fr = "deux îles,plus grande", ja = "二つの島,大きい方", ru = "Два острова,большом"}
 
 [[group]]
 # 16  An island far off, small and remote. There is nowhere else f
 ids = ["0x35f49055"]
-ans = "kw"
+ans = "Cayman"
 clues = {zh = "遥远,又小又偏", de = "weit draußen,allein", es = "lejana,remota", fr = "éloignée,lointaine", ja = "はるか遠く,孤島", ru = "далеко,маленький"}
 
 [[group]]
 # 17  X is a town that has streets paved with gold. Its majestic h
 ids = ["0x35f49056"]
-ans = "kw"
+ans = "Port Royale"
 clues = {zh = "黄金,港口", de = "Straßen aus Gold,Hafen", es = "pavimentadas de oro,puerto", fr = "pavées d'or,port", ja = "黄金,港", ru = "златом,гавань"}
 
 [[group]]
 # 18  Four towns are situated around a volcano. The town in the so
 ids = ["0x35f49057"]
-ans = "southeast"
+ans = "Santo Domingo"
 clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
 
 [[group]]
 # 19  On its sands, the sea is home to towns for which no one care
+#     Selket 表 H18 给两个候选：Guadeloupe 或 Martinique；此处取 Guadeloupe
 ids = ["0x35f490c0"]
-ans = "kw"
+ans = "Guadeloupe"
 clues = {zh = "无人关心,精良的货品", de = "niemand kümmert,feine Waren", es = "a nadie le importa,mercancías selectas", fr = "n'intéressent personne,biens de qualité", ja = "誰も顧みない,良い品", ru = "Забытый город,прекрасные товары"}
 
 [[group]]
 # 20  An island lies here, as though in a cradle. A peninsula from
+#     Selket 表 H10 未给解法；同文的 H10a（陆地自北伸来）给 Providence
 ids = ["0x35f490c3", "0x35f490c4"]
-ans = "north"
+ans = "Providence"
 clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "северн"}
 
 [[group]]
 # 21  White strand beside the jungle, a little river known to none
 ids = ["0x35f490c5"]
-ans = "kw"
+ans = "Santa Marta"
 clues = {zh = "白沙,丛林,只有阳光", de = "Weißer Strand,Dschungel,nur die Sonne", es = "Blanca orilla,selva,solo ve el sol", fr = "Plage blanche,jungle,que le soleil", ja = "白い砂浜,ジャングル,太陽だけ", ru = "джунглей,солнце"}
 
 [[group]]
 # 22  Here lies the town, overlooking the sound. It guards the bay
 ids = ["0x35f490c6"]
-ans = "kw"
+ans = "Maracaibo"
 clues = {zh = "海峡,海湾,船", de = "Sund,Bucht,Schiffen", es = "estrecho,bahía,barcos", fr = "baie,navires", ja = "海峡,湾,船", ru = "пролив,бухте,кораблей"}
 
 [[group]]
 # 23  Not far from the town, at the bottom of a cliff, lie the bat
 ids = ["0x35f490c7", "0x35f49136"]
-ans = "kw"
+ans = "Caracas"
 clues = {zh = "沉船,崖底", de = "Schiffswracks,Klippe", es = "naufragado,acantilado", fr = "épave,falaise", ja = "難破船,崖の下", ru = "корабль разбитый,скал"}
 
 [[group]]
 # 24  Spain set up a harbor here once. You will find wood and bric
 ids = ["0x35f490c8"]
-ans = "kw"
+ans = "Port of Spain"
 clues = {zh = "西班牙,木料,砖石,小麦", de = "Spanien,Holz,Ziegel,Weizen", es = "España,madera,ladrillos,trigo", fr = "L'Espagne,bois,briques,blé", ja = "スペイン,木材,レンガ,小麦", ru = "Испанцы,кирпичи,древесина,пшеницы"}
 
 [[group]]
 # 25  In a large bay lie some towns, there are three. X refers to 
+#     Selket 表只有「最西」版（H27，Vera Cruz）；最东版不在表里，保留方位
 ids = ["0x35f49131"]
 ans = "east"
 clues = {zh = "东", de = "östlichste", es = "oriental", fr = "l'est", ja = "東", ru = "восток"}
@@ -173,23 +176,24 @@ clues = {zh = "东", de = "östlichste", es = "oriental", fr = "l'est", ja = "�
 [[group]]
 # 26  An island lies here, as though in a cradle. The land from th
 ids = ["0x35f49132", "0x35f49133"]
-ans = "north"
+ans = "Providence"
 clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "северн"}
 
 [[group]]
 # 27  You come from the west, the bridge you cross over. The town 
 ids = ["0x35f49134"]
-ans = "east"
+ans = "Cartagena"
 clues = {zh = "西", de = "Westen", es = "oeste", fr = "ouest", ja = "西", ru = "запад"}
 
 [[group]]
 # 28  Oh what a wondrous place. Nestled in a bay. Protected by tow
 ids = ["0x35f49135"]
-ans = "kw"
+ans = "Gibraltar"
 clues = {zh = "海湾,峭壁", de = "Bucht,Klippen", es = "bahía,acantilados", fr = "baie,falaises", ja = "湾,崖", ru = "залив,выси"}
 
 [[group]]
 # 29  Powerful river flowing so deep, on towards the east and into
+#     不在 Selket 的 27 条里；保留方位谜底
 ids = ["0x35f49137"]
 ans = "southeast"
 clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
