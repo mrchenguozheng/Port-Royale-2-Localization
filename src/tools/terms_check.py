@@ -378,11 +378,21 @@ def check_lang(lang, groups, en, doc):
         pass
     rules = [(compile_rule(t), t, ok, stems, g, k, same_group)
              for t, ok, stems, g, k, same_group in build_rules(groups, en, doc, lang)]
+    # 名字行：术语表自己登记的那些条目（城镇、货物、船只、军衔、建筑…）。
+    # 这些行的内容**就是名字**，里面的词是名字的一部分，不是句子里的用法——
+    # `Dyes plantation` 是建筑名，不该拿货物「Dyes」的基准去要求它写成染料本身；
+    # `Rum distillery`、`Fruit farm` 同理。此前这三条是散着用 ignore/alt 压的，
+    # 现在按「这一行是名字」整片跳过，组里再加建筑也不会回来登记。
+    name_rows = set()
+    for g in groups:
+        name_rows.update(pick_ids(g, en))
     missing, morph = [], []
     seen = set()
     for rid, en_text in en.items():
         tr = doc.get(rid, "") or ""
         if not tr.strip():
+            continue
+        if rid in name_rows:
             continue
         if is_name_shaped(en_text):
             continue        # 专名条目：Captain／England 是名字的一部分，不是术语本身

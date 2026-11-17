@@ -120,6 +120,26 @@ class TestAltScope(unittest.TestCase):
         self.assertEqual(TC.alt_for(group, "0x1", "zh"), ["载入", "读取"])
 
 
+class TestNameRows(unittest.TestCase):
+    """术语表自己登记的那一行是「名字行」：里面的词是名字的一部分，不按别的组查。"""
+
+    GROUPS = [{"name": "货物", "ids": ["0x1"]},
+              {"name": "建筑", "ids": ["0x2"]}]
+
+    def test_building_name_row_is_not_checked_against_goods(self):
+        en = {"0x1": "Fruit", "0x2": "Fruit farm"}
+        doc = {"0x1": "Obst", "0x2": "Obstfarm"}
+        res = TC.check_lang("de", self.GROUPS, en, doc)
+        self.assertEqual([x["id"] for x in res["missing"]], [])
+        self.assertEqual(res["morph"], [])
+
+    def test_prose_row_is_still_checked(self):
+        en = {"0x1": "Fruit", "0x2": "Fruit farm", "0x3": "We sell Fruit here."}
+        doc = {"0x1": "Obst", "0x2": "Obstfarm", "0x3": "Wir verkaufen Holz."}
+        res = TC.check_lang("de", self.GROUPS, en, doc)
+        self.assertEqual([x["id"] for x in res["missing"]], ["0x3"])
+
+
 class TestVerseSkip(unittest.TestCase):
     def test_range_expands_to_ids_inside_it(self):
         en = {"0x0f": "", "0x10": "", "0x12": "", "0x13": ""}
