@@ -287,7 +287,7 @@ def main(argv=None):
         langs = [l for l in term_langs(data_dir) if l != src_lang] or term_langs(data_dir)
         if src_lang not in langs:
             langs = [src_lang] + langs
-        tkeys = terms_baseline(sorted(set(term_langs(data_dir) | set(table_langs(data_dir))),
+        tkeys = terms_baseline(sorted(set(term_langs(data_dir)) | set(table_langs(data_dir)),
                                key=lambda l: (l != src_lang, l)), data_dir)
         nkeys = names_baseline(data_dir)
         changed = 0

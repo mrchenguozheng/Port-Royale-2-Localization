@@ -47,3 +47,15 @@ en_quality_of_life = "Calidad de vida"
 # Swordsmanship）@0x31b9fe94，德语 Treffsicherheit 对得上，法语作 Militaire 属偏离、
 # 记不改。锁「精准」，不写「准确度」（「准确」7 处都是罗盘、方位、位置，另一个词）。
 en_accuracy = "Puntería"
+# ---- 待译（table_sync 追加，值空 = 未译）----
+en_pirate = ""
+en_governor = ""
+en_warehouse = ""
+en_colony = ""
+en_convoy = ""
+en_buccaneer = ""
+en_captain = ""
+en_sailor = ""
+en_hideout = ""
+en_trade_route = ""
+en_market = ""

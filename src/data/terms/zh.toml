@@ -45,3 +45,20 @@ en_quality_of_life = "生活品质"
 # Swordsmanship）@0x31b9fe94，德语 Treffsicherheit 对得上，法语作 Militaire 属偏离、
 # 记不改。锁「精准」，不写「准确度」（「准确」7 处都是罗盘、方位、位置，另一个词）。
 en_accuracy        = "精准"
+
+# ---- 核心概念（第 322 批补）----
+# 都是「同一语境里只有一个义项」的词，且全表译法已统一。括号里是启用时的实测覆盖率：
+# 英文锚词出现的条目里，有多少条用了这个译法。没到 100% 的几条缺的都是占位符
+# （`@T$Town$` 这类地名占位在中文里只留占位、不重复写「城镇」），不是解释成别的词。
+
+en_pirate      = "海盗"      # pirate / pirates，143/143
+en_governor    = "总督"      # governor / governors，110/110
+en_warehouse   = "仓库"      # warehouse，59/59
+en_colony      = "殖民地"    # colony / colonies，9/9
+en_convoy      = "船队"      # convoy / convoys，394/396（缺 2 条是纯占位地名）
+en_buccaneer   = "私掠者"    # buccaneer，62/64（另 2 条指私掠许可证，另一概念）
+en_captain     = "船长"      # captain，112/113
+en_sailor      = "水手"      # sailor / sailors，39/40
+en_hideout     = "藏身处"    # hideout，游戏对象义；「藏身之处」这类散文用法不算
+en_trade_route = "贸易路线"  # trade route，27→30 条（第 322 批把 3 条「贸易航线」并入）
+en_market      = "市场"      # market / marketplace，34→42 条（第 322 批把 8 条市集／集市并入）
