@@ -59,6 +59,7 @@ import io
 import os
 import re
 import tomllib
+import unicodedata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -279,13 +280,12 @@ ANS_CLUE_KINDS = ("pun", "direction", "count", "feature", "produce", "history", 
 _DASH_LOOKALIKES = frozenset("‐‑‒–—−－")
 
 
-#: 否定方位只收两种：`-east`（规范）与 `not east`（空格）。`not_east` 不再接受，
-#: 下划线是纯形式负担、也容易漏打。
-_NEG_WORD_RX = re.compile(r"^not (.*)$")
+#: 否定方位只收两种：`-east`（规范）与 `not east`（空格，大小写不限）。
+#: `not_east` 不再接受，下划线是纯形式负担、也容易漏打。
+_NEG_WORD_RX = re.compile(r"^not\s+(.*)$", re.I)
 
-#: 四个「长」方位（复合词）允许缩写，且**必须大写**——大写的 NE/SE/SW/NW 一眼是罗盘缩写，
-#: 小写的 ne/se/sw/nw 会混进普通词里，也让「大写即可辨方向」这条判据失效。
-#: 正方位 north/east/south/west 不设缩写：它们本来就只有四五个字母。
+#: 四个「长」方位（复合词）允许缩写。缩写与完整词都不限大小写（`NE` / `ne` / `Ne`
+#: 都认），因为值域就是这八个方位，认出来不会跟别的东西抢。写进值的仍是完整键。
 ANS_ABBREV = {
     "NE": "northeast",
     "SE": "southeast",
@@ -293,77 +293,80 @@ ANS_ABBREV = {
     "NW": "northwest",
 }
 _CARDINAL_1 = {"N": "north", "E": "east", "S": "south", "W": "west"}
-_ABBREV_LOWER = frozenset(k.lower() for k in ANS_ABBREV)
-_CARDINAL_LOWER = frozenset(k.lower() for k in _CARDINAL_1)
+
+
+def _fold(text):
+    """把写法差异折平：大小写、变音符号、首尾与连续空白。
+
+    `East` / `east` / `EAST` / `eaSt` → `east`；`Roatán` / `roatan` → `roatan`；
+    `St.  Juan` → `st. juan`。只用来比对，写进数据的仍是原本那个键。
+    """
+    t = unicodedata.normalize("NFKD", text)
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return " ".join(t.casefold().split())
+
+
+#: 折平后的方位写法 → 正向方位键。八个完整词 + 四个缩写 + 四个单字母。
+_DIR_TOKEN = {_fold(k): k for k in ANS_DIRECTIONS}
+_DIR_TOKEN.update({_fold(k): v for k, v in ANS_ABBREV.items()})
+_DIR_TOKEN.update({_fold(k): v for k, v in _CARDINAL_1.items()})
+_SINGLE_LETTER = frozenset(_fold(k) for k in _CARDINAL_1)
 
 
 def _dir_word(text, hid, raw, allow_cardinal=False):
     """把一个方位写法归一成正向方位键；不认识的抛错，报错里给出全部合法写法。
 
+    大小写、变音符号、多余空白都不计较（`East`、`eaSt`、`Ｅ` 指的都是 east）。
     `allow_cardinal` 只在明写了 `direction=` 时打开：那时单字母 N/E/S/W 一定是方向，
-    不会和城名抢。裸值不打开——裸的 `N` 既可能是缩写的 north，也可能是没登记的地名，
+    不会和城名抢。裸值不打开——裸的 `n` 既可能是缩写的 north，也可能是没登记的地名，
     不猜。
     """
-    if text in ANS_DIRECTIONS:
-        return text
-    if text in ANS_ABBREV:
-        return ANS_ABBREV[text]
-    if allow_cardinal and text in _CARDINAL_1:
-        return _CARDINAL_1[text]
-    if allow_cardinal and text in _CARDINAL_LOWER:
-        raise MarkError("%s：谜底 %r 的单字母缩写要大写（%s）"
-                        % (hid, raw, text.upper()))
-    if text.lower() in _ABBREV_LOWER:
-        raise MarkError("%s：谜底 %r 的缩写要全大写（%s），小写会被当成普通词"
-                        % (hid, raw, text.upper()))
-    if text.lower() in ANS_DIRECTIONS:
-        raise MarkError("%s：谜底 %r 的完整方位词要全小写（%s）；缩写 NE/SE/SW/NW 才大写"
-                        % (hid, raw, text.lower()))
-    if text in _CARDINAL_1:
-        raise MarkError("%s：谜底 %r 里的 %s 只在明写 direction= 时才许缩写，写全 %s"
-                        % (hid, raw, text, _CARDINAL_1[text]))
+    key = _DIR_TOKEN.get(_fold(text))
+    if key is not None:
+        if _fold(text) in _SINGLE_LETTER and not allow_cardinal:
+            raise MarkError("%s：谜底 %r 里的 %s 只在明写 direction= 时才许缩写，写全 %s"
+                            % (hid, raw, text, key))
+        return key
     opts = " / ".join(sorted(ANS_DIRECTIONS))
-    raise MarkError("%s：谜底 %r 里的 %r 不是方位词（写全 %s，或缩写 NE/SE/SW/NW）"
-                    % (hid, raw, text, opts))
+    raise MarkError("%s：谜底 %r 里的 %r 不是方位词（写全 %s，或缩写 NE/SE/SW/NW，"
+                    "大小写均可）" % (hid, raw, text, opts))
 
 
 def _canon_answer(value, hid, allow_cardinal=False):
-    """把否定方位归一成 `-方位`，把大写缩写归一成完整方位词。
+    """把否定方位归一成 `-方位`，把缩写/大小写/变音写法归一成完整方位键。
 
-    收 `-east`（规范）与 `not east`（自然英语）；`not_east` 明确不再接受。
+    收 `-east`（规范）与 `not east`（自然英语，大小写不限）；`not_east` 明确不再接受。
     归一发生在解析期，后面的 `ANS_KEYS` 查表、组内副本比对、`--apply` 复核只见到
     `-east` / `east`，所以同一谜底不会因为写法不同分裂成两串文本。
 
-    形状写错的一律报错：`-`、`--east`、`-not_east`、`-East`、`not`、`not-`、
-    `not East`、`not eastnorth`、`ne`（小写缩写）、裸 `N`（单字母只许在 direction= 下）；
-    全角/长破折号开头的先单独报字符问题，因为肉眼几乎看不出，落进「未知谜底」
-    会把人引去查拼写。
+    不是方位模样的值原样返回（交给 check_doc 当城名去查 entities，查的时候同样不计
+    大小写与变音符号）。形状写错的一律报错：`-`、`--east`、`-not_east`、`not`、
+    `not-`、裸 `n`（单字母只许在 direction= 下）；全角/长破折号开头的先单独报字符
+    问题，因为肉眼几乎看不出，落进「未知谜底」会把人引去查拼写。
     """
     if value[:1] in _DASH_LOOKALIKES:
         raise MarkError("%s：谜底 %r 开头那个是长破折号/全角减号，不是半角 ASCII 减号"
                         "（改成 -north 这种写法，全角字符肉眼几乎看不出）" % (hid, value))
+    folded = _fold(value)
     if value.startswith("-"):
         return "-" + _dir_word(value[1:], hid, value, allow_cardinal)
-    if value.startswith("not_"):
+    if folded.startswith("not_"):
         raise MarkError("%s：谜底 %r 用了 not_ 写法（下划线不再接受）——写 -north 或 "
                         "not north" % (hid, value))
-    if value.startswith("not-"):
+    if folded.startswith("not-"):
         raise MarkError("%s：谜底 %r 用了 not- 连字符（写 not north，或者直接 -north）"
                         % (hid, value))
     m = _NEG_WORD_RX.match(value)
     if m:
         return "-" + _dir_word(m.group(1), hid, value, allow_cardinal)
-    if value == "not":
+    if folded == "not":
         raise MarkError("%s：谜底写成了光秃秃的 not（后面要跟方位词）" % hid)
-    if value in ANS_ABBREV:
-        return ANS_ABBREV[value]
-    if allow_cardinal:
-        return _dir_word(value, hid, value, True)
-    if value in _ABBREV_LOWER:
-        raise MarkError("%s：谜底 %r 的缩写要全大写（%s）" % (hid, value, value.upper()))
-    if value in _CARDINAL_1:
-        raise MarkError("%s：谜底 %r 里的 %s 只在明写 direction= 时才许缩写，写全 %s"
-                        % (hid, value, value, _CARDINAL_1[value]))
+    key = _DIR_TOKEN.get(folded)
+    if key is not None:
+        if folded in _SINGLE_LETTER and not allow_cardinal:
+            raise MarkError("%s：谜底 %r 里的 %s 只在明写 direction= 时才许缩写，写全 %s"
+                            % (hid, value, value, key))
+        return key
     return value
 
 
@@ -392,7 +395,9 @@ def _answer_items(raw, hid, kind=None):
                 raise MarkError("%s：direction= 的值 %r 不是方位键（正向 north…、"
                                 "否定 -north 或 not north、缩写 NE…）" % (hid, value))
         elif kind == "town":
-            if part.startswith("-") or part.startswith("not ") or part[:1] in _DASH_LOOKALIKES:
+            folded = _fold(part)
+            if (part.startswith("-") or folded.startswith("not ")
+                    or part[:1] in _DASH_LOOKALIKES):
                 raise MarkError("%s：town= 的值 %r 写成了否定方位——方位谜底用 "
                                 "direction=，town= 里只放城名" % (hid, part))
             value = part
@@ -709,6 +714,10 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
     entities = load_entities() if entities is None else entities
     table = load_names(lang)
     terms = load_terms(lang) if terms is None else terms
+    # 城名的宽容查表：同一串折平后可能对上几条登记名，那就得让作者挑明。
+    ent_index = {}
+    for name in entities:
+        ent_index.setdefault(_fold(name), []).append(name)
     ans_used = set()
     ans_groups = {}
     for hid in sorted(doc):
@@ -739,28 +748,42 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                     continue
                 sig = []
                 for kind, value in answers:
+                    # 城名比对不计大小写、变音符号和多余空白；对上了就用登记名本身
+                    # 作为规范值（组内比对、死条目统计都用它）。
+                    cands = ent_index.get(_fold(value), []) if value not in entities else [value]
                     if kind is None:
-                        # 没写前缀：值在方位键里算方位，否则按城镇查 entities。
+                        # 没写类型：值在方位键里算方位，否则按城镇查 entities。
                         in_keys = value in ANS_KEYS
-                        in_entities = value in entities
-                        if in_keys and in_entities:
+                        if in_keys and cands:
                             kind = "town"
                             problems.append(
-                                "%s：谜底 %r 既是方位键又是登记过的城镇，改用 town=… 或 "
-                                "direction=… 字段消歧" % (hid, value))
+                                "%s：谜底 %r 既是方位键又是登记过的城镇 %s，改用 town=… 或 "
+                                "direction=… 字段消歧" % (hid, value, cands[0]))
                         elif in_keys:
                             kind = "direction"
-                        elif in_entities:
+                        elif len(cands) == 1:
                             kind = "town"
+                            value = cands[0]
+                        elif len(cands) > 1:
+                            problems.append(
+                                "%s：谜底 %r 折平后对上多条登记名（%s），大小写/变音写成了"
+                                "哪一条分不清——按登记名原样写" % (hid, value, " / ".join(cands)))
                         else:
                             problems.append(
                                 "%s：谜底 %r 既不是方位键，也没登记在 entities.toml"
                                 "（先决定它算不算专名；方位只能写 %s 或 -方位）"
                                 % (hid, value, " / ".join(sorted(ANS_DIRECTIONS))))
-                    elif kind == "town" and value not in entities:
-                        problems.append(
-                            "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
-                            % (hid, value))
+                    elif kind == "town":
+                        if len(cands) == 1:
+                            value = cands[0]
+                        elif len(cands) > 1:
+                            problems.append(
+                                "%s：谜底 %r 折平后对上多条登记名（%s），大小写/变音写成了"
+                                "哪一条分不清——按登记名原样写" % (hid, value, " / ".join(cands)))
+                        else:
+                            problems.append(
+                                "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
+                                % (hid, value))
                     if kind == "town" and value in entities:
                         ans_used.add(value)
                     sig.append(value)

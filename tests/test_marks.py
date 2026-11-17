@@ -321,9 +321,10 @@ class TestAnswerMark(unittest.TestCase):
             self.assertIn("-north", str(ctx.exception))
 
     def test_long_direction_abbrev_is_accepted(self):
-        # 长方位允许缩写，且必须大写；解析期补全成 northeast 这类完整键
+        # 长方位允许缩写，解析期补全成 northeast 这类完整键；大小写不限
         for abbr, full in (("NE", "northeast"), ("SE", "southeast"),
-                           ("SW", "southwest"), ("NW", "northwest")):
+                           ("SW", "southwest"), ("NW", "northwest"),
+                           ("ne", "northeast"), ("nW", "northwest")):
             doc = {"0x00000001": "[riddle:answer=%s;clue=direction:north]north 侧只有水。"
                                  % abbr}
             problems = M.check_doc("zh", doc, entities={}, terms={})
@@ -332,12 +333,13 @@ class TestAnswerMark(unittest.TestCase):
                                 % abbr}
             self.assertEqual(M.check_doc("zh", neg, entities={}, terms={}), [], abbr)
 
-    def test_lowercase_abbrev_is_rejected(self):
-        for bad in ("ne", "se", "sw", "nw", "-ne", "not nw"):
-            with self.assertRaises(M.MarkError) as ctx:
-                M.expand("[riddle:answer=%s;clue=direction:东]north 侧只有水。" % bad,
-                         TABLE, "zh")
-            self.assertIn("大写", str(ctx.exception))
+    def test_full_direction_word_any_case_is_accepted(self):
+        # 八个方位词的值域是封闭的，大小写怎么写都认；连 `not East` 也认
+        for spelling in ("East", "east", "EAST", "eaSt", "ｅａｓｔ",
+                         "-East", "not East", "NOT east"):
+            doc = {"0x00000001": "[riddle:answer=%s;clue=direction:north]north 侧只有水。"
+                                 % spelling}
+            self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [], spelling)
 
     def test_cardinal_single_letter_is_rejected(self):
         # 裸值不设单字母缩写：裸的 N 也可能是没登记的地名，不猜
@@ -357,12 +359,44 @@ class TestAnswerMark(unittest.TestCase):
             problems = M.check_doc("zh", doc, entities={}, terms={})
             self.assertEqual(problems, [], spelling)
 
-    def test_lowercase_cardinal_under_direction_is_rejected(self):
-        for bad in ("direction=n", "direction=-s"):
-            with self.assertRaises(M.MarkError) as ctx:
-                M.expand("[riddle:%s;clue=direction:north]north 侧只有水。" % bad,
-                         TABLE, "zh")
-            self.assertIn("大写", str(ctx.exception))
+    def test_lowercase_cardinal_under_direction_is_accepted(self):
+        # direction= 明写类型，单字母大小写不再要求；正向与否定都收
+        for spelling in ("direction=n", "direction=-s", "direction=E", "direction=-w"):
+            doc = {"0x00000001": "[riddle:%s;clue=direction:north]north 侧只有水。"
+                                 % spelling}
+            self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [], spelling)
+
+    def test_town_answer_ignores_case_and_diacritics(self):
+        # 城名只比对「字母顺序 + 空格」：大小写、变音符号都不计较，对上就用登记名本身
+        for canon, spelling in (("Vera Cruz", "vera cruz"), ("Vera Cruz", "VERA  CRUZ"),
+                                ("Roatán", "Roatan"), ("Roatán", "roatán")):
+            for field in ("answer", "town"):
+                doc = {"0x00000001": "[riddle:%s=%s;clue=count:三座]三座城镇。"
+                                     % (field, spelling)}
+                self.assertEqual(M.check_doc("zh", doc, entities={canon: {}}, terms={}),
+                                 [], (field, spelling))
+
+    def test_town_answer_matching_two_names_is_error(self):
+        # 折平后对上两条登记名，说明写法本身分不清是哪一条，必须按登记名原样写
+        ents = {"San Juan": {}, "San Juán": {}}
+        doc = {"0x00000001": "[riddle:town=san juan;clue=count:三座]三座城镇。"}
+        problems = M.check_doc("zh", doc, entities=ents, terms={})
+        self.assertTrue(any("多条登记名" in p for p in problems), problems)
+
+    def test_town_answer_case_variants_share_group_signature(self):
+        # 组内副本用不同大小写写同一个城名，归一后是同一串谜底，不能报不一致
+        ents = {"Vera Cruz": {}}
+        doc = {"0x00000001": "[riddle:town=vera cruz;group=00000002;clue=count:三座]三座城镇。",
+               "0x00000002": "[riddle:town=VERA CRUZ;group=00000001;clue=count:三座]三座城镇。"}
+        self.assertEqual(M.check_doc("zh", doc, entities=ents, terms={}), [])
+
+    def test_bare_answer_matching_town_is_lenient(self):
+        # answer= 也吃大小写/变音写法；判类型时同样先折平再查表
+        doc = {"0x00000001": "[riddle:answer=veracruzx;clue=count:三座]三座城镇。"}
+        problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
+        self.assertTrue(any("veracruzx" in p for p in problems), problems)
+        doc2 = {"0x00000001": "[riddle:answer=east;clue=direction:东]望向东边。"}
+        self.assertEqual(M.check_doc("zh", doc2, entities={}, terms={}), [])
 
     def test_answer_field_may_be_omitted_with_type(self):
         # 省略 answer=：字段名直接写 town= / direction=
@@ -423,13 +457,15 @@ class TestAnswerMark(unittest.TestCase):
         self.assertIn("重复", str(ctx.exception))
 
     def test_bad_not_shapes_are_errors(self):
-        for bad in ("not", "not-", "not- north", "not East", "not eastnorth"):
+        # 大小写放宽后，`not East` 是合法写法；剩下的都是真形状错
+        for bad in ("not", "not-", "not- north", "not eastnorth"):
             with self.assertRaises(M.MarkError):
                 M.expand("[riddle:answer=%s;clue=direction:北]北边什么也没有。" % bad,
                          TABLE, "zh")
 
     def test_lone_dash_is_error(self):
-        for bad in ("-", "--east", "-not_east", "-eastnorth", "-East"):
+        # `-East` 现在合法（负 east）；剩下这些还是形状错
+        for bad in ("-", "--east", "-not_east", "-eastnorth"):
             with self.assertRaises(M.MarkError):
                 M.expand("[riddle:answer=%s;clue=exclude:东南]往东南去航是白费力气。" % bad,
                          TABLE, "zh")
