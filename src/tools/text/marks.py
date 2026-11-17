@@ -16,15 +16,19 @@
     [lit:%2 %1日]               字面照写，原文保留
     [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
     [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
-    [riddle:name=town:Corpus Christi;clue=feature:荒凉+遗弃]
+    [riddle:answer=Corpus Christi;clue=feature:荒凉+遗弃]
                                 诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
-                                字段：`name=` 谜底，`clue=` 线索；`;` 分字段。
-                                `name` 的类型必填：town / direction，`|` 分隔
-                                「或」的候选；`clue` 的每一项也必写 `<标签>:<正文>`，
+                                字段：`answer=` 谜底（`|` 是「或」的候选），
+                                `group=` 同组其余副本的文本键（`+` 连接，单副本不写），
+                                `clue=` 线索（`,` 分隔、`+` 同标签并值）。
+                                answer 正常不写类型：方位键照写原词（east / not_north），
+                                其余一律按城镇查 entities.toml；只有城名与方位键撞名
+                                （目前 0 例）才写 town: / direction: 消歧。
+                                clue 的每一项必写 `<标签>:<正文>`，
                                 pun / direction / count / feature / produce / history /
-                                exclude 是已知类型，`,` 分隔并列项、`+` 是同类并值，
-                                值必须是**谜面正文里逐字出现的片段**；`_` 开头的自造
-                                标签静默，字母开头的自造标签报 warning，裸写报错。
+                                exclude 是已知类型，值必须是**谜面正文里逐字出现的片段**；
+                                `_` 开头的自造标签静默，字母开头的自造标签报 warning，
+                                裸写报错。
                                 展开时逐条核对——
                                 写不出线索就说明这条谜面根本推不到这个答案（或线索该改）。
                                 谜底/线索都不生成本文，也不许把答案照抄成 town，
@@ -241,40 +245,84 @@ def _ref_target(arg, doc, hid=""):
     return key, target
 
 
-#: `[riddle:]` 的字段名。`;` 分字段；两个字段都吃「`<类型>:<值>`」的项：
-#: `name=` 里 `|` 是「或」，`clue=` 里 `,` 是「并列」、`+` 是同类并值。
-ANS_FIELDS = ("name", "clue")
+#: `[riddle:]` 的字段名。`;` 分字段：`answer=` 谜底（`|` 是「或」），
+#: `group=` 同组其余副本的键（`+` 连接），`clue=` 线索（`,` 分隔、`+` 同标签并值）。
+ANS_FIELDS = ("answer", "group", "clue")
 
-#: name 的类型：城镇查 entities.toml，方位查 ANS_DIRECTIONS | ANS_NEGATIVE。
+#: answer 的类型前缀。正常**不写**：值在方位键里就是方位，否则按城镇查 entities.toml。
+#: 只有城名与方位键撞名（目前 0 例）才需要 `town:` / `direction:` 消歧。
 ANS_NAME_KINDS = ("town", "direction")
+
+#: group 列的是「同组其余副本」的文本键：完整 0x 形式，与 [ref:] 一致。
+#: 一条诗谜最多三个同谜底副本（13 组 Vera Cruz），所以最多列三个键；
+#: 单副本的组不写这个字段。
+ANS_KEY_RX = re.compile(r"^0x[0-9a-f]{8}$")
 
 #: clue 的类型：说明这条谜面的信息属于哪一类，也决定译者必须保住什么。
 ANS_CLUE_KINDS = ("pun", "direction", "count", "feature", "produce", "history", "exclude")
 
 
-def _ans_item(part, kinds, what, hid):
-    """`<类型>:<值>` → (类型, 值)。类型写错、漏冒号都失败。"""
-    if ":" not in part:
-        raise MarkError("%s：ans 的 %s 项要写成 <类型>:<值>，收到 %r"
-                        % (hid, what, part))
-    kind, _, value = part.partition(":")
-    kind, value = kind.strip(), value.strip()
-    if kind not in kinds:
-        raise MarkError("%s：ans 的 %s 类型 %r 不认识（只有 %s）"
-                        % (hid, what, kind, " / ".join(kinds)))
-    return kind, value
+def _answer_items(raw, hid):
+    """`answer=` → [(类型|None, 值)]。类型正常不写，靠值查表推断。
+
+    `|` 分隔「或」的候选；显式 `town:` / `direction:` 只在值有歧义时才写——城名
+    跟方位键撞名（目前 0 例）。写了前缀就按前缀校验，不写就留给 check_doc 推断。
+    """
+    parts = [p.strip() for p in raw.split("|")]
+    if any(not p for p in parts):
+        raise MarkError("%s：ans 的 answer 里有空的候选（`|` 两侧都要写）" % hid)
+    items = []
+    for part in parts:
+        if ":" not in part:
+            items.append((None, part))
+            continue
+        kind, _, value = part.partition(":")
+        kind, value = kind.strip(), value.strip()
+        if kind not in ANS_NAME_KINDS:
+            raise MarkError(
+                "%s：ans 的 answer 前缀 %r 不认识（只有 %s；正常不写前缀，"
+                "值在方位键里算方位，否则按城镇查表）"
+                % (hid, kind, " / ".join(ANS_NAME_KINDS)))
+        if not value:
+            raise MarkError("%s：answer 的 %s 项缺值" % (hid, kind))
+        if kind == "direction" and value not in ANS_KEYS:
+            raise MarkError("%s：answer 的 direction 值 %r 不是方位键（见 ANS_DIRECTIONS）"
+                            % (hid, value))
+        items.append((kind, value))
+    if len(set(items)) != len(items):
+        raise MarkError("%s：ans 的 answer 有重复候选" % hid)
+    return items
+
+
+def _group_tokens(raw, hid):
+    """`group=` → 同组其余副本的键。`+` 连接，完整 0x 形式，不许把自己列进去。"""
+    toks = [t.strip() for t in raw.split("+")]
+    if any(not t for t in toks):
+        raise MarkError("%s：ans 的 group 里 `+` 两侧都要写键（收到 %r）" % (hid, raw))
+    for t in toks:
+        if not ANS_KEY_RX.match(t):
+            raise MarkError("%s：group 的键 %r 不是文本键（要写 0x 加 8 位小写十六进制）"
+                            % (hid, t))
+        if t == hid:
+            raise MarkError("%s：group 里列了本条自己（只列同组其余副本）" % hid)
+    if len(set(toks)) != len(toks):
+        raise MarkError("%s：ans 的 group 里有重复的键" % hid)
+    return toks
 
 
 def _split_ans(arg, hid="", warns=None):
-    """`[riddle:name=town:城|town:城;clue=direction:东,count:四座+第三座]`
-    → ([(类型, 值)…], [(类型|None, 词)…])。
+    """`[riddle:answer=城|城;group=0x…+0x…;clue=direction:东,count:四座+第三座]`
+    → ([(类型|None, 值)…], [同组其余副本的键…], [(类型|None, 词)…])。
 
-    `name` 里 `|` 是「或」（多个候选），`clue` 里 `,` 是「并列」（全部必须成立）、
-    `+` 是「同一个标签下的多个值」（展开后等价于把该项重复几遍）。
-    `name` 的每一项都必须带类型；`clue` 的每一项必须写成 `<标签>:<正文>`：
-    标签是七个已知类型就按类型校验，`_` 开头的自造标签静默通过，字母开头的自造
-    标签只当关键词并往 `warns` 记一条（多半是拼错）。
-    裸写、标签含大写/数字开头、已知类型缺值、`+` 两侧缺值、缺字段、字段重名、全角逗号，一律失败。
+    `answer` 里 `|` 是「或」（多个候选），`group` 里 `+` 连接同组其余副本的键，
+    `clue` 里 `,` 是「并列」（全部必须成立）、`+` 是「同一个标签下的多个值」
+    （展开后等价于把该项重复几遍）。
+    `answer` 正常不写类型前缀（值在方位键里算方位，否则按城镇查表），
+    `clue` 的每一项必须写成 `<标签>:<正文>`：标签是七个已知类型就按类型校验，
+    `_` 开头的自造标签静默通过，字母开头的自造标签只当关键词并往 `warns` 记一条
+    （多半是拼错）。
+    裸写、标签含大写/数字开头、已知类型缺值、`+` 两侧缺值、缺字段、字段重名、
+    全角逗号、group 列了自己或键形不对，一律失败。
     """
     fields = {}
     for part in arg.split(";"):
@@ -282,7 +330,7 @@ def _split_ans(arg, hid="", warns=None):
         if not part:
             raise MarkError("%s：ans 里有空字段（多打了 `;`？）" % hid)
         if "=" not in part:
-            raise MarkError("%s：ans 的字段要写成 name=… / clue=…，收到 %r"
+            raise MarkError("%s：ans 的字段要写成 answer=… / group=… / clue=…，收到 %r"
                             % (hid, part))
         name, _, value = part.partition("=")
         name, value = name.strip(), value.strip()
@@ -293,26 +341,11 @@ def _split_ans(arg, hid="", warns=None):
             raise MarkError("%s：ans 的 %s 字段写了两遍" % (hid, name))
         fields[name] = value
 
-    if "name" not in fields:
+    if "answer" not in fields:
         raise MarkError(
-            "%s：ans 缺 name 字段（写成 [riddle:name=town:城;clue=direction:东,…]）" % hid)
-    raw = fields["name"]
-    if not raw:
-        raise MarkError("%s：ans 的 name 为空" % hid)
-    parts = [p.strip() for p in raw.split("|")]
-    if any(not p for p in parts):
-        raise MarkError("%s：ans 的 name 里有空的候选（`|` 两侧都要写）" % hid)
-    names = []
-    for part in parts:
-        kind, value = _ans_item(part, ANS_NAME_KINDS, "name", hid)
-        if not value:
-            raise MarkError("%s：name 的 %s 缺值" % (hid, kind))
-        if kind == "direction" and value not in ANS_DIRECTIONS | ANS_NEGATIVE:
-            raise MarkError("%s：name 的 direction 值 %r 不是方位键（见 ANS_DIRECTIONS）"
-                            % (hid, value))
-        names.append((kind, value))
-    if len(set(names)) != len(names):
-        raise MarkError("%s：ans 的 name 有重复候选" % hid)
+            "%s：ans 缺 answer 字段（写成 [riddle:answer=城;clue=direction:东,…]）" % hid)
+    answers = _answer_items(fields["answer"], hid)
+    group = _group_tokens(fields["group"], hid) if "group" in fields else []
 
     clue_raw = fields.get("clue", "")
     if "，" in clue_raw:
@@ -349,22 +382,25 @@ def _split_ans(arg, hid="", warns=None):
             clues.append((tag if known else None, value))
     if not clues:
         raise MarkError(
-            "%s：ans 只有谜底 %r，没有 clue（谜面里能推出它的词要逐条写进来）"
-            % (hid, raw))
-    return names, clues
+            "%s：ans 只写了谜底 %r，没有 clue（谜面里能推出它的词要逐条写进来）"
+            % (hid, "|".join(v for _, v in answers)))
+    return answers, group, clues
 
 
 def _check_ans(arg, body, hid="", warns=None):
-    """核对谜底与线索：线索必须逐条出现在谜面正文里。返回候选名单。写错抛 MarkError。"""
-    names, clues = _split_ans(arg, hid, warns=warns)
+    """核对谜底与线索：线索必须逐条出现在谜面正文里。
+
+    返回 (候选 [(类型|None, 值)…], 同组其余副本的键, 线索)。写错抛 MarkError。
+    """
+    answers, group, clues = _split_ans(arg, hid, warns=warns)
     text = (body or "").casefold()
     missing = [v for _, v in clues if v.casefold() not in text]
     if missing:
         raise MarkError(
             "%s：ans 的谜底是 %r，但线索 %s 没出现在谜面里（谜面推不出这个答案，"
-            "或者线索该换）" % (hid, "|".join(v for _, v in names),
+            "或者线索该换）" % (hid, "|".join(v for _, v in answers),
                                 " / ".join(repr(v) for v in missing)))
-    return names
+    return answers, group, clues
 
 
 def expand(text, table, lang, hid="", terms=None, doc=None):
@@ -542,6 +578,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
     table = load_names(lang)
     terms = load_terms(lang) if terms is None else terms
     ans_used = set()
+    ans_groups = {}
     for hid in sorted(doc):
         text = doc[hid] or ""
         if not text or hid in EXEMPT_KEYS:
@@ -563,18 +600,39 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                 # 哪座城」无从核对，标注就退化成一条注释。答案本身不查译名：
                 # 诗里不照抄译名。
                 try:
-                    names = _check_ans(arg, _ANS_SPAN.sub("", text), hid, warns=warns)
+                    answers, group, _clues = _check_ans(
+                        arg, _ANS_SPAN.sub("", text), hid, warns=warns)
                 except MarkError as e:
                     problems.append(str(e))
                     continue
-                for kind, name in names:
-                    if kind != "town":
-                        continue        # 方位不进 names 表，没什么可登记可引用
-                    if name not in entities:
+                sig = []
+                for kind, value in answers:
+                    if kind is None:
+                        # 没写前缀：值在方位键里算方位，否则按城镇查 entities。
+                        in_keys = value in ANS_KEYS
+                        in_entities = value in entities
+                        if in_keys and in_entities:
+                            kind = "town"
+                            problems.append(
+                                "%s：谜底 %r 既是方位键又是登记过的城镇，要写 town: 或 "
+                                "direction: 消歧" % (hid, value))
+                        elif in_keys:
+                            kind = "direction"
+                        elif in_entities:
+                            kind = "town"
+                        else:
+                            problems.append(
+                                "%s：谜底 %r 既不是方位键，也没登记在 entities.toml"
+                                "（先决定它算不算专名；方位键只有 %s）"
+                                % (hid, value, " / ".join(sorted(ANS_DIRECTIONS))))
+                    elif kind == "town" and value not in entities:
                         problems.append(
                             "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
-                            % (hid, name))
-                    ans_used.add(name)
+                            % (hid, value))
+                    if kind == "town" and value in entities:
+                        ans_used.add(value)
+                    sig.append(value)
+                ans_groups[hid] = ("|".join(sig), group)
                 continue
             if key == "ref":
                 # 只校验结构，不展开：目标键自身的标注在它自己那一轮里查。
@@ -593,6 +651,31 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                     _resolve(arg, table, hid, lang)
                 except MarkError as e:
                     problems.append(str(e))
+    # 同组副本互指：`group` 只列其余副本，所以「本条 + group 里的键」就是整组。
+    # 组是身份不是答案——Roatán 出现在 14/15 两组、Providence 出现在 20/26 两组，
+    # 按 answer 自动归并会把两个不同的寻宝组合成一个。
+    for hid_g in sorted(ans_groups):
+        sig_g, toks = ans_groups[hid_g]
+        if not toks:
+            continue
+        members = set(toks) | {hid_g}
+        for t in toks:
+            if t not in ans_groups:
+                problems.append(
+                    "%s：group 里的 %s 没有 riddle 标注（同组每条都要标）" % (hid_g, t))
+                continue
+            sig_t, toks_t = ans_groups[t]
+            if sig_t != sig_g:
+                problems.append(
+                    "%s：group 里的 %s 谜底是 %r，本条是 %r——同组副本不一致"
+                    % (hid_g, t, sig_t, sig_g))
+            if hid_g not in toks_t:
+                problems.append(
+                    "%s：group 里的 %s 没反过来列出本条（互指必须对称）" % (hid_g, t))
+            elif set(toks_t) | {t} != members:
+                problems.append(
+                    "%s：与 %s 的组员集合不一致（两边都要列全整组其余副本）"
+                    % (hid_g, t))
     used = used_names(doc) | ans_used
     if used:
         # 死条目：既没被标注引用、译名也没在正文任何一条里出现，才报。

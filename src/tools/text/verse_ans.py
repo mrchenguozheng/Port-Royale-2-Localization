@@ -2,9 +2,11 @@
 """诗谜谜底队列：把 glossary\\verse_ans.toml 里填好的 ans 落进六语译文。
 
 谜面在 09 卷第六十四节定义的 verse 区间里，整片不挂 town/ref/lit/term，只允许
-[riddle:name=town:实体|town:实体;clue=线索,…]（`;` 分字段、`|` 是或、`,` 分线索、
-`+` 是同类并值，见 09 卷第七十八、七十九、八十一节）。`clue` 每项必写 `<标签>:<正文>`：
-七个已知类型有校验，`_` 开头的自造标签静默，字母开头的自造标签报 warning，裸写报错。
+[riddle:answer=谜底;group=同组其余键;clue=线索,…]（`;` 分字段；`answer` 里 `|` 是「或」，
+`group` 里 `+` 连其余副本的键，`clue` 里 `,` 分项、`+` 同类并值；见 09 卷第七十八、
+七十九、八十一、八十三节）。`answer` 正常不写类型前缀：方位键直接写，其余按城镇查表。
+`clue` 每项必写 `<标签>:<正文>`：七个已知类型有校验，`_` 开头的自造标签静默，
+字母开头的自造标签报 warning，裸写报错。
 这个工具只管那一件事：
 
     python src\\tools\\text\\verse_ans.py --list     # 看 41 条 / 29 组，谁还没填
@@ -204,12 +206,13 @@ def cmd_apply():
             register_entity(ans, tid, rows)
             print("登记实体 %s（城镇行 %s）" % (ans, tid))
 
-        if ans in MK.ANS_KEYS:
-            name_item = "direction:%s" % ans          # 方位键与 not_<方位> 都算方位
-        else:
-            name_item = "town:%s" % ans
+        # answer 正常不写前缀：方位键直接写（east / not_north），其余按城镇查表。
+        # 只有当城名恰好与方位键同名（目前 0 例）才补 town: 消歧。
+        answer_item = ans
+        if ans in MK.ANS_KEYS and towns.get(ans.lower()):
+            answer_item = "town:%s" % ans
 
-        wanted, ok = {}, True
+        wanted = {}
         for lang in LANGS:
             clues = split_clues((g.get("clues") or {}).get(lang, ""), lang)
             kinds = (g.get("kinds") or {}).get(lang, [])
@@ -218,12 +221,19 @@ def cmd_apply():
                 if c.casefold() not in text.casefold():
                     raise SystemExit("%s 的线索「%s」没出现在谜面里（%s）"
                                      "——谜面推不出这个谜底，或者线索该换" % (lang, c, ids[0]))
-            wanted[lang] = "[riddle:name=%s;clue=%s]" % (
-                name_item, clue_text(clues, kinds, lang))
+            clue_part = clue_text(clues, kinds, lang)
+            for k in ids:
+                # group 只列同组其余副本：单副本的组不写这个字段
+                group_part = ""
+                if len(ids) > 1:
+                    others = "+".join(sorted(x for x in ids if x != k))
+                    group_part = ";group=%s" % others
+                wanted[(lang, k)] = "[riddle:answer=%s%s;clue=%s]" % (
+                    answer_item, group_part, clue_part)
 
         already = [ANS_MARK.match(rows[lang].get(k, "")) for k in ids for lang in LANGS]
         if [m.group(0) if m else None for m in already] == \
-                [wanted[lang] for k in ids for lang in LANGS]:
+                [wanted[(lang, k)] for k in ids for lang in LANGS]:
             skipped += 1
             continue
         present = [m.group(0) for m in already if m]
@@ -236,7 +246,7 @@ def cmd_apply():
             doc, order = toml_io.read_doc(path)
             for k in ids:
                 assert "[riddle:" not in doc[k], (lang, k)
-                doc[k] = wanted[lang] + doc[k]
+                doc[k] = wanted[(lang, k)] + doc[k]
             toml_io.write_doc_atomic(path, doc, order=order, header=toml_io.head_lines(path))
         changed += 1
         print("落标注 %s -> %s" % (",".join(ids), ans))
