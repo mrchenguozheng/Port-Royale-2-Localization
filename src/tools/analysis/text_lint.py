@@ -43,6 +43,7 @@ TPL = re.compile(r"%[0-9]+|@[a-zA-Z]\$[^$]*\$|<(?:n|c|t|ts:[0-9]+|gs:[^>]*|r|b)>
 FONT = re.compile(r"<f:([^>]*)>")
 HAN = re.compile(r"[\u4e00-\u9fff]")
 LATIN = re.compile(r"[A-Za-z]")
+MARK_ANY = re.compile(r"\[(?:ref|lit|term):?")
 
 KEEP = {"0xfc512ea5"}
 
@@ -51,6 +52,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 from shared.core.validate import is_identifier  # noqa: E402
 from text import marks as MK  # noqa: E402
+import terms_check as TC  # noqa: E402
 
 
 def norm_font(v):
@@ -136,6 +138,13 @@ def main(argv):
     # 内联标注（[ref:…] / [lit:…] / [term:…]）：未定义引用、缺形态、方括号写错、死条目
     for p in MK.check_doc(lang, tr_raw, entities=MK.load_entities()):
         E.append(("标注", "标注", p))
+
+    # 诗谜整片不许挂标注：谜面的用词由韵脚和字数决定，ref/term 会把词冻成表里的写法，
+    # 谜语也被提前泄底（`Holy August` 的双关就没了）。诗里只写自由文本。
+    _g, _ig, verse = TC.load_terms()
+    for k in sorted(TC.verse_ids(verse, en), key=lambda x: int(x, 16)):
+        if MARK_ANY.search(tr_raw.get(k, "") or ""):
+            E.append((k, "诗谜挂标注", tr_raw[k][:60]))
 
     lines = []
     lines.append("# %s 机械复核（判据见 09 卷已落卷定则）\n" % lang)

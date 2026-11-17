@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 """terms_check 的三级判定：词形差不该报成错，真错译不该被词根放行。
 
-只测纯函数，不读真实术语表——真实表的组定义会随项目变。
+除最后一条「全仓不变式」外只测纯函数，不读真实术语表——真实表的组定义会随项目变。
 """
 
 import os
+import re
 import sys
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "src", "tools"))
+sys.path.insert(0, os.path.join(ROOT, "src", "tools", "text"))
 
 import terms_check as TC      # noqa: E402
 
@@ -126,6 +128,26 @@ class TestVerseSkip(unittest.TestCase):
 
     def test_empty_verse_list_skips_nothing(self):
         self.assertEqual(TC.verse_ids([], {"0x10": ""}), set())
+
+
+class TestVerseHasNoMarks(unittest.TestCase):
+    """诗谜整片不挂标注（读真实数据，属于全仓不变式）。"""
+
+    def test_no_marker_in_any_language(self):
+        import toml_io
+        en, _o = toml_io.read_doc(
+            os.path.join(ROOT, "src", "orig", "en.gog_1.1.2.3.toml"))
+        _g, _ig, verse = TC.load_terms()
+        vids = TC.verse_ids(verse, en)
+        self.assertTrue(vids, "术语表里没有 verse 区间")
+        bad = []
+        for lang in ("zh", "de", "es", "fr", "ja", "ru"):
+            doc, _od = toml_io.read_doc(
+                os.path.join(ROOT, "src", "translations", "%s.toml" % lang))
+            for k in vids:
+                if re.search(r"\[(?:ref|lit|term):?", doc.get(k, "") or ""):
+                    bad.append((lang, k))
+        self.assertEqual(bad, [])
 
 
 if __name__ == "__main__":
