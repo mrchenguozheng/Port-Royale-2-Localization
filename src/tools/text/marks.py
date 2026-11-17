@@ -11,9 +11,12 @@
     [lit:%2 %1日]               字面照写，原文保留
     [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
     [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
-    [ans:St. Augustine]         诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
-                                ——谜面要能把读者导到这个答案，但不许把答案词照抄成
-                                ref，否则既泄底又冻死用词（见 09 卷第六十三节）
+    [ans:St. Augustine|north,August]  诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
+                                `|` 后面是**谜面里能推出这个谜底的线索词**，逗号分隔，
+                                至少一条。展开时逐条核对它们真的出现在谜面里——写不出
+                                线索就说明这条谜面根本推不到这个答案（或线索该改）。
+                                谜底/线索都不生成本文，也不许把答案照抄成 ref，
+                                否则既泄底又冻死用词（见 09 卷第六十三、六十四节）
 
 为什么不用成对标记
 ------------------
@@ -56,6 +59,7 @@ TERM_PREFIXES = ("en", "de", "fr")
 
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
+_ANS_SPAN = re.compile(r"\[ans:[^\[\]]*\]")
 
 
 class MarkError(Exception):
@@ -169,6 +173,33 @@ def _resolve(arg, table, hid, lang):
     return value
 
 
+def _split_ans(arg, hid=""):
+    """`[ans:实体|线索,线索]` → (实体名, [线索])。谜底与线索都缺即失败。"""
+    entity, _, clues_raw = arg.partition("|")
+    entity = entity.strip()
+    if not entity:
+        raise MarkError("%s：ans 参数为空（写成 [ans:实体|线索,…]）" % hid)
+    clues = [c.strip() for c in clues_raw.replace("，", ",").split(",")]
+    clues = [c for c in clues if c]
+    if not clues:
+        raise MarkError(
+            "%s：ans 只有谜底 %r，没有线索词（写成 [ans:%s|谜面里的词,…]）——"
+            "没有线索就核对不了「这条谜面推不推得到这个答案」" % (hid, entity, entity))
+    return entity, clues
+
+
+def _check_ans(arg, body, hid=""):
+    """核对谜底与线索：线索必须逐条出现在谜面正文里。写错抛 MarkError。"""
+    entity, clues = _split_ans(arg, hid)
+    text = (body or "").casefold()
+    missing = [c for c in clues if c.casefold() not in text]
+    if missing:
+        raise MarkError(
+            "%s：ans 的谜底是 %r，但线索 %s 没出现在谜面里（谜面推不出这个答案，"
+            "或者线索该换）" % (hid, entity, " / ".join(repr(c) for c in missing)))
+    return entity
+
+
 def expand(text, table, lang, hid="", terms=None):
     """展开一条标注文本，返回纯文本。写错一律抛 MarkError。
 
@@ -178,6 +209,7 @@ def expand(text, table, lang, hid="", terms=None):
     if terms is None:
         terms = load_terms(lang)
     out = []
+    ans_args = []
     i = 0
     n = len(text)
     while i < n:
@@ -189,7 +221,7 @@ def expand(text, table, lang, hid="", terms=None):
         m = _MARK.match(text, i)
         if not m:
             raise MarkError("%s：第 %d 个字符处的 `[` 不成标记（要写成 [ref:…] / "
-                            "[lit:…] / [term:…]）" % (hid, i + 1))
+                            "[lit:…] / [term:…] / [ans:…]）" % (hid, i + 1))
         key, arg = m.group(1), m.group(2)
         if key not in KEYWORDS:
             raise MarkError("%s：未知标注关键字 %r（只有 %s）"
@@ -199,13 +231,15 @@ def expand(text, table, lang, hid="", terms=None):
         elif key == "term":
             out.append(_resolve_term(arg, terms, hid, lang))
         elif key == "ans":
-            pass                      # 谜底只给翻译人看，玩家文本里不出现
+            ans_args.append(arg)      # 谜底只给翻译人看，玩家文本里不出现
         else:
             out.append(arg)
         i = m.end()
     rest = "".join(out)
     if _ANY_BRACKET.search(rest):
         raise MarkError("%s：展开后仍残留方括号（正文里不许出现 `[` 或 `]`）" % hid)
+    for arg in ans_args:
+        _check_ans(arg, rest, hid)
     return rest
 
 
@@ -332,12 +366,15 @@ def check_doc(lang, doc, entities=None, terms=None):
                     problems.append(str(e))
                 continue
             if key == "ans":
-                # 谜底必须是登记过的实体：否则「这条谜面指向哪座城」无从核对，
-                # 标注就退化成一条注释。答案本身不查译名——诗里不照抄译名。
-                name = arg.strip()
-                if not name:
-                    problems.append("%s：ans 参数为空（谜底写实体名）" % hid)
-                elif name not in entities:
+                # 谜底必须登记过实体，线索必须真的在谜面里——否则「这条谜面指向
+                # 哪座城」无从核对，标注就退化成一条注释。答案本身不查译名：
+                # 诗里不照抄译名。
+                try:
+                    name = _check_ans(arg, _ANS_SPAN.sub("", text), hid)
+                except MarkError as e:
+                    problems.append(str(e))
+                    continue
+                if name not in entities:
                     problems.append(
                         "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
                         % (hid, name))

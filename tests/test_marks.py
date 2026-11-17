@@ -98,23 +98,40 @@ class TestExpand(unittest.TestCase):
 
 
 class TestAnswerMark(unittest.TestCase):
-    """[ans:…] 是给翻译人看的谜底，展开必须为空。"""
+    """[ans:…] 是给翻译人看的谜底，展开必须为空；线索词必须真在谜面里。"""
+
+    VERSE = "[ans:St. Augustine|north,August]He left for the north in August."
 
     def test_expands_to_nothing(self):
-        self.assertEqual(M.expand("[ans:St. Augustine]已向北走。", TABLE, "zh"),
-                         "已向北走。")
+        self.assertEqual(M.expand(self.VERSE, TABLE, "zh"),
+                         "He left for the north in August.")
 
     def test_does_not_count_as_name_usage(self):
-        doc = {"0x00000001": "[ans:St. Augustine]已向北走。"}
+        doc = {"0x00000001": self.VERSE}
         self.assertEqual(M.used_names(doc), set())
 
+    def test_clue_missing_is_error(self):
+        # 谜面里没有 north 这个词 → 这条谜面推不出这个答案
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[ans:St. Augustine|south,August]He went north in August.",
+                     TABLE, "zh")
+        self.assertIn("south", str(ctx.exception))
+
+    def test_no_clue_is_error(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[ans:St. Augustine]He went north.", TABLE, "zh")
+
+    def test_clue_case_insensitive(self):
+        self.assertEqual(M.expand("[ans:St. Augustine|NORTH]He went north.", TABLE, "zh"),
+                         "He went north.")
+
     def test_unknown_answer_is_reported(self):
-        doc = {"0x00000001": "[ans:Nowhere]往北。"}
+        doc = {"0x00000001": "[ans:Nowhere|north]He went north."}
         problems = M.check_doc("zh", doc, entities={"St. Augustine": {}}, terms={})
         self.assertTrue(any("Nowhere" in p for p in problems), problems)
 
     def test_known_answer_passes(self):
-        doc = {"0x00000001": "[ans:St. Augustine]往北。"}
+        doc = {"0x00000001": self.VERSE}
         self.assertEqual(M.check_doc("zh", doc, entities={"St. Augustine": {}},
                                      terms={}), [])
 
