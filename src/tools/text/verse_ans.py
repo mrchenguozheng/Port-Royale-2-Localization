@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 """诗谜谜底队列：把 glossary\\verse_ans.toml 里填好的 ans 落进六语译文。
 
-谜面在 09 卷第六十四节定义的 verse 区间里，整片不挂 ref/lit/term，只允许 [ans:实体|线索,…]。
+谜面在 09 卷第六十四节定义的 verse 区间里，整片不挂 town/ref/lit/term，只允许
+[ans:name=实体|实体;clue=线索,…]（`;` 分字段、`|` 是或、`,` 分线索，见 09 卷第七十八节）。
 这个工具只管那一件事：
 
     python src\\tools\\text\\verse_ans.py --list     # 看 41 条 / 29 组，谁还没填
     python src\\tools\\text\\verse_ans.py --apply    # 把填好的组写进六语译文
 
 --apply 的判据：
-  · ans 必须是 entities.toml 里的实体键；若它是城镇表里的城名但还没登记，就顺带把
+  · name 必须是 entities.toml 里的实体键；若它是城镇表里的城名但还没登记，就顺带把
     六语译名从译文行里取出来，登记进 entities.toml 与 names/<lang>.toml；
-  · 或者 ans 是 marks.ANS_KEYS 里的键：方位（north/east/southeast…）、否定方位
+  · 或者 name 是 marks.ANS_KEYS 里的键：方位（north/east/southeast…）、否定方位
     （not_north/not_southeast…）、关键词谜底 `kw`（谜面既无城名也无朝向时，
     能定位它的关键词组合写在线索里，至少两条）。这几种都不登记实体、不查译名；
   · 六语线索都不能空，只收英文逗号，每条线索都要出现在该语言自己的谜面正文里；
@@ -180,7 +181,7 @@ def cmd_apply():
                 if c.casefold() not in text.casefold():
                     raise SystemExit("%s 的线索「%s」没出现在谜面里（%s）"
                                      "——谜面推不出这个谜底，或者线索该换" % (lang, c, ids[0]))
-            wanted[lang] = "[ans:%s|%s]" % (ans, ",".join(clues))
+            wanted[lang] = "[ans:name=%s;clue=%s]" % (ans, ",".join(clues))
 
         already = [ANS_MARK.match(rows[lang].get(k, "")) for k in ids for lang in LANGS]
         if [m.group(0) if m else None for m in already] == \

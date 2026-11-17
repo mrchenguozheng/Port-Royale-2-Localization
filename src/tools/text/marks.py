@@ -16,8 +16,10 @@
     [lit:%2 %1日]               字面照写，原文保留
     [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
     [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
-    [ans:St. Augustine|north,August]  诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
-                                `|` 后面是**谜面里能推出这个谜底的线索词**，用英文逗号
+    [ans:name=Corpus Christi;clue=荒凉,遗弃]
+                                诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
+                                `name=` 是谜底，`|` 分隔「或」的多个候选；
+                                `clue=` 是**谜面里能推出这个谜底的线索词**，用英文逗号
                                 `,` 分隔（全角「，」不收），至少一条。展开时逐条核对
                                 它们真的出现在谜面里——写不出
                                 线索就说明这条谜面根本推不到这个答案（或线索该改）。
@@ -25,6 +27,7 @@
                                 否则既泄底又冻死用词（见 09 卷第六十三、六十四节）
                                 谜底也可以只写方位（`east`/`southeast`…，见 ANS_DIRECTIONS）：
                                 那批谜面只说朝向，写不出城名（09 卷第七十二节）。
+                                字段语法见 09 卷第七十八节（`;` 分字段、`|` 是或、`,` 分线索）。
 
 为什么不用成对标记
 ------------------
@@ -231,27 +234,62 @@ def _ref_target(arg, doc, hid=""):
     return key, target
 
 
+#: `[ans:]` 的字段名。`;` 分字段，`name=` 里 `|` 是「或」，`clue=` 里 `,` 分线索。
+#: 只收这两个字段：写错的字段名会被报出来，不会静默忽略。
+ANS_FIELDS = ("name", "clue")
+
+
 def _split_ans(arg, hid=""):
-    """`[ans:实体|线索,线索]` → (实体名, [线索])。谜底与线索都缺即失败。"""
-    entity, _, clues_raw = arg.partition("|")
-    entity = entity.strip()
-    if not entity:
-        raise MarkError("%s：ans 参数为空（写成 [ans:实体|线索,…]）" % hid)
-    if "，" in clues_raw:
+    """`[ans:name=实体|实体;clue=线索,线索]` → ([实体…], [线索])。
+
+    `name` 里 `|` 是「或」（多个候选），`clue` 里 `,` 分隔线索。
+    缺 name、缺 clue、字段名写错、字段重名、全角逗号，一律失败。
+    """
+    fields = {}
+    for part in arg.split(";"):
+        part = part.strip()
+        if not part:
+            raise MarkError("%s：ans 里有空字段（多打了 `;`？）" % hid)
+        if "=" not in part:
+            raise MarkError("%s：ans 的字段要写成 name=… / clue=…，收到 %r"
+                            % (hid, part))
+        name, _, value = part.partition("=")
+        name, value = name.strip(), value.strip()
+        if name not in ANS_FIELDS:
+            raise MarkError("%s：ans 没有字段 %r（只有 %s）"
+                            % (hid, name, " / ".join(ANS_FIELDS)))
+        if name in fields:
+            raise MarkError("%s：ans 的 %s 字段写了两遍" % (hid, name))
+        fields[name] = value
+
+    if "name" not in fields:
+        raise MarkError("%s：ans 缺 name 字段（写成 [ans:name=实体;clue=线索,…]）"
+                        % hid)
+    raw = fields["name"]
+    if not raw:
+        raise MarkError("%s：ans 的 name 为空" % hid)
+    names = [n.strip() for n in raw.split("|")]
+    if any(not n for n in names):
+        raise MarkError("%s：ans 的 name 里有空的候选（`|` 两侧都要写）" % hid)
+    if len(set(names)) != len(names):
+        raise MarkError("%s：ans 的 name 有重复候选" % hid)
+
+    clue_raw = fields.get("clue", "")
+    if "，" in clue_raw:
         raise MarkError("%s：ans 的线索用英文逗号 `,` 分隔，不要用全角「，」" % hid)
-    clues = [c.strip() for c in clues_raw.split(",")]
+    clues = [c.strip() for c in clue_raw.split(",")]
     clues = [c for c in clues if c]
     if not clues:
         raise MarkError(
-            "%s：ans 只有谜底 %r，没有线索词（写成 [ans:%s|谜面里的词,…]）——"
-            "没有线索就核对不了「这条谜面推不推得到这个答案」" % (hid, entity, entity))
-    return entity, clues
+            "%s：ans 只有谜底 %r，没有 clue 字段（谜面里能推出它的词要逐条写进来）"
+            % (hid, raw))
+    return names, clues
 
 
 def _check_ans(arg, body, hid=""):
-    """核对谜底与线索：线索必须逐条出现在谜面正文里。写错抛 MarkError。"""
-    entity, clues = _split_ans(arg, hid)
-    if entity == ANS_KEYWORD and len(clues) < 2:
+    """核对谜底与线索：线索必须逐条出现在谜面正文里。返回候选名单。写错抛 MarkError。"""
+    names, clues = _split_ans(arg, hid)
+    if ANS_KEYWORD in names and len(clues) < 2:
         raise MarkError(
             "%s：谜底是关键词组合（%s），至少写两条线索——一条算不上组合，"
             "也定位不到地方" % (hid, ANS_KEYWORD))
@@ -260,8 +298,9 @@ def _check_ans(arg, body, hid=""):
     if missing:
         raise MarkError(
             "%s：ans 的谜底是 %r，但线索 %s 没出现在谜面里（谜面推不出这个答案，"
-            "或者线索该换）" % (hid, entity, " / ".join(repr(c) for c in missing)))
-    return entity
+            "或者线索该换）" % (hid, "|".join(names),
+                                " / ".join(repr(c) for c in missing)))
+    return names
 
 
 def expand(text, table, lang, hid="", terms=None, doc=None):
@@ -457,15 +496,16 @@ def check_doc(lang, doc, entities=None, terms=None):
                 # 哪座城」无从核对，标注就退化成一条注释。答案本身不查译名：
                 # 诗里不照抄译名。
                 try:
-                    name = _check_ans(arg, _ANS_SPAN.sub("", text), hid)
+                    names = _check_ans(arg, _ANS_SPAN.sub("", text), hid)
                 except MarkError as e:
                     problems.append(str(e))
                     continue
-                if name not in entities and name not in ANS_KEYS:
-                    problems.append(
-                        "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
-                        % (hid, name))
-                ans_used.add(name)
+                for name in names:
+                    if name not in entities and name not in ANS_KEYS:
+                        problems.append(
+                            "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
+                            % (hid, name))
+                    ans_used.add(name)
                 continue
             if key == "ref":
                 # 只校验结构，不展开：目标键自身的标注在它自己那一轮里查。

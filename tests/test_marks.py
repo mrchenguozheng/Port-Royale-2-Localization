@@ -153,7 +153,7 @@ class TestExpand(unittest.TestCase):
 class TestAnswerMark(unittest.TestCase):
     """[ans:…] 是给翻译人看的谜底，展开必须为空；线索词必须真在谜面里。"""
 
-    VERSE = "[ans:St. Augustine|north,August]He left for the north in August."
+    VERSE = "[ans:name=St. Augustine;clue=north,August]He left for the north in August."
 
     def test_expands_to_nothing(self):
         self.assertEqual(M.expand(self.VERSE, TABLE, "zh"),
@@ -166,27 +166,27 @@ class TestAnswerMark(unittest.TestCase):
     def test_clue_missing_is_error(self):
         # 谜面里没有 north 这个词 → 这条谜面推不出这个答案
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[ans:St. Augustine|south,August]He went north in August.",
+            M.expand("[ans:name=St. Augustine;clue=south,August]He went north in August.",
                      TABLE, "zh")
         self.assertIn("south", str(ctx.exception))
 
     def test_no_clue_is_error(self):
         with self.assertRaises(M.MarkError):
-            M.expand("[ans:St. Augustine]He went north.", TABLE, "zh")
+            M.expand("[ans:name=St. Augustine]He went north.", TABLE, "zh")
 
     def test_clue_case_insensitive(self):
-        self.assertEqual(M.expand("[ans:St. Augustine|NORTH]He went north.", TABLE, "zh"),
+        self.assertEqual(M.expand("[ans:name=St. Augustine;clue=NORTH]He went north.", TABLE, "zh"),
                          "He went north.")
 
     def test_fullwidth_comma_rejected(self):
         # 线索只用英文逗号；全角「，」会把两个词粘成一条，报错比「命中不了」更好查
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[ans:St. Augustine|north，August]He went north in August.",
+            M.expand("[ans:name=St. Augustine;clue=north，August]He went north in August.",
                      TABLE, "zh")
         self.assertIn(",", str(ctx.exception))
 
     def test_unknown_answer_is_reported(self):
-        doc = {"0x00000001": "[ans:Nowhere|north]He went north."}
+        doc = {"0x00000001": "[ans:name=Nowhere;clue=north]He went north."}
         problems = M.check_doc("zh", doc, entities={"St. Augustine": {}}, terms={})
         self.assertTrue(any("Nowhere" in p for p in problems), problems)
 
@@ -197,32 +197,65 @@ class TestAnswerMark(unittest.TestCase):
 
     def test_direction_answer_needs_no_entity(self):
         # 方位谜底不进 entities.toml：它不是专名，也没有译名可登记
-        doc = {"0x00000001": "[ans:southeast|东南]望向东南，第三座便是。"}
+        doc = {"0x00000001": "[ans:name=southeast;clue=东南]望向东南，第三座便是。"}
         self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
 
     def test_answer_counts_as_used_name(self):
         # 谜底那座城的名字在诗里被替换成 X，正文本来就没有它；
         # 按「死条目」报会误伤，故谜底算一次引用
-        doc = {"0x00000001": "[ans:San Juan|东南]X 在一座岛上，但望向东南。"}
+        doc = {"0x00000001": "[ans:name=San Juan;clue=东南]X 在一座岛上，但望向东南。"}
         problems = M.check_doc("zh", doc, entities={"San Juan": {}}, terms={})
         self.assertFalse(any("既没被引用" in p for p in problems), problems)
 
     def test_wrong_direction_answer_still_passes_but_key_must_be_known(self):
-        doc = {"0x00000001": "[ans:eastnorth|东南]望向东南，第三座便是。"}
+        doc = {"0x00000001": "[ans:name=eastnorth;clue=东南]望向东南，第三座便是。"}
         problems = M.check_doc("zh", doc, entities={}, terms={})
         self.assertTrue(any("eastnorth" in p for p in problems), problems)
 
     def test_negative_direction_answer_is_a_key(self):
         # 「往东南去航是白费力气」只能排除东南，写 not_southeast 不替原文补正向
-        doc = {"0x00000001": "[ans:not_southeast|东南]往东南去航是白费力气。"}
+        doc = {"0x00000001": "[ans:name=not_southeast;clue=东南]往东南去航是白费力气。"}
         self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
 
     def test_keyword_answer_needs_two_clues(self):
-        ok = {"0x00000001": "[ans:kw|黄金,港口]街道以黄金铺就，港口雄伟。"}
+        ok = {"0x00000001": "[ans:name=kw;clue=黄金,港口]街道以黄金铺就，港口雄伟。"}
         self.assertEqual(M.check_doc("zh", ok, entities={}, terms={}), [])
-        bad = {"0x00000001": "[ans:kw|黄金]街道以黄金铺就，港口雄伟。"}
+        bad = {"0x00000001": "[ans:name=kw;clue=黄金]街道以黄金铺就，港口雄伟。"}
         problems = M.check_doc("zh", bad, entities={}, terms={})
         self.assertTrue(any("关键词组合" in p for p in problems), problems)
+
+    def test_alternative_names_both_count_as_used(self):
+        # `|` 是「或」：两个候选都算被引用，也都要登记，否则死条目会误报其中一城
+        doc = {"0x00000001": "[ans:name=San Juan|St. Juan;clue=岛,东南]X 在一座岛上，望向东南。"}
+        problems = M.check_doc("zh", doc, entities={"San Juan": {}, "St. Juan": {}}, terms={})
+        self.assertEqual(problems, [])
+
+    def test_alternative_name_unregistered_is_reported(self):
+        doc = {"0x00000001": "[ans:name=San Juan|Nowhere;clue=岛]X 在一座岛上。"}
+        problems = M.check_doc("zh", doc, entities={"San Juan": {}}, terms={})
+        self.assertTrue(any("Nowhere" in p for p in problems), problems)
+
+    def test_old_pipe_syntax_now_means_alternatives(self):
+        # 旧写法 `[ans:实体|线索]` 现在会被读成「两个候选、没有 clue」，必须报缺 clue，
+        # 不能悄悄当成谜底+线索
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[ans:St. Augustine|north]", TABLE, "zh")
+        self.assertIn("clue", str(ctx.exception))
+
+    def test_unknown_field_is_error(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[ans:name=St. Augustine;clue=north;note=x]He went north.",
+                     TABLE, "zh")
+
+    def test_duplicate_field_is_error(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[ans:name=St. Augustine;name=Havana;clue=north]He went north.",
+                     TABLE, "zh")
+
+    def test_empty_alternative_is_error(self):
+        with self.assertRaises(M.MarkError):
+            M.expand("[ans:name=San Juan||St. Juan;clue=岛]X is on an island.",
+                     TABLE, "zh")
 
 
 class TestDoc(unittest.TestCase):
