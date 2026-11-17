@@ -92,9 +92,9 @@ ANS_DIRECTIONS = frozenset({
 #: 第三种谜底：否定朝向 `-<方位>`。谜面明写「往东南去航是白费力气」「北边什么
 #: 也没有」这种**只能排除一个方向**的句子用它——原文明写的是「不是那边」，
 #: 硬填成一个正向方位就是替原文做主。写 `-north` 表示「不是北边」。
-#: 减号是规范写法（短、无下划线、与布尔取反区分）；输入容忍 `not north`（空格）
-#: 与 `not_north`（旧写法），`_canon_answer` 在解析期统一归一成 `-north`。
-#: 形状写错的（`-`、`--east`、`-not_east`、`not-`、`not East`）都报错。
+#: 减号是规范写法（短、无下划线、与布尔取反区分）；`not north`（空格）同样接受，
+#: `_canon_answer` 归一成 `-north`。`not_north` 的下划线写法明确不接受。
+#: 长方位可缩写 NE/SE/SW/NW，但必须大写；north/east/south/west 不设缩写。
 ANS_NEGATIVE = frozenset("-" + d for d in ANS_DIRECTIONS)
 
 #: `[riddle:]` 里允许不登记实体的全部谜底取值：只有方位（正向与否定）。
@@ -272,43 +272,74 @@ ANS_CLUE_KINDS = ("pun", "direction", "count", "feature", "produce", "history", 
 _DASH_LOOKALIKES = frozenset("‐‑‒–—−－")
 
 
-#: 否定方位的两种输入写法：`not east`（空格）与 `not_east`（下划线）。都归一成 `-east`。
-_NEG_WORD_RX = re.compile(r"^not[ _](.*)$")
+#: 否定方位只收两种：`-east`（规范）与 `not east`（空格）。`not_east` 不再接受，
+#: 下划线是纯形式负担、也容易漏打。
+_NEG_WORD_RX = re.compile(r"^not (.*)$")
+
+#: 四个「长」方位（复合词）允许缩写，且**必须大写**——大写的 NE/SE/SW/NW 一眼是罗盘缩写，
+#: 小写的 ne/se/sw/nw 会混进普通词里，也让「大写即可辨方向」这条判据失效。
+#: 正方位 north/east/south/west 不设缩写：它们本来就只有四五个字母。
+ANS_ABBREV = {
+    "NE": "northeast",
+    "SE": "southeast",
+    "SW": "southwest",
+    "NW": "northwest",
+}
+_CARDINAL_1 = {"N": "north", "E": "east", "S": "south", "W": "west"}
+_ABBREV_LOWER = frozenset(k.lower() for k in ANS_ABBREV)
+
+
+def _dir_word(text, hid, raw):
+    """把一个方位写法归一成正向方位键；不认识的抛错，报错里给出全部合法写法。"""
+    if text in ANS_DIRECTIONS:
+        return text
+    if text in ANS_ABBREV:
+        return ANS_ABBREV[text]
+    if text.lower() in _ABBREV_LOWER:
+        raise MarkError("%s：谜底 %r 的缩写要全大写（%s），小写会被当成普通词"
+                        % (hid, raw, text.upper()))
+    if text in _CARDINAL_1:
+        raise MarkError("%s：谜底 %r 里的 %s 不设缩写，写全 %s"
+                        % (hid, raw, text, _CARDINAL_1[text]))
+    opts = " / ".join(sorted(ANS_DIRECTIONS))
+    raise MarkError("%s：谜底 %r 里的 %r 不是方位词（写全 %s，或缩写 NE/SE/SW/NW）"
+                    % (hid, raw, text, opts))
 
 
 def _canon_answer(value, hid):
-    """把否定方位的三种写法归一成 `-方位`。
+    """把否定方位归一成 `-方位`，把大写缩写归一成完整方位词。
 
-    收 `-east`（规范）、`-east` 同义的 `not east`（自然英语）、`not_east`（旧写法，
-    容忍输入）。归一发生在解析期，后面的校验、`ANS_KEYS` 查表、组内比对只见到
-    `-east`，所以两种写法不会让同一个谜底分裂成两串不同文本。
+    收 `-east`（规范）与 `not east`（自然英语）；`not_east` 明确不再接受。
+    归一发生在解析期，后面的 `ANS_KEYS` 查表、组内副本比对、`--apply` 复核只见到
+    `-east` / `east`，所以同一谜底不会因为写法不同分裂成两串文本。
 
     形状写错的一律报错：`-`、`--east`、`-not_east`、`-East`、`not`、`not-`、
-    `not East`、`not eastnorth`；全角/长破折号开头的先单独报字符问题，因为肉眼
-    几乎看不出，落进「未知谜底」会把人引去查方位拼写。
+    `not East`、`not eastnorth`、`ne`（小写缩写）、`N`（正方位缩写）；全角/长破折号
+    开头的先单独报字符问题，因为肉眼几乎看不出，落进「未知谜底」会把人引去查拼写。
     """
     if value[:1] in _DASH_LOOKALIKES:
         raise MarkError("%s：谜底 %r 开头那个是长破折号/全角减号，不是半角 ASCII 减号"
                         "（改成 -north 这种写法，全角字符肉眼几乎看不出）" % (hid, value))
     if value.startswith("-"):
-        if value[1:] in ANS_DIRECTIONS:
-            return value
-        opts = " / ".join("-" + d for d in sorted(ANS_DIRECTIONS))
-        raise MarkError("%s：谜底 %r 的减号后面不是方位词（否定方位写成 %s，"
-                        "也可以写 not north）" % (hid, value, opts))
+        return "-" + _dir_word(value[1:], hid, value)
+    if value.startswith("not_"):
+        raise MarkError("%s：谜底 %r 用了 not_ 写法（下划线不再接受）——写 -north 或 "
+                        "not north" % (hid, value))
     if value.startswith("not-"):
-        raise MarkError("%s：谜底 %r 用了 not- 连字符（写成 not north、not_north，"
-                        "或者直接 -north）" % (hid, value))
+        raise MarkError("%s：谜底 %r 用了 not- 连字符（写 not north，或者直接 -north）"
+                        % (hid, value))
     m = _NEG_WORD_RX.match(value)
     if m:
-        rest = m.group(1)
-        if rest in ANS_DIRECTIONS:
-            return "-" + rest
-        opts = " / ".join(sorted(ANS_DIRECTIONS))
-        raise MarkError("%s：谜底 %r 里 not 后面不是方位词（只有 %s；不要大写，"
-                        "不要用 not- 连字符）" % (hid, value, opts))
+        return "-" + _dir_word(m.group(1), hid, value)
     if value == "not":
         raise MarkError("%s：谜底写成了光秃秃的 not（后面要跟方位词）" % hid)
+    if value in ANS_ABBREV:
+        return ANS_ABBREV[value]
+    if value.lower() in _ABBREV_LOWER:
+        raise MarkError("%s：谜底 %r 的缩写要全大写（%s）" % (hid, value, value.upper()))
+    if value in _CARDINAL_1:
+        raise MarkError("%s：谜底 %r 里的 %s 不设缩写，写全 %s"
+                        % (hid, value, value, _CARDINAL_1[value]))
     return value
 
 

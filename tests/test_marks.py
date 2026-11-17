@@ -306,11 +306,52 @@ class TestAnswerMark(unittest.TestCase):
         self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
 
     def test_not_word_form_is_accepted(self):
-        # 两种写法都收：`not north`（空格）、`not_north`（旧下划线），解析期归一成 -north
-        for spelling in ("not north", "not_north", "-north"):
+        # 收两种写法：`-north`（规范）与 `not north`（空格）；解析期归一成 -north
+        for spelling in ("not north", "-north"):
             doc = {"0x00000001": "[riddle:answer=%s;clue=direction:北]北边什么也没有。"
                                  % spelling}
             self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [], spelling)
+
+    def test_not_underscore_is_rejected(self):
+        # 下划线写法不再接受：报错直接给两种合法写法
+        for bad in ("not_north", "not_southeast"):
+            with self.assertRaises(M.MarkError) as ctx:
+                M.expand("[riddle:answer=%s;clue=direction:北]北边什么也没有。" % bad,
+                         TABLE, "zh")
+            self.assertIn("-north", str(ctx.exception))
+
+    def test_long_direction_abbrev_is_accepted(self):
+        # 长方位允许缩写，且必须大写；解析期补全成 northeast 这类完整键
+        for abbr, full in (("NE", "northeast"), ("SE", "southeast"),
+                           ("SW", "southwest"), ("NW", "northwest")):
+            doc = {"0x00000001": "[riddle:answer=%s;clue=direction:north]north 侧只有水。"
+                                 % abbr}
+            problems = M.check_doc("zh", doc, entities={}, terms={})
+            self.assertEqual(problems, [], abbr)
+            neg = {"0x00000001": "[riddle:answer=-%s;clue=direction:north]north 侧只有水。"
+                                % abbr}
+            self.assertEqual(M.check_doc("zh", neg, entities={}, terms={}), [], abbr)
+
+    def test_lowercase_abbrev_is_rejected(self):
+        for bad in ("ne", "se", "sw", "nw", "-ne", "not nw"):
+            with self.assertRaises(M.MarkError) as ctx:
+                M.expand("[riddle:answer=%s;clue=direction:东]north 侧只有水。" % bad,
+                         TABLE, "zh")
+            self.assertIn("大写", str(ctx.exception))
+
+    def test_cardinal_single_letter_is_rejected(self):
+        # 正方位不设缩写：写 N/E/S/W 会让人以为一套简写都成立
+        for bad in ("N", "E", "S", "W", "-N"):
+            with self.assertRaises(M.MarkError):
+                M.expand("[riddle:answer=%s;clue=direction:东]north 侧只有水。" % bad,
+                         TABLE, "zh")
+
+    def test_abbrev_normalizes_to_same_candidate(self):
+        # NE 与 northeast 归一后是同一个候选，写两遍算重复
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:answer=NE|northeast;clue=direction:东]north 侧只有水。",
+                     TABLE, "zh")
+        self.assertIn("重复", str(ctx.exception))
 
     def test_not_word_form_under_prefix_is_accepted(self):
         doc = {"0x00000001": "[riddle:answer=direction:not north;clue=direction:北]"
