@@ -69,6 +69,14 @@ ANS_DIRECTIONS = frozenset({
     "south", "southwest", "west", "northwest",
 })
 
+#: 第三种谜底：否定朝向 `not_<方位>`。谜面明写「往东南去航是白费力气」「北边什么
+#: 也没有」这种**只能排除一个方向**的句子用它——原文明写的是「不是那边」，
+#: 硬填成一个正向方位就是替原文做主。写 `not_north` 表示「不是北边」。
+ANS_NEGATIVE = frozenset("not_" + d for d in ANS_DIRECTIONS)
+
+#: `[ans:]` 里允许不登记实体的全部谜底取值。
+ANS_KEYS = ANS_DIRECTIONS | ANS_NEGATIVE
+
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
 _ANS_SPAN = re.compile(r"\[ans:[^\[\]]*\]")
@@ -406,7 +414,7 @@ def check_doc(lang, doc, entities=None, terms=None):
                 except MarkError as e:
                     problems.append(str(e))
                     continue
-                if name not in entities and name not in ANS_DIRECTIONS:
+                if name not in entities and name not in ANS_KEYS:
                     problems.append(
                         "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
                         % (hid, name))

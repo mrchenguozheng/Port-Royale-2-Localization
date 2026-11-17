@@ -11,8 +11,10 @@
 #
 # 谜面本身不要改：加 [ans:] 只在行首加标注，正文一字不动。
 #
-# 已标 10 组：05 圣奥古斯丁（城名），03/04/09/13/14/18/25/27/29 九组是方位谜底。
-# 其余 19 组（01/02/06/07/08/10/11/12/15/16/17/19/20/21/22/23/24/26/28）等地图判定。
+# 已标 16 组：05 圣奥古斯丁（城名）；03/04/09/13/14/18/25/27/29 九组是正向方位；
+# 06/07 是**否定方位**（not_southeast / not_southwest，谜面直说往那边去是白费）；
+# 11/12/20/26 拿路标方位当谜底（东南那座更大的岛 / 北边什么都没有 / 半岛自北伸来）。
+# 其余 13 组（01/02/08/10/15/16/17/19/21/22/23/24/28）等地图判定，谜面里没有方位。
 
 [[group]]
 # 01  The town that you seek is a desolate place, far flung from a
@@ -47,14 +49,14 @@ clues = {zh = "圣奥古斯丁,北", de = "August,Norden", es = "Agustín,norte"
 [[group]]
 # 06  Once long ago did other people here live, with their great t
 ids = ["0x35f48fe4"]
-ans = ""
-clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+ans = "not_southeast"
+clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
 
 [[group]]
 # 07  Once long ago did other people here live, with their great t
 ids = ["0x35f48fe5"]
-ans = ""
-clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+ans = "not_southwest"
+clues = {zh = "西南", de = "Südwesten", es = "suroeste", fr = "sud-ouest", ja = "南西", ru = "юго-запад"}
 
 [[group]]
 # 08  The distance from X to Nombre is not far, you have plenty of
@@ -77,14 +79,14 @@ clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
 [[group]]
 # 11  X lies on the island, it’s really quite small. But look to t
 ids = ["0x35f49050", "0x35f490bf"]
-ans = ""
-clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+ans = "southeast"
+clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "югу"}
 
 [[group]]
 # 12  Here in the island chain, you’ll see a break. To the west th
 ids = ["0x35f49051"]
-ans = ""
-clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+ans = "not_north"
+clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "север"}
 
 [[group]]
 # 13  In a large bay lie some towns, there are three. X refers to 
@@ -131,8 +133,8 @@ clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
 [[group]]
 # 20  An island lies here, as though in a cradle. A peninsula from
 ids = ["0x35f490c3", "0x35f490c4"]
-ans = ""
-clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+ans = "north"
+clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "северн"}
 
 [[group]]
 # 21  White strand beside the jungle, a little river known to none
@@ -167,8 +169,8 @@ clues = {zh = "东", de = "östlichste", es = "oriental", fr = "l'est", ja = "�
 [[group]]
 # 26  An island lies here, as though in a cradle. The land from th
 ids = ["0x35f49132", "0x35f49133"]
-ans = ""
-clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+ans = "north"
+clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "северн"}
 
 [[group]]
 # 27  You come from the west, the bridge you cross over. The town 

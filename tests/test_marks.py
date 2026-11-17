@@ -174,6 +174,11 @@ class TestAnswerMark(unittest.TestCase):
         problems = M.check_doc("zh", doc, entities={}, terms={})
         self.assertTrue(any("eastnorth" in p for p in problems), problems)
 
+    def test_negative_direction_answer_is_a_key(self):
+        # 「往东南去航是白费力气」只能排除东南，写 not_southeast 不替原文补正向
+        doc = {"0x00000001": "[ans:not_southeast|东南]往东南去航是白费力气。"}
+        self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
+
 
 class TestDoc(unittest.TestCase):
     def test_exempt_key(self):
