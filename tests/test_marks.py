@@ -317,6 +317,14 @@ class TestAnswerMark(unittest.TestCase):
                 M.expand("[riddle:answer=%s;clue=exclude:东南]往东南去航是白费力气。" % bad,
                          TABLE, "zh")
 
+    def test_dash_lookalike_is_error(self):
+        # 全角减号和长破折号肉眼几乎看不出，报错要直接点名是字符问题
+        for bad in ("－east", "–east", "—east", "−east", "‐east"):
+            with self.assertRaises(M.MarkError) as ctx:
+                M.expand("[riddle:answer=%s;clue=exclude:东南]往东南去航是白费力气。" % bad,
+                         TABLE, "zh")
+            self.assertIn("ASCII", str(ctx.exception))
+
     def test_kw_answer_is_gone(self):
         # `kw` 谜底已删：谜底只能指到城镇或方位，写 kw 既不是方位键也没登记，
         # 报错要指名这个值，别让人以为它被当成城市名收下了

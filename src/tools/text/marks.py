@@ -266,13 +266,21 @@ ANS_KEY_RX = re.compile(r"^[0-9a-f]{8}$")
 ANS_CLUE_KINDS = ("pun", "direction", "count", "feature", "produce", "history", "exclude")
 
 
+#: 长得像减号、但不是 ASCII 减号的字符：中文输入法下的全角`－`、排版用的各种破折号。
+#: 它们会让 `-north` 变成「未知谜底」，报错文案得先点出这个坑，否则读者以为方位拼错。
+_DASH_LOOKALIKES = frozenset("‐‑‒–—−－")
+
+
 def _check_bare_answer(value, hid):
     """裸值以减号开头就只能是「否定方位」：减号后必须紧跟 ANS_DIRECTIONS 里的词。
 
-    这一层只拦住形状写错的（`-`、`--east`、`-not_east`、`-East`）；写对形状的裸值
-    仍交给 check_doc 判「是不是登记过的城镇」。旧写法 `not_southeast` 没有减号，
-    会落到 check_doc 报未知值——不会悄悄被当成城名收下。
+    这一层只拦住形状写错的（`-`、`--east`、`-not_east`、`-East`）和全角同形减号；
+    写对形状的裸值仍交给 check_doc 判「是不是登记过的城镇」。旧写法 `not_southeast`
+    没有减号，会落到 check_doc 报未知值——不会悄悄被当成城名收下。
     """
+    if value[:1] in _DASH_LOOKALIKES:
+        raise MarkError("%s：谜底 %r 开头那个是长破折号/全角减号，不是半角 ASCII 减号"
+                        "（改成 -north 这种写法，全角字符肉眼几乎看不出）" % (hid, value))
     if not value.startswith("-"):
         return
     if value[1:] not in ANS_DIRECTIONS:
