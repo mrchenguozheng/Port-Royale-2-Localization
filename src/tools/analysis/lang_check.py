@@ -30,7 +30,10 @@ if ROOT not in sys.path:
 from text import toml_io  # noqa: E402
 from text import marks as MK  # noqa: E402
 
-#: LanguageTool 的语言码；这里没有的语言跳过语法检查（日文、中文不在 LT 覆盖内）
+#: LanguageTool 的语言码。6.8 的 /languages 列表里其实有 ja-JP 与 zh-CN，但实测：ja-JP
+#: 对三条日语样本零命中（规则集近乎为空）；zh-CN 有 wa5／wb2／wb4 一类规则，三条样本三处
+#: 命中全是误报（「一种叫作 xocoatl 的饮品」不含量词错、「以它的尺寸而言」本可搭配、
+#: 「精细的装饰」是形容词修饰名词）。两门语言的 LT 结果都不能当判据，故不入表。
 LT_CODE = {"de": "de-DE", "fr": "fr", "es": "es", "ru": "ru-RU", "nl": "nl", "pt": "pt-PT"}
 
 #: 字母串：任何非 ASCII 标点、非数字、非中日韩的字母（法语重音、西语 ñ、俄语西里尔都靠它）
@@ -104,12 +107,23 @@ def split_head(w, vocab, link=("s", "n", "en", "er", "es", "e")):
 
 
 #: 本地 hunspell 词典（src/data/qa/dict/<base>.aff + .dic）。有就用它，它带变形与复合词规则，
-#: 比纯频率表准得多；没有就退回 pyspellchecker。
+#: 比纯频率表准得多；没有就退回 pyspellchecker（pyspellchecker 只收拉丁系与俄语、波兰语等，
+#: 中日韩没有词表，硬走会抛 ValueError，因此这里显式跳过）。
 HUNSPELL = {"de": "de_DE_frami", "fr": "fr_FR", "es": "es_ES", "ru": "ru_RU"}
+NO_HUNSPELL = {"zh", "ja"}
 
 
 def spell(lang, tr, allow):
-    """未收录词。专名、术语、缩写、以及能拆成两个词典词的复合词都不报。"""
+    """未收录词。专名、术语、缩写、以及能拆成两个词典词的复合词都不报。
+
+    中日韩没有 hunspell 词典、pyspellchecker 也没有对应词表：这两门语言的「拼写」不是
+    词形问题，而是分词与用字问题（日语假名种类混用、中文简繁与全半角），词表法查不出来，
+    所以这里直接返回空，交给 test_lint 的字符层规则。
+    """
+    if lang in NO_HUNSPELL:
+        print("  「%s」无形态词典，拼写层跳过" % lang)
+        return {}
+
     base = HUNSPELL.get(lang)
     dic = os.path.join(ROOT, "src", "data", "qa", "dict", base or "")
     hd = None
