@@ -119,6 +119,7 @@ if ($Target -in @('All', 'Injector')) {
 }
 if ($Target -in @('All', 'Packs')) {
     Write-Host '[build] 语言包：build\runtime\PR2Localization\packs'
+    Write-Host '[build] 版本变体：build\variants\<原版版本id>\（按玩家安装版本取用）'
 }
 
 if (-not $NoPause -and $Host.Name -eq 'ConsoleHost') {

@@ -37,6 +37,10 @@ ROOT = os.path.dirname(SRC)                              # 仓库根
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 DEFAULT_OUT = os.path.join(ROOT, "build", "runtime", "PR2Localization", "packs")
+#: 非 primary 基线的语言包落点。**不放进 packs\\**：运行时按 packs\\<语言>.txt
+#: 找活动语言，多出来的同级文件会让语言列表出现重名项，子目录也会被部署脚本
+#: 一起拷进游戏目录。放仓库 build\\variants\\<版本id>\\ 下，按目标安装手动取用。
+DEFAULT_VARIANT_OUT = os.path.join(ROOT, "build", "variants")
 
 # 占位符与「占位文本」的判定只有一份，在 shared\core\validate.py。
 from shared.core.validate import (  # noqa: E402
@@ -191,53 +195,53 @@ def add_mark(txt, mark):
     return txt[:m.end()] + mark + txt[m.end():]
 
 
-def build(lang, out_dir, strict, marks=False):
-    # 参考原文**不参与编译**：生成 en.txt / fr.txt 交给引擎等于用「原始英文」
-    # 覆盖游戏，等于没汉化。所以直接拒绝，而不是打个警告继续跑。
-    # 名单问 translate —— 那里是唯一一份（src\orig\en.gog_1.1.2.3 之类）。
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+def _version_bases(baseline):
+    """选要出包的版本基线：'all' = 全部；否则按 id 选一个。
+
+    基线清单与定向差在 src\\data\\versions\\ 下（versions.py 负责读与核对）。
+    """
+    from text import versions as V
+    bases = V.load_baselines()
+    if baseline in ("", "all"):
+        return bases
+    want = [b for b in bases if b["id"] == baseline]
+    if not want:
+        raise SystemExit("没有这个版本基线：%s（可选：all、%s）"
+                         % (baseline, "、".join(b["id"] for b in bases)))
+    return want
+
+
+def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal):
+    """按某份基线的键集出行（顺序 = 该版本原文表的顺序）。
+
+    【并集与缺行】译文层是 `src\\translations\\<语言>.toml` 一套，键集覆盖基准版
+    全部条目；个别版本独有的键（fr.gog_1.1.2.42 多出 42 条）在任何语版里都是
+    `+++EMPTY+++`，译文层不为它们建行 —— 这里从原文表复制该值，既是「原文空」
+    也是「不用翻」，不是漏译。原文非空却没有译文行，才是漏译，报错误。
+    """
+    from text import versions as V
     import translate as T
-    if lang in T.REFERENCE_LANGS:
-        print("拒绝：%s 是原文参考语言（%s），不生成语言包。"
-              % (lang, "/".join(T.REFERENCE_LANGS)))
-        print("      英文/法文只用于校对译文与 id 顺序对照。")
-        return 2
-
-    # 合并层的字段名就是语言代码本身（文件名即语言名，不做映射）。
-    field = lang
-    doc = _load_merged()
-
-    # 译文层 → 引擎层：排版规则在构建期套一遍，结果只写到 build/ 里。
-    # 这就是「引擎文本是构建产物」的落点（旧的 src/live 已并入这里）—— 仓库里不再有第二份成品文本。
-    from text import engine_text as ET
-    plain, order = {}, []
-    for s in doc.get("s", []):
-        h = s.get("id", "").lower()
-        if s.get(field):
-            plain[h] = s.get(field)
-            order.append(h)
-    engine = ET.build(field, plain, order)
-    engine_path = ET.write(field, engine, order)
-    print("引擎文本 %d 条 → %s" % (len(engine), engine_path))
-
-    errors, warnings, fatal = [], [], []
-
-    os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, "%s.txt" % lang)
     lines = []
     meta = load_pack_meta(lang)
     for k in ("alias", "min_runtime"):
         if meta.get(k):
             val = meta[k].replace("\n", " ").replace("\r", " ")
             lines.append("# pack-meta %s=%s\n" % (k, val))
-    n = n_ph = 0
-    mk = mark_map([x.get("id", "").lower() for x in doc.get("s", []) if x.get("id")]) if marks else {}
+    n = n_ph = n_empty = 0
 
-    for s in doc.get("s", []):
-        h = s.get("id", "").lower()
+    for h in b["keys"]:
         txt = engine.get(h)
         if not txt:
+            orig = b["table"][h]
+            if orig.strip() != V.EMPTY:
+                errors.append("%s 缺译文：%s 里这条是正文（%r）"
+                              % (h, b["id"], orig[:40]))
+                continue
+            lines.append("%s = %s\n"
+                         % (h.upper().replace("0X", "0x"), V.EMPTY))
+            n_empty += 1
             continue
+        s = by_hash.get(h, {})
         if h in KEEP_ORIGINAL:
             eng = s.get(T.BASE_LANG, "") or txt
             if txt != eng:
@@ -267,49 +271,119 @@ def build(lang, out_dir, strict, marks=False):
         n += 1
         if is_placeholder(txt) or ident_ph:
             n_ph += 1
+    return lines, n, n_ph, n_empty, meta
 
-    if fatal:
-        print("\n错误 %d 条（旧写法 | 不再自动转换）：" % len(fatal))
-        for e in fatal[:30]:
+
+def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None):
+    # 参考原文**不参与编译**：生成 en.txt / fr.txt 交给引擎等于用「原始英文」
+    # 覆盖游戏，等于没汉化。所以直接拒绝，而不是打个警告继续跑。
+    # 名单问 translate —— 那里是唯一一份（src\orig\en.gog_1.1.2.3 之类）。
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import translate as T
+    from text import versions as V
+    if lang in T.REFERENCE_LANGS:
+        print("拒绝：%s 是原文参考语言（%s），不生成语言包。"
+              % (lang, "/".join(T.REFERENCE_LANGS)))
+        print("      英文/法文只用于校对译文与 id 顺序对照。")
+        return 2
+
+    # 合并层的字段名就是语言代码本身（文件名即语言名，不做映射）。
+    field = lang
+    doc = _load_merged()
+
+    # 译文层 → 引擎层：排版规则在构建期套一遍，结果只写到 build/ 里。
+    # 这就是「引擎文本是构建产物」的落点（旧的 src/live 已并入这里）—— 仓库里不再有第二份成品文本。
+    from text import engine_text as ET
+    plain, order = {}, []
+    for s in doc.get("s", []):
+        h = s.get("id", "").lower()
+        if s.get(field):
+            plain[h] = s.get(field)
+            order.append(h)
+    engine = ET.build(field, plain, order)
+    engine_path = ET.write(field, engine, order)
+    print("引擎文本 %d 条 → %s" % (len(engine), engine_path))
+
+    by_hash = {}
+    for s in doc.get("s", []):
+        if s.get("id"):
+            by_hash[s["id"].lower()] = s
+
+    bases = _version_bases(baseline)
+    variant_out = variant_out or DEFAULT_VARIANT_OUT
+    mk = mark_map(list(by_hash)) if marks else {}
+
+    # 定向差是「按版本出包」的唯一依据，构建前先核一遍：
+    # 数据漂移（手改了 only_from/only_to、加了新基线没配差）必须在这里就停，
+    # 不能出一个「键集与目标版不符」的包还没人知道。
+    drift = V.check()
+    if drift:
+        print("\n版本差核对失败 %d 条：" % len(drift))
+        for e in drift[:20]:
             print("  x " + e)
-        if len(fatal) > 30:
-            print("  … 还有 %d 条" % (len(fatal) - 30))
-        print("未生成 %s" % path)
         return 1
 
-    # 一条都没编出来就**不写文件**：写一个 0 条的语言包毫无用处，
-    # 装进游戏目录等于没汉化，而调用方只看「文件在不在」。
-    # 成因通常是 src\translations\<语言>.toml 压根不存在 ——
-    # 合并层只为实际存在的语言建字段。
-    if n == 0:
-        print("错误：没有编出任何条目，未生成 %s" % path)
-        print("      找不到 %s\\%s.toml，或它里面没有条目。"
-              % (os.path.join(SRC, "translations"), lang))
-        print("      加一种语言：python src\\tools\\pack\\new_lang.py"
-              " --new-lang %s" % lang)
-        return 1
+    codes, made = [], []
+    for b in bases:
+        errors, warnings, fatal = [], [], []
+        lines, n, n_ph, n_empty, meta = _pack_lines(
+            lang, b, engine, by_hash, mk, marks, errors, warnings, fatal)
+        dst_dir = out_dir if b["primary"] else os.path.join(variant_out, b["id"])
+        path = os.path.join(dst_dir, "%s.txt" % lang)
+        os.makedirs(dst_dir, exist_ok=True)
 
-    with io.open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.write("".join(lines))
+        if fatal:
+            print("\n错误 %d 条（旧写法 | 不再自动转换）：" % len(fatal))
+            for e in fatal[:30]:
+                print("  x " + e)
+            if len(fatal) > 30:
+                print("  … 还有 %d 条" % (len(fatal) - 30))
+            print("未生成 %s（%s）" % (path, b["id"]))
+            codes.append(1)
+            continue
 
-    print("已生成 %s" % path)
-    print("  条目 %d 条，其中占位未翻译 %d 条%s"
-          % (n, n_ph, "，已加排查标记" if marks else ""))
-    if warnings:
-        print("\n警告 %d 条：" % len(warnings))
-        for w in warnings[:20]:
-            print("  ! " + w)
-        if len(warnings) > 20:
-            print("  … 还有 %d 条" % (len(warnings) - 20))
-    if errors:
-        print("\n错误 %d 条：" % len(errors))
-        for e in errors[:30]:
-            print("  x " + e)
-        if len(errors) > 30:
-            print("  … 还有 %d 条" % (len(errors) - 30))
-        if strict:
-            return 1
-    return 0
+        # 一条都没编出来就**不写文件**：写一个 0 条的语言包毫无用处，
+        # 装进游戏目录等于没汉化，而调用方只看「文件在不在」。
+        # 成因通常是 src\translations\<语言>.toml 压根不存在 ——
+        # 合并层只为实际存在的语言建字段。
+        if n == 0 and n_empty == 0:
+            print("错误：没有编出任何条目，未生成 %s（%s）" % (path, b["id"]))
+            print("      找不到 %s\\%s.toml，或它里面没有条目。"
+                  % (os.path.join(SRC, "translations"), lang))
+            print("      加一种语言：python src\\tools\\pack\\new_lang.py"
+                  " --new-lang %s" % lang)
+            codes.append(1)
+            continue
+
+        with io.open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write("".join(lines))
+
+        print("\n已生成 %s（%s，键集 %d 条）" % (path, b["id"], len(b["keys"])))
+        print("  条目 %d 条，其中占位未翻译 %d 条、原文空占位 %d 条%s"
+              % (n + n_empty, n_ph, n_empty, "，已加排查标记" if marks else ""))
+        made.append((b["id"], path, n + n_empty, n_empty))
+        if warnings:
+            print("\n警告 %d 条：" % len(warnings))
+            for w in warnings[:20]:
+                print("  ! " + w)
+            if len(warnings) > 20:
+                print("  … 还有 %d 条" % (len(warnings) - 20))
+        if errors:
+            print("\n错误 %d 条：" % len(errors))
+            for e in errors[:30]:
+                print("  x " + e)
+            if len(errors) > 30:
+                print("  … 还有 %d 条" % (len(errors) - 30))
+            if strict:
+                codes.append(1)
+                continue
+        codes.append(0)
+
+    if len(made) > 1:
+        print("\n本次共出 %d 份：" % len(made))
+        for vid, path, total, n_empty in made:
+            print("  %-18s %5d 条（空占位 %d）  %s" % (vid, total, n_empty, path))
+    return max(codes) if codes else 0
 
 
 def main():
@@ -321,11 +395,17 @@ def main():
                     help="只编语言包，不检查/重建字体（批量编译时由调用方统一做）")
     ap.add_argument("--marks", action="store_true",
                     help="给每条正文加 [XXXX] 排查标记（开发用，正常包不要加）")
+    ap.add_argument("--baseline", default="all",
+                    help="按哪个原版键集出包：all（默认，每个基线各一份）、或某个版本 id"
+                         "（如 fr.gog_1.1.2.42）。primary 那份写到 --out，其余写到"
+                         " build\\variants\\<id>\\")
+    ap.add_argument("--variant-out", default=DEFAULT_VARIANT_OUT,
+                    help="非 primary 基线的输出根目录（默认 build\\variants）")
     a = ap.parse_args()
     lang = a.lang
     if not lang:
         lang = _default_lang()
-    code = build(lang, a.out, a.strict, a.marks)
+    code = build(lang, a.out, a.strict, a.marks, a.baseline, a.variant_out)
 
     # 编完语言包顺手检查字体：译文里出现新字（比如新补的「嫩」）时，
     # 字体不重缝就会画成空白。字体出错不算构建失败 —— 语言包本身没问题。
