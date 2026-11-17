@@ -153,9 +153,9 @@ class TestExpand(unittest.TestCase):
 class TestAnswerMark(unittest.TestCase):
     """[ans:…] 是给翻译人看的谜底，展开必须为空；线索词必须真在谜面里。
 
-    `name` 的每一项必须写 `<类型>:<值>`，只认 town / direction / kw；
-    `clue` 的类型可选：写成 `pun:August` 有类型，写成 `August` 就是一个关键词，
-    两种都当正文锚点核对。类型写错（已知前缀却缺值）报错，未知前缀按关键词处理。
+    `name` 的每一项必写 `<类型>:<值>`，只认 town / direction（`kw` 已删）；
+    `clue` 的每一项也必写 `<标签>:<正文>`：已知类型按类型校验，`_` 开头的自造标签
+    静默，字母开头的自造标签报 warning；相邻同类型可用 `+` 并值，语义仍是「都要成立」。
     """
 
     VERSE = "[ans:name=town:St. Augustine;clue=pun:August,direction:north]He left for the north in August."
@@ -294,19 +294,28 @@ class TestAnswerMark(unittest.TestCase):
         doc = {"0x00000001": "[ans:name=direction:not_southeast;clue=exclude:东南]往东南去航是白费力气。"}
         self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
 
-    def test_keyword_answer_needs_two_clues(self):
+    def test_kw_answer_is_gone(self):
+        # `kw` 谜底已删：谜底只能指到城镇或方位，写 kw 就是类型不认识
         ok = {"0x00000001": "[ans:name=kw:;clue=produce:黄金,feature:港口]街道以黄金铺就，港口雄伟。"}
-        self.assertEqual(M.check_doc("zh", ok, entities={}, terms={}), [])
-        bad = {"0x00000001": "[ans:name=kw:;clue=produce:黄金]街道以黄金铺就，港口雄伟。"}
-        problems = M.check_doc("zh", bad, entities={}, terms={})
-        self.assertTrue(any("关键词组合" in p for p in problems), problems)
+        problems = M.check_doc("zh", ok, entities={}, terms={})
+        self.assertTrue(any("kw" in p for p in problems), problems)
 
-    def test_keyword_answer_takes_no_value(self):
-        # kw 是「关键词组合」这个标记本身，后面不该再跟东西
+    def test_plus_groups_same_kind(self):
+        # `feature:白沙+丛林` 与 `feature:白沙,feature:丛林` 等价：两个词都要在谜面里
+        self.assertEqual(
+            M.expand("[ans:name=town:St. Augustine;clue=feature:白沙+丛林]"
+                     "白沙与丛林。", TABLE, "zh"),
+            "白沙与丛林。")
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[ans:name=kw:黄金;clue=produce:黄金,feature:港口]"
-                     "街道以黄金铺就，港口雄伟。", TABLE, "zh")
-        self.assertIn("kw", str(ctx.exception))
+            M.expand("[ans:name=town:St. Augustine;clue=feature:白沙+峡谷]"
+                     "白沙与丛林。", TABLE, "zh")
+        self.assertIn("峡谷", str(ctx.exception))
+
+    def test_plus_needs_value_on_both_sides(self):
+        for bad in ("feature:白沙+", "feature:+丛林", "feature:白+  +沙"):
+            with self.assertRaises(M.MarkError):
+                M.expand("[ans:name=town:St. Augustine;clue=%s]白沙与丛林。" % bad,
+                         TABLE, "zh")
 
     def test_alternative_names_both_count_as_used(self):
         # `|` 是「或」：两个候选都算被引用，也都要登记，否则死条目会误报其中一城

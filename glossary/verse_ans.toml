@@ -26,7 +26,7 @@
 # （Steam 帖 steamcommunity.com/app/12470/discussions/0/1354868867712622875/，
 # 帖子正文标题 "Port Royal 2 - Three Part Treasure Quests"，作者 Darinthal 转录 Selket 原文）。
 # 剩余 5 组：07/12/25/29 在该表里查不到（保留方位谜底），05 早有城名。
-# 谜底取值仍支持四类：城名、正向方位、否定方位 not_*、关键词组合 kw（当前 0 组使用，留作兜底）。
+# 谜底取值支持三类：城名、正向方位、否定方位 not_*（`kw` 关键词谜底已删，0 组用过）。
 
 [[group]]
 # 01  The town that you seek is a desolate place, far flung from a

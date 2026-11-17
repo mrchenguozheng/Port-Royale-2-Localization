@@ -13,9 +13,8 @@
 --apply 的判据：
   · name 必须是 entities.toml 里的实体键；若它是城镇表里的城名但还没登记，就顺带把
     六语译名从译文行里取出来，登记进 entities.toml 与 names/<lang>.toml；
-  · 或者 name 是 marks.ANS_KEYS 里的键：方位（north/east/southeast…）、否定方位
-    （not_north/not_southeast…）、关键词谜底 `kw`（谜面既无城名也无朝向时，
-    能定位它的关键词组合写在线索里，至少两条）。这几种都不登记实体、不查译名；
+  · 或者 name 是 marks.ANS_KEYS 里的键：方位（north/east/southeast…）或否定方位
+    （not_north/not_southeast…）。这类不登记实体、不查译名；
   · 六语线索都不能空，只收英文逗号，每条线索都要出现在该语言自己的谜面正文里；
   · 已经标成同值的组直接跳开（可重复跑），标成别的值则报错，不覆盖。
 """
@@ -157,6 +156,7 @@ def clue_text(clues, kinds, lang):
     `kinds` 缺省（空）时整组都算出错——clue 每项都必须带标签，裸写不允许；
     给了就按位加前缀。前缀可以是七个已知类型，也可以是自造标签：`_` 开头静默，
     字母开头的自造标签展开侧会报 warning（这里不拦）。
+    相邻且同标签的几条并成一项：`feature:白沙+丛林`，与逐条重复等价。
     """
     if not kinds:
         raise SystemExit("%s 的线索没有 kinds：clue 每项都要写 <标签>:<正文>，"
@@ -166,7 +166,18 @@ def clue_text(clues, kinds, lang):
                          % (lang, len(clues), len(kinds)))
     if not all(k for k in kinds):
         raise SystemExit("%s 的 kinds 里有空项：没有标签就等于裸写" % lang)
-    return ",".join("%s:%s" % (k, c) for k, c in zip(kinds, clues))
+    out = []
+    run_tag, run_vals = None, []
+    for k, c in zip(kinds, clues):
+        if run_tag is not None and k == run_tag:
+            run_vals.append(c)
+            continue
+        if run_tag is not None:
+            out.append((run_tag, run_vals))
+        run_tag, run_vals = k, [c]
+    if run_tag is not None:
+        out.append((run_tag, run_vals))
+    return ",".join("%s:%s" % (k, "+".join(vals)) for k, vals in out)
 
 
 def cmd_apply():
@@ -193,9 +204,7 @@ def cmd_apply():
             register_entity(ans, tid, rows)
             print("登记实体 %s（城镇行 %s）" % (ans, tid))
 
-        if ans == MK.ANS_KEYWORD:
-            name_item = "%s:" % MK.ANS_KEYWORD       # kw 不取值，写成 name=kw:
-        elif ans in MK.ANS_KEYS:
+        if ans in MK.ANS_KEYS:
             name_item = "direction:%s" % ans          # 方位键与 not_<方位> 都算方位
         else:
             name_item = "town:%s" % ans

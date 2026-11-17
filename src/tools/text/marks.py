@@ -19,11 +19,12 @@
     [ans:name=town:Corpus Christi;clue=feature:荒凉,feature:遗弃]
                                 诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
                                 字段：`name=` 谜底，`clue=` 线索；`;` 分字段。
-                                `name` 的类型必填：town / direction / kw，`|` 分隔
-                                「或」的候选；`clue` 的类型可选，写成 pun / direction /
-                                count / feature / produce / history / exclude 有类型，
-                                `,` 分隔并列项，值必须是**谜面正文里逐字出现的片段**；
-                                不写类型时整项就是一个自解释关键词，同样当锚点核对。
+                                `name` 的类型必填：town / direction，`|` 分隔
+                                「或」的候选；`clue` 的每一项也必写 `<标签>:<正文>`，
+                                pun / direction / count / feature / produce / history /
+                                exclude 是已知类型，`,` 分隔并列项、`+` 是同类并值，
+                                值必须是**谜面正文里逐字出现的片段**；`_` 开头的自造
+                                标签静默，字母开头的自造标签报 warning，裸写报错。
                                 展开时逐条核对——
                                 写不出线索就说明这条谜面根本推不到这个答案（或线索该改）。
                                 谜底/线索都不生成本文，也不许把答案照抄成 town，
@@ -87,13 +88,11 @@ ANS_DIRECTIONS = frozenset({
 #: 硬填成一个正向方位就是替原文做主。写 `not_north` 表示「不是北边」。
 ANS_NEGATIVE = frozenset("not_" + d for d in ANS_DIRECTIONS)
 
-#: 第四种谜底：`kw`——谜面既不指名城镇、也不给朝向（"荒凉之地、被遗弃"、
-#: "三座小岛只有一座有缆绳"），只能拿**能定位它的关键词组合**当谜底。`ans` 写 `kw`，
-#: 组合本身放进线索（至少两条，逐条要在谜面里出现）。见 09 卷第七十四节。
-ANS_KEYWORD = "kw"
-
-#: `[ans:]` 里允许不登记实体的全部谜底取值。
-ANS_KEYS = ANS_DIRECTIONS | ANS_NEGATIVE | {ANS_KEYWORD}
+#: `[ans:]` 里允许不登记实体的全部谜底取值：只有方位（正向与否定）。
+#: 早先还有第四种谜底 `kw`（关键词组合），一条都没用上就删了——它靠 `name=kw:`
+#: 带一个空值表达「这不是专名」，既不比方位表清楚，也和「谜底要能指到具体地方」
+#: 的初衷相反。真拿不准的时候谜底留空，而不是拿关键词凑。
+ANS_KEYS = ANS_DIRECTIONS | ANS_NEGATIVE
 
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
@@ -241,11 +240,11 @@ def _ref_target(arg, doc, hid=""):
 
 
 #: `[ans:]` 的字段名。`;` 分字段；两个字段都吃「`<类型>:<值>`」的项：
-#: `name=` 里 `|` 是「或」，`clue=` 里 `,` 是「并列」。
+#: `name=` 里 `|` 是「或」，`clue=` 里 `,` 是「并列」、`+` 是同类并值。
 ANS_FIELDS = ("name", "clue")
 
-#: name 的类型：城镇查 entities.toml，方位查 ANS_DIRECTIONS，kw 是关键词谜底（不取值）。
-ANS_NAME_KINDS = ("town", "direction", ANS_KEYWORD)
+#: name 的类型：城镇查 entities.toml，方位查 ANS_DIRECTIONS | ANS_NEGATIVE。
+ANS_NAME_KINDS = ("town", "direction")
 
 #: clue 的类型：说明这条谜面的信息属于哪一类，也决定译者必须保住什么。
 ANS_CLUE_KINDS = ("pun", "direction", "count", "feature", "produce", "history", "exclude")
@@ -265,14 +264,15 @@ def _ans_item(part, kinds, what, hid):
 
 
 def _split_ans(arg, hid="", warns=None):
-    """`[ans:name=town:城|town:城;clue=direction:东,count:四座]`
+    """`[ans:name=town:城|town:城;clue=direction:东,count:四座+第三座]`
     → ([(类型, 值)…], [(类型|None, 词)…])。
 
-    `name` 里 `|` 是「或」（多个候选），`clue` 里 `,` 是「并列」（全部必须成立）。
+    `name` 里 `|` 是「或」（多个候选），`clue` 里 `,` 是「并列」（全部必须成立）、
+    `+` 是「同一个标签下的多个值」（展开后等价于把该项重复几遍）。
     `name` 的每一项都必须带类型；`clue` 的每一项必须写成 `<标签>:<正文>`：
     标签是七个已知类型就按类型校验，`_` 开头的自造标签静默通过，字母开头的自造
     标签只当关键词并往 `warns` 记一条（多半是拼错）。
-    裸写、标签含大写/数字开头、已知类型缺值、缺字段、字段重名、全角逗号，一律失败。
+    裸写、标签含大写/数字开头、已知类型缺值、`+` 两侧缺值、缺字段、字段重名、全角逗号，一律失败。
     """
     fields = {}
     for part in arg.split(";"):
@@ -303,11 +303,6 @@ def _split_ans(arg, hid="", warns=None):
     names = []
     for part in parts:
         kind, value = _ans_item(part, ANS_NAME_KINDS, "name", hid)
-        if kind == ANS_KEYWORD:
-            if value:
-                raise MarkError("%s：kw 不取值（写成 name=kw:）" % hid)
-            names.append((kind, ""))
-            continue
         if not value:
             raise MarkError("%s：name 的 %s 缺值" % (hid, kind))
         if kind == "direction" and value not in ANS_DIRECTIONS | ANS_NEGATIVE:
@@ -336,14 +331,20 @@ def _split_ans(arg, hid="", warns=None):
         if not tail:
             raise MarkError("%s：clue 的 %s 项缺值（要写谜面里出现的原词）"
                             % (hid, tag))
-        if tag in ANS_CLUE_KINDS:
-            clues.append((tag, tail))
-        else:
+        # 同类型并值：`feature:白沙+丛林` 等价于 `feature:白沙,feature:丛林`。
+        # `+` 只在标签内部起作用，语义仍是「都要成立」，省掉重复标签。
+        values = [v.strip() for v in tail.split("+")]
+        if any(not v for v in values):
+            raise MarkError("%s：clue 的 %s 项里 `+` 两侧都要写值（收到 %r）"
+                            % (hid, tag, tail))
+        known = tag in ANS_CLUE_KINDS
+        if not known:
             # 自造标签：`_` 开头是显式声明，静默；字母开头多半是拼错，记一条 warning。
             if not tag.startswith("_") and warns is not None:
                 warns.append("%s：clue 的标签 %r 不是已知类型，按关键词扫描"
                              "（自造标签请用 `_` 开头）" % (hid, tag))
-            clues.append((None, tail))
+        for value in values:
+            clues.append((tag if known else None, value))
     if not clues:
         raise MarkError(
             "%s：ans 只有谜底 %r，没有 clue（谜面里能推出它的词要逐条写进来）"
@@ -354,10 +355,6 @@ def _split_ans(arg, hid="", warns=None):
 def _check_ans(arg, body, hid="", warns=None):
     """核对谜底与线索：线索必须逐条出现在谜面正文里。返回候选名单。写错抛 MarkError。"""
     names, clues = _split_ans(arg, hid, warns=warns)
-    if any(kind == ANS_KEYWORD for kind, _ in names) and len(clues) < 2:
-        raise MarkError(
-            "%s：谜底是关键词组合（%s），至少写两条线索——一条算不上组合，"
-            "也定位不到地方" % (hid, ANS_KEYWORD))
     text = (body or "").casefold()
     missing = [v for _, v in clues if v.casefold() not in text]
     if missing:
@@ -570,7 +567,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                     continue
                 for kind, name in names:
                     if kind != "town":
-                        continue        # 方位/kw 不进 names 表，没什么可登记可引用
+                        continue        # 方位不进 names 表，没什么可登记可引用
                     if name not in entities:
                         problems.append(
                             "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"

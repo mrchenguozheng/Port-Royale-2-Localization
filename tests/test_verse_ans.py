@@ -88,9 +88,16 @@ class TestClueText(unittest.TestCase):
             VA.clue_text(["四座"], [""], "zh")
 
     def test_typed_items(self):
+        # 相邻同类型并成一项：count:四座+第三座
         self.assertEqual(VA.clue_text(["四座", "第三座", "东"],
                                       ["count", "count", "direction"], "zh"),
-                         "count:四座,count:第三座,direction:东")
+                         "count:四座+第三座,direction:东")
+
+    def test_same_kind_split_by_other_kind(self):
+        # 同类型不连续就不合并，只并相邻的
+        self.assertEqual(VA.clue_text(["四座", "东", "五座"],
+                                      ["count", "direction", "count"], "zh"),
+                         "count:四座,direction:东,count:五座")
 
     def test_count_mismatch_stops(self):
         with self.assertRaises(SystemExit):
