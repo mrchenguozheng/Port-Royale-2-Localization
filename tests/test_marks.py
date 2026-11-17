@@ -305,11 +305,30 @@ class TestAnswerMark(unittest.TestCase):
         doc = {"0x00000001": "[riddle:answer=-southeast;clue=exclude:东南]往东南去航是白费力气。"}
         self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
 
-    def test_old_not_prefix_is_error(self):
-        # 旧写法 `not_southeast` 不再被认作方位：报未知值，不悄悄收下
-        doc = {"0x00000001": "[riddle:answer=not_southeast;clue=exclude:东南]往东南去航是白费力气。"}
-        problems = M.check_doc("zh", doc, entities={}, terms={})
-        self.assertTrue(any("not_southeast" in p for p in problems), problems)
+    def test_not_word_form_is_accepted(self):
+        # 两种写法都收：`not north`（空格）、`not_north`（旧下划线），解析期归一成 -north
+        for spelling in ("not north", "not_north", "-north"):
+            doc = {"0x00000001": "[riddle:answer=%s;clue=direction:北]北边什么也没有。"
+                                 % spelling}
+            self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [], spelling)
+
+    def test_not_word_form_under_prefix_is_accepted(self):
+        doc = {"0x00000001": "[riddle:answer=direction:not north;clue=direction:北]"
+                             "北边什么也没有。"}
+        self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
+
+    def test_not_word_form_normalizes_to_same_candidate(self):
+        # 归一的意义：两种写法不能把同一个谜底分裂成两串不同文本，写重就算重复
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:answer=not north|-north;clue=direction:北]北边什么也没有。",
+                     TABLE, "zh")
+        self.assertIn("重复", str(ctx.exception))
+
+    def test_bad_not_shapes_are_errors(self):
+        for bad in ("not", "not-", "not- north", "not East", "not eastnorth"):
+            with self.assertRaises(M.MarkError):
+                M.expand("[riddle:answer=%s;clue=direction:北]北边什么也没有。" % bad,
+                         TABLE, "zh")
 
     def test_lone_dash_is_error(self):
         for bad in ("-", "--east", "-not_east", "-eastnorth", "-East"):

@@ -92,8 +92,9 @@ ANS_DIRECTIONS = frozenset({
 #: 第三种谜底：否定朝向 `-<方位>`。谜面明写「往东南去航是白费力气」「北边什么
 #: 也没有」这种**只能排除一个方向**的句子用它——原文明写的是「不是那边」，
 #: 硬填成一个正向方位就是替原文做主。写 `-north` 表示「不是北边」。
-#: 用减号而不是 `not_` 前缀：没有下划线可忘，比 not_north 短 4 个字符，
-#: 且不会让人把它当专名。`-` 后面必须紧跟方位词，`-`、`--east`、`-not_east` 都报错。
+#: 减号是规范写法（短、无下划线、与布尔取反区分）；输入容忍 `not north`（空格）
+#: 与 `not_north`（旧写法），`_canon_answer` 在解析期统一归一成 `-north`。
+#: 形状写错的（`-`、`--east`、`-not_east`、`not-`、`not East`）都报错。
 ANS_NEGATIVE = frozenset("-" + d for d in ANS_DIRECTIONS)
 
 #: `[riddle:]` 里允许不登记实体的全部谜底取值：只有方位（正向与否定）。
@@ -271,22 +272,44 @@ ANS_CLUE_KINDS = ("pun", "direction", "count", "feature", "produce", "history", 
 _DASH_LOOKALIKES = frozenset("‐‑‒–—−－")
 
 
-def _check_bare_answer(value, hid):
-    """裸值以减号开头就只能是「否定方位」：减号后必须紧跟 ANS_DIRECTIONS 里的词。
+#: 否定方位的两种输入写法：`not east`（空格）与 `not_east`（下划线）。都归一成 `-east`。
+_NEG_WORD_RX = re.compile(r"^not[ _](.*)$")
 
-    这一层只拦住形状写错的（`-`、`--east`、`-not_east`、`-East`）和全角同形减号；
-    写对形状的裸值仍交给 check_doc 判「是不是登记过的城镇」。旧写法 `not_southeast`
-    没有减号，会落到 check_doc 报未知值——不会悄悄被当成城名收下。
+
+def _canon_answer(value, hid):
+    """把否定方位的三种写法归一成 `-方位`。
+
+    收 `-east`（规范）、`-east` 同义的 `not east`（自然英语）、`not_east`（旧写法，
+    容忍输入）。归一发生在解析期，后面的校验、`ANS_KEYS` 查表、组内比对只见到
+    `-east`，所以两种写法不会让同一个谜底分裂成两串不同文本。
+
+    形状写错的一律报错：`-`、`--east`、`-not_east`、`-East`、`not`、`not-`、
+    `not East`、`not eastnorth`；全角/长破折号开头的先单独报字符问题，因为肉眼
+    几乎看不出，落进「未知谜底」会把人引去查方位拼写。
     """
     if value[:1] in _DASH_LOOKALIKES:
         raise MarkError("%s：谜底 %r 开头那个是长破折号/全角减号，不是半角 ASCII 减号"
                         "（改成 -north 这种写法，全角字符肉眼几乎看不出）" % (hid, value))
-    if not value.startswith("-"):
-        return
-    if value[1:] not in ANS_DIRECTIONS:
+    if value.startswith("-"):
+        if value[1:] in ANS_DIRECTIONS:
+            return value
         opts = " / ".join("-" + d for d in sorted(ANS_DIRECTIONS))
-        raise MarkError("%s：谜底 %r 的减号后面不是方位词（否定方位写成 %s；"
-                        "旧写法 not_north 已废）" % (hid, value, opts))
+        raise MarkError("%s：谜底 %r 的减号后面不是方位词（否定方位写成 %s，"
+                        "也可以写 not north）" % (hid, value, opts))
+    if value.startswith("not-"):
+        raise MarkError("%s：谜底 %r 用了 not- 连字符（写成 not north、not_north，"
+                        "或者直接 -north）" % (hid, value))
+    m = _NEG_WORD_RX.match(value)
+    if m:
+        rest = m.group(1)
+        if rest in ANS_DIRECTIONS:
+            return "-" + rest
+        opts = " / ".join(sorted(ANS_DIRECTIONS))
+        raise MarkError("%s：谜底 %r 里 not 后面不是方位词（只有 %s；不要大写，"
+                        "不要用 not- 连字符）" % (hid, value, opts))
+    if value == "not":
+        raise MarkError("%s：谜底写成了光秃秃的 not（后面要跟方位词）" % hid)
+    return value
 
 
 def _answer_items(raw, hid):
@@ -301,8 +324,7 @@ def _answer_items(raw, hid):
     items = []
     for part in parts:
         if ":" not in part:
-            _check_bare_answer(part, hid)
-            items.append((None, part))
+            items.append((None, _canon_answer(part, hid)))
             continue
         kind, _, value = part.partition(":")
         kind, value = kind.strip(), value.strip()
@@ -313,9 +335,11 @@ def _answer_items(raw, hid):
                 % (hid, kind, " / ".join(ANS_NAME_KINDS)))
         if not value:
             raise MarkError("%s：answer 的 %s 项缺值" % (hid, kind))
-        if kind == "direction" and value not in ANS_KEYS:
-            raise MarkError("%s：answer 的 direction 值 %r 不是方位键（见 ANS_DIRECTIONS）"
-                            % (hid, value))
+        if kind == "direction":
+            value = _canon_answer(value, hid)
+            if value not in ANS_KEYS:
+                raise MarkError("%s：answer 的 direction 值 %r 不是方位键（正向 north…、"
+                                "否定 -north 或 not north）" % (hid, value))
         items.append((kind, value))
     if len(set(items)) != len(items):
         raise MarkError("%s：ans 的 answer 有重复候选" % hid)
