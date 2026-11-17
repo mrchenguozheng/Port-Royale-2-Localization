@@ -422,13 +422,21 @@ def get_terms(req):
     en = {r["id"]: r.get(T.BASE_LANG, "") for r in rows}
     skip = set(ignore) | terms_check.verse_ids(verse, en)
     doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in skip}
-    issues = filter_term_issues(terms_check.check_lang(lang, groups, en, doc)["missing"])
+    found = terms_check.check_lang(lang, groups, en, doc)
+    issues = filter_term_issues(found["missing"])
+    morph = filter_term_issues(found.get("morph") or [])
     out = {}
     for x in issues:
         out.setdefault(x["id"], []).append(
             "%s：应为「%s」" % (x["term"], x["expected"]))
-    return req.send_json({"count": len(issues), "issues": out,
-                           "lang": lang})
+    # 词形差也上报：术语是对的，只是词尾/格变了。原来只给 MISSING，
+    # 编辑器里这类行看起来完全干净，德语、俄语的屈折错误就全漏过去了。
+    for x in morph:
+        out.setdefault(x["id"], []).append(
+            "%s：词形差，基准「%s」，写成「%s」"
+            % (x["term"], x["expected"], (x.get("form") or "").strip() or "?"))
+    return req.send_json({"count": len(issues) + len(morph), "issues": out,
+                           "morph_count": len(morph), "lang": lang})
 
 
 def get_entries(req):

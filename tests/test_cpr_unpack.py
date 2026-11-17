@@ -95,6 +95,22 @@ class TestCprUnpack(unittest.TestCase):
         with self.assertRaises(AssertionError):
             CPR.parse(self.write(bytes(bad)))
 
+    def test_directory_entry_overlaps_data_start(self):
+        # arct 那类：头部 count 多算一项，末项的 12 字节偏移字段落到数据起点之后。
+        # 应当停在该项之前，把名字报出来，而不是读越界数据。
+        data = bytearray(build_cpr(["a", "bbbb"], [b"xy", b"zzzz"]))
+        pos = 60
+        for _ in range(2):
+            pos = data.index(b"\x00", pos) + 1 + 12
+        struct.pack_into("<I", data, 48, pos - 12 + 1)   # 数据起点压进末项字段块
+        _d, entries, meta = CPR.parse(self.write(bytes(data)))
+        self.assertEqual([e["name"] for e in entries], ["a"])
+        self.assertEqual(meta["truncated"], "bbbb")
+
+    def test_no_truncation_reports_none(self):
+        _d, _e, meta = CPR.parse(self.write(build_cpr(["a"], [b"xyz"])))
+        self.assertIsNone(meta["truncated"])
+
     def test_content_never_escapes_outdir(self):
         p = self.write(build_cpr(["dir\\x.txt"], [b"ok"]))
         _d, entries, _m = CPR.parse(p)

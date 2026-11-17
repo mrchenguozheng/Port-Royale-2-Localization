@@ -48,9 +48,13 @@ def parse(path):
     entries = []
     cur = data_start
     prev_len = first_len          # 头部 52 处的真实长度属于第一个文件
+    truncated = None
     for i in range(count):
         end = d.index(b"\x00", pos)
         name = d[pos:end].decode("latin-1")
+        if end + 13 > data_start:      # 名字后的 12 字节字段压过数据起点
+            truncated = name
+            break
         pos = end + 1
         (next_end, mid, flag) = struct.unpack_from("<3I", d, pos)
         pos += 12
@@ -76,7 +80,8 @@ def parse(path):
     assert cur <= len(d), "条目链末 %d 超过文件长度 %d" % (cur, len(d))
     return d, entries, {"table_len": table_len, "count": count,
                         "data_start": data_start, "header_end": pos,
-                        "data_len": data_len, "chain_end": cur}
+                        "data_len": data_len, "chain_end": cur,
+                        "file_len": len(d), "truncated": truncated}
 
 
 def main():
@@ -96,6 +101,18 @@ def main():
             print("%-52s %10d %10d  @%d%s"
                   % (e["name"], e["content"], e["padded"], e["start"],
                      "" if e["exact"] else "  (尾部推断)"))
+        if meta["truncated"]:
+            print("注意：头部 count=%d，但 %r 的偏移字段压在数据起点 %d 上，"
+                  "已按 %d 项解（该项不可解）"
+                  % (meta["count"], meta["truncated"], meta["data_start"],
+                     len(entries)))
+        tail = meta["file_len"] - meta["chain_end"]
+        if tail > 65536:
+            # GOG 的 pr2_arcs.cpr 就是这样：第一张目录表只列 89 项，后面还有一张
+            # 第二目录表（missions.bin + NavData + scenario\CVS），不去找就静默少解 3.5 MB。
+            print("注意：目录只覆盖到 %d，文件还有 %d 字节没列进目录"
+                  "（这版包可能带第二张目录表，别当垃圾数据丢掉）"
+                  % (meta["chain_end"], tail))
         return 0
 
     root = os.path.normpath(a.out)

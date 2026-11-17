@@ -323,7 +323,25 @@ def used_terms(doc):
     return used
 
 
-def _dead_entries(problems, label, table, used, doc):
+def _appears(value, doc, lang):
+    """译词是否在正文出现过。
+
+    大小写不敏感（西语 `Bucanero` 在句中是 `bucanero`），屈折语再放宽到词尾：
+    俄语 `Колония` 在正文里只会是 `колонии`/`колонию`。中日不按词尾放宽——
+    「殖民」会把「殖民地」吃掉，反而放过真正的死条目。
+    """
+    v = value.strip()
+    if not v:
+        return True
+    hay = "\n".join(t or "" for t in doc.values()).casefold()
+    if v.casefold() in hay:
+        return True
+    if lang not in ("zh", "ja") and " " not in v and len(v) >= 6:
+        return v[:-2].casefold() in hay
+    return False
+
+
+def _dead_entries(problems, label, table, used, doc, lang):
     """表里有、但既没被标注引用、译词也没在正文出现过的条目。
 
     空占位（骨架同步出来的待译行）不算死条目：它本来就还没译，
@@ -335,7 +353,7 @@ def _dead_entries(problems, label, table, used, doc):
         filled = [v for v in values if isinstance(v, str) and v.strip()]
         if not filled:
             continue
-        if any(any(v in (t or "") for t in doc.values()) for v in filled):
+        if any(_appears(v, doc, lang) for v in filled):
             continue
         problems.append(
             "%s 的 %r 既没被引用、译词也没在正文出现过（拼错或该删）"
@@ -397,8 +415,8 @@ def check_doc(lang, doc, entities=None, terms=None):
         # 死条目：既没被标注引用、译名也没在正文任何一条里出现，才报。
         # 这样表可以先建好、译文再逐步改标注，不会因为「暂时还没引用」而卡住。
         names_table = {k: v for k, v in table.items() if k in entities}
-        _dead_entries(problems, "names/%s.toml" % lang, names_table, used, doc)
+        _dead_entries(problems, "names/%s.toml" % lang, names_table, used, doc, lang)
     used_t = used_terms(doc)
     if used_t:
-        _dead_entries(problems, "terms/%s.toml" % lang, terms, used_t, doc)
+        _dead_entries(problems, "terms/%s.toml" % lang, terms, used_t, doc, lang)
     return problems

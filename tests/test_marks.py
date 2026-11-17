@@ -96,6 +96,28 @@ class TestExpand(unittest.TestCase):
                                terms={"en_business": "产业", "en_tools": "工具"})
         self.assertTrue(any("en_tools" in p for p in problems), problems)
 
+    def test_term_alive_when_only_case_differs(self):
+        # 西语正文里是小写 bucanero，表里写 Bucanero —— 不是死条目
+        doc = {"0x00000001": "seguro que ya te has enfrentado a un bucanero"}
+        problems = M.check_doc("es", doc, entities={},
+                               terms={"en_buccaneer": "Bucanero"})
+        self.assertEqual(problems, [])
+
+    def test_term_alive_when_inflected(self):
+        # 俄语正文里是 колонии，表里写主格 Колония —— 不是死条目
+        doc = {"0x00000001": "жители колонии ждут корабль"}
+        problems = M.check_doc("ru", doc, entities={},
+                               terms={"en_colony": "Колония"})
+        self.assertEqual(problems, [])
+
+    def test_term_still_dead_in_inflected_language(self):
+        # 死条目校验只在正文确实用过术语时才跑，所以先放一条被引用的术语
+        doc = {"0x00000001": "[term:en_business] совсем другой текст"}
+        problems = M.check_doc("ru", doc, entities={},
+                               terms={"en_business": "Дела",
+                                      "en_colony": "Колония"})
+        self.assertTrue(any("en_colony" in p for p in problems), problems)
+
 
 class TestAnswerMark(unittest.TestCase):
     """[ans:…] 是给翻译人看的谜底，展开必须为空；线索词必须真在谜面里。"""

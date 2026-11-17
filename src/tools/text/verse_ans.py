@@ -107,7 +107,7 @@ def split_clues(text, lang):
     return clues
 
 
-def cmd_list():
+def cmd_list(all_langs=False):
     en, rows = load_rows()
     groups = load_queue()
     done = 0
@@ -119,6 +119,13 @@ def cmd_list():
         print("[%02d] %-3s %s" % (i, "已标" if marked else "待填", ",".join(ids)))
         print("     EN %s" % en.get(ids[0], "")[:100].replace("\n", " "))
         print("     ZH %s" % rows["zh"].get(ids[0], "")[:80].replace("\n", " "))
+        if all_langs:
+            # 线索必须在每门语言的谜面里都能找到，逐门读一遍省得来回翻 toml
+            for lang in LANGS:
+                if lang == "zh":
+                    continue
+                print("     %-2s %s" % (lang.upper(),
+                                        rows[lang].get(ids[0], "").replace("\n", " ")))
         if ans:
             print("     ans %s" % ans)
     print("\n%d 组，已标 %d 组，待填 %d 组" % (len(groups), done, len(groups) - done))
@@ -180,10 +187,12 @@ def cmd_apply():
 def main():
     ap = argparse.ArgumentParser(description="诗谜谜底队列")
     ap.add_argument("--list", action="store_true", help="列出各组与填写状态")
+    ap.add_argument("--langs", action="store_true",
+                    help="配合 --list：六门谜面全打出来（线索要逐门核对）")
     ap.add_argument("--apply", action="store_true", help="把填好的谜底落进六语译文")
     args = ap.parse_args()
     if args.list:
-        cmd_list()
+        cmd_list(args.langs)
     elif args.apply:
         cmd_apply()
     else:
