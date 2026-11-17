@@ -10,9 +10,9 @@
 --apply 的判据：
   · ans 必须是 entities.toml 里的实体键；若它是城镇表里的城名但还没登记，就顺带把
     六语译名从译文行里取出来，登记进 entities.toml 与 names/<lang>.toml；
-  · 或者 ans 是 marks.ANS_KEYS 里的方位键（north/east/southeast…，以及否定的
-    not_north/not_southeast…）：谜面只给朝向、给不出城名的那批诗谜用这种谜底，
-    不登记实体、不查译名；
+  · 或者 ans 是 marks.ANS_KEYS 里的键：方位（north/east/southeast…）、否定方位
+    （not_north/not_southeast…）、关键词谜底 `kw`（谜面既无城名也无朝向时，
+    能定位它的关键词组合写在线索里，至少两条）。这几种都不登记实体、不查译名；
   · 六语线索都不能空，只收英文逗号，每条线索都要出现在该语言自己的谜面正文里；
   · 已经标成同值的组直接跳开（可重复跑），标成别的值则报错，不覆盖。
 """

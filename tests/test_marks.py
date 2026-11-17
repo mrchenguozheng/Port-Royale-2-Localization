@@ -179,6 +179,13 @@ class TestAnswerMark(unittest.TestCase):
         doc = {"0x00000001": "[ans:not_southeast|东南]往东南去航是白费力气。"}
         self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
 
+    def test_keyword_answer_needs_two_clues(self):
+        ok = {"0x00000001": "[ans:kw|黄金,港口]街道以黄金铺就，港口雄伟。"}
+        self.assertEqual(M.check_doc("zh", ok, entities={}, terms={}), [])
+        bad = {"0x00000001": "[ans:kw|黄金]街道以黄金铺就，港口雄伟。"}
+        problems = M.check_doc("zh", bad, entities={}, terms={})
+        self.assertTrue(any("关键词组合" in p for p in problems), problems)
+
 
 class TestDoc(unittest.TestCase):
     def test_exempt_key(self):

@@ -74,8 +74,13 @@ ANS_DIRECTIONS = frozenset({
 #: 硬填成一个正向方位就是替原文做主。写 `not_north` 表示「不是北边」。
 ANS_NEGATIVE = frozenset("not_" + d for d in ANS_DIRECTIONS)
 
+#: 第四种谜底：`kw`——谜面既不指名城镇、也不给朝向（"荒凉之地、被遗弃"、
+#: "三座小岛只有一座有缆绳"），只能拿**能定位它的关键词组合**当谜底。`ans` 写 `kw`，
+#: 组合本身放进线索（至少两条，逐条要在谜面里出现）。见 09 卷第七十四节。
+ANS_KEYWORD = "kw"
+
 #: `[ans:]` 里允许不登记实体的全部谜底取值。
-ANS_KEYS = ANS_DIRECTIONS | ANS_NEGATIVE
+ANS_KEYS = ANS_DIRECTIONS | ANS_NEGATIVE | {ANS_KEYWORD}
 
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
@@ -213,6 +218,10 @@ def _split_ans(arg, hid=""):
 def _check_ans(arg, body, hid=""):
     """核对谜底与线索：线索必须逐条出现在谜面正文里。写错抛 MarkError。"""
     entity, clues = _split_ans(arg, hid)
+    if entity == ANS_KEYWORD and len(clues) < 2:
+        raise MarkError(
+            "%s：谜底是关键词组合（%s），至少写两条线索——一条算不上组合，"
+            "也定位不到地方" % (hid, ANS_KEYWORD))
     text = (body or "").casefold()
     missing = [c for c in clues if c.casefold() not in text]
     if missing:
