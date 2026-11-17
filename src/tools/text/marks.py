@@ -11,6 +11,9 @@
     [lit:%2 %1日]               字面照写，原文保留
     [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
     [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
+    [ans:St. Augustine]         诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
+                                ——谜面要能把读者导到这个答案，但不许把答案词照抄成
+                                ref，否则既泄底又冻死用词（见 09 卷第六十三节）
 
 为什么不用成对标记
 ------------------
@@ -45,7 +48,7 @@ TERMS_DIR = os.path.join(ROOT, "src", "data", "terms")
 #: 这个键是字符清单，方括号是被展示的字符本身，整条豁免。
 EXEMPT_KEYS = {"0x11f0398f"}
 
-KEYWORDS = ("ref", "lit", "term")
+KEYWORDS = ("ref", "lit", "term", "ans")
 
 #: term 参数允许的语言前缀。目前只有三种对照语言有原文表：英文（主原文）、
 #: 德语零售版、法语 GOG 版。加语言时同时确认 src/orig 里有对应文件。
@@ -195,6 +198,8 @@ def expand(text, table, lang, hid="", terms=None):
             out.append(_resolve(arg, table, hid, lang))
         elif key == "term":
             out.append(_resolve_term(arg, terms, hid, lang))
+        elif key == "ans":
+            pass                      # 谜底只给翻译人看，玩家文本里不出现
         else:
             out.append(arg)
         i = m.end()
@@ -325,6 +330,17 @@ def check_doc(lang, doc, entities=None, terms=None):
                     _resolve_term(arg, terms, hid, lang)
                 except MarkError as e:
                     problems.append(str(e))
+                continue
+            if key == "ans":
+                # 谜底必须是登记过的实体：否则「这条谜面指向哪座城」无从核对，
+                # 标注就退化成一条注释。答案本身不查译名——诗里不照抄译名。
+                name = arg.strip()
+                if not name:
+                    problems.append("%s：ans 参数为空（谜底写实体名）" % hid)
+                elif name not in entities:
+                    problems.append(
+                        "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
+                        % (hid, name))
                 continue
             if key == "ref":
                 name, form = _split_form(arg)

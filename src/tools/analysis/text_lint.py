@@ -44,6 +44,7 @@ FONT = re.compile(r"<f:([^>]*)>")
 HAN = re.compile(r"[\u4e00-\u9fff]")
 LATIN = re.compile(r"[A-Za-z]")
 MARK_ANY = re.compile(r"\[(?:ref|lit|term):?")
+ANS_MARK = re.compile(r"\[ans:")
 
 KEEP = {"0xfc512ea5"}
 
@@ -139,12 +140,19 @@ def main(argv):
     for p in MK.check_doc(lang, tr_raw, entities=MK.load_entities()):
         E.append(("标注", "标注", p))
 
-    # 诗谜整片不许挂标注：谜面的用词由韵脚和字数决定，ref/term 会把词冻成表里的写法，
-    # 谜语也被提前泄底（`Holy August` 的双关就没了）。诗里只写自由文本。
+    # 诗谜整片不许挂 ref/lit/term：谜面的用词由韵脚和字数决定，这几种标注会把词冻成
+    # 表里的写法，谜语也被提前泄底（`Holy August` 的双关就没了）。诗里只写自由文本，
+    # 谜底另走 [ans:实体]——只给翻译人看，展开为空。
     _g, _ig, verse = TC.load_terms()
-    for k in sorted(TC.verse_ids(verse, en), key=lambda x: int(x, 16)):
+    vids = sorted(TC.verse_ids(verse, en), key=lambda x: int(x, 16))
+    for k in vids:
         if MARK_ANY.search(tr_raw.get(k, "") or ""):
             E.append((k, "诗谜挂标注", tr_raw[k][:60]))
+    no_ans = [k for k in vids if not ANS_MARK.search(tr_raw.get(k, "") or "")]
+    if no_ans:
+        W.append(("诗谜", "缺谜底 %d 条" % len(no_ans),
+                  "已标 %d/%d，第一个缺：%s"
+                  % (len(vids) - len(no_ans), len(vids), no_ans[0])))
 
     lines = []
     lines.append("# %s 机械复核（判据见 09 卷已落卷定则）\n" % lang)

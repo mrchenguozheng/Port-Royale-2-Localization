@@ -97,6 +97,28 @@ class TestExpand(unittest.TestCase):
         self.assertTrue(any("en_tools" in p for p in problems), problems)
 
 
+class TestAnswerMark(unittest.TestCase):
+    """[ans:…] 是给翻译人看的谜底，展开必须为空。"""
+
+    def test_expands_to_nothing(self):
+        self.assertEqual(M.expand("[ans:St. Augustine]已向北走。", TABLE, "zh"),
+                         "已向北走。")
+
+    def test_does_not_count_as_name_usage(self):
+        doc = {"0x00000001": "[ans:St. Augustine]已向北走。"}
+        self.assertEqual(M.used_names(doc), set())
+
+    def test_unknown_answer_is_reported(self):
+        doc = {"0x00000001": "[ans:Nowhere]往北。"}
+        problems = M.check_doc("zh", doc, entities={"St. Augustine": {}}, terms={})
+        self.assertTrue(any("Nowhere" in p for p in problems), problems)
+
+    def test_known_answer_passes(self):
+        doc = {"0x00000001": "[ans:St. Augustine]往北。"}
+        self.assertEqual(M.check_doc("zh", doc, entities={"St. Augustine": {}},
+                                     terms={}), [])
+
+
 class TestDoc(unittest.TestCase):
     def test_exempt_key(self):
         raw = '"``°§$%&()=?\\^<|>@/*~[]"'
