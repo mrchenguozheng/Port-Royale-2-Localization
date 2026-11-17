@@ -1,0 +1,107 @@
+# -*- coding: utf-8 -*-
+"""terms_check 的三级判定：词形差不该报成错，真错译不该被词根放行。
+
+只测纯函数，不读真实术语表——真实表的组定义会随项目变。
+"""
+
+import os
+import sys
+import unittest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+sys.path.insert(0, os.path.join(ROOT, "src", "tools"))
+
+import terms_check as TC      # noqa: E402
+
+
+class TestStemPrefix(unittest.TestCase):
+    def test_length_floor_and_ceiling(self):
+        # 4 是下限：5 字词取 4，11 字以上封顶 8
+        self.assertEqual(TC.stem_prefix("Pirat"), "Pira")
+        self.assertEqual(TC.stem_prefix("Spanien"), "Span")
+        self.assertEqual(TC.stem_prefix("Handelsroute"), "Handelsr")
+        self.assertEqual(TC.stem_prefix("Weltmarktordnung"), "Weltmark")
+
+    def test_too_short_returns_none(self):
+        self.assertIsNone(TC.stem_prefix("Rot"))
+        self.assertIsNone(TC.stem_prefix("猫"))
+
+    def test_multiphrase_uses_last_word(self):
+        self.assertEqual(TC.stem_prefix("Ruta comercial"), "comerc")
+
+    def test_non_alpha_returns_none(self):
+        self.assertIsNone(TC.stem_prefix("A1"))
+
+
+class TestJudge(unittest.TestCase):
+    def stems(self, want):
+        s = TC.stem_prefix(want)
+        return [TC.compile_stem(s)] if s else []
+
+    def test_exact_wins(self):
+        lvl, _ = TC.judge("Der Matrose %2", ["Matrose"], self.stems("Matrose"))
+        self.assertEqual(lvl, "EXACT")
+
+    def test_base_as_substring_is_exact(self):
+        # 「Matrose」本身就嵌在「Matrosen」里，这类屈折直接算通过，不漏报
+        lvl, _ = TC.judge("die Matrosen an Bord", ["Matrose"], self.stems("Matrose"))
+        self.assertEqual(lvl, "EXACT")
+
+    def test_suffix_changed_form_is_morph_not_error(self):
+        # Lagerhaus → Lagerhäuser：词面不再是子串（变音改写词尾），靠词根认出来
+        lvl, frag = TC.judge("zwei Lagerhäuser", ["Lagerhaus"],
+                             self.stems("Lagerhaus"))
+        self.assertEqual(lvl, "MORPH")
+        self.assertTrue(frag.startswith("Lagerh"))
+
+    def test_adjective_of_proper_noun_is_morph(self):
+        # Spanien 在句里作形容词 spanischen，首字母小写也要认
+        lvl, _ = TC.judge("das spanischen Weltreich", ["Spanien"], self.stems("Spanien"))
+        self.assertEqual(lvl, "MORPH")
+
+    def test_other_word_is_missing(self):
+        lvl, _ = TC.judge("Die Seeleute jubelten", ["Matrose"], self.stems("Matrose"))
+        self.assertEqual(lvl, "MISSING")
+
+    def test_cjk_has_no_stem(self):
+        self.assertEqual(self.stems("贸易路线"), [])
+        lvl, _ = TC.judge("贸易航线", ["贸易路线"], [])
+        self.assertEqual(lvl, "MISSING")
+
+    def test_whitespace_insensitive_exact(self):
+        lvl, _ = TC.judge("护 送 贸 易 路 线", ["贸易路线"], [])
+        self.assertEqual(lvl, "EXACT")
+
+
+class TestNearForms(unittest.TestCase):
+    def test_latin_requires_shared_prefix(self):
+        # Steuern 只是首字母相同，不能被当成 Spanien 的疑似写法
+        self.assertEqual(TC.near_forms("Steuern und Seeleute", "Spanien"), [])
+
+    def test_latin_similar_word_is_reported(self):
+        # 窗口长度等于基准形长度，所以给出的是 spanisc 这类片段，共享前 5 个字母
+        got = TC.near_forms("die spanischen Kolonien", "Spanien")
+        self.assertEqual(len(got), 1)
+        self.assertTrue(got[0].startswith("spani"))
+
+    def test_cjk_single_char_shared_is_enough(self):
+        self.assertEqual(TC.near_forms("这条贸易航线很长", "贸易路线"), ["贸易航线"])
+
+    def test_exact_base_is_not_a_near_form(self):
+        self.assertEqual(TC.near_forms("贸易路线", "贸易路线"), [])
+
+
+class TestAltScope(unittest.TestCase):
+    def test_language_scoped_alt(self):
+        group = {"alt": {"0x1": {"de": ["Pirat"], "*": ["Seeräuber"]}}}
+        self.assertEqual(TC.alt_for(group, "0x1", "de"), ["Pirat", "Seeräuber"])
+        self.assertEqual(TC.alt_for(group, "0x1", "ru"), ["Seeräuber"])
+
+    def test_legacy_flat_alt_still_works(self):
+        group = {"alt": {"0x1": ["载入", "读取"]}}
+        self.assertEqual(TC.alt_for(group, "0x1", "zh"), ["载入", "读取"])
+
+
+if __name__ == "__main__":
+    unittest.main()

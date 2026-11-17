@@ -77,7 +77,7 @@ def attention_ids(lang):
         if groups:
             en = {r["id"]: r.get(T.BASE_LANG, "") for r in rows}
             doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in ignore}
-            for x in terms_check.check_lang(lang, groups, en, doc):
+            for x in terms_check.check_lang(lang, groups, en, doc)["missing"]:
                 if x["id"] not in bad:
                     bad.append(x["id"])
     except Exception:
@@ -420,7 +420,7 @@ def get_terms(req):
     rows = load_all()
     en = {r["id"]: r.get(T.BASE_LANG, "") for r in rows}
     doc = {r["id"]: r.get(lang, "") for r in rows if r["id"] not in ignore}
-    issues = filter_term_issues(terms_check.check_lang(lang, groups, en, doc))
+    issues = filter_term_issues(terms_check.check_lang(lang, groups, en, doc)["missing"])
     out = {}
     for x in issues:
         out.setdefault(x["id"], []).append(
