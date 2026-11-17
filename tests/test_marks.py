@@ -153,9 +153,9 @@ class TestExpand(unittest.TestCase):
 class TestAnswerMark(unittest.TestCase):
     """[ans:…] 是给翻译人看的谜底，展开必须为空；线索词必须真在谜面里。
 
-    name 与 clue 的每一项都写成 `<类型>:<值>`：name 只认 town / direction / kw，
-    clue 只认 pun / direction / count / feature / produce / history / exclude。
-    类型写错、漏冒号、值为空都报错——旧的无类型写法是响亮失败，不是兼容。
+    `name` 的每一项必须写 `<类型>:<值>`，只认 town / direction / kw；
+    `clue` 的类型可选：写成 `pun:August` 有类型，写成 `August` 就是一个关键词，
+    两种都当正文锚点核对。类型写错（已知前缀却缺值）报错，未知前缀按关键词处理。
     """
 
     VERSE = "[ans:name=town:St. Augustine;clue=pun:August,direction:north]He left for the north in August."
@@ -199,16 +199,23 @@ class TestAnswerMark(unittest.TestCase):
                      TABLE, "zh")
         self.assertIn("类型", str(ctx.exception))
 
-    def test_clue_without_kind_is_error(self):
-        with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[ans:name=town:St. Augustine;clue=north]He went north.", TABLE, "zh")
-        self.assertIn("类型", str(ctx.exception))
+    def test_clue_without_kind_is_keyword(self):
+        # 类型可选：不写类型就是一条自解释关键词，仍然当正文锚点核对
+        self.assertEqual(
+            M.expand("[ans:name=town:St. Augustine;clue=north]He went north.", TABLE, "zh"),
+            "He went north.")
 
-    def test_unknown_clue_kind_is_error(self):
+    def test_bare_keyword_still_checked(self):
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[ans:name=town:St. Augustine;clue=south]He went north.", TABLE, "zh")
+        self.assertIn("south", str(ctx.exception))
+
+    def test_unknown_prefix_is_bare_keyword(self):
+        # `vibe:` 不是已知类型 → 整项当关键词，正文里没有这串，报的是缺锚点而不是「未知类型」
         with self.assertRaises(M.MarkError) as ctx:
             M.expand("[ans:name=town:St. Augustine;clue=vibe:north]He went north.",
                      TABLE, "zh")
-        self.assertIn("vibe", str(ctx.exception))
+        self.assertIn("vibe:north", str(ctx.exception))
 
     def test_empty_clue_value_is_error(self):
         # `clue=direction:` 只写了类型、没写原词，等于没指到正文任何东西

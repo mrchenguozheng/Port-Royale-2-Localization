@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(ROOT, "src", "tools"))
 sys.path.insert(0, os.path.join(ROOT, "src", "tools", "text"))
 import toml_io
 import terms_check as TC
+import verse_ans as VA
 
 LANGS = ("zh", "de", "es", "fr", "ja", "ru")
 QUEUE = os.path.join(ROOT, "glossary", "verse_ans.toml")
@@ -58,6 +59,38 @@ class TestVerseQueue(unittest.TestCase):
                 text = self.rows[lang][g["ids"][0]].casefold()
                 for c in [x.strip() for x in clues.split(",")]:
                     self.assertIn(c.casefold(), text, (ans, lang, c))
+
+    def test_kinds_are_optional_but_aligned_when_given(self):
+        # kinds 是可选的译者标签：给了就必须与该语线索一条对一条、取值在七个类型里
+        ok = ("pun", "direction", "count", "feature", "produce", "history", "exclude")
+        for g in self.groups:
+            kinds = g.get("kinds") or {}
+            for lang, arr in kinds.items():
+                self.assertIn(lang, LANGS, g["ids"])
+                clues = [x for x in (g["clues"].get(lang) or "").split(",") if x.strip()]
+                self.assertEqual(len(arr), len(clues), (g["ids"], lang))
+                for kind in arr:
+                    self.assertIn(kind, ok, (g["ids"], lang))
+
+
+class TestClueText(unittest.TestCase):
+    """kinds 可选：没给就只拼关键词，给了就逐条套类型，条数不等即停。"""
+
+    def test_bare_keywords(self):
+        self.assertEqual(VA.clue_text(["荒凉", "遗弃"], [], "zh"), "荒凉,遗弃")
+
+    def test_typed_items(self):
+        self.assertEqual(VA.clue_text(["四座", "第三座", "东"],
+                                      ["count", "count", "direction"], "zh"),
+                         "count:四座,count:第三座,direction:东")
+
+    def test_count_mismatch_stops(self):
+        with self.assertRaises(SystemExit):
+            VA.clue_text(["四座", "东"], ["count"], "zh")
+
+    def test_unknown_kind_stops(self):
+        with self.assertRaises(SystemExit):
+            VA.clue_text(["四座"], ["vibe"], "zh")
 
 
 if __name__ == "__main__":

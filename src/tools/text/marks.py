@@ -19,11 +19,12 @@
     [ans:name=town:Corpus Christi;clue=feature:荒凉,feature:遗弃]
                                 诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
                                 字段：`name=` 谜底，`clue=` 线索；`;` 分字段。
-                                两个字段的每一项都是 `<类型>:<值>`：
-                                `name` 的类型是 town / direction / kw，`|` 分隔「或」的候选；
-                                `clue` 的类型是 pun / direction / count / feature /
-                                produce / history / exclude，`,` 分隔并列项，
-                                值必须是**谜面正文里逐字出现的片段**。展开时逐条核对——
+                                `name` 的类型必填：town / direction / kw，`|` 分隔
+                                「或」的候选；`clue` 的类型可选，写成 pun / direction /
+                                count / feature / produce / history / exclude 有类型，
+                                `,` 分隔并列项，值必须是**谜面正文里逐字出现的片段**；
+                                不写类型时整项就是一个自解释关键词，同样当锚点核对。
+                                展开时逐条核对——
                                 写不出线索就说明这条谜面根本推不到这个答案（或线索该改）。
                                 谜底/线索都不生成本文，也不许把答案照抄成 town，
                                 否则既泄底又冻死用词（见 09 卷第六十三、六十四节）
@@ -262,10 +263,12 @@ def _ans_item(part, kinds, what, hid):
 
 def _split_ans(arg, hid=""):
     """`[ans:name=town:城|town:城;clue=direction:东,count:四座]`
-    → ([(类型, 值)…], [(类型, 词)…])。
+    → ([(类型, 值)…], [(类型|None, 词)…])。
 
     `name` 里 `|` 是「或」（多个候选），`clue` 里 `,` 是「并列」（全部必须成立）。
-    缺字段、字段重名、类型写错、name 候选为空、clue 项为空、全角逗号，一律失败。
+    `name` 的每一项都必须带类型；`clue` 的类型可选——写成 `pun:August` 有类型，
+    写成 `August` 就是一个自解释的关键词，两种都当正文锚点核对。
+    缺字段、字段重名、name 候选为空、name 类型错、clue 项为空、全角逗号，一律失败。
     """
     fields = {}
     for part in arg.split(";"):
@@ -318,15 +321,22 @@ def _split_ans(arg, hid=""):
         part = part.strip()
         if not part:
             raise MarkError("%s：ans 的 clue 里有空项（多打了 `,`？）" % hid)
-        kind, value = _ans_item(part, ANS_CLUE_KINDS, "clue", hid)
-        if not value:
-            raise MarkError("%s：clue 的 %s 项缺值（要写谜面里出现的原词）"
-                            % (hid, kind))
-        clues.append((kind, value))
+        head = part.partition(":")[0].strip()
+        if ":" in part and head in ANS_CLUE_KINDS:
+            kind, _, value = part.partition(":")
+            kind, value = kind.strip(), value.strip()
+            if not value:
+                raise MarkError("%s：clue 的 %s 项缺值（要写谜面里出现的原词）"
+                                % (hid, kind))
+            clues.append((kind, value))
+        else:
+            # 类型是可选的：不写类型、或前缀不是已知类型，就整项当一个关键词。
+            # 它仍然是正文锚点（展开时照样核对），只是不参与类型统计。
+            clues.append((None, part))
     if not clues:
         raise MarkError(
-            "%s：ans 只有谜底 %r，没有 clue（谜面里能推出它的词要逐条写进来，"
-            "并标上类型）" % (hid, raw))
+            "%s：ans 只有谜底 %r，没有 clue（谜面里能推出它的词要逐条写进来）"
+            % (hid, raw))
     return names, clues
 
 

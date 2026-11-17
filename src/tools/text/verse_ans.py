@@ -2,7 +2,9 @@
 """诗谜谜底队列：把 glossary\\verse_ans.toml 里填好的 ans 落进六语译文。
 
 谜面在 09 卷第六十四节定义的 verse 区间里，整片不挂 town/ref/lit/term，只允许
-[ans:name=实体|实体;clue=线索,…]（`;` 分字段、`|` 是或、`,` 分线索，见 09 卷第七十八节）。
+[ans:name=town:实体|town:实体;clue=线索,…]（`;` 分字段、`|` 是或、`,` 分线索，见
+09 卷第七十八、七十九节）。`clue` 的类型可选：写了 `pun:August` 是给译者的提示，
+不写 `August` 也照样当正文锚点核对。
 这个工具只管那一件事：
 
     python src\\tools\\text\\verse_ans.py --list     # 看 41 条 / 29 组，谁还没填
@@ -149,6 +151,20 @@ def cmd_list(all_langs=False):
     print("\n%d 组，已标 %d 组，待填 %d 组" % (len(groups), done, len(groups) - done))
 
 
+def clue_text(clues, kinds, lang):
+    """把一语的线索拼成标注串。`kinds` 缺省（空）时只拼关键词，不强制写类型。"""
+    if not kinds:
+        return ",".join(clues)
+    if len(kinds) != len(clues):
+        raise SystemExit("%s 的线索 %d 条，kinds 给了 %d 条（逐语对齐）"
+                         % (lang, len(clues), len(kinds)))
+    bad = [k for k in kinds if k not in MK.ANS_CLUE_KINDS]
+    if bad:
+        raise SystemExit("%s 的 kinds 里有不认识的值 %s（只有 %s）"
+                         % (lang, bad, " / ".join(MK.ANS_CLUE_KINDS)))
+    return ",".join("%s:%s" % (k, c) for k, c in zip(kinds, clues))
+
+
 def cmd_apply():
     en, rows = load_rows()
     groups = load_queue()
@@ -184,20 +200,13 @@ def cmd_apply():
         for lang in LANGS:
             clues = split_clues((g.get("clues") or {}).get(lang, ""), lang)
             kinds = (g.get("kinds") or {}).get(lang, [])
-            if len(kinds) != len(clues):
-                raise SystemExit("%s 的线索 %d 条，kinds 给了 %d 条（逐语对齐）"
-                                 % (lang, len(clues), len(kinds)))
-            bad = [k for k in kinds if k not in MK.ANS_CLUE_KINDS]
-            if bad:
-                raise SystemExit("%s 的 kinds 里有不认识的值 %s（只有 %s）"
-                                 % (lang, bad, " / ".join(MK.ANS_CLUE_KINDS)))
             text = ANS_MARK.sub("", rows[lang].get(ids[0], ""))
             for c in clues:
                 if c.casefold() not in text.casefold():
                     raise SystemExit("%s 的线索「%s」没出现在谜面里（%s）"
                                      "——谜面推不出这个谜底，或者线索该换" % (lang, c, ids[0]))
-            clue_text = ",".join("%s:%s" % (k, c) for k, c in zip(kinds, clues))
-            wanted[lang] = "[ans:name=%s;clue=%s]" % (name_item, clue_text)
+            wanted[lang] = "[ans:name=%s;clue=%s]" % (
+                name_item, clue_text(clues, kinds, lang))
 
         already = [ANS_MARK.match(rows[lang].get(k, "")) for k in ids for lang in LANGS]
         if [m.group(0) if m else None for m in already] == \
