@@ -2,10 +2,11 @@
 """诗谜谜底队列：把 glossary\\verse_ans.toml 里填好的 ans 落进六语译文。
 
 谜面在 09 卷第六十四节定义的 verse 区间里，整片不挂 town/ref/lit/term，只允许
-[riddle:answer=谜底;group=同组其余键;clue=线索,…]（`;` 分字段；`answer` 里 `|` 是「或」，
-`group` 里 `+` 连其余副本的键，`clue` 里 `,` 分项、`+` 同类并值；见 09 卷第七十八、
-七十九、八十一、八十三节）。谜底正常写 `answer=`，靠值推断类型；要明写类型就把字段名
-换成 `town=`（城名）或 `direction=`（方位），此时省掉 `answer=`（见第八十六节）。
+[riddle:answer=谜底;group=整组键含自己;clue=线索,…]（`;` 分字段；`answer` 里 `|` 是
+「或」，`group` 里 `+` 连本组全体成员（含本条），`clue` 里 `,` 分项、`+` 同类并值；
+见 09 卷第七十八、七十九、八十一、八十三节）。`group` 与 `clue` 都必填，单副本写
+`group=<自己的键>`（见第八十九节）。谜底正常写 `answer=`，靠值推断类型；要明写类型就把
+字段名换成 `town=`（城名）或 `direction=`（方位），此时省掉 `answer=`（见第八十六节）。
 `clue` 每项必写 `<标签>:<正文>`：七个已知类型有校验，`_` 开头的自造标签静默，
 字母开头的自造标签报 warning，裸写报错。
 这个工具只管那一件事：
@@ -224,14 +225,11 @@ def cmd_apply():
                                      "——谜面推不出这个谜底，或者线索该换" % (lang, c, ids[0]))
             clue_part = clue_text(clues, kinds, lang)
             for k in ids:
-                # group 只列同组其余副本（8 位小写十六进制、不带 0x、升序）
-                group_part = ""
-                if len(ids) > 1:
-                    others = "+".join(sorted(
-                        x[2:] if x.startswith("0x") else x for x in ids if x != k))
-                    group_part = ";group=%s" % others
-                wanted[(lang, k)] = "[riddle:%s=%s%s;clue=%s]" % (
-                    answer_field, ans, group_part, clue_part)
+                # group 列全组含本条自己（8 位小写十六进制、不带 0x、升序）
+                members = "+".join(sorted(
+                    x[2:] if x.startswith("0x") else x for x in ids))
+                wanted[(lang, k)] = "[riddle:%s=%s;group=%s;clue=%s]" % (
+                    answer_field, ans, members, clue_part)
 
         already = [ANS_MARK.match(rows[lang].get(k, "")) for k in ids for lang in LANGS]
         if [m.group(0) if m else None for m in already] == \

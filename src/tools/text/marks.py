@@ -427,10 +427,11 @@ def _answer_items(raw, hid, kind=None):
 
 
 def _group_tokens(raw, hid):
-    """`group=` → 同组其余副本的键（8 位小写十六进制、不带 0x、按升序排列）。
+    """`group=` → 本组全体成员的键（**含本条自己**）：8 位小写十六进制、不带 0x、升序。
 
-    `hid` 是本文键（`0x` 形式），比对时去掉前缀；键列表必须升序，写乱了就是错——
-    排序是为了让「同组几条」一眼可比，也让手写与自动生成的结果一致。
+    `hid` 是本文键（`0x` 形式），比对时去掉前缀。列全组含自己有两个好处：
+    「单副本」也有明确写法（`group=<自己>`），于是没写 group 与写了但漏人分得清；
+    组员集合可以直接拿两边的键列表相等来比，不用再补一条自己。
     """
     toks = [t.strip() for t in raw.split("+")]
     if any(not t for t in toks):
@@ -440,13 +441,14 @@ def _group_tokens(raw, hid):
         if not ANS_KEY_RX.match(t):
             raise MarkError("%s：group 的键 %r 不是 8 位小写十六进制（不带 0x）"
                             % (hid, t))
-        if t == self_bare:
-            raise MarkError("%s：group 里列了本条自己（只列同组其余副本）" % hid)
     if len(set(toks)) != len(toks):
         raise MarkError("%s：ans 的 group 里有重复的键" % hid)
     if toks != sorted(toks):
         raise MarkError("%s：group 的键要按十六进制升序排列（收到 %s）"
                         % (hid, "+".join(toks)))
+    if self_bare and self_bare not in toks:
+        raise MarkError("%s：group 里漏了本条自己（group 列整组含自己：单副本写 "
+                        "group=%s）" % (hid, self_bare))
     return toks
 
 
@@ -454,7 +456,7 @@ def _split_ans(arg, hid="", warns=None):
     """`[riddle:answer=城|城;group=00000001+00000002;clue=direction:东,count:四座+第三座]`
     → ([(类型|None, 值)…], [同组其余副本的键…], [(类型|None, 词)…])。
 
-    `answer` 里 `|` 是「或」（多个候选），`group` 里 `+` 连接同组其余副本的键，
+    `answer` 里 `|` 是「或」（多个候选），`group` 里 `+` 连接本组全体成员的键（含本条），
     `clue` 里 `,` 是「并列」（全部必须成立）、`+` 是「同一个标签下的多个值」
     （展开后等价于把该项重复几遍）。
     `answer` 正常不写类型（值在方位键里算方位，否则按城镇查表）；想明写类型就改用
@@ -463,8 +465,9 @@ def _split_ans(arg, hid="", warns=None):
     `clue` 的每一项必须写成 `<标签>:<正文>`：标签是七个已知类型就按类型校验，
     `_` 开头的自造标签静默通过，字母开头的自造标签只当关键词并往 `warns` 记一条
     （多半是拼错）。
+    `group` 与 `clue` 都必填：单副本写 `group=<自己的键>`。
     裸写、标签含大写/数字开头、已知类型缺值、`+` 两侧缺值、缺谜底、字段重名、
-    谜底写两处、全角逗号、group 列了自己或键形不对，一律失败。
+    谜底写两处、全角逗号、group 漏了本条或键形不对，一律失败。
     """
     fields = {}
     kind = None
@@ -542,15 +545,19 @@ def _split_ans(arg, hid="", warns=None):
         raise MarkError(
             "%s：ans 只写了谜底 %r，没有 clue（谜面里能推出它的词要逐条写进来）"
             % (hid, "|".join(v for _, v in answers)))
-    return answers, group, clues
+    if "group" not in fields:
+        raise MarkError(
+            "%s：ans 缺 group（group 必填：列全组含本条自己；单副本写 group=%s）"
+            % (hid, hid[2:] if hid.startswith("0x") else (hid or "<本条键>")))
+    return answers, group, clues, (kind or "answer")
 
 
 def _check_ans(arg, body, hid="", warns=None):
     """核对谜底与线索：线索必须逐条出现在谜面正文里。
 
-    返回 (候选 [(类型|None, 值)…], 同组其余副本的键, 线索)。写错抛 MarkError。
+    返回 (候选 [(类型|None, 值)…], 本组全体成员的键, 线索, 谜底字段名)。写错抛 MarkError。
     """
-    answers, group, clues = _split_ans(arg, hid, warns=warns)
+    answers, group, clues, field = _split_ans(arg, hid, warns=warns)
     text = (body or "").casefold()
     missing = [v for _, v in clues if v.casefold() not in text]
     if missing:
@@ -558,7 +565,7 @@ def _check_ans(arg, body, hid="", warns=None):
             "%s：ans 的谜底是 %r，但线索 %s 没出现在谜面里（谜面推不出这个答案，"
             "或者线索该换）" % (hid, "|".join(v for _, v in answers),
                                 " / ".join(repr(v) for v in missing)))
-    return answers, group, clues
+    return answers, group, clues, field
 
 
 def expand(text, table, lang, hid="", terms=None, doc=None):
@@ -763,7 +770,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                 # 哪座城」无从核对，标注就退化成一条注释。答案本身不查译名：
                 # 诗里不照抄译名。
                 try:
-                    answers, group, _clues = _check_ans(
+                    answers, group, _clues, field = _check_ans(
                         arg, _ANS_SPAN.sub("", text), hid, warns=warns)
                 except MarkError as e:
                     problems.append(str(e))
@@ -809,7 +816,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                     if kind == "town" and value in entities:
                         ans_used.add(value)
                     sig.append(value)
-                ans_groups[hid] = ("|".join(sig), group)
+                ans_groups[hid] = (field, "|".join(sig), group)
                 # 同文索引：同一段谜面在数据里出现多次时，用来反向查「谁漏写了 group」。
                 riddle_bodies.setdefault(_fold(_ANS_SPAN.sub("", text)), []).append(hid)
                 continue
@@ -830,53 +837,61 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                     _resolve(arg, table, hid, lang)
                 except MarkError as e:
                     problems.append(str(e))
-    # 同组副本互指：`group` 只列其余副本，所以「本条 + group 里的键」就是整组。
+    # 同组自证：`group` 列全组含本条自己，所以每个成员的键列表本身就应该是同一个集合。
     # 组是身份不是答案——Roatán 出现在 14/15 两组、Providence 出现在 20/26 两组，
     # 按 answer 自动归并会把两个不同的寻宝组合成一个。
+    group_sets = {}
     for hid_g in sorted(ans_groups):
-        sig_g, toks = ans_groups[hid_g]
-        if not toks:
-            continue
-        members = {"0x" + t for t in toks} | {hid_g}
-        for t in toks:
-            t_key = "0x" + t
-            if t_key not in ans_groups:
+        toks = ans_groups[hid_g][2]
+        group_sets.setdefault(frozenset("0x" + t for t in toks), []).append(hid_g)
+    for whole, hids in sorted(group_sets.items()):
+        for hid_g in hids:
+            for t_key in whole:
+                if t_key not in ans_groups:
+                    problems.append(
+                        "%s：group 里的 %s 没有 riddle 标注（同组每条都要标）"
+                        % (hid_g, t_key[2:]))
+        present = [h for h in whole if h in ans_groups]
+        for hid_g in present:
+            if frozenset("0x" + t for t in ans_groups[hid_g][2]) != whole:
                 problems.append(
-                    "%s：group 里的 %s 没有 riddle 标注（同组每条都要标）" % (hid_g, t))
-                continue
-            sig_t, toks_t = ans_groups[t_key]
-            if sig_t != sig_g:
+                    "%s：与本组的组员集合不一致（group 列全组含自己，两边要一模一样）"
+                    % hid_g)
+        # 组内谜底按字段比：answer 一律相同、town 一律相同；只有 direction 的成员不参与
+        # 比对（同一组副本可以用不同的方位写法，方位又不是专名）。
+        for field in ("answer", "town"):
+            vals = {ans_groups[h][1] for h in present if ans_groups[h][0] == field}
+            if len(vals) > 1:
                 problems.append(
-                    "%s：group 里的 %s 谜底是 %r，本条是 %r——同组副本不一致"
-                    % (hid_g, t, sig_t, sig_g))
-            if hid_g not in {"0x" + x for x in toks_t}:
-                problems.append(
-                    "%s：group 里的 %s 没反过来列出本条（互指必须对称）" % (hid_g, t))
-            elif {"0x" + x for x in toks_t} | {t_key} != members:
-                problems.append(
-                    "%s：与 %s 的组员集合不一致（两边都要列全整组其余副本）"
-                    % (hid_g, t))
-    # 反向查漏：`group` 只从声明方出发，「三条都忘写 group」是查不出来的——所以再从
-    # 谜面本身出发：展开后的正文逐字相同（折平后）就算同文副本，必须互相列全。
+                    "%s：同组 %s 不一致（%s）——同组的 %s 必须一样"
+                    % (" / ".join(sorted(present)), field,
+                       " / ".join(sorted(vals)), field))
+    # 反向查漏：`group` 只从声明方出发，若整组都写错成「各写各的」，集合比对能抓；
+    # 但两条同文的谜面各自声明成单副本时，集合也是自洽的——所以再从谜面本身出发：
+    # 展开后的正文逐字相同（折平后）就算同文副本，必须同一组。
     # 只立这一个方向：同文 ⇒ 同组；不同文的条目当然可以同谜底（Roatán 在 14/15 两组、
     # Providence 在 20/26 两组，都是不同谜面同谜底），不能反过来要求。
     for body_key in sorted(riddle_bodies):
         members = riddle_bodies[body_key]
         if len(members) < 2:
             continue
-        sigs = {ans_groups[h][0] for h in members}
-        if len(sigs) > 1:
-            problems.append(
-                "%s 的谜面逐字相同，谜底却不一样（%s）——同文副本必须同一个谜底"
-                % (" / ".join(members), " / ".join(sorted(sigs))))
+        bad_sig = False
+        for field in ("answer", "town"):
+            vals = {ans_groups[h][1] for h in members if ans_groups[h][0] == field}
+            if len(vals) > 1:
+                problems.append(
+                    "%s 的谜面逐字相同，%s 却不一样（%s）——同文副本的 %s 必须一样"
+                    % (" / ".join(members), field, " / ".join(sorted(vals)), field))
+                bad_sig = True
+        if bad_sig:
             continue
         whole = set(members)
         bad = [h for h in members
-               if {"0x" + t for t in ans_groups[h][1]} | {h} != whole]
+               if frozenset("0x" + t for t in ans_groups[h][2]) != whole]
         if bad:
             problems.append(
-                "%s 的谜面逐字相同，group 却没互指成一组（%s 的声明对不上这 %d 条）——"
-                "同文副本每一条都要写 group 列全其余副本"
+                "%s 的谜面逐字相同，group 却没列成同一组（%s 的声明对不上这 %d 条）——"
+                "同文副本的 group 要完全相同"
                 % (" / ".join(members), " / ".join(bad), len(members)))
     used = used_names(doc) | ans_used
     if used:
