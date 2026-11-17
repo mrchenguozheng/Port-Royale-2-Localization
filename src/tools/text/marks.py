@@ -16,7 +16,7 @@
     [lit:%2 %1日]               字面照写，原文保留
     [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
     [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
-    [ans:name=town:Corpus Christi;clue=feature:荒凉,feature:遗弃]
+    [riddle:name=town:Corpus Christi;clue=feature:荒凉+遗弃]
                                 诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
                                 字段：`name=` 谜底，`clue=` 线索；`;` 分字段。
                                 `name` 的类型必填：town / direction，`|` 分隔
@@ -68,13 +68,15 @@ EXEMPT_KEYS = {"0x11f0398f"}
 
 #: `ref` 只做跨键引用（refid）：本条与目标键是同一句，展开取目标键译文。
 #: **只允许一层**——目标键本身不得再含 `[ref:…]`，禁链式展开。
-KEYWORDS = ("ref", "town", "lit", "term", "ans")
+#: `riddle` 是诗谜标注（旧名 `ans`，2026-11-17 改名）：谜底与线索只给翻译人看，
+#: 展开为空。代码里的 `ANS_*` 常量仍按「answer 这个概念」命名，与标记名无关。
+KEYWORDS = ("ref", "town", "lit", "term", "riddle")
 
 #: term 参数允许的语言前缀。目前只有三种对照语言有原文表：英文（主原文）、
 #: 德语零售版、法语 GOG 版。加语言时同时确认 src/orig 里有对应文件。
 TERM_PREFIXES = ("en", "de", "fr")
 
-#: [ans:] 允许的第二种谜底：方位。诗谜里有一批谜面只说朝向（东向第三座、
+#: [riddle:] 允许的第二种谜底：方位。诗谜里有一批谜面只说朝向（东向第三座、
 #: 三座里最西/最南、火山东南面、从西边过桥往东…），没有可直读的城镇名，
 #: 城镇坐标又不在数据里。这类只把**朝向**当谜底，理由记在 09 卷第七十二节。
 #: 取值是固定的英文键（和地名一样不随语言变），中文线索里写「东/东南」。
@@ -88,7 +90,7 @@ ANS_DIRECTIONS = frozenset({
 #: 硬填成一个正向方位就是替原文做主。写 `not_north` 表示「不是北边」。
 ANS_NEGATIVE = frozenset("not_" + d for d in ANS_DIRECTIONS)
 
-#: `[ans:]` 里允许不登记实体的全部谜底取值：只有方位（正向与否定）。
+#: `[riddle:]` 里允许不登记实体的全部谜底取值：只有方位（正向与否定）。
 #: 早先还有第四种谜底 `kw`（关键词组合），一条都没用上就删了——它靠 `name=kw:`
 #: 带一个空值表达「这不是专名」，既不比方位表清楚，也和「谜底要能指到具体地方」
 #: 的初衷相反。真拿不准的时候谜底留空，而不是拿关键词凑。
@@ -96,7 +98,7 @@ ANS_KEYS = ANS_DIRECTIONS | ANS_NEGATIVE
 
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
-_ANS_SPAN = re.compile(r"\[ans:[^\[\]]*\]")
+_ANS_SPAN = re.compile(r"\[riddle:[^\[\]]*\]")
 #: clue 项的标签形态：只允许小写字母或 `_` 开头，后面小写字母/数字/_/-。
 #: 大写、数字开头都报错（大写还会让人误以为类型名不区分大小写）。
 _TAG_RX = re.compile(r"^[a-z_][a-z0-9_-]*$")
@@ -239,7 +241,7 @@ def _ref_target(arg, doc, hid=""):
     return key, target
 
 
-#: `[ans:]` 的字段名。`;` 分字段；两个字段都吃「`<类型>:<值>`」的项：
+#: `[riddle:]` 的字段名。`;` 分字段；两个字段都吃「`<类型>:<值>`」的项：
 #: `name=` 里 `|` 是「或」，`clue=` 里 `,` 是「并列」、`+` 是同类并值。
 ANS_FIELDS = ("name", "clue")
 
@@ -264,7 +266,7 @@ def _ans_item(part, kinds, what, hid):
 
 
 def _split_ans(arg, hid="", warns=None):
-    """`[ans:name=town:城|town:城;clue=direction:东,count:四座+第三座]`
+    """`[riddle:name=town:城|town:城;clue=direction:东,count:四座+第三座]`
     → ([(类型, 值)…], [(类型|None, 词)…])。
 
     `name` 里 `|` 是「或」（多个候选），`clue` 里 `,` 是「并列」（全部必须成立）、
@@ -293,7 +295,7 @@ def _split_ans(arg, hid="", warns=None):
 
     if "name" not in fields:
         raise MarkError(
-            "%s：ans 缺 name 字段（写成 [ans:name=town:城;clue=direction:东,…]）" % hid)
+            "%s：ans 缺 name 字段（写成 [riddle:name=town:城;clue=direction:东,…]）" % hid)
     raw = fields["name"]
     if not raw:
         raise MarkError("%s：ans 的 name 为空" % hid)
@@ -387,7 +389,7 @@ def expand(text, table, lang, hid="", terms=None, doc=None):
         m = _MARK.match(text, i)
         if not m:
             raise MarkError("%s：第 %d 个字符处的 `[` 不成标记（要写成 [town:…] / "
-                            "[lit:…] / [term:…] / [ans:…]）" % (hid, i + 1))
+                            "[lit:…] / [term:…] / [riddle:…]）" % (hid, i + 1))
         key, arg = m.group(1), m.group(2)
         if key not in KEYWORDS:
             raise MarkError("%s：未知标注关键字 %r（只有 %s）"
@@ -399,7 +401,7 @@ def expand(text, table, lang, hid="", terms=None, doc=None):
             out.append(expand(target, table, lang, key_id, terms=terms, doc=doc))
         elif key == "term":
             out.append(_resolve_term(arg, terms, hid, lang))
-        elif key == "ans":
+        elif key == "riddle":
             ans_args.append(arg)      # 谜底只给翻译人看，玩家文本里不出现
         else:
             out.append(arg)
@@ -556,7 +558,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                 except MarkError as e:
                     problems.append(str(e))
                 continue
-            if key == "ans":
+            if key == "riddle":
                 # 谜底必须登记过实体，线索必须真的在谜面里——否则「这条谜面指向
                 # 哪座城」无从核对，标注就退化成一条注释。答案本身不查译名：
                 # 诗里不照抄译名。

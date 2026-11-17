@@ -44,7 +44,7 @@ FONT = re.compile(r"<f:([^>]*)>")
 HAN = re.compile(r"[\u4e00-\u9fff]")
 LATIN = re.compile(r"[A-Za-z]")
 MARK_ANY = re.compile(r"\[(?:town|lit|term):?")
-ANS_MARK = re.compile(r"\[ans:")
+ANS_MARK = re.compile(r"\[riddle:")
 # 站内变量 @x$Name$：x 是格式码。同一个变量在整份语料里几乎只有一种码，出现孤例多半是
 # 原文笔误被逐语照抄（0xca4930dc 的 @A$Amount$ 就是：同文件 55 处 @a$Amount$）。
 VAR_CODE = re.compile(r"@([A-Za-z])\$([A-Za-z0-9_]+)\$")

@@ -2,9 +2,9 @@
 """诗谜谜底队列：把 glossary\\verse_ans.toml 里填好的 ans 落进六语译文。
 
 谜面在 09 卷第六十四节定义的 verse 区间里，整片不挂 town/ref/lit/term，只允许
-[ans:name=town:实体|town:实体;clue=线索,…]（`;` 分字段、`|` 是或、`,` 分线索，见
-09 卷第七十八、七十九节）。`clue` 的类型可选：写了 `pun:August` 是给译者的提示，
-不写 `August` 也照样当正文锚点核对。
+[riddle:name=town:实体|town:实体;clue=线索,…]（`;` 分字段、`|` 是或、`,` 分线索、
+`+` 是同类并值，见 09 卷第七十八、七十九、八十一节）。`clue` 每项必写 `<标签>:<正文>`：
+七个已知类型有校验，`_` 开头的自造标签静默，字母开头的自造标签报 warning，裸写报错。
 这个工具只管那一件事：
 
     python src\\tools\\text\\verse_ans.py --list     # 看 41 条 / 29 组，谁还没填
@@ -50,7 +50,7 @@ TOWN_RANGES = (
     ("0xc77f4f20", "0xc77f4f29"),   # 61–70
     ("0xc77f4f91", "0xc77f4f96"),   # 71–76
 )
-ANS_MARK = re.compile(r"^\[ans:[^\[\]]*\]")
+ANS_MARK = re.compile(r"^\[riddle:[^\[\]]*\]")
 REF_ROW = re.compile(r"^\[ref:([^\[\]]*)\]$")
 
 
@@ -99,7 +99,7 @@ def register_entity(name, town_id, rows):
         if name in entities:
             return False
     with io.open(ENTITIES, "a", encoding="utf-8", newline="") as f:
-        f.write('\n["%s"]\nkind = "town"\nnote = "诗谜谜底；登记来给 [ans:] 用"\n' % name)
+        f.write('\n["%s"]\nkind = "town"\nnote = "诗谜谜底；登记来给 [riddle:] 用"\n' % name)
     for lang in LANGS:
         path = os.path.join(NAMES_DIR, "%s.toml" % lang)
         doc, _order = toml_io.read_doc(path)
@@ -133,7 +133,7 @@ def cmd_list(all_langs=False):
     for i, g in enumerate(groups, 1):
         ids = g.get("ids", [])
         ans = (g.get("ans") or "").strip()
-        marked = any("[ans:" in rows["zh"].get(k, "") for k in ids)
+        marked = any("[riddle:" in rows["zh"].get(k, "") for k in ids)
         done += 1 if marked else 0
         print("[%02d] %-3s %s" % (i, "已标" if marked else "待填", ",".join(ids)))
         print("     EN %s" % en.get(ids[0], "")[:100].replace("\n", " "))
@@ -218,7 +218,7 @@ def cmd_apply():
                 if c.casefold() not in text.casefold():
                     raise SystemExit("%s 的线索「%s」没出现在谜面里（%s）"
                                      "——谜面推不出这个谜底，或者线索该换" % (lang, c, ids[0]))
-            wanted[lang] = "[ans:name=%s;clue=%s]" % (
+            wanted[lang] = "[riddle:name=%s;clue=%s]" % (
                 name_item, clue_text(clues, kinds, lang))
 
         already = [ANS_MARK.match(rows[lang].get(k, "")) for k in ids for lang in LANGS]
@@ -235,7 +235,7 @@ def cmd_apply():
             path = os.path.join(TRANS, "%s.toml" % lang)
             doc, order = toml_io.read_doc(path)
             for k in ids:
-                assert "[ans:" not in doc[k], (lang, k)
+                assert "[riddle:" not in doc[k], (lang, k)
                 doc[k] = wanted[lang] + doc[k]
             toml_io.write_doc_atomic(path, doc, order=order, header=toml_io.head_lines(path))
         changed += 1
