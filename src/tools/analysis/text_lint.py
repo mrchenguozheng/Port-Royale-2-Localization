@@ -163,12 +163,12 @@ def main(argv):
                           " / ".join(sorted(outs))[:120]))
 
     # 内联标注（[town:…] / [lit:…] / [term:…]）：未定义引用、缺形态、方括号写错、死条目
+    # 自造 clue 标签（非 `_` 开头、也不是已知类型）只做关键词扫描、没有任何校验，
+    # 所以走 strict_warns：在构建之前必须清零，不能降级成 W 留着。
     mwarn = []
-    for p in MK.check_doc(lang, tr_raw, entities=MK.load_entities(), warns=mwarn):
+    for p in MK.check_doc(lang, tr_raw, entities=MK.load_entities(), warns=mwarn,
+                          strict_warns=True):
         E.append(("标注", "标注", p))
-    for w in mwarn:
-        # 自造 clue 标签（非 `_` 开头、也不是已知类型）不致命，但多半是拼错了类型名
-        W.append(("标注", "自造标签", w[:120]))
 
     # 诗谜整片不许挂 town/lit/term：谜面的用词由韵脚和字数决定，这几种标注会把词冻成
     # 表里的写法，谜语也被提前泄底（`Holy August` 的双关就没了）。诗里只写自由文本，

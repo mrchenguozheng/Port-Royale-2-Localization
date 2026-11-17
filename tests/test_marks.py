@@ -242,6 +242,17 @@ class TestAnswerMark(unittest.TestCase):
                                      warns=warns2), [])
         self.assertEqual(warns2, [])
 
+    def test_unknown_tag_blocks_build_under_strict_warns(self):
+        # 构建前（strict_warns）自造标签必须升级成问题，不许以 W 级留到 build
+        doc = {"0x00000001": "[riddle:answer=St. Augustine;group=00000001;clue=dirction:north]He went north."}
+        problems = M.check_doc("zh", doc, entities={"St. Augustine": {}}, terms={},
+                               warns=[], strict_warns=True)
+        self.assertTrue(any("dirction" in p for p in problems), problems)
+        # `_` 开头是显式声明，严格档也静默
+        doc2 = {"0x00000001": "[riddle:answer=St. Augustine;group=00000001;clue=_hello:north]He went north."}
+        self.assertEqual(M.check_doc("zh", doc2, entities={"St. Augustine": {}}, terms={},
+                                     warns=[], strict_warns=True), [])
+
     def test_unknown_tag_still_needs_value(self):
         # 标签后面的正文不在谜面里，照样失败——未预定义不等于免检
         with self.assertRaises(M.MarkError) as ctx:
@@ -657,7 +668,7 @@ class TestAnswerGroup(unittest.TestCase):
                         "[riddle:answer=Santa Marta%s" % same)
         problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}, "Santa Marta": {}},
                                terms={})
-        self.assertTrue(any("answer 不一致" in p for p in problems), problems)
+        self.assertTrue(any("城镇部分不一致" in p for p in problems), problems)
 
     def test_town_mismatch_is_reported(self):
         same = self._g(self.A, self.B) + self.S
@@ -665,7 +676,22 @@ class TestAnswerGroup(unittest.TestCase):
                         "[riddle:town=Santa Marta%s" % same)
         problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}, "Santa Marta": {}},
                                terms={})
-        self.assertTrue(any("town 不一致" in p for p in problems), problems)
+        self.assertTrue(any("城镇部分不一致" in p for p in problems), problems)
+
+    def test_answer_and_town_fields_share_comparison(self):
+        # 一条写 answer=、另一条写 town=：都是「指明是城镇」，值相同就算一致
+        same = self._g(self.A, self.B) + self.S
+        doc = self._doc("[riddle:answer=Vera Cruz%s" % same,
+                        "[riddle:town=Vera Cruz%s" % same)
+        self.assertEqual(M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={}), [])
+
+    def test_answer_and_town_fields_mismatch_is_reported(self):
+        same = self._g(self.A, self.B) + self.S
+        doc = self._doc("[riddle:answer=Vera Cruz%s" % same,
+                        "[riddle:town=Santa Marta%s" % same)
+        problems = M.check_doc("zh", doc,
+                               entities={"Vera Cruz": {}, "Santa Marta": {}}, terms={})
+        self.assertTrue(any("城镇部分不一致" in p for p in problems), problems)
 
     def test_direction_does_not_participate(self):
         # 只有 direction 的成员不参与比对：同组可以用不同方位写法
@@ -694,7 +720,7 @@ class TestAnswerGroup(unittest.TestCase):
                         "[riddle:answer=Havana|-north%s" % same)
         problems = M.check_doc("zh", doc, entities={"San Juan": {}, "Havana": {}},
                                terms={})
-        self.assertTrue(any("answer 不一致" in p for p in problems), problems)
+        self.assertTrue(any("城镇部分不一致" in p for p in problems), problems)
 
     def test_member_without_riddle_is_reported(self):
         doc = self._doc(
@@ -710,7 +736,7 @@ class TestAnswerGroup(unittest.TestCase):
             "[riddle:answer=Vera Cruz%s%s" % (self._g(self.A, self.B), self.S))
         problems = M.check_doc("zh", doc,
                                entities={"Vera Cruz": {}, "Santa Marta": {}}, terms={})
-        self.assertTrue(any("answer 不一致" in p for p in problems), problems)
+        self.assertTrue(any("城镇部分不一致" in p for p in problems), problems)
 
     def test_same_text_without_any_group_is_reported(self):
         # 两条同文各自写成单副本（各自 group=自己），集合自洽，只能从谜面反查

@@ -183,11 +183,83 @@ def clue_text(clues, kinds, lang):
     return ",".join("%s:%s" % (k, "+".join(vals)) for k, vals in out)
 
 
+def _fields(arg):
+    """`[riddle:…]` 里的字段串 → {字段名: 原值}，只做最松的切分（不校验）。"""
+    out = {}
+    for part in arg.split(";"):
+        if "=" not in part:
+            continue
+        name, _, value = part.partition("=")
+        out.setdefault(name.strip(), value.strip())
+    return out
+
+
+def _group_norm(raw):
+    """group 值 → 升序键元组；顺手吃掉 `0x` 前缀和大小写，用来比较而不是校验。"""
+    toks = []
+    for t in (raw or "").split("+"):
+        t = t.strip().lower()
+        if t.startswith("0x"):
+            t = t[2:]
+        if t:
+            toks.append(t)
+    return tuple(sorted(toks))
+
+
+def _clue_norm(raw):
+    """clue 值 → 元组（标签, 正文元组）；标签保留原样，分隔符两侧空白不计。"""
+    out = []
+    for part in (raw or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        tag, _, tail = part.partition(":")
+        out.append((tag.strip(), tuple(v.strip() for v in tail.split("+"))))
+    return tuple(out)
+
+
+def mark_key(text, ent_index):
+    """把一条已有标注归一成可比较的键：没有标注返回 None。
+
+    这是 `--apply` 的「已标成同值就跳过」判据，所以比 `check_doc` 松：
+    谜底值走 marks 的解析（方位缩写/否定/大小写/变音都归成一串），城名再按折平查登记名；
+    字段名 answer= 与 town= 不再区分（两者都「指明是城镇」，check_doc 侧也是同一个比对集），
+    group 吃 `0x` 前缀与顺序，clue 只忽略分隔符两侧空白。
+    """
+    m = ANS_MARK.match(text or "")
+    if not m:
+        return None
+    arg = m.group(0)[len("[riddle:"):-1]
+    fields = _fields(arg)
+    kind = "town" if "town" in fields else ("direction" if "direction" in fields else None)
+    raw = fields.get("town") or fields.get("direction") or fields.get("answer")
+    if raw is None:
+        return ("RAW", arg)
+    try:
+        items = MK._answer_items(raw, "", kind)
+    except MK.MarkError:
+        return ("RAW", arg)
+    answers = []
+    for item_kind, value in items:
+        is_dir = item_kind == "direction" or (item_kind is None and value in MK.ANS_KEYS)
+        if is_dir:
+            answers.append(("direction", value))
+            continue
+        cands = ent_index.get(MK._fold(value), [])
+        answers.append(("town", cands[0] if len(cands) == 1 else value))
+    return (tuple(sorted(answers)), _group_norm(fields.get("group", "")),
+            _clue_norm(fields.get("clue", "")))
+
+
 def cmd_apply():
     en, rows = load_rows()
     groups = load_queue()
     towns = town_ids()
-    changed = skipped = 0
+    ents = toml_io.read_doc(ENTITIES)[0] if os.path.isfile(ENTITIES) else {}
+    ent_index = {}
+    for name in ents:
+        ent_index.setdefault(MK._fold(name), []).append(name)
+    changed = skipped = normed = 0
     for g in groups:
         ans = (g.get("ans") or "").strip()
         if not ans:
@@ -231,26 +303,43 @@ def cmd_apply():
                 wanted[(lang, k)] = "[riddle:%s=%s;group=%s;clue=%s]" % (
                     answer_field, ans, members, clue_part)
 
-        already = [ANS_MARK.match(rows[lang].get(k, "")) for k in ids for lang in LANGS]
-        if [m.group(0) if m else None for m in already] == \
-                [wanted[(lang, k)] for k in ids for lang in LANGS]:
+        order = [(lang, k) for k in ids for lang in LANGS]
+        already = {lk: rows[lk[0]].get(lk[1], "") for lk in order}
+        want_text = {lk: ANS_MARK.match(wanted[lk]).group(0) for lk in order}
+        same_key = [mark_key(already[lk], ent_index) == mark_key(want_text[lk], ent_index)
+                    for lk in order]
+        same_text = [already[lk].startswith(want_text[lk]) for lk in order]
+        if all(same_key) and all(same_text):
             skipped += 1
             continue
-        present = [m.group(0) for m in already if m]
-        if present:
+        present = [ANS_MARK.match(already[lk]).group(0) for lk in order
+                   if ANS_MARK.match(already[lk])]
+        if present and not all(same_key):
             raise SystemExit("%s 已有标注 %s，与队列填的不同；先人工核对"
                              % (ids, present[0]))
 
         for lang in LANGS:
             path = os.path.join(TRANS, "%s.toml" % lang)
-            doc, order = toml_io.read_doc(path)
+            doc, order_t = toml_io.read_doc(path)
             for k in ids:
-                assert "[riddle:" not in doc[k], (lang, k)
-                doc[k] = wanted[(lang, k)] + doc[k]
-            toml_io.write_doc_atomic(path, doc, order=order, header=toml_io.head_lines(path))
-        changed += 1
-        print("落标注 %s -> %s" % (",".join(ids), ans))
-    print("\n本次落 %d 组，跳过（已是该值）%d 组" % (changed, skipped))
+                mark = wanted[(lang, k)]
+                if "[riddle:" in doc[k]:
+                    # 值相同、只是写法不规范（大小写/变音/方位缩写/group 带 0x 之类）：
+                    # 原地换成规范串，不改正文。
+                    assert ANS_MARK.match(doc[k]), (lang, k)
+                    doc[k] = ANS_MARK.sub(mark, doc[k], count=1)
+                else:
+                    doc[k] = mark + doc[k]
+            toml_io.write_doc_atomic(path, doc, order=order_t,
+                                     header=toml_io.head_lines(path))
+        if all(same_key):
+            normed += 1
+            print("规范化 %s -> %s" % (",".join(ids), ans))
+        else:
+            changed += 1
+            print("落标注 %s -> %s" % (",".join(ids), ans))
+    print("\n本次落 %d 组，规范化 %d 组，跳过（已是该值）%d 组"
+          % (changed, normed, skipped))
 
 
 def main():

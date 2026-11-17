@@ -464,7 +464,7 @@ def _split_ans(arg, hid="", warns=None):
     `[riddle:town=Vera Cruz;clue=…]` / `[riddle:direction=SE;clue=…]`。
     `clue` 的每一项必须写成 `<标签>:<正文>`：标签是七个已知类型就按类型校验，
     `_` 开头的自造标签静默通过，字母开头的自造标签只当关键词并往 `warns` 记一条
-    （多半是拼错）。
+    （多半是拼错；lint 把它算 E 级，构建前必须清零）。
     `group` 与 `clue` 都必填：单副本写 `group=<自己的键>`。
     裸写、标签含大写/数字开头、已知类型缺值、`+` 两侧缺值、缺谜底、字段重名、
     谜底写两处、全角逗号、group 漏了本条或键形不对，一律失败。
@@ -729,16 +729,19 @@ def _dead_entries(problems, label, table, used, doc, lang):
             % (label, name))
 
 
-def check_doc(lang, doc, entities=None, terms=None, warns=None):
+def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=False):
     """返回问题列表（空 = 通过）。构建前和 lint 共用这一份判据。
 
     town 查 names 表、term 查 terms 表、ref 查本语言译文（只许一层），两边都是
     「缺条目即失败 + 死条目提醒」，调用方不需要额外提供原文。
 
     `warns` 传一个列表时，会把「自造 clue 标签」（非 `_` 开头、也不是已知类型）
-    这类不致命的问题记进去——lint 打 W 级，构建不受影响。
+    记进去。`strict_warns=True` 时这些条目同时算问题：构建前的复核走这一档，
+    因为这种标签只做关键词扫描、没有任何校验，留在译文里等于放过拼错的类型名。
+    `_` 开头的自造标签是显式声明，静默。
     """
     problems = []
+    warn_start = len(warns) if warns is not None else 0
     entities = load_entities() if entities is None else entities
     table = load_names(lang)
     terms = load_terms(lang) if terms is None else terms
@@ -817,14 +820,13 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                     if kind == "town" and value in entities:
                         ans_used.add(value)
                     sig.append(value)
-                    # 比对用的部分：`answer=` 里夹着的方位候选不参与组内比对（`|` 拆开后
-                    # 逐项看类型），只有 town 部分参与。`town=` 整字段参与，`direction=`
-                    # 整字段不参与。
-                    if field == "answer" and kind == "town":
+                    # 比对用的部分：「指明是城镇」的那几项。`answer=` 里夹着的方位候选
+                    # 不参与（`|` 拆开后逐项看类型），`town=` 整字段参与，`direction=`
+                    # 整字段不参与。两者落进同一个集合，所以一条写 answer=Vera Cruz、
+                    # 另一条写 town=Vera Cruz 也算一致。
+                    if field == "town" or (field == "answer" and kind == "town"):
                         cmp_sig.append(value)
-                    elif field == "town":
-                        cmp_sig.append(value)
-                ans_groups[hid] = (field, "|".join(sig), "|".join(cmp_sig), group)
+                ans_groups[hid] = (field, "|".join(sig), tuple(cmp_sig), group)
                 # 同文索引：同一段谜面在数据里出现多次时，用来反向查「谁漏写了 group」。
                 riddle_bodies.setdefault(_fold(_ANS_SPAN.sub("", text)), []).append(hid)
                 continue
@@ -865,17 +867,16 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                 problems.append(
                     "%s：与本组的组员集合不一致（group 列全组含自己，两边要一模一样）"
                     % hid_g)
-        # 组内谜底按字段比：answer 里只比城镇那几项（`|` 里的方位候选不参与）、
-        # town 整字段比；只有 direction 的成员不参与（方位不是专名，各写各的也算合法）。
-        # 比较为空（整条谜底全是方位）的成员同样不参与。
-        for field in ("answer", "town"):
-            vals = {ans_groups[h][2] for h in present
-                    if ans_groups[h][0] == field and ans_groups[h][2]}
-            if len(vals) > 1:
-                problems.append(
-                    "%s：同组 %s 不一致（%s）——同组的 %s 必须一样（方位部分不参与比对）"
-                    % (" / ".join(sorted(present)), field,
-                       " / ".join(sorted(vals)), field))
+        # 组内比对只看「指明是城镇」的部分：answer= 里推断成 town 的项 + town= 整字段，
+        # 两者合成一个集合比（同组一条写 answer=Vera Cruz、另一条写 town=Vera Cruz
+        # 也算一致）。direction= 与整条全是方位的成员比较为空，跳过。
+        vals = {frozenset(ans_groups[h][2]) for h in present if ans_groups[h][2]}
+        if len(vals) > 1:
+            problems.append(
+                "%s：同组谜底里的城镇部分不一致（%s）——同组的 answer/town 必须一样"
+                "（方位部分不参与比对）"
+                % (" / ".join(sorted(present)),
+                   " / ".join("+".join(sorted(v)) for v in sorted(vals, key=lambda s: sorted(s)))))
     # 反向查漏：`group` 只从声明方出发，若整组都写错成「各写各的」，集合比对能抓；
     # 但两条同文的谜面各自声明成单副本时，集合也是自洽的——所以再从谜面本身出发：
     # 展开后的正文逐字相同（折平后）就算同文副本，必须同一组。
@@ -886,15 +887,15 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
         if len(members) < 2:
             continue
         bad_sig = False
-        for field in ("answer", "town"):
-            vals = {ans_groups[h][2] for h in members
-                    if ans_groups[h][0] == field and ans_groups[h][2]}
-            if len(vals) > 1:
-                problems.append(
-                    "%s 的谜面逐字相同，%s 却不一样（%s）——同文副本的 %s 必须一样"
-                    "（方位部分不参与比对）"
-                    % (" / ".join(members), field, " / ".join(sorted(vals)), field))
-                bad_sig = True
+        vals = {frozenset(ans_groups[h][2]) for h in members if ans_groups[h][2]}
+        if len(vals) > 1:
+            problems.append(
+                "%s 的谜面逐字相同，谜底里的城镇部分却不一样（%s）——同文副本的 "
+                "answer/town 必须一样（方位部分不参与比对）"
+                % (" / ".join(members),
+                   " / ".join("+".join(sorted(v)) for v in sorted(vals, key=lambda s: sorted(s))))
+                )
+            bad_sig = True
         if bad_sig:
             continue
         whole = set(members)
@@ -915,4 +916,8 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
     used_t = used_terms(doc)
     if used_t:
         _dead_entries(problems, "terms/%s.toml" % lang, terms, used_t, doc, lang)
+    if strict_warns and warns is not None:
+        # 自造标签不许留到构建：严格档把它们升级成问题，和 E 级一样卡住。
+        for w in warns[warn_start:]:
+            problems.append(w + "——构建前必须清零（改用 `_` 开头，或换成七个已知类型）")
     return problems

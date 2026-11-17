@@ -109,5 +109,47 @@ class TestClueText(unittest.TestCase):
         self.assertEqual(VA.clue_text(["四座"], ["_hello"], "zh"), "_hello:四座")
 
 
+class TestMarkKey(unittest.TestCase):
+    """--apply 的「已标成同值就跳过」判据要能容忍不规范写法。"""
+
+    ENT = {"vera cruz": ["Vera Cruz"], "san juan": ["San Juan"]}
+
+    def key(self, text):
+        return VA.mark_key(text, self.ENT)
+
+    def test_plain_equals_canonical(self):
+        self.assertEqual(
+            self.key("[riddle:answer=Vera Cruz;group=00000001;clue=count:三座]"),
+            self.key("[riddle:answer=Vera Cruz;group=00000001;clue=count:三座]"))
+
+    def test_case_and_diacritics_are_tolerated(self):
+        self.assertEqual(
+            self.key("[riddle:answer=vera cruz;group=00000001;clue=count:三座] 三座城镇。"),
+            self.key("[riddle:answer=Vera Cruz;group=00000001;clue=count:三座] 三座城镇。"))
+
+    def test_direction_spellings_are_tolerated(self):
+        self.assertEqual(
+            self.key("[riddle:answer=not north;group=00000001;clue=count:三座]"),
+            self.key("[riddle:answer=-north;group=00000001;clue=count:三座]"))
+
+    def test_answer_and_town_are_interchangeable(self):
+        self.assertEqual(
+            self.key("[riddle:town=Vera Cruz;group=00000001;clue=count:三座]"),
+            self.key("[riddle:answer=Vera Cruz;group=00000001;clue=count:三座]"))
+
+    def test_group_prefix_and_order_are_tolerated(self):
+        self.assertEqual(
+            self.key("[riddle:answer=Vera Cruz;group=0x00000002+0x00000001;clue=count:三座]"),
+            self.key("[riddle:answer=Vera Cruz;group=00000001+00000002;clue=count:三座]"))
+
+    def test_different_clue_still_differs(self):
+        self.assertNotEqual(
+            self.key("[riddle:answer=Vera Cruz;group=00000001;clue=count:三座]"),
+            self.key("[riddle:answer=Vera Cruz;group=00000001;clue=count:四座]"))
+
+    def test_no_mark_gives_none(self):
+        self.assertIsNone(self.key("三座城镇，X 在最西。"))
+
+
 if __name__ == "__main__":
     unittest.main()
