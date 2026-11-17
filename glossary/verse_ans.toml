@@ -41,8 +41,8 @@ kinds = {zh = ["feature", "feature"], de = ["feature", "feature"], es = ["featur
 # 03  Four towns sit on the bay together. Sail to the east, in the
 ids = ["0x35f48f6e"]
 ans = "Pensacola"
-clues = {zh = "东", de = "Osten", es = "este", fr = "l'est", ja = "東", ru = "восток"}
-kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}
+clues = {zh = "四座,第三座,东", de = "Vier,dritte,Osten", es = "Cuatro,tercera,este", fr = "Quatre,troisième,l'est", ja = "四つ,三つ目,東", ru = "Четыре,третий,восток"}
+kinds = {zh = ["count", "count", "direction"], de = ["count", "count", "direction"], es = ["count", "count", "direction"], fr = ["count", "count", "direction"], ja = ["count", "count", "direction"], ru = ["count", "count", "direction"]}
 
 [[group]]
 # 04  Not the most northerly town can it be, but further north onl
@@ -114,15 +114,15 @@ kinds = {zh = ["exclude"], de = ["exclude"], es = ["exclude"], fr = ["exclude"],
 # 13  In a large bay lie some towns, there are three. X refers to 
 ids = ["0x35f49052", "0x35f490c1", "0x35f490c2", "0x35f49130"]
 ans = "Vera Cruz"
-clues = {zh = "西", de = "westlichste", es = "occidental", fr = "ouest", ja = "西", ru = "западн"}
-kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}
+clues = {zh = "三座,西", de = "drei,westlichste", es = "tres,occidental", fr = "trois,ouest", ja = "三つ,西", ru = "три,западн"}
+kinds = {zh = ["count", "direction"], de = ["count", "direction"], es = ["count", "direction"], fr = ["count", "direction"], ja = ["count", "direction"], ru = ["count", "direction"]}
 
 [[group]]
 # 14  In a large bay lie some towns, there are three. X refers to 
 ids = ["0x35f49053"]
 ans = "Roatán"
-clues = {zh = "南", de = "südlichste", es = "meridional", fr = "sud", ja = "南", ru = "юге"}
-kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}
+clues = {zh = "三座,南", de = "drei,südlichste", es = "tres,meridional", fr = "trois,sud", ja = "三つ,南", ru = "три,юге"}
+kinds = {zh = ["count", "direction"], de = ["count", "direction"], es = ["count", "direction"], fr = ["count", "direction"], ja = ["count", "direction"], ru = ["count", "direction"]}
 
 [[group]]
 # 15  A bay holds two islands, one large and one small. The town o
@@ -149,8 +149,8 @@ kinds = {zh = ["produce", "feature"], de = ["produce", "feature"], es = ["produc
 # 18  Four towns are situated around a volcano. The town in the so
 ids = ["0x35f49057"]
 ans = "Santo Domingo"
-clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
-kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}
+clues = {zh = "四座,火山,东南", de = "Vier,Vulkan,Südosten", es = "Cuatro,volcán,sureste", fr = "Quatre,volcan,sud-est", ja = "四つ,火山,南東", ru = "Четыре,вулкан,юго-восток"}
+kinds = {zh = ["count", "feature", "direction"], de = ["count", "feature", "direction"], es = ["count", "feature", "direction"], fr = ["count", "feature", "direction"], ja = ["count", "feature", "direction"], ru = ["count", "feature", "direction"]}
 
 [[group]]
 # 19  On its sands, the sea is home to towns for which no one care
@@ -201,8 +201,8 @@ kinds = {zh = ["history", "produce", "produce", "produce"], de = ["history", "pr
 #     Selket 表只有「最西」版（H27，Vera Cruz）；最东版不在表里，保留方位
 ids = ["0x35f49131"]
 ans = "east"
-clues = {zh = "东", de = "östlichste", es = "oriental", fr = "l'est", ja = "東", ru = "восток"}
-kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}
+clues = {zh = "三座,东", de = "drei,östlichste", es = "tres,oriental", fr = "trois,l'est", ja = "三つ,東", ru = "три,восток"}
+kinds = {zh = ["count", "direction"], de = ["count", "direction"], es = ["count", "direction"], fr = ["count", "direction"], ja = ["count", "direction"], ru = ["count", "direction"]}
 
 [[group]]
 # 26  An island lies here, as though in a cradle. The land from th
