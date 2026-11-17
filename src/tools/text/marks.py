@@ -98,6 +98,9 @@ ANS_KEYS = ANS_DIRECTIONS | ANS_NEGATIVE | {ANS_KEYWORD}
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
 _ANS_SPAN = re.compile(r"\[ans:[^\[\]]*\]")
+#: clue 项里可当「标签前缀」的形态：纯 ASCII 词。`12:30` 这类不以字母开头的
+#: 不算标签，整项当一个关键词，免得把正文里的数字串拆坏。
+_TAG_RX = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 #: 判断「目标键自己又挂了 ref」用：只看 ref，别的标注不算第二层。
 _REF_MARK = re.compile(r"\[ref:")
 
@@ -266,9 +269,11 @@ def _split_ans(arg, hid=""):
     → ([(类型, 值)…], [(类型|None, 词)…])。
 
     `name` 里 `|` 是「或」（多个候选），`clue` 里 `,` 是「并列」（全部必须成立）。
-    `name` 的每一项都必须带类型；`clue` 的类型可选——写成 `pun:August` 有类型，
-    写成 `August` 就是一个自解释的关键词，两种都当正文锚点核对。
-    缺字段、字段重名、name 候选为空、name 类型错、clue 项为空、全角逗号，一律失败。
+    `name` 的每一项都必须带类型；`clue` 的每一项可以写成 `pun:August`（已知类型，
+    按类型校验值），也可以写成 `dirction:August`、`other:whatever`（前缀不是已知
+    类型就只当标签，扫描冒号后的正文），还可以裸写 `August`。
+    缺字段、字段重名、name 候选为空、name 类型错、已知类型缺值、clue 项为空、
+    全角逗号，一律失败。
     """
     fields = {}
     for part in arg.split(";"):
@@ -321,17 +326,23 @@ def _split_ans(arg, hid=""):
         part = part.strip()
         if not part:
             raise MarkError("%s：ans 的 clue 里有空项（多打了 `,`？）" % hid)
-        head = part.partition(":")[0].strip()
-        if ":" in part and head in ANS_CLUE_KINDS:
-            kind, _, value = part.partition(":")
-            kind, value = kind.strip(), value.strip()
-            if not value:
+        # `前缀:正文` 两种待遇：前缀是七个已知类型就按类型校验；前缀是别的词
+        # （写错、没预定义、临时自造）一律只取冒号后的正文做关键词扫描。
+        # 前缀必须是纯 ASCII 词，否则整项当关键词（`12:30` 这种带冒号的词不会被拆）。
+        head, sep, tail = part.partition(":")
+        head, tail = head.strip(), tail.strip()
+        tagged = bool(sep) and bool(_TAG_RX.match(head))
+        if not tagged:
+            clues.append((None, part))
+            continue
+        if head in ANS_CLUE_KINDS:
+            if not tail:
                 raise MarkError("%s：clue 的 %s 项缺值（要写谜面里出现的原词）"
-                                % (hid, kind))
-            clues.append((kind, value))
+                                % (hid, head))
+            clues.append((head, tail))
+        elif tail:
+            clues.append((None, tail))      # 未预定义的前缀只当标签，扫描它后面的正文
         else:
-            # 类型是可选的：不写类型、或前缀不是已知类型，就整项当一个关键词。
-            # 它仍然是正文锚点（展开时照样核对），只是不参与类型统计。
             clues.append((None, part))
     if not clues:
         raise MarkError(

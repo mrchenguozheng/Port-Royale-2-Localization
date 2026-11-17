@@ -210,12 +210,30 @@ class TestAnswerMark(unittest.TestCase):
             M.expand("[ans:name=town:St. Augustine;clue=south]He went north.", TABLE, "zh")
         self.assertIn("south", str(ctx.exception))
 
-    def test_unknown_prefix_is_bare_keyword(self):
-        # `vibe:` 不是已知类型 → 整项当关键词，正文里没有这串，报的是缺锚点而不是「未知类型」
+    def test_unknown_prefix_scans_value(self):
+        # 前缀不是已知类型（写错、自造、没预定义）只当标签：核对的是冒号后的正文
+        self.assertEqual(
+            M.expand("[ans:name=town:St. Augustine;clue=dirction:north]He went north.",
+                     TABLE, "zh"),
+            "He went north.")
+        self.assertEqual(
+            M.expand("[ans:name=town:St. Augustine;clue=aaa:He went north]He went north.",
+                     TABLE, "zh"),
+            "He went north.")
+
+    def test_unknown_prefix_still_needs_value(self):
+        # 标签后面的正文不在谜面里，照样失败——未预定义不等于免检
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[ans:name=town:St. Augustine;clue=vibe:north]He went north.",
+            M.expand("[ans:name=town:St. Augustine;clue=aaa:south]He went north.",
                      TABLE, "zh")
-        self.assertIn("vibe:north", str(ctx.exception))
+        self.assertIn("south", str(ctx.exception))
+
+    def test_colon_word_is_not_a_tag(self):
+        # 前缀不是纯字母（`12`）就不当标签，整项当一个关键词
+        self.assertEqual(
+            M.expand("[ans:name=town:St. Augustine;clue=12:30]He left at 12:30.",
+                     TABLE, "zh"),
+            "He left at 12:30.")
 
     def test_empty_clue_value_is_error(self):
         # `clue=direction:` 只写了类型、没写原词，等于没指到正文任何东西

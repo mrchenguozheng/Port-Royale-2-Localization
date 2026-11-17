@@ -88,9 +88,12 @@ class TestClueText(unittest.TestCase):
         with self.assertRaises(SystemExit):
             VA.clue_text(["四座", "东"], ["count"], "zh")
 
-    def test_unknown_kind_stops(self):
-        with self.assertRaises(SystemExit):
-            VA.clue_text(["四座"], ["vibe"], "zh")
+    def test_unknown_kind_is_passed_through(self):
+        # 写错/自造的类型不拦：展开侧对未知前缀只扫冒号后的正文
+        self.assertEqual(VA.clue_text(["四座"], ["vibe"], "zh"), "vibe:四座")
+
+    def test_empty_kind_gives_bare_keyword(self):
+        self.assertEqual(VA.clue_text(["四座"], [""], "zh"), "四座")
 
 
 if __name__ == "__main__":

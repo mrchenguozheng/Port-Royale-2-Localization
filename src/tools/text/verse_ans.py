@@ -152,17 +152,18 @@ def cmd_list(all_langs=False):
 
 
 def clue_text(clues, kinds, lang):
-    """把一语的线索拼成标注串。`kinds` 缺省（空）时只拼关键词，不强制写类型。"""
+    """把一语的线索拼成标注串。
+
+    `kinds` 缺省（空）时只拼关键词；给了就按位加前缀。前缀可以是七个已知类型，
+    也可以是写错/自造的标签——展开侧对未知前缀只取冒号后的正文做关键词扫描，
+    所以这里不拦。
+    """
     if not kinds:
         return ",".join(clues)
     if len(kinds) != len(clues):
         raise SystemExit("%s 的线索 %d 条，kinds 给了 %d 条（逐语对齐）"
                          % (lang, len(clues), len(kinds)))
-    bad = [k for k in kinds if k not in MK.ANS_CLUE_KINDS]
-    if bad:
-        raise SystemExit("%s 的 kinds 里有不认识的值 %s（只有 %s）"
-                         % (lang, bad, " / ".join(MK.ANS_CLUE_KINDS)))
-    return ",".join("%s:%s" % (k, c) for k, c in zip(kinds, clues))
+    return ",".join("%s:%s" % (k, c) if k else c for k, c in zip(kinds, clues))
 
 
 def cmd_apply():
