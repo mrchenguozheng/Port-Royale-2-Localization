@@ -61,7 +61,8 @@ class TestVerseQueue(unittest.TestCase):
                     self.assertIn(c.casefold(), text, (ans, lang, c))
 
     def test_kinds_are_optional_but_aligned_when_given(self):
-        # kinds 是可选的译者标签：给了就必须与该语线索一条对一条、取值在七个类型里
+        # kinds 是必填的译者标签（缺了就是裸写）：必须与该语线索一条对一条；
+        # 取值要么是七个已知类型，要么是 `_` 开头的自造标签
         ok = ("pun", "direction", "count", "feature", "produce", "history", "exclude")
         for g in self.groups:
             kinds = g.get("kinds") or {}
@@ -70,14 +71,21 @@ class TestVerseQueue(unittest.TestCase):
                 clues = [x for x in (g["clues"].get(lang) or "").split(",") if x.strip()]
                 self.assertEqual(len(arr), len(clues), (g["ids"], lang))
                 for kind in arr:
-                    self.assertIn(kind, ok, (g["ids"], lang))
+                    self.assertTrue(kind in ok or kind.startswith("_"),
+                                    (g["ids"], lang, kind))
 
 
 class TestClueText(unittest.TestCase):
     """kinds 可选：没给就只拼关键词，给了就逐条套类型，条数不等即停。"""
 
-    def test_bare_keywords(self):
-        self.assertEqual(VA.clue_text(["荒凉", "遗弃"], [], "zh"), "荒凉,遗弃")
+    def test_bare_is_error(self):
+        # 不给 kinds 就是裸写，不许
+        with self.assertRaises(SystemExit):
+            VA.clue_text(["四座", "东"], [], "zh")
+
+    def test_empty_kind_is_error(self):
+        with self.assertRaises(SystemExit):
+            VA.clue_text(["四座"], [""], "zh")
 
     def test_typed_items(self):
         self.assertEqual(VA.clue_text(["四座", "第三座", "东"],
@@ -91,9 +99,7 @@ class TestClueText(unittest.TestCase):
     def test_unknown_kind_is_passed_through(self):
         # 写错/自造的类型不拦：展开侧对未知前缀只扫冒号后的正文
         self.assertEqual(VA.clue_text(["四座"], ["vibe"], "zh"), "vibe:四座")
-
-    def test_empty_kind_gives_bare_keyword(self):
-        self.assertEqual(VA.clue_text(["四座"], [""], "zh"), "四座")
+        self.assertEqual(VA.clue_text(["四座"], ["_hello"], "zh"), "_hello:四座")
 
 
 if __name__ == "__main__":

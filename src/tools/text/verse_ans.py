@@ -154,16 +154,19 @@ def cmd_list(all_langs=False):
 def clue_text(clues, kinds, lang):
     """把一语的线索拼成标注串。
 
-    `kinds` 缺省（空）时只拼关键词；给了就按位加前缀。前缀可以是七个已知类型，
-    也可以是写错/自造的标签——展开侧对未知前缀只取冒号后的正文做关键词扫描，
-    所以这里不拦。
+    `kinds` 缺省（空）时整组都算出错——clue 每项都必须带标签，裸写不允许；
+    给了就按位加前缀。前缀可以是七个已知类型，也可以是自造标签：`_` 开头静默，
+    字母开头的自造标签展开侧会报 warning（这里不拦）。
     """
     if not kinds:
-        return ",".join(clues)
+        raise SystemExit("%s 的线索没有 kinds：clue 每项都要写 <标签>:<正文>，"
+                         "裸写不允许（自造标签用 `_` 开头）" % lang)
     if len(kinds) != len(clues):
         raise SystemExit("%s 的线索 %d 条，kinds 给了 %d 条（逐语对齐）"
                          % (lang, len(clues), len(kinds)))
-    return ",".join("%s:%s" % (k, c) if k else c for k, c in zip(kinds, clues))
+    if not all(k for k in kinds):
+        raise SystemExit("%s 的 kinds 里有空项：没有标签就等于裸写" % lang)
+    return ",".join("%s:%s" % (k, c) for k, c in zip(kinds, clues))
 
 
 def cmd_apply():

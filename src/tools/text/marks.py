@@ -98,9 +98,9 @@ ANS_KEYS = ANS_DIRECTIONS | ANS_NEGATIVE | {ANS_KEYWORD}
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
 _ANS_SPAN = re.compile(r"\[ans:[^\[\]]*\]")
-#: clue 项里可当「标签前缀」的形态：纯 ASCII 词。`12:30` 这类不以字母开头的
-#: 不算标签，整项当一个关键词，免得把正文里的数字串拆坏。
-_TAG_RX = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
+#: clue 项的标签形态：只允许小写字母或 `_` 开头，后面小写字母/数字/_/-。
+#: 大写、数字开头都报错（大写还会让人误以为类型名不区分大小写）。
+_TAG_RX = re.compile(r"^[a-z_][a-z0-9_-]*$")
 #: 判断「目标键自己又挂了 ref」用：只看 ref，别的标注不算第二层。
 _REF_MARK = re.compile(r"\[ref:")
 
@@ -264,16 +264,15 @@ def _ans_item(part, kinds, what, hid):
     return kind, value
 
 
-def _split_ans(arg, hid=""):
+def _split_ans(arg, hid="", warns=None):
     """`[ans:name=town:城|town:城;clue=direction:东,count:四座]`
     → ([(类型, 值)…], [(类型|None, 词)…])。
 
     `name` 里 `|` 是「或」（多个候选），`clue` 里 `,` 是「并列」（全部必须成立）。
-    `name` 的每一项都必须带类型；`clue` 的每一项可以写成 `pun:August`（已知类型，
-    按类型校验值），也可以写成 `dirction:August`、`other:whatever`（前缀不是已知
-    类型就只当标签，扫描冒号后的正文），还可以裸写 `August`。
-    缺字段、字段重名、name 候选为空、name 类型错、已知类型缺值、clue 项为空、
-    全角逗号，一律失败。
+    `name` 的每一项都必须带类型；`clue` 的每一项必须写成 `<标签>:<正文>`：
+    标签是七个已知类型就按类型校验，`_` 开头的自造标签静默通过，字母开头的自造
+    标签只当关键词并往 `warns` 记一条（多半是拼错）。
+    裸写、标签含大写/数字开头、已知类型缺值、缺字段、字段重名、全角逗号，一律失败。
     """
     fields = {}
     for part in arg.split(";"):
@@ -326,24 +325,25 @@ def _split_ans(arg, hid=""):
         part = part.strip()
         if not part:
             raise MarkError("%s：ans 的 clue 里有空项（多打了 `,`？）" % hid)
-        # `前缀:正文` 两种待遇：前缀是七个已知类型就按类型校验；前缀是别的词
-        # （写错、没预定义、临时自造）一律只取冒号后的正文做关键词扫描。
-        # 前缀必须是纯 ASCII 词，否则整项当关键词（`12:30` 这种带冒号的词不会被拆）。
-        head, sep, tail = part.partition(":")
-        head, tail = head.strip(), tail.strip()
-        tagged = bool(sep) and bool(_TAG_RX.match(head))
-        if not tagged:
-            clues.append((None, part))
-            continue
-        if head in ANS_CLUE_KINDS:
-            if not tail:
-                raise MarkError("%s：clue 的 %s 项缺值（要写谜面里出现的原词）"
-                                % (hid, head))
-            clues.append((head, tail))
-        elif tail:
-            clues.append((None, tail))      # 未预定义的前缀只当标签，扫描它后面的正文
+        if ":" not in part:
+            raise MarkError("%s：ans 的 clue 项要写成 <标签>:<正文>，不接受裸写（收到 %r）"
+                            % (hid, part))
+        tag, _, tail = part.partition(":")
+        tag, tail = tag.strip(), tail.strip()
+        if not _TAG_RX.match(tag):
+            raise MarkError("%s：clue 的标签 %r 不合法（只允许小写字母或 `_` 开头，"
+                            "后面只能是小写字母/数字/`_`/`-`）" % (hid, tag))
+        if not tail:
+            raise MarkError("%s：clue 的 %s 项缺值（要写谜面里出现的原词）"
+                            % (hid, tag))
+        if tag in ANS_CLUE_KINDS:
+            clues.append((tag, tail))
         else:
-            clues.append((None, part))
+            # 自造标签：`_` 开头是显式声明，静默；字母开头多半是拼错，记一条 warning。
+            if not tag.startswith("_") and warns is not None:
+                warns.append("%s：clue 的标签 %r 不是已知类型，按关键词扫描"
+                             "（自造标签请用 `_` 开头）" % (hid, tag))
+            clues.append((None, tail))
     if not clues:
         raise MarkError(
             "%s：ans 只有谜底 %r，没有 clue（谜面里能推出它的词要逐条写进来）"
@@ -351,9 +351,9 @@ def _split_ans(arg, hid=""):
     return names, clues
 
 
-def _check_ans(arg, body, hid=""):
+def _check_ans(arg, body, hid="", warns=None):
     """核对谜底与线索：线索必须逐条出现在谜面正文里。返回候选名单。写错抛 MarkError。"""
-    names, clues = _split_ans(arg, hid)
+    names, clues = _split_ans(arg, hid, warns=warns)
     if any(kind == ANS_KEYWORD for kind, _ in names) and len(clues) < 2:
         raise MarkError(
             "%s：谜底是关键词组合（%s），至少写两条线索——一条算不上组合，"
@@ -529,11 +529,14 @@ def _dead_entries(problems, label, table, used, doc, lang):
             % (label, name))
 
 
-def check_doc(lang, doc, entities=None, terms=None):
+def check_doc(lang, doc, entities=None, terms=None, warns=None):
     """返回问题列表（空 = 通过）。构建前和 lint 共用这一份判据。
 
     town 查 names 表、term 查 terms 表、ref 查本语言译文（只许一层），两边都是
     「缺条目即失败 + 死条目提醒」，调用方不需要额外提供原文。
+
+    `warns` 传一个列表时，会把「自造 clue 标签」（非 `_` 开头、也不是已知类型）
+    这类不致命的问题记进去——lint 打 W 级，构建不受影响。
     """
     problems = []
     entities = load_entities() if entities is None else entities
@@ -561,7 +564,7 @@ def check_doc(lang, doc, entities=None, terms=None):
                 # 哪座城」无从核对，标注就退化成一条注释。答案本身不查译名：
                 # 诗里不照抄译名。
                 try:
-                    names = _check_ans(arg, _ANS_SPAN.sub("", text), hid)
+                    names = _check_ans(arg, _ANS_SPAN.sub("", text), hid, warns=warns)
                 except MarkError as e:
                     problems.append(str(e))
                     continue

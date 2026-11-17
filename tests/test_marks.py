@@ -199,19 +199,14 @@ class TestAnswerMark(unittest.TestCase):
                      TABLE, "zh")
         self.assertIn("类型", str(ctx.exception))
 
-    def test_clue_without_kind_is_keyword(self):
-        # 类型可选：不写类型就是一条自解释关键词，仍然当正文锚点核对
-        self.assertEqual(
-            M.expand("[ans:name=town:St. Augustine;clue=north]He went north.", TABLE, "zh"),
-            "He went north.")
-
-    def test_bare_keyword_still_checked(self):
+    def test_bare_clue_is_error(self):
+        # 裸写不认：clue 每项都得有标签，写不出类型就写 `_` 开头的自造标签
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[ans:name=town:St. Augustine;clue=south]He went north.", TABLE, "zh")
-        self.assertIn("south", str(ctx.exception))
+            M.expand("[ans:name=town:St. Augustine;clue=north]He went north.", TABLE, "zh")
+        self.assertIn("裸写", str(ctx.exception))
 
-    def test_unknown_prefix_scans_value(self):
-        # 前缀不是已知类型（写错、自造、没预定义）只当标签：核对的是冒号后的正文
+    def test_unknown_tag_scans_value(self):
+        # 不是已知类型 → 只当标签：核对的是冒号后的正文，展开本身不失败
         self.assertEqual(
             M.expand("[ans:name=town:St. Augustine;clue=dirction:north]He went north.",
                      TABLE, "zh"),
@@ -221,17 +216,42 @@ class TestAnswerMark(unittest.TestCase):
                      TABLE, "zh"),
             "He went north.")
 
-    def test_unknown_prefix_still_needs_value(self):
+    def test_unknown_tag_warns(self):
+        # 字母开头的自造标签要报 warning（多半是拼错类型名），`_` 开头的不报
+        doc = {"0x00000001": "[ans:name=town:St. Augustine;clue=dirction:north]He went north."}
+        warns = []
+        self.assertEqual(M.check_doc("zh", doc, entities={"St. Augustine": {}}, terms={},
+                                    warns=warns), [])
+        self.assertEqual(len(warns), 1, warns)
+        self.assertIn("dirction", warns[0])
+
+        doc2 = {"0x00000001": "[ans:name=town:St. Augustine;clue=_hello:north]He went north."}
+        warns2 = []
+        self.assertEqual(M.check_doc("zh", doc2, entities={"St. Augustine": {}}, terms={},
+                                     warns=warns2), [])
+        self.assertEqual(warns2, [])
+
+    def test_unknown_tag_still_needs_value(self):
         # 标签后面的正文不在谜面里，照样失败——未预定义不等于免检
         with self.assertRaises(M.MarkError) as ctx:
             M.expand("[ans:name=town:St. Augustine;clue=aaa:south]He went north.",
                      TABLE, "zh")
         self.assertIn("south", str(ctx.exception))
 
-    def test_colon_word_is_not_a_tag(self):
-        # 前缀不是纯字母（`12`）就不当标签，整项当一个关键词
-        self.assertEqual(
+    def test_tag_must_be_lowercase(self):
+        # 大写标签报错：类型名区分大小写，`Pun:` 会被当成自造标签，不如直接拦住
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[ans:name=town:St. Augustine;clue=Pun:August]He went south in August.",
+                     TABLE, "zh")
+        self.assertIn("Pun", str(ctx.exception))
+
+    def test_digit_start_is_error(self):
+        # `12:30` 不是标签（数字开头），裸写也不认 → 报错；要写就写 `feature:12:30`
+        with self.assertRaises(M.MarkError):
             M.expand("[ans:name=town:St. Augustine;clue=12:30]He left at 12:30.",
+                     TABLE, "zh")
+        self.assertEqual(
+            M.expand("[ans:name=town:St. Augustine;clue=feature:12:30]He left at 12:30.",
                      TABLE, "zh"),
             "He left at 12:30.")
 
