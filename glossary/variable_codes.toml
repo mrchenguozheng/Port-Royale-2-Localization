@@ -1,0 +1,730 @@
+# PR2 文本变量码表（@码$变量名$）
+#
+# 结构：@ + 单字母格式码 + $ + 变量名 + $，尾 $ 必需（770 处引用零例外）。
+# 码是「类型/转换器」标签（大小写是类型名的一部分，不是文本变换，见 09 卷 67.9），
+# 不是 @A$ 首字母大写化之类的开关。
+#
+# conf 三档：confirmed=配对结构实证 / inferred=由配对与语境推断 / unknown=只有配对事实
+# 本表由 build/qa/_var_table_gen.py 从 en.gog_1.1.2.3 的 770 处引用生成，
+# 人工补含义；工具读取入口是 src/tools/text/var_codes.py。
+
+[meta]
+title = "PR2 文本变量码表"
+references_en = 770
+references_all = 5396
+names = 67
+codes = 19
+confidence_legend = "confirmed / inferred / unknown"
+tool = "python src\\tools\\text\\var_codes.py --table"
+
+[code.A]
+meaning = "未知（推断：称呼形态）"
+display = "实证只配 USER（19 处）与一处 Amount 孤例，含义未定；可能是称谓/敬称形态，也可能是别的显示变体"
+conf = "unknown"
+evidence = "20 处：USER 19 + 0xca4930dc 的 Amount 1"
+refs_en = 20
+refs_all = 140
+names = ["Amount", "USER"]
+
+[code.C]
+meaning = "船队名"
+display = "船队的名字"
+conf = "confirmed"
+evidence = "4 处，只配 Convoy"
+refs_en = 4
+refs_all = 28
+names = ["Convoy"]
+
+[code.D]
+meaning = "日期"
+display = "按当前语言格式化的日期"
+conf = "confirmed"
+evidence = "132 处，只配 Date/EndDate/DepartDate"
+refs_en = 132
+refs_all = 924
+names = ["Date", "DepartDate", "EndDate"]
+
+[code.F]
+meaning = "名（first name）"
+display = "角色名字的名"
+conf = "confirmed"
+evidence = "3 处，只配 FName/WifeName"
+refs_en = 3
+refs_all = 21
+names = ["FName", "WifeName"]
+
+[code.G]
+meaning = "货物名"
+display = "查货物名表后替换"
+conf = "confirmed"
+evidence = "49 处，只配 Goods/MsgGoods"
+refs_en = 49
+refs_all = 343
+names = ["Goods", "MsgGoods"]
+
+[code.I]
+meaning = "整数"
+display = "十进制整数，无格式"
+conf = "confirmed"
+evidence = "45 处，只配 Days/Idx/Pop/Sailors/Settlers/NumShips/NumConvoys/Val1"
+refs_en = 45
+refs_all = 315
+names = ["Days", "Idx", "NumConvoys", "NumShips", "Pop", "Sailors", "Settlers", "Val1"]
+
+[code.L]
+meaning = "姓（last name）"
+display = "角色名字的姓"
+conf = "confirmed"
+evidence = "2 处，只配 LName/RandLName"
+refs_en = 2
+refs_all = 14
+names = ["LName", "RandLName"]
+
+[code.M]
+meaning = "位置（未知变体）"
+display = "整条只有变量的三条之一，疑似位置文本的摆放锚点"
+conf = "unknown"
+evidence = "1 处，Pos"
+refs_en = 1
+refs_all = 7
+names = ["Pos"]
+
+[code.N]
+meaning = "人名"
+display = "人名文本"
+conf = "confirmed"
+evidence = "38 处，只配 Name/CaptainName/OwnerName/ContactName/DestName/TeacherName/PlayerName"
+refs_en = 38
+refs_all = 266
+names = ["CaptainName", "ContactName", "DestName", "Name", "OwnerName", "PlayerName", "TeacherName"]
+
+[code.P]
+meaning = "海盗名"
+display = "海盗的名字"
+conf = "confirmed"
+evidence = "18 处，只配 PirateName"
+refs_en = 18
+refs_all = 126
+names = ["PirateName"]
+
+[code.S]
+meaning = "船型名"
+display = "查船型名表后替换"
+conf = "confirmed"
+evidence = "5 处，只配 ShipType"
+refs_en = 5
+refs_all = 35
+names = ["ShipType"]
+
+[code.T]
+meaning = "城镇名"
+display = "查本地化城镇名表后替换"
+conf = "confirmed"
+evidence = "169 处，全部配城镇类变量名（Town/TOWN/TargetTown/DestTown…）"
+refs_en = 169
+refs_all = 1183
+names = ["ContactTown", "DestTown", "HostileTown", "MsgTown0", "MsgTown1", "SampleTown", "StartTown", "TOWN", "TargetTown", "Town"]
+
+[code.a]
+meaning = "数量"
+display = "纯数字"
+conf = "confirmed"
+evidence = "67 处，只配 Amount/AmountGoal/SubGoal；实机记录过「参数替换后是『有5的…』」"
+refs_en = 67
+refs_all = 469
+names = ["Amount", "AmountGoal", "SubGoal"]
+
+[code.d]
+meaning = "位置（未知变体）"
+display = "整条只有变量的三条之一，疑似位置文本的摆放锚点"
+conf = "unknown"
+evidence = "1 处，Pos"
+refs_en = 1
+refs_all = 7
+names = ["Pos"]
+
+[code.g]
+meaning = "金额"
+display = "数值，按货币格式排版（是否带千分位/货币符未实测）"
+conf = "inferred"
+evidence = "85 处，只配 Gold/Price/Reward/StartGold/TotalPrice 等金钱类变量"
+refs_en = 85
+refs_all = 601
+names = ["FullPrice", "Gold", "GoldGoal", "GoldPerBarrel", "GoldReward", "PirateGold", "Price", "PriceBuy", "PriceSell", "Reward", "StartGold", "TotalPrice", "Wealth"]
+
+[code.l]
+meaning = "位置（可嵌句）"
+display = "海图标记/地点描述；句中紧跟一句指令时使用"
+conf = "inferred"
+evidence = "27 处，配 Pos/ChestPos/ConvoyPos/DebrisPos/IslandPos/TeacherPos"
+refs_en = 27
+refs_all = 189
+names = ["ChestPos", "ConvoyPos", "DebrisPos", "IslandPos", "Pos", "TeacherPos"]
+
+[code.n]
+meaning = "国家名"
+display = "查国家名表后替换"
+conf = "confirmed"
+evidence = "86 处，只配 Nation/DestNation/FoeNation/HostileNation/TargetNation…"
+refs_en = 86
+refs_all = 602
+names = ["DestNation", "FoeNation", "HostileNation", "Nation", "Nation1", "Nation2", "TargetNation"]
+
+[code.r]
+meaning = "位置（未知变体）"
+display = "整条只有变量的三条之一，疑似位置文本的摆放锚点"
+conf = "unknown"
+evidence = "1 处，Pos"
+refs_en = 1
+refs_all = 7
+names = ["Pos"]
+
+[code.s]
+meaning = "未知（推断：裸玩家名）"
+display = "实证只配 USER（17 处），与 A 同为玩家名但形态不同"
+conf = "unknown"
+evidence = "17 处，全部 USER"
+refs_en = 17
+refs_all = 119
+names = ["USER"]
+
+[var.Amount]
+meaning = "数量（桶/件）"
+codes = ["A", "a"]
+refs_en = 56
+refs_all = 392
+example = "I am glad to see you, @A$USER$. You have a large trading fleet don't you? It's just that I have to ship @A$Amo"
+in_original = true
+note = "同一变量名出现多种码：A×7, a×385"
+
+[var.AmountGoal]
+meaning = "目标数量"
+codes = ["a"]
+refs_en = 5
+refs_all = 35
+example = "Build two weaving mills in Cartagena and produce @a$AmountGoal$ of cloth."
+in_original = true
+
+[var.CaptainName]
+meaning = "船长名"
+codes = ["N"]
+refs_en = 1
+refs_all = 7
+example = "You have sabotaged the town of @T$TargetTown$ and I thank you on behalf of my nation. I have a very special re"
+in_original = true
+
+[var.ChestPos]
+meaning = "宝箱位置"
+codes = ["l"]
+refs_en = 4
+refs_all = 28
+example = " You must get me the things by @D$EndDate$. @l$ChestPos$"
+in_original = true
+
+[var.ContactName]
+meaning = "联系人名"
+codes = ["N"]
+refs_en = 9
+refs_all = 63
+example = "You have found the chest of @N$ContactName$.<n><n>"
+in_original = true
+
+[var.ContactTown]
+meaning = "联系人所在城镇"
+codes = ["T"]
+refs_en = 1
+refs_all = 7
+example = "Find a chest by @D$EndDate$ for @N$ContactName$ in @T$ContactTown$. @l$ChestPos$"
+in_original = true
+
+[var.Convoy]
+meaning = "船队名"
+codes = ["C"]
+refs_en = 4
+refs_all = 28
+example = "Convoy @C$Convoy$ has picked up a castaway. Take him to @T$DestTown$."
+in_original = true
+
+[var.ConvoyPos]
+meaning = "船队位置"
+codes = ["l"]
+refs_en = 3
+refs_all = 21
+example = "Convoy (one ship) sighted: @l$ConvoyPos$"
+in_original = true
+
+[var.Date]
+meaning = "日期"
+codes = ["D"]
+refs_en = 16
+refs_all = 112
+example = "So be it. Deliver @a$Amount$ to @T$DestTown$. The tools must arrive by @D$Date$. "
+in_original = true
+
+[var.Days]
+meaning = "天数"
+codes = ["I"]
+refs_en = 8
+refs_all = 56
+example = "Nice work! The famine in Tortuga is over. It lasted @I$Days$ days."
+in_original = true
+
+[var.DebrisPos]
+meaning = "残骸位置"
+codes = ["l"]
+refs_en = 1
+refs_all = 7
+example = "<g:INTEXT_SCHIFFBRUECHIGER_800x600.screen><n>You have picked up a sailor from @n$Nation$. To thank you for res"
+in_original = true
+
+[var.DepartDate]
+meaning = "出发日期"
+codes = ["D"]
+refs_en = 4
+refs_all = 28
+example = "You are a man of action. A transport convoy will shortly arrive here and will be leaving port for Europe on @D"
+in_original = true
+
+[var.DestName]
+meaning = "目的地的人名"
+codes = ["N"]
+refs_en = 1
+refs_all = 7
+example = "You are doing me a great favor. All is in order, you have paid me the @g$PriceBuy$. Meet me in the market and "
+in_original = true
+
+[var.DestNation]
+meaning = "目的国家"
+codes = ["n"]
+refs_en = 5
+refs_all = 35
+example = "Convoy @C$Convoy$ has picked up castaway. Take him to a town belonging to @n$DestNation$."
+in_original = true
+
+[var.DestTown]
+meaning = "目的城镇"
+codes = ["T"]
+refs_en = 11
+refs_all = 77
+example = "Convoy @C$Convoy$ has picked up a castaway. Take him to @T$DestTown$."
+in_original = true
+
+[var.EndDate]
+meaning = "截止日期"
+codes = ["D"]
+refs_en = 112
+refs_all = 784
+example = " Complete this mission by @D$EndDate$."
+in_original = true
+
+[var.FName]
+meaning = "名（first name）"
+codes = ["F"]
+refs_en = 1
+refs_all = 7
+example = "Hello, @F$FName$ @L$LName$, sit down here beside me and let's have a wee tipple. Then I'll tell you of hidden "
+in_original = true
+
+[var.FoeNation]
+meaning = "敌对国家"
+codes = ["n"]
+refs_en = 4
+refs_all = 28
+example = " However, the war with @n$FoeNation$ has made this difficult. Can you help me? "
+in_original = true
+
+[var.FullPrice]
+meaning = "全价（金币）"
+codes = ["g"]
+refs_en = 3
+refs_all = 21
+example = "Greetings to you, @s$USER$. I am organizing a convoy to Europe, for I have heard that @G$Goods$ is fetching a "
+in_original = true
+
+[var.Gold]
+meaning = "金币"
+codes = ["g"]
+refs_en = 10
+refs_all = 70
+example = " You have received @g$Gold$."
+in_original = true
+
+[var.GoldGoal]
+meaning = "目标金币数"
+codes = ["g"]
+refs_en = 15
+refs_all = 105
+example = "You must accumulate @g$GoldGoal$ cash by trading."
+in_original = true
+
+[var.GoldPerBarrel]
+meaning = "每桶价格（金币）"
+codes = ["g"]
+refs_en = 10
+refs_all = 70
+example = "Deliver @a$Amount$ of @G$Goods$ to @T$TOWN$ by @D$Date$. You shall receive @g$GoldPerBarrel$ for each <gs:TEXT"
+in_original = true
+
+[var.GoldReward]
+meaning = "赏金"
+codes = ["g"]
+refs_en = 2
+refs_all = 14
+example = "My thanks to you for destroying the pirate convoy. Here is a reward of @g$GoldReward$. If luck is on our side,"
+in_original = true
+
+[var.Goods]
+meaning = "货物名"
+codes = ["G"]
+refs_en = 48
+refs_all = 336
+example = "Looted @a$Amount$ of @G$Goods$ from Dutch traders."
+in_original = true
+
+[var.HostileNation]
+meaning = "敌对国"
+codes = ["n"]
+refs_en = 40
+refs_all = 280
+example = "<n>To make matters appear more official, I will give you a Letter of Marque against @n$HostileNation$."
+in_original = true
+
+[var.HostileTown]
+meaning = "敌对城镇"
+codes = ["T"]
+refs_en = 5
+refs_all = 35
+example = "Good! The convoy set sail from @T$HostileTown$ in the direction of Europe and will leave the Caribbean in the "
+in_original = true
+
+[var.Idx]
+meaning = "序号/索引"
+codes = ["I"]
+refs_en = 8
+refs_all = 56
+example = "Tortuga_@I$Idx$"
+in_original = true
+
+[var.IslandPos]
+meaning = "岛屿位置"
+codes = ["l"]
+refs_en = 2
+refs_all = 14
+example = "Find Blackbeard's pirate hideout. @l$IslandPos$"
+in_original = true
+
+[var.LName]
+meaning = "姓（last name）"
+codes = ["L"]
+refs_en = 1
+refs_all = 7
+example = "Hello, @F$FName$ @L$LName$, sit down here beside me and let's have a wee tipple. Then I'll tell you of hidden "
+in_original = true
+
+[var.MsgGoods]
+meaning = "消息里的货物名"
+codes = ["G"]
+refs_en = 1
+refs_all = 7
+example = "The demand for @G$MsgGoods$ is high in: @T$MsgTown0$ and @T$MsgTown1$"
+in_original = true
+
+[var.MsgTown0]
+meaning = "消息里的城镇槽 0"
+codes = ["T"]
+refs_en = 1
+refs_all = 7
+example = "The demand for @G$MsgGoods$ is high in: @T$MsgTown0$ and @T$MsgTown1$"
+in_original = true
+
+[var.MsgTown1]
+meaning = "消息里的城镇槽 1"
+codes = ["T"]
+refs_en = 1
+refs_all = 7
+example = "The demand for @G$MsgGoods$ is high in: @T$MsgTown0$ and @T$MsgTown1$"
+in_original = true
+
+[var.Name]
+meaning = "名字（上下文里的被指者）"
+codes = ["N"]
+refs_en = 8
+refs_all = 56
+example = "The traveler @N$Name$ thanks you for rescuing him and disembarks."
+in_original = true
+
+[var.Nation]
+meaning = "国家名"
+codes = ["n"]
+refs_en = 9
+refs_all = 63
+example = "Once again, we are faced with a shortage of those imported goods delivered by transport convoys from @n$Nation"
+in_original = true
+
+[var.Nation1]
+meaning = "国家槽 1"
+codes = ["n"]
+refs_en = 1
+refs_all = 7
+example = "As you know, @n$Nation1$ and @n$Nation2$ are at war.<n>For this reason, I will still not be getting any import"
+in_original = true
+
+[var.Nation2]
+meaning = "国家槽 2"
+codes = ["n"]
+refs_en = 4
+refs_all = 28
+example = "What does @n$Nation2$ think it's doing? I have just learned from an informant that transport convoys from Euro"
+in_original = true
+
+[var.NumConvoys]
+meaning = "船队数量"
+codes = ["I"]
+refs_en = 9
+refs_all = 63
+example = " Keep a lookout for Dutch convoys in the area and destroy @I$NumConvoys$ of them."
+in_original = true
+
+[var.NumShips]
+meaning = "船只数量"
+codes = ["I"]
+refs_en = 10
+refs_all = 70
+example = "Blackbeard convoy (@I$NumShips$ ships) sighted: @l$ConvoyPos$"
+in_original = true
+
+[var.OwnerName]
+meaning = "船主名"
+codes = ["N"]
+refs_en = 9
+refs_all = 63
+example = "You must find a package. @l$Pos$ Return it to @N$OwnerName$ in @T$TOWN$ by @D$EndDate$. "
+in_original = true
+
+[var.PirateGold]
+meaning = "海盗那边的金币（战利品分成）"
+codes = ["g"]
+refs_en = 0
+refs_all = 6
+example = "让一名拥有 20艘以上船只的海盗听你调遣，并且他至少要交给你 @g$PirateGold$ 的战利品分成。<n>不过要完成这项任务，你得先把其它任务全部完成。"
+in_original = false
+note = "英文原文里没有这个引用，译自标识符行的补译（2004 竞赛文本）"
+
+[var.PirateName]
+meaning = "海盗名"
+codes = ["P"]
+refs_en = 18
+refs_all = 126
+example = "Destroy the pirate hideout of @P$PirateName$."
+in_original = true
+
+[var.PlayerName]
+meaning = "玩家名（另一处，界面用）"
+codes = ["N"]
+refs_en = 1
+refs_all = 7
+example = "Greetings, @N$PlayerName$. Won't you come over here? "
+in_original = true
+
+[var.Pop]
+meaning = "人口"
+codes = ["I"]
+refs_en = 6
+refs_all = 42
+example = "Well done! The plague in Tortuga is over and the population has been restored to @I$Pop$.<n>You accomplished t"
+in_original = true
+
+[var.Pos]
+meaning = "位置（地图上的标记/地点）"
+codes = ["M", "d", "l", "r"]
+refs_en = 14
+refs_all = 98
+example = "@M$Pos$<n>"
+in_original = true
+note = "同一变量名出现多种码：M×7, d×7, l×77, r×7"
+
+[var.Price]
+meaning = "单价（金币）"
+codes = ["g"]
+refs_en = 22
+refs_all = 154
+example = " For @g$Price$, I will tell you where you can find @N$ContactName$."
+in_original = true
+
+[var.PriceBuy]
+meaning = "买价（金币）"
+codes = ["g"]
+refs_en = 4
+refs_all = 28
+example = "You are doing me a great favor. All is in order, you have paid me the @g$PriceBuy$. Meet me in the market and "
+in_original = true
+
+[var.PriceSell]
+meaning = "卖价（金币）"
+codes = ["g"]
+refs_en = 3
+refs_all = 21
+example = "I am glad to see you, @A$USER$. You have a large trading fleet don't you? It's just that I have to ship @A$Amo"
+in_original = true
+
+[var.RandLName]
+meaning = "随机姓氏"
+codes = ["L"]
+refs_en = 1
+refs_all = 7
+example = "<g:INTEXT_TREIBGUT_800x600.screen><n>The ship that sank here must have been under the command of a very experi"
+in_original = true
+
+[var.Reward]
+meaning = "报酬（金币）"
+codes = ["g"]
+refs_en = 11
+refs_all = 77
+example = "Thank you for returning the package to me. Here is your reward of @g$Reward$."
+in_original = true
+
+[var.Sailors]
+meaning = "水手数量"
+codes = ["I"]
+refs_en = 1
+refs_all = 7
+example = "<g:INTEXT_SCHIFFBRUECHIGER_800x600.screen><n>You have picked up @I$Sailors$ shipwrecked sailors, who appear to"
+in_original = true
+
+[var.SampleTown]
+meaning = "示例城镇（教学剧本里的固定城名）"
+codes = ["T"]
+refs_en = 5
+refs_all = 35
+example = "Some of the settlers were unhappy with the working conditions in @T$SampleTown$ and left in a rickety rowing b"
+in_original = true
+
+[var.Settlers]
+meaning = "移民数量"
+codes = ["I"]
+refs_en = 2
+refs_all = 14
+example = "You have come across castaways on a raft and have picked up @I$Settlers$ settlers. They are hoping to be put a"
+in_original = true
+
+[var.ShipType]
+meaning = "船型名"
+codes = ["S"]
+refs_en = 5
+refs_all = 35
+example = "I want you to attack military convoys belonging to @n$HostileNation$ and capture two @S$ShipType$ type ships. "
+in_original = true
+
+[var.StartGold]
+meaning = "起始资金"
+codes = ["g"]
+refs_en = 1
+refs_all = 7
+example = "Strange things are happening in Tortuga. Due to a number of events that have happened in the past, hardly a si"
+in_original = true
+
+[var.StartTown]
+meaning = "起始城镇"
+codes = ["T"]
+refs_en = 4
+refs_all = 28
+example = "Find and destroy the Spanish treasure fleet. It was last in @T$StartTown$, from there it set sail for @T$DestT"
+in_original = true
+
+[var.SubGoal]
+meaning = "子目标数量"
+codes = ["a"]
+refs_en = 7
+refs_all = 49
+example = "You should ensure that you have a supply of @a$SubGoal$ of cotton in the warehouse by the time your weaving mi"
+in_original = true
+
+[var.TOWN]
+meaning = "城镇名（多用在大写语境的目标提示）"
+codes = ["T"]
+refs_en = 53
+refs_all = 371
+example = "A Blockade in @T$TOWN$"
+in_original = true
+
+[var.TargetNation]
+meaning = "目标国家"
+codes = ["n"]
+refs_en = 23
+refs_all = 161
+example = "Destroy @I$NumConvoys$ military convoys belonging to @n$TargetNation$ by @D$EndDate$."
+in_original = true
+
+[var.TargetTown]
+meaning = "目标城镇"
+codes = ["T"]
+refs_en = 48
+refs_all = 336
+example = "Bring the traveler to @T$TargetTown$ by @D$EndDate$ ."
+in_original = true
+
+[var.TeacherName]
+meaning = "师父/传授者的名字"
+codes = ["N"]
+refs_en = 9
+refs_all = 63
+example = " No doubt you'll find him at an inn. But I'm sure he'll help you to find @N$TeacherName$."
+in_original = true
+
+[var.TeacherPos]
+meaning = "师父所在位置"
+codes = ["l"]
+refs_en = 6
+refs_all = 42
+example = "Use a convoy to find the teacher's hideout. @l$TeacherPos$ There must be @a$Amount$ of rum on board the convoy"
+in_original = true
+
+[var.TotalPrice]
+meaning = "总价（金币）"
+codes = ["g"]
+refs_en = 3
+refs_all = 21
+example = "Thank you for the @g$TotalPrice$. Meet me at the market and I will give you the goods."
+in_original = true
+
+[var.Town]
+meaning = "城镇名"
+codes = ["T"]
+refs_en = 40
+refs_all = 280
+example = "Build a school in @T$Town$ by @D$EndDate$."
+in_original = true
+
+[var.USER]
+meaning = "玩家名（自称/称呼）"
+codes = ["A", "s"]
+refs_en = 36
+refs_all = 252
+example = "I'm glad to see you, @A$USER$. I lost a package on my way here. Could you find it for me?"
+in_original = true
+note = "同一变量名出现多种码：A×133, s×119"
+
+[var.Val1]
+meaning = "通用数值槽 1（用途随任务）"
+codes = ["I"]
+refs_en = 1
+refs_all = 7
+example = "Congratulations! You have successfully completed each of the tasks in this scenario in @I$Days$ days and you h"
+in_original = true
+
+[var.Wealth]
+meaning = "总资产（金币）"
+codes = ["g"]
+refs_en = 1
+refs_all = 7
+example = "Congratulations! You have successfully completed each of the tasks in this scenario in @I$Days$ days and you h"
+in_original = true
+
+[var.WifeName]
+meaning = "妻子的名字"
+codes = ["F"]
+refs_en = 2
+refs_all = 14
+example = "The position is @l$Pos$. Search this area, perhaps @F$WifeName$ was trying to tell us something when she menti"
+in_original = true
+
