@@ -10,6 +10,8 @@
 --apply 的判据：
   · ans 必须是 entities.toml 里的实体键；若它是城镇表里的城名但还没登记，就顺带把
     六语译名从译文行里取出来，登记进 entities.toml 与 names/<lang>.toml；
+  · 或者 ans 是 marks.ANS_DIRECTIONS 里的方位键（north/east/southeast…）：谜面只给
+    朝向、给不出城名的那批诗谜用这种谜底，不登记实体、不查译名；
   · 六语线索都不能空，只收英文逗号，每条线索都要出现在该语言自己的谜面正文里；
   · 已经标成同值的组直接跳开（可重复跑），标成别的值则报错，不覆盖。
 """
@@ -24,6 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 sys.path.insert(0, HERE)
 import toml_io
+import marks as MK
 
 QUEUE = os.path.join(ROOT, "glossary", "verse_ans.toml")
 EN_PATH = os.path.join(ROOT, "src", "orig", "en.gog_1.1.2.3.toml")
@@ -145,10 +148,13 @@ def cmd_apply():
         for k in ids:
             assert k in en, "队列里的 %s 不在英文原文里" % k
 
-        if not os.path.isfile(ENTITIES) or ans not in toml_io.read_doc(ENTITIES)[0]:
+        if ans in MK.ANS_DIRECTIONS:
+            pass            # 方位谜底不进 entities.toml：它不是专名，也没有译名可登记
+        elif not os.path.isfile(ENTITIES) or ans not in toml_io.read_doc(ENTITIES)[0]:
             tid = towns.get(ans.lower())
             if not tid:
-                raise SystemExit("谜底「%s」既不在 entities.toml，也不在城镇表里" % ans)
+                raise SystemExit("谜底「%s」既不在 entities.toml、城镇表，也不是方位键"
+                                 "（方位键见 marks.ANS_DIRECTIONS）" % ans)
             register_entity(ans, tid, rows)
             print("登记实体 %s（城镇行 %s）" % (ans, tid))
 

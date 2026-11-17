@@ -18,6 +18,8 @@
                                 线索就说明这条谜面根本推不到这个答案（或线索该改）。
                                 谜底/线索都不生成本文，也不许把答案照抄成 ref，
                                 否则既泄底又冻死用词（见 09 卷第六十三、六十四节）
+                                谜底也可以只写方位（`east`/`southeast`…，见 ANS_DIRECTIONS）：
+                                那批谜面只说朝向，写不出城名（09 卷第七十二节）。
 
 为什么不用成对标记
 ------------------
@@ -57,6 +59,15 @@ KEYWORDS = ("ref", "lit", "term", "ans")
 #: term 参数允许的语言前缀。目前只有三种对照语言有原文表：英文（主原文）、
 #: 德语零售版、法语 GOG 版。加语言时同时确认 src/orig 里有对应文件。
 TERM_PREFIXES = ("en", "de", "fr")
+
+#: [ans:] 允许的第二种谜底：方位。诗谜里有一批谜面只说朝向（东向第三座、
+#: 三座里最西/最南、火山东南面、从西边过桥往东…），没有可直读的城镇名，
+#: 城镇坐标又不在数据里。这类只把**朝向**当谜底，理由记在 09 卷第七十二节。
+#: 取值是固定的英文键（和地名一样不随语言变），中文线索里写「东/东南」。
+ANS_DIRECTIONS = frozenset({
+    "north", "northeast", "east", "southeast",
+    "south", "southwest", "west", "northwest",
+})
 
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
@@ -395,7 +406,7 @@ def check_doc(lang, doc, entities=None, terms=None):
                 except MarkError as e:
                     problems.append(str(e))
                     continue
-                if name not in entities:
+                if name not in entities and name not in ANS_DIRECTIONS:
                     problems.append(
                         "%s：谜底 %r 没登记在 entities.toml（先决定它算不算专名）"
                         % (hid, name))

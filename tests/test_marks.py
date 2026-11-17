@@ -164,6 +164,16 @@ class TestAnswerMark(unittest.TestCase):
         self.assertEqual(M.check_doc("zh", doc, entities={"St. Augustine": {}},
                                      terms={}), [])
 
+    def test_direction_answer_needs_no_entity(self):
+        # 方位谜底不进 entities.toml：它不是专名，也没有译名可登记
+        doc = {"0x00000001": "[ans:southeast|东南]望向东南，第三座便是。"}
+        self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
+
+    def test_wrong_direction_answer_still_passes_but_key_must_be_known(self):
+        doc = {"0x00000001": "[ans:eastnorth|东南]望向东南，第三座便是。"}
+        problems = M.check_doc("zh", doc, entities={}, terms={})
+        self.assertTrue(any("eastnorth" in p for p in problems), problems)
+
 
 class TestDoc(unittest.TestCase):
     def test_exempt_key(self):
