@@ -1,0 +1,185 @@
+# 诗谜谜底队列 —— 谜面在 09 卷第六十四节定义的 verse 区间里，共 41 条，按同一首谜面归成 29 组。
+#
+# 只填两样：
+#   ans    谜底。必须是 entities.toml 里登记的实体键（城镇用英文名，六语共用）；
+#          城镇名不在表里也行，verse_ans.py --apply 会按城镇表把六语译名一起登记进来。
+#          线索词至少一条，英文逗号分隔，禁止全角「，」；每条线索都必须真的出现在
+#          该语言的谜面正文里——展开时自动校验，推不出来就构建失败。
+#
+# 谜面本身不要改：加 [ans:] 只在行首加标注，正文一字不动。
+#
+# 已标好的一组是样板：圣奥古斯丁（0x35f48f70/72/73）。其余 28 组等地图判定。
+
+[[group]]
+# 01  The town that you seek is a desolate place, far flung from a
+ids = ["0x35f48f6c", "0x35f48f74", "0x35f48f75"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 02  A river from the wilds at the headland divides There lies a 
+ids = ["0x35f48f6d"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 03  Four towns sit on the bay together. Sail to the east, in the
+ids = ["0x35f48f6e"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 04  Not the most northerly town can it be, but further north onl
+ids = ["0x35f48f6f", "0x35f48f71"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 05  Holy August is now northward bound, very soon in the town is
+ids = ["0x35f48f70", "0x35f48f72", "0x35f48f73"]
+ans = "St. Augustine"
+clues = {zh = "圣奥古斯丁,北", de = "August,Norden", es = "Agustín,norte", fr = "Augustin,nord", ja = "オーガスティン,北", ru = "Август,север"}
+
+[[group]]
+# 06  Once long ago did other people here live, with their great t
+ids = ["0x35f48fe4"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 07  Once long ago did other people here live, with their great t
+ids = ["0x35f48fe5"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 08  The distance from X to Nombre is not far, you have plenty of
+ids = ["0x35f48fe6"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 09  If off the cliffs to the north you should teeter, then in X 
+ids = ["0x35f4904e"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 10  Three little islands this area surround, but only on one are
+ids = ["0x35f4904f"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 11  X lies on the island, it’s really quite small. But look to t
+ids = ["0x35f49050", "0x35f490bf"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 12  Here in the island chain, you’ll see a break. To the west th
+ids = ["0x35f49051"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 13  In a large bay lie some towns, there are three. X refers to 
+ids = ["0x35f49052", "0x35f490c1", "0x35f490c2", "0x35f49130"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 14  In a large bay lie some towns, there are three. X refers to 
+ids = ["0x35f49053"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 15  A bay holds two islands, one large and one small. The town o
+ids = ["0x35f49054"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 16  An island far off, small and remote. There is nowhere else f
+ids = ["0x35f49055"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 17  X is a town that has streets paved with gold. Its majestic h
+ids = ["0x35f49056"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 18  Four towns are situated around a volcano. The town in the so
+ids = ["0x35f49057"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 19  On its sands, the sea is home to towns for which no one care
+ids = ["0x35f490c0"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 20  An island lies here, as though in a cradle. A peninsula from
+ids = ["0x35f490c3", "0x35f490c4"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 21  White strand beside the jungle, a little river known to none
+ids = ["0x35f490c5"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 22  Here lies the town, overlooking the sound. It guards the bay
+ids = ["0x35f490c6"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 23  Not far from the town, at the bottom of a cliff, lie the bat
+ids = ["0x35f490c7", "0x35f49136"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 24  Spain set up a harbor here once. You will find wood and bric
+ids = ["0x35f490c8"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 25  In a large bay lie some towns, there are three. X refers to 
+ids = ["0x35f49131"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 26  An island lies here, as though in a cradle. The land from th
+ids = ["0x35f49132", "0x35f49133"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 27  You come from the west, the bridge you cross over. The town 
+ids = ["0x35f49134"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 28  Oh what a wondrous place. Nestled in a bay. Protected by tow
+ids = ["0x35f49135"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
+
+[[group]]
+# 29  Powerful river flowing so deep, on towards the east and into
+ids = ["0x35f49137"]
+ans = ""
+clues = {zh = "", de = "", es = "", fr = "", ja = "", ru = ""}
