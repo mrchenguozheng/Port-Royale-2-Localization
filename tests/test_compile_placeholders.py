@@ -47,5 +47,27 @@ class TestIdentifierExemption(unittest.TestCase):
         self.assertTrue(V.is_identifier("IDM_CONTEST_01_2004_LOG_00_HDR"))
 
 
+class TestVariableCodeFix(unittest.TestCase):
+    """原文自身的变量码笔误：0xca4930dc 的 @A$Amount$ 不该逼译文跟着错。
+
+    同一变量在 12 个语料文件里 55 处写 @a$Amount$，`A` 这个码只用于 @A$USER$；
+    德语零售版这一行写的是 @a$。归一之后，译文写 a 不算「少了占位符」，
+    写 A 也不算「多了占位符」——真正的守门员是 text_lint 的「变量码孤例」。
+    """
+
+    def test_original_typo_normalized_both_sides(self):
+        en = "I have to ship @A$Amount$ of @G$Goods$."
+        zh = "我得运 @a$Amount$ 的 @G$Goods$。"
+        self.assertEqual(V.tokens(en), V.tokens(zh))
+        errors, warnings = [], []
+        ok = C.check_placeholders("0xca4930dc", en, zh, errors, warnings)
+        self.assertTrue(ok)
+        self.assertEqual((errors, warnings), ([], []))
+
+    def test_other_variable_names_stay_case_sensitive(self):
+        # 归一表只收这一条：别的变量名后面真出现大小写差异，仍是两个不同引用
+        self.assertNotEqual(V.tokens("@A$Price$"), V.tokens("@a$Price$"))
+
+
 if __name__ == "__main__":
     unittest.main()

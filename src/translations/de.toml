@@ -196,7 +196,7 @@
 "0xca07bf88" = "Konvoi überladen"
 "0xca19aeae" = "Händlerverfolgung"
 "0xca4930db" = "Seid gegrüßt, @A$USER$. Ich muss eine große Lieferung @G$Goods$ nach @T$Town$ bringen, doch leider hat mich mein Kapitän im Stich gelassen. Ich schlage Euch Folgendes vor: Ihr zahlt mir eine Sicherheit von @g$PriceBuy$, bringt @a$Amount$ nach @T$Town$ und erhaltet dort @g$PriceSell$ dafür. Was sagt Ihr?"
-"0xca4930dc" = "Schön, Euch zu sehen, @A$USER$. Ihr habt doch eine große Handelsflotte? Ich muss nämlich @A$Amount$ @G$Goods$ verschiffen.<n>Wie wär's, Ihr zahlt mir eine Sicherheit von @g$PriceBuy$ und bringt die Waren nach @T$Town$. Dort könnt Ihr sie für @g$PriceSell$ verkaufen."
+"0xca4930dc" = "Schön, Euch zu sehen, @A$USER$. Ihr habt doch eine große Handelsflotte? Ich muss nämlich @a$Amount$ @G$Goods$ verschiffen.<n>Wie wär's, Ihr zahlt mir eine Sicherheit von @g$PriceBuy$ und bringt die Waren nach @T$Town$. Dort könnt Ihr sie für @g$PriceSell$ verkaufen."
 "0xca4930dd" = "Ich bin in einer misslichen Lage. Bis @D$EndDate$ muss ich @a$Amount$ @G$Goods$ nach @T$Town$ liefern, doch mein Konvoi ist bereits mit einer anderen Lieferung unterwegs. Ich mache Euch folgendes Angebot: Zahlt mir eine Sicherheit von @g$PriceBuy$ und liefert die Waren. Dafür erhaltet Ihr @g$PriceSell$. Was sagt Ihr dazu?"
 "0xca6a6869" = "Speichern"
 "0xca6f7275" = "Wir konnten das Piratenversteck von %1 aufspüren. %2 Wie wäre es, wenn Ihr das Versteck angreift, diese Bande ein für alle Mal auslöscht und unseren Gewässern so etwas wie Frieden zurückgebt?"

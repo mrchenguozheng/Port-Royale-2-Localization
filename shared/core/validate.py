@@ -30,6 +30,12 @@ from collections import Counter
 #: 所以这里用必需的 $ 而不是 \$? —— 漏掉尾 $ 必须报错，不能静默放过。
 #: 比对时用**完整 token**：@P$TeacherName$ 与 @N$TeacherName$ 是两个
 #: 不同的引用（同一变量名配不同前缀），别只比变量名。
+#: 原文自身的变量码笔误，比对前归一。0xca4930dc 的 `@A$Amount$`：同一变量在
+#: 12 个语料文件里 55 处写作 `@a$Amount$`，而 `A` 这个码在语料里只用于
+#: `@A$USER$`（19 处）；德语零售版这一行写的是 `@a$`，是全库唯一规整过的版本。
+#: 原文写错、各语照抄，归一之后不再要求译文跟着错（本包六语已统一成 `@a$`）。
+SCRIPT_FIX = {"@A$Amount$": "@a$Amount$"}
+
 RE_SCRIPT = re.compile(r"@[A-Za-z]\$[A-Za-z_][A-Za-z_0-9]*\$")
 
 #: 任何排版标签（剥标签用）。含 <f:fonts\A.res> 这类字体标记 ——
@@ -59,7 +65,7 @@ def tokens(text):
     if text is None:
         return set()
     t = RE_TAG_ALL.sub(" ", str(text))
-    out = set(RE_SCRIPT.findall(t))
+    out = {SCRIPT_FIX.get(tok, tok) for tok in RE_SCRIPT.findall(t)}
     out |= set(RE_POS.findall(t))
     return out
 

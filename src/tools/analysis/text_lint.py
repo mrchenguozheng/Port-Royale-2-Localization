@@ -45,13 +45,18 @@ HAN = re.compile(r"[\u4e00-\u9fff]")
 LATIN = re.compile(r"[A-Za-z]")
 MARK_ANY = re.compile(r"\[(?:ref|lit|term):?")
 ANS_MARK = re.compile(r"\[ans:")
+# 站内变量 @x$Name$：x 是格式码。同一个变量在整份语料里几乎只有一种码，出现孤例多半是
+# 原文笔误被逐语照抄（0xca4930dc 的 @A$Amount$ 就是：同文件 55 处 @a$Amount$）。
+VAR_CODE = re.compile(r"@([A-Za-z])\$([A-Za-z0-9_]+)\$")
+# 这几个变量的码本来就是一词多形：Pos 的 d/l/r/M 是方位，USER 的 A/s 是称呼与署名。
+VAR_CODE_MULTI = {"Pos", "USER"}
 
 KEEP = {"0xfc512ea5"}
 
 sys.path.insert(0, os.path.dirname(HERE))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
-from shared.core.validate import is_identifier  # noqa: E402
+from shared.core.validate import is_identifier, SCRIPT_FIX  # noqa: E402
 from text import marks as MK  # noqa: E402
 import terms_check as TC  # noqa: E402
 
@@ -62,7 +67,7 @@ def norm_font(v):
 
 
 def tpl_set(v):
-    return sorted(TPL.findall(norm_font(v)))
+    return sorted(SCRIPT_FIX.get(t, t) for t in TPL.findall(norm_font(v)))
 
 
 def half_width_punct(v):
@@ -91,11 +96,28 @@ def main(argv):
     tr = MK.expand_doc(lang, tr_raw)
     zh_mode = lang == "zh"
 
+    # 变量名 → 各格式码在本文里的出现次数，供逐行查孤例
+    codes = {}
+    for v in tr.values():
+        for m in VAR_CODE.finditer(norm_font(v)):
+            per = codes.setdefault(m.group(2), {})
+            per[m.group(1)] = per.get(m.group(1), 0) + 1
+
     E, W = [], []
 
     for k, v in tr.items():
         if k in KEEP:
             continue
+        for m in VAR_CODE.finditer(norm_font(v)):
+            if m.group(2) in VAR_CODE_MULTI:
+                continue
+            per = codes.get(m.group(2)) or {}
+            top = max(per.values()) if per else 0
+            if per.get(m.group(1), 0) == 1 and top >= 10:
+                E.append((k, "变量码孤例",
+                          "@%s$%s$（该变量本文 %d 处用 %s）"
+                          % (m.group(1), m.group(2), top,
+                             max(per, key=per.get))))
         src = en.get(k)
         # 纯符号／纯数字条目：字符清单、单个标点，不参与中文规则
         if zh_mode and not HAN.search(v) and not LATIN.search(v):

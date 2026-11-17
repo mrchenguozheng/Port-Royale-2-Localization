@@ -195,7 +195,7 @@
 "0xca07bf88" = "Convoy sobrecargado"
 "0xca19aeae" = "Tras el comerciante"
 "0xca4930db" = "Saludos, @A$USER$. Debo entregar un gran cargamento de @G$Goods$ en @T$Town$, pero, desgraciadamente, mi capitán me ha fallado. Te propongo el siguiente plan: me pagas una fianza de @g$PriceBuy$, transportas @a$Amount$ a @T$Town$ y allí recibirás @g$PriceSell$ a cambio. ¿Qué dices?"
-"0xca4930dc" = "Me alegra verte, @A$USER$. Tienes una gran flota comercial, ¿verdad? Es que tengo que enviar @A$Amount$ de @G$Goods$.<n>¿Qué tal si me pagas una fianza de @g$PriceBuy$ y llevas las mercancías a @T$Town$? Allí podrás venderlas por @g$PriceSell$."
+"0xca4930dc" = "Me alegra verte, @A$USER$. Tienes una gran flota comercial, ¿verdad? Es que tengo que enviar @a$Amount$ de @G$Goods$.<n>¿Qué tal si me pagas una fianza de @g$PriceBuy$ y llevas las mercancías a @T$Town$? Allí podrás venderlas por @g$PriceSell$."
 "0xca4930dd" = "Estoy en una situación delicada. Tengo hasta @D$EndDate$ para entregar @a$Amount$ de @G$Goods$ en @T$Town$, pero mi convoy ya está en marcha con otra entrega de mercancías. Te hago la siguiente oferta: págame una fianza de @g$PriceBuy$ y entrega las mercancías. Después recibirás @g$PriceSell$ a cambio. ¿Qué me dices?"
 "0xca6a6869" = "Guardar"
 "0xca6f7275" = "Hemos conseguido descubrir el escondite pirata de %1.  %2 ¿Te gustaría atacar el escondite y destruir a esta banda de una vez por todas, devolviendo así cierta paz a nuestras aguas?"

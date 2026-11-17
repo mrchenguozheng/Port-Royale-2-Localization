@@ -196,7 +196,7 @@
 "0xca07bf88" = "Convoi surchargé"
 "0xca19aeae" = "Poursuivre les marchands"
 "0xca4930db" = "Salutations, @A$USER$. Je dois livrer un gros chargement de @G$Goods$ à @T$Town$, mais malheureusement, mon capitaine n'est pas disponible. Voilà ma proposition : vous me laissez une somme en gage, @g$PriceBuy$, vous transportez @a$Amount$ à @T$Town$ et vous y toucherez @g$PriceSell$ en échange des marchandises. Qu'en dites-vous ?"
-"0xca4930dc" = "Je suis heureux de vous voir, @A$USER$. Vous avez une grande flotte marchande, n'est-ce pas ? J'ai en effet une cargaison de @A$Amount$ de @G$Goods$ à livrer.<n>Si vous me laissez @g$PriceBuy$ en gage et que vous emmenez les marchandises à @T$Town$, vous y toucherez @g$PriceSell$."
+"0xca4930dc" = "Je suis heureux de vous voir, @A$USER$. Vous avez une grande flotte marchande, n'est-ce pas ? J'ai en effet une cargaison de @a$Amount$ de @G$Goods$ à livrer.<n>Si vous me laissez @g$PriceBuy$ en gage et que vous emmenez les marchandises à @T$Town$, vous y toucherez @g$PriceSell$."
 "0xca4930dd" = "Je suis dans une position difficile. J'ai jusqu'au @D$EndDate$ pour livrer @a$Amount$ de @G$Goods$ à @T$Town$, mais mon convoi est déjà en route avec une autre cargaison. Je vous propose le marché suivant : donnez-moi @g$PriceBuy$ en gage et livrez les marchandises. Vous serez alors payé @g$PriceSell$. C'est un marché tentant, non ?"
 "0xca6a6869" = "Sauvegarder"
 "0xca6f7275" = "Nous avons pu découvrir l'emplacement du repaire du pirate %1. %2 Pourquoi n'iriez-vous pas attaquer ce repaire afin de détruire ce pirate une fois pour toutes, afin de restaurer un peu la paix dans nos eaux ?"
