@@ -125,6 +125,13 @@ class TestAnswerMark(unittest.TestCase):
         self.assertEqual(M.expand("[ans:St. Augustine|NORTH]He went north.", TABLE, "zh"),
                          "He went north.")
 
+    def test_fullwidth_comma_rejected(self):
+        # 线索只用英文逗号；全角「，」会把两个词粘成一条，报错比「命中不了」更好查
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[ans:St. Augustine|north，August]He went north in August.",
+                     TABLE, "zh")
+        self.assertIn(",", str(ctx.exception))
+
     def test_unknown_answer_is_reported(self):
         doc = {"0x00000001": "[ans:Nowhere|north]He went north."}
         problems = M.check_doc("zh", doc, entities={"St. Augustine": {}}, terms={})

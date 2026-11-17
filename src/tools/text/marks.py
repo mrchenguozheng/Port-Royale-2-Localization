@@ -12,8 +12,9 @@
     [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
     [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
     [ans:St. Augustine|north,August]  诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
-                                `|` 后面是**谜面里能推出这个谜底的线索词**，逗号分隔，
-                                至少一条。展开时逐条核对它们真的出现在谜面里——写不出
+                                `|` 后面是**谜面里能推出这个谜底的线索词**，用英文逗号
+                                `,` 分隔（全角「，」不收），至少一条。展开时逐条核对
+                                它们真的出现在谜面里——写不出
                                 线索就说明这条谜面根本推不到这个答案（或线索该改）。
                                 谜底/线索都不生成本文，也不许把答案照抄成 ref，
                                 否则既泄底又冻死用词（见 09 卷第六十三、六十四节）
@@ -179,7 +180,9 @@ def _split_ans(arg, hid=""):
     entity = entity.strip()
     if not entity:
         raise MarkError("%s：ans 参数为空（写成 [ans:实体|线索,…]）" % hid)
-    clues = [c.strip() for c in clues_raw.replace("，", ",").split(",")]
+    if "，" in clues_raw:
+        raise MarkError("%s：ans 的线索用英文逗号 `,` 分隔，不要用全角「，」" % hid)
+    clues = [c.strip() for c in clues_raw.split(",")]
     clues = [c for c in clues if c]
     if not clues:
         raise MarkError(
