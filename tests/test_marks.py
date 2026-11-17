@@ -335,19 +335,34 @@ class TestAnswerMark(unittest.TestCase):
 
     def test_full_direction_word_any_case_is_accepted(self):
         # 八个方位词的值域是封闭的，大小写怎么写都认；连 `not East` 也认
-        for spelling in ("East", "east", "EAST", "eaSt", "ｅａｓｔ",
+        for spelling in ("East", "east", "EAST", "eaSt",
                          "-East", "not East", "NOT east"):
             doc = {"0x00000001": "[riddle:answer=%s;clue=direction:north]north 侧只有水。"
                                  % spelling}
             self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [], spelling)
 
-    def test_cardinal_single_letter_is_rejected(self):
-        # 裸值不设单字母缩写：裸的 N 也可能是没登记的地名，不猜
-        for bad in ("N", "E", "S", "W", "-N"):
+    def test_fullwidth_letters_are_rejected(self):
+        # 只认半角 ASCII：全角字母肉眼和半角几乎一样，混进来必须当场点名
+        for bad in ("ｅａｓｔ", "ＥＡＳＴ", "Ｅ", "nｏrth"):
             with self.assertRaises(M.MarkError) as ctx:
-                M.expand("[riddle:answer=%s;clue=direction:东]north 侧只有水。" % bad,
+                M.expand("[riddle:answer=%s;clue=direction:north]north 侧只有水。" % bad,
                          TABLE, "zh")
-            self.assertIn("direction", str(ctx.exception))
+            self.assertIn("全角", str(ctx.exception))
+        for bad in ("ｅａｓｔ", "NＯＲＴＨ"):
+            with self.assertRaises(M.MarkError) as ctx:
+                M.expand("[riddle:direction=%s;clue=direction:north]north 侧只有水。" % bad,
+                         TABLE, "zh")
+            self.assertIn("全角", str(ctx.exception))
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:town=Ｖｅｒａ Ｃｒｕｚ;clue=direction:north]北边。", TABLE, "zh")
+        self.assertIn("全角", str(ctx.exception))
+
+    def test_cardinal_single_letter_is_accepted(self):
+        # 值域封闭，裸的 `n` 只能是 north（要指同名地名就写 town=）；否定形态同理
+        for spelling in ("N", "n", "E", "s", "-N", "not w"):
+            doc = {"0x00000001": "[riddle:answer=%s;clue=direction:north]north 侧只有水。"
+                                 % spelling}
+            self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [], spelling)
 
     def test_cardinal_single_letter_under_direction_is_accepted(self):
         # 明写 direction= 时单字母一定是方向，N/E/S/W 及其否定形态都收
