@@ -147,6 +147,30 @@ class TestMarkKey(unittest.TestCase):
             self.key("[riddle:answer=Vera Cruz;group=00000001;clue=count:三座]"),
             self.key("[riddle:answer=Vera Cruz;group=00000001;clue=count:四座]"))
 
+    def test_tail_fields_are_kept(self):
+        # certainty / source 不在队列里：重写标注时必须原样带回去
+        wanted = "[riddle:answer=Vera Cruz;group=00000001;clue=count:三座]"
+        old = ("[riddle:answer=vera cruz;group=00000001;clue=count:三座;"
+               "certainty=certain;source=original-en] 三座城镇。")
+        self.assertEqual(
+            VA.with_tail(wanted, old),
+            "[riddle:answer=Vera Cruz;group=00000001;clue=count:三座;"
+            "certainty=certain;source=original-en]")
+
+    def test_tail_fields_absent_means_plain_wanted(self):
+        wanted = "[riddle:answer=Vera Cruz;group=00000001;clue=count:三座]"
+        self.assertEqual(VA.with_tail(wanted, "三座城镇。"), wanted)
+        self.assertEqual(VA.with_tail(wanted, wanted), wanted)
+
+    def test_tail_fields_order_preserved(self):
+        wanted = "[riddle:answer=Vera Cruz;group=00000001;clue=count:三座]"
+        old = ("[riddle:answer=Vera Cruz;group=00000001;clue=count:三座;"
+               "source=original-en;certainty=certain]")
+        self.assertEqual(
+            VA.with_tail(wanted, old),
+            "[riddle:answer=Vera Cruz;group=00000001;clue=count:三座;"
+            "source=original-en;certainty=certain]")
+
     def test_no_mark_gives_none(self):
         self.assertIsNone(self.key("三座城镇，X 在最西。"))
 

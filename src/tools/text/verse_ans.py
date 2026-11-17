@@ -19,7 +19,9 @@
     方位包括正向（north/east/southeast…）与否定（-north/-southeast…，减号表示
     「不是那边」）。这两类不登记实体、不查译名；
   · 六语线索都不能空，只收英文逗号，每条线索都要出现在该语言自己的谜面正文里；
-  · 已经标成同值的组直接跳开（可重复跑），标成别的值则报错，不覆盖。
+  · 已经标成同值的组直接跳开（可重复跑），标成别的值则报错，不覆盖；
+  · 队列只生成 answer/town/direction/group/clue 五个字段；`certainty` / `source`
+    这类队列之外的字段由人工维护，重写标注时原样保留（`tail_fields`/`with_tail`）。
 """
 import argparse
 import io
@@ -194,6 +196,39 @@ def _fields(arg):
     return out
 
 
+#: 队列负责生成的字段；其余字段（`certainty` / `source` …）由人工维护，重写时必须原样带回。
+QUEUE_FIELDS = ("answer", "town", "direction", "group", "clue")
+
+
+def tail_fields(text):
+    """已有标注里队列不生成的那些字段，按原样返回（`;` 分隔的一段段）。
+
+    引号内不可能出现 `;`（语法禁止），所以这里按 `;` 直接切是安全的；切出来的段不重排、
+    不改写，原封不动带回去。
+    """
+    m = ANS_MARK.match(text or "")
+    if not m:
+        return []
+    arg = m.group(0)[len("[riddle:"):-1]
+    out = []
+    for part in arg.split(";"):
+        name = part.partition("=")[0].strip()
+        if name in QUEUE_FIELDS:
+            continue
+        if part.strip():
+            out.append(part.strip())
+    return out
+
+
+def with_tail(wanted, text):
+    """把 `text` 里的尾字段接到 `wanted` 上，返回新的标注串。"""
+    tails = tail_fields(text)
+    if not tails:
+        return wanted
+    assert wanted.endswith("]"), wanted
+    return wanted[:-1] + ";" + ";".join(tails) + "]"
+
+
 def _group_norm(raw):
     """group 值 → 升序键元组；顺手吃掉 `0x` 前缀和大小写，用来比较而不是校验。"""
     toks = []
@@ -305,10 +340,13 @@ def cmd_apply():
 
         order = [(lang, k) for k in ids for lang in LANGS]
         already = {lk: rows[lk[0]].get(lk[1], "") for lk in order}
-        want_text = {lk: ANS_MARK.match(wanted[lk]).group(0) for lk in order}
-        same_key = [mark_key(already[lk], ent_index) == mark_key(want_text[lk], ent_index)
+        want_mark = {lk: ANS_MARK.match(wanted[lk]).group(0) for lk in order}
+        # 尾字段（certainty / source）不在队列里，重写时原样接回去，不能抹掉。
+        new_mark = {lk: with_tail(want_mark[lk], already[lk]) for lk in order}
+        same_key = [mark_key(already[lk], ent_index) == mark_key(want_mark[lk], ent_index)
                     for lk in order]
-        same_text = [already[lk].startswith(want_text[lk]) for lk in order]
+        same_text = [(ANS_MARK.match(already[lk]).group(0) if ANS_MARK.match(already[lk])
+                      else None) == new_mark[lk] for lk in order]
         if all(same_key) and all(same_text):
             skipped += 1
             continue
@@ -322,10 +360,10 @@ def cmd_apply():
             path = os.path.join(TRANS, "%s.toml" % lang)
             doc, order_t = toml_io.read_doc(path)
             for k in ids:
-                mark = wanted[(lang, k)]
+                mark = new_mark[(lang, k)]
                 if "[riddle:" in doc[k]:
                     # 值相同、只是写法不规范（大小写/变音/方位缩写/group 带 0x 之类）：
-                    # 原地换成规范串，不改正文。
+                    # 原地换成规范串，正文和尾字段都不动。
                     assert ANS_MARK.match(doc[k]), (lang, k)
                     doc[k] = ANS_MARK.sub(mark, doc[k], count=1)
                 else:
