@@ -502,6 +502,10 @@ def _split_ans(arg, hid="", warns=None):
     group = _group_tokens(fields["group"], hid) if "group" in fields else []
 
     clue_raw = fields.get("clue", "")
+    if not clue_raw:
+        # clue 是必填：没有线索的谜底无从核对，标注就退化成一条注释。
+        raise MarkError(
+            "%s：ans 缺 clue（谜面里能推出谜底的词要逐条写成 clue=direction:东,…）" % hid)
     if "，" in clue_raw:
         raise MarkError("%s：ans 的线索用英文逗号 `,` 分隔，不要用全角「，」" % hid)
     clues = []
@@ -737,6 +741,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
         ent_index.setdefault(_fold(name), []).append(name)
     ans_used = set()
     ans_groups = {}
+    riddle_bodies = {}
     for hid in sorted(doc):
         text = doc[hid] or ""
         if not text or hid in EXEMPT_KEYS:
@@ -805,6 +810,8 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                         ans_used.add(value)
                     sig.append(value)
                 ans_groups[hid] = ("|".join(sig), group)
+                # 同文索引：同一段谜面在数据里出现多次时，用来反向查「谁漏写了 group」。
+                riddle_bodies.setdefault(_fold(_ANS_SPAN.sub("", text)), []).append(hid)
                 continue
             if key == "ref":
                 # 只校验结构，不展开：目标键自身的标注在它自己那一轮里查。
@@ -849,6 +856,28 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None):
                 problems.append(
                     "%s：与 %s 的组员集合不一致（两边都要列全整组其余副本）"
                     % (hid_g, t))
+    # 反向查漏：`group` 只从声明方出发，「三条都忘写 group」是查不出来的——所以再从
+    # 谜面本身出发：展开后的正文逐字相同（折平后）就算同文副本，必须互相列全。
+    # 只立这一个方向：同文 ⇒ 同组；不同文的条目当然可以同谜底（Roatán 在 14/15 两组、
+    # Providence 在 20/26 两组，都是不同谜面同谜底），不能反过来要求。
+    for body_key in sorted(riddle_bodies):
+        members = riddle_bodies[body_key]
+        if len(members) < 2:
+            continue
+        sigs = {ans_groups[h][0] for h in members}
+        if len(sigs) > 1:
+            problems.append(
+                "%s 的谜面逐字相同，谜底却不一样（%s）——同文副本必须同一个谜底"
+                % (" / ".join(members), " / ".join(sorted(sigs))))
+            continue
+        whole = set(members)
+        bad = [h for h in members
+               if {"0x" + t for t in ans_groups[h][1]} | {h} != whole]
+        if bad:
+            problems.append(
+                "%s 的谜面逐字相同，group 却没互指成一组（%s 的声明对不上这 %d 条）——"
+                "同文副本每一条都要写 group 列全其余副本"
+                % (" / ".join(members), " / ".join(bad), len(members)))
     used = used_names(doc) | ans_used
     if used:
         # 死条目：既没被标注引用、译名也没在正文任何一条里出现，才报。

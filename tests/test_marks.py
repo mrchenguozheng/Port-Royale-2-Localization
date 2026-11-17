@@ -671,6 +671,45 @@ class TestAnswerGroup(unittest.TestCase):
                                entities={"Vera Cruz": {}, "Santa Marta": {}}, terms={})
         self.assertTrue(any("不一致" in p for p in problems), problems)
 
+    def test_same_text_without_any_group_is_reported(self):
+        # 防漏：两条忘了写 group，从声明方出发查不出来——改从谜面本身出发反查
+        doc = self._doc(
+            "[riddle:answer=Vera Cruz%s" % self.S,
+            "[riddle:answer=Vera Cruz%s" % self.S)
+        problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
+        self.assertTrue(any("逐字相同" in p and "group" in p for p in problems), problems)
+
+    def test_same_text_with_partial_group_is_reported(self):
+        # 只标了一条：另一条被对称检查抓到，这里额外要从「同文」这一侧也能说清
+        doc = self._doc(
+            "[riddle:answer=Vera Cruz;group=%s%s" % (self._b(self.B), self.S),
+            "[riddle:answer=Vera Cruz%s" % self.S)
+        problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
+        self.assertTrue(any("逐字相同" in p for p in problems), problems)
+
+    def test_same_text_with_different_answers_is_reported(self):
+        doc = self._doc(
+            "[riddle:answer=Vera Cruz%s" % self.S,
+            "[riddle:answer=Santa Marta%s" % self.S)
+        problems = M.check_doc("zh", doc,
+                               entities={"Vera Cruz": {}, "Santa Marta": {}}, terms={})
+        self.assertTrue(any("逐字相同" in p and "谜底" in p for p in problems), problems)
+
+    def test_different_texts_may_share_answer(self):
+        # 反方向不立：不同谜面可以同谜底（Roatán 在 14/15 两组、Providence 在 20/26 两组）
+        doc = self._doc(
+            "[riddle:answer=Vera Cruz%s" % self.S,
+            "[riddle:answer=Vera Cruz;clue=count:三座]三座城，X 在西边。")
+        self.assertEqual(M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={}), [])
+
+    def test_same_text_across_case_and_spacing_is_reported(self):
+        # 同文判定折平：全半角以外的写法差异不该让它漏过去
+        doc = self._doc(
+            "[riddle:answer=Vera Cruz%s" % self.S,
+            "[riddle:answer=vera  cruz%s" % self.S)
+        problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
+        self.assertTrue(any("逐字相同" in p for p in problems), problems)
+
 
 class TestDoc(unittest.TestCase):
     def test_exempt_key(self):
