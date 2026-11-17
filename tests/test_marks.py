@@ -806,8 +806,8 @@ class TestCertaintyAndSource(unittest.TestCase):
 
     def test_certainty_values(self):
         for v in M.ANS_CERTAINTY:
-            if v == "inferred":
-                # inferred 自带「必须写 source」的规则，单独测
+            if v in ("inferred", "either"):
+                # 两者都自带附加规则（要 source / 要两个候选），单独测
                 continue
             self.assertEqual(self.ok("certainty=" + v), "He went north in August.")
         self.assertEqual(self.ok("certainty=inferred;source=original-en&cargo"),
@@ -900,6 +900,36 @@ class TestCertaintyAndSource(unittest.TestCase):
 
     def test_unknown_source_category(self):
         self.bad("source=hearsay", "没有类别")
+
+    # ---- either：两个地点都成立（answer=A|B），不是「没定」 ----
+
+    EITHER_BODY = "He went north in August."
+
+    def either_mark(self, answer="St. Augustine|Havana", tail="certainty=either;source=original-en&cargo"):
+        return ("[riddle:answer=%s;group=00000001;clue=direction:north;%s]%s"
+                % (answer, tail, self.EITHER_BODY))
+
+    def test_either_with_two_candidates(self):
+        self.assertEqual(M.expand(self.either_mark(), TABLE, "zh"), self.EITHER_BODY)
+
+    def test_either_needs_two_candidates(self):
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand(self.either_mark(answer="St. Augustine"), TABLE, "zh")
+        self.assertIn("两个以上候选", str(ctx.exception))
+
+    def test_either_needs_source(self):
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand(self.either_mark(tail="certainty=either"), TABLE, "zh")
+        self.assertIn("必须写 source", str(ctx.exception))
+
+    def test_multi_candidate_without_either_is_allowed(self):
+        # `|` 也可能是同一座城的异写（San Juan|St. Juan），机器分不清，所以不设禁令
+        self.assertEqual(
+            M.expand(self.either_mark(tail="certainty=inferred;source=original-en&cargo"),
+                     TABLE, "zh"), self.EITHER_BODY)
+
+    def test_single_candidate_without_either_is_fine(self):
+        self.assertEqual(self.ok("certainty=certain"), self.EITHER_BODY)
 
 
 if __name__ == "__main__":

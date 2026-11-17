@@ -275,8 +275,9 @@ ANS_KEY_RX = re.compile(r"^[0-9a-f]{8}$")
 #: clue 的类型：说明这条谜面的信息属于哪一类，也决定译者必须保住什么。
 ANS_CLUE_KINDS = ("pun", "direction", "count", "feature", "produce", "history", "exclude")
 
-#: certainty：这条谜底有多确定（见 09 卷第九十一节）。
-ANS_CERTAINTY = ("certain", "inferred", "disputed")
+#: certainty：这条谜底有多确定（见 09 卷第九十一、九十五节）。
+#: `either` 专指「两个地点都成立」——不是没定，是并列成立，答案用 `answer=A|B` 列全。
+ANS_CERTAINTY = ("certain", "inferred", "either", "disputed")
 
 #: source 的两份原文（GOG 版英文与法语）：`original-en` / `original-fr`。
 ANS_ORIGINALS = ("original-en", "original-fr")
@@ -803,6 +804,15 @@ def _split_ans(arg, hid="", warns=None):
         if all(kind == "original" for kind, _t in sources):
             raise MarkError("%s：certainty=inferred 的 source 不能只有 original-*"
                             "（原文直接推得出就该写 certain）" % hid)
+    # either 是「两个地点都成立」，答案用 `|` 列全。反向不设禁令：`|` 既可能是两座城，
+    # 也可能同一座城的异写（`San Juan|St. Juan`），机器只数得出候选个数、分不清哪种，
+    # 所以「多候选却没写 either」不报错，由作者自己交代清楚。
+    if certainty == "either":
+        if len(answers) < 2:
+            raise MarkError("%s：certainty=either 要在 answer 里列两个以上候选"
+                            "（answer=A|B）；只有一个答案就写 certain / inferred" % hid)
+        if not sources:
+            raise MarkError("%s：certainty=either 必须写 source（凭哪份材料说两个都成立）" % hid)
     return answers, group, clues, (kind or "answer"), certainty, sources
 
 
