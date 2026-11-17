@@ -23,14 +23,18 @@
 （「我刚听说， 一艘满载移民的 英格兰船沉了。」）。现在只在「一段连续汉字
 长到超过预算」时才动手，标点不插空格。`ZhGroupSpacing` 保留为可回退的旧路径。
 
-分词器优先，兜底才机械切
-------------------------
-* 首选 spaCy + zh_core_web_sm（OOV 比 jieba 好：「私掠者」「总督府」
-  「胡安·贝尔穆德斯」不会被拆）。它需要 Python 3.11，用环境变量
-  `PR2_SPACY_PYTHON` 指向那个解释器（或用仓库里的 `.venv-spacy`）；
-* 没有 spaCy 就用 jieba；
-* 两个都没有，才退回 `fallback_wrap()` —— 按字数机械切，**不保证切在词界**
+分词器只有 spaCy 一条路，兜底才机械切
+--------------------------------------
+* spaCy + zh_core_web_sm（OOV 比旧方案好：「私掠者」「总督府」「胡安·贝尔穆德斯」
+  不会被拆）。它要求 Python 3.9～3.13，用环境变量 `PR2_SPACY_PYTHON` 指向那个
+  解释器（或用仓库里的 `.venv-spacy`）；
+* 没有 spaCy 就退回 `fallback_wrap()` —— 按字数机械切，**不保证切在词界**
   （会出现「因 而」这种断在词中间的结果）。这是降级路径，不是默认路径。
+
+**不用 jieba**。它最后一次提交停在 2020-02-15，issues 攒了 649 个、基本无人处理，
+当构建依赖等于把分词质量锁死在一个不再维护的词典上。这条是硬性规定，不是偏好：
+见 `docs/构建与安装.md` 的「不要用 jieba」一节，别再加回来。
+
 
 用法（生成逻辑在 engine_text.py，这里只提供能力）
 ----
@@ -72,7 +76,7 @@ MIN_RUN = MAX_CHARS + 1
 def spacy_python():
     """找一个装了 spaCy 的 Python。
 
-    优先级：环境变量 PR2_SPACY_PYTHON > 仓库里的 .venv-spacy > 空（退回 jieba）。
+    优先级：环境变量 PR2_SPACY_PYTHON > 仓库里的 .venv-spacy > 空（退回机械切）。
     """
     explicit = os.environ.get("PR2_SPACY_PYTHON")
     if explicit:
@@ -100,39 +104,26 @@ def _segment_spacy(runs):
     return dict(zip(runs, json.loads(proc.stdout.decode("utf-8"))))
 
 
-def _segment_jieba(runs):
-    try:
-        import jieba
-    except ImportError:
-        return None
-    dict_path = os.path.join(TOOLS, "data", "zh_userdict.txt")
-    if os.path.isfile(dict_path):
-        jieba.load_userdict(dict_path)
-    return {run: [w for w in jieba.cut(run, HMM=True) if w] for run in runs}
-
-
 def segment(runs):
     """把待分词的片段一次性切成词。
 
     返回 `(lookup, name)`：lookup(run) 给出词表，name 是用了哪个分词器；
-    两个分词器都没有时返回 `(None, "")`，调用方应退回 fallback_wrap。
+    没有 spaCy 时返回 `(None, "")`，调用方应退回 fallback_wrap。
 
     lookup 上挂着一个 `missing` 列表：调用方给的片段不在这次分词结果里时
     会记一条。正常情况下它必须为空 —— 有内容就说明「会被切两组的片段
     没进分词」，成组只能按单字来（会切在词中间）。
+
+    这里**只认 spaCy**：jieba 已于 2020 年停更，不作构建依赖，见模块头注释。
     """
     if not runs:
         lookup = lambda run: list(run)  # noqa: E731
         lookup.missing = []
         return lookup, "none"
     seg = _segment_spacy(runs)
-    if seg is not None:
-        name = "spacy"
-    else:
-        seg = _segment_jieba(runs)
-        if seg is None:
-            return None, ""
-        name = "jieba"
+    if seg is None:
+        return None, ""
+    name = "spacy"
     missed = []
 
     def lookup(run):
@@ -223,7 +214,7 @@ def fallback_wrap(text, min_run=MIN_RUN, step=MAX_CHARS):
     """没有分词器时的兜底：超长汉字串按字数硬切。
 
     **不保证切在词界**（会切出「因 而」这种结果），所以只在
-    spaCy/jieba 都不可用时使用。步长取 `MAX_CHARS`，兜底出来的组
+    spaCy 不可用时使用。步长取 `MAX_CHARS`，兜底出来的组
     也不超过同一份字数预算。
     """
     particles = set("的了是在和与而或也就都但并且时后中上下里外为以于对把被将从到着过们吗呢吧啊呀哦嗯")
@@ -257,23 +248,13 @@ _TIGHT_SPACE = re.compile(r"(?<=%s)\s+|\s+(?=%s)" % (_TIGHT, _TIGHT))
 
 
 def load_user_words(words):
-    """把已知专名/术语塞进 jieba 词典，免得切在词中间（「皇家 / 港」）。
+    """把已知专名/术语交给分词器，免得切在词中间（「皇家 / 港」）。
 
-    只对已 import 过的 jieba 生效：spaCy 路径下返回 0，不强行拉起另一个分词器。
-    返回加进去的条数，供 CLI 展示。
+    只剩 spaCy 一条路后这里不再需要往词典里塞词：spaCy 用统计模型分词，
+    没有「用户词典」这个概念，专名由 `collect_runs()` 的整段交给它自己切。
+    函数保留为空实现，仅为不破坏 `lang_rules/zh.py` 的调用点与外部脚本。
     """
-    if not words:
-        return 0
-    try:
-        import jieba
-    except ImportError:
-        return 0
-    n = 0
-    for w in words:
-        if w and len(w) > 1 and re.search(r"[\u4e00-\u9fff]", w):
-            jieba.add_word(w, freq=100000)
-            n += 1
-    return n
+    return 0
 
 
 def _words(run, lookup):

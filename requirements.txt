@@ -18,9 +18,14 @@ unidic-lite>=1.0.8
 # 脚本会自动找到；想统一就装进主环境。
 fonttools>=4.0
 
-# 可选：中文分词（text/zh_space.py，构建期按词补空格用）。
-#   没有分词器时会退回「按字数机械切」，照样能构建，只是可能切在词中间。
-#   首选 spaCy + zh_core_web_sm（需 Python 3.11，用 PR2_SPACY_PYTHON 指向那个解释器），
-#   其次 jieba（纯 Python）。本机目前已装 janome 0.5.2 / fugashi 1.5.2 /
-#   unidic-lite 1.0.8 / jieba 0.42.1（2026-11-16 补齐 janome 与 fugashi）。
-# jieba
+# 中文分词（text/zh_space.py，构建期按词补空格用）。只有一个选择：spaCy。
+#   没有它会退回「按字数机械切」，照样能构建，只是可能切在词中间。
+#   装法（Python 3.9～3.13，仓库根的 .venv-spacy 会被自动发现）：
+#     python -m venv .venv-spacy
+#     .venv-spacy\Scripts\python -m pip install spacy
+#     .venv-spacy\Scripts\python -m spacy download zh_core_web_sm
+#
+# 【禁止】不要引入 jieba。它最后一次提交停在 2020-02-15，issues 累积 649 个、
+#   基本无人处理；把它当构建依赖，等于把中文分词锁在一个不再维护的词典上。
+#   理由与替代方案见 docs/构建与安装.md 的「不要用 jieba」一节。
+# spacy>=3.8

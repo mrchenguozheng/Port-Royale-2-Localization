@@ -36,21 +36,15 @@ def normalize(text, date_format=False):
 
 
 class ZhSegmenter(S.Segmenter):
-    """中文分词器：spaCy → jieba → 无（由 Spacing 退回机械切）。
+    """中文分词器：只有 spaCy 一条路；没有就由 Spacing 退回机械切。
 
     `prepare()` 一次性把所有待切片段交出去，避免逐条起子进程。
+    jieba 已于 2020 年停更，不作构建依赖（见 `zh_space` 模块头注释）。
     """
 
     name = "none"
 
     def prepare(self, texts):
-        # 已知专名先塞进 jieba 词典，否则「皇家港」「查尔斯陶恩」会被切开。
-        from text import marks as MK
-        words = []
-        for name, val in MK.load_names(LANG).items():
-            t = val["default"] if isinstance(val, dict) else val
-            words.append(t)
-        zh_space.load_user_words(words)
         runs = zh_space.collect_runs(texts)
         self.runs = runs
         if not runs:
@@ -58,8 +52,9 @@ class ZhSegmenter(S.Segmenter):
         lookup, name = zh_space.segment(runs)
         self.name = name
         if lookup is None:
-            print("提示：没有 spaCy/jieba，中文补空格退回按字数机械切"
-                  "（会切在词中间，见 zh_space.fallback_wrap）。")
+            print("提示：没有 spaCy，中文补空格退回按字数机械切"
+                  "（会切在词中间，见 zh_space.fallback_wrap）。"
+                  "装法见 docs/构建与安装.md。")
         return lookup
 
 

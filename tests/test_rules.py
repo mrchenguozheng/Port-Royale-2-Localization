@@ -121,7 +121,7 @@ class TestSpecInterface(unittest.TestCase):
     def test_zh_spec_parts(self):
         sp = lang_rules.get_spec("zh")
         self.assertEqual((sp.code, sp.spacing.mode), ("zh", "compact"))
-        self.assertIn(sp.segmenter.name, ("spacy", "jieba", "none"))
+        self.assertIn(sp.segmenter.name, ("spacy", "none"))
         self.assertEqual(sp.punct.normalize("你好,世界!"), "你好，世界！")
 
     def test_ja_spec_parts(self):
