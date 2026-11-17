@@ -55,6 +55,7 @@
 * 唯一豁免：0x11f0398f 是字符清单，`[]` 在那里是被展示的字符。
 """
 
+import hashlib
 import io
 import os
 import re
@@ -254,7 +255,7 @@ def _ref_target(arg, doc, hid=""):
 #: 谜底字段：`answer=` 靠值推断类型；`town=` / `direction=` 把类型明写出来，
 #: 因此可以省掉 `answer=`——两者只能出现一处。
 ANS_ANSWER_FIELDS = ("answer", "town", "direction")
-ANS_FIELDS = ANS_ANSWER_FIELDS + ("group", "clue")
+ANS_FIELDS = ANS_ANSWER_FIELDS + ("group", "clue", "certainty", "source")
 
 #: 谜底的两种类型。正常**不写**：值在方位键里就是方位，否则按城镇查 entities.toml；
 #: 只有城名与方位键撞名（目前 0 例）才需要在字段名上写明。
@@ -264,15 +265,36 @@ ANS_NAME_KINDS = ("town", "direction")
 #: 只有城名与方位键撞名（目前 0 例）才需要 `town:` / `direction:` 消歧。
 ANS_NAME_KINDS = ("town", "direction")
 
-#: group 列的是「同组其余副本」的文本键：8 位小写十六进制、**不带 0x**，
+#: group 列的是「同组全体成员」的文本键：8 位小写十六进制、**不带 0x**，
 #: 且必须按十六进制升序排列。实测量过：去掉 0x 后 8 位仍全表唯一，
 #: 只留末 6 位会撞（`0x1db7f908` 与 `0xfdb7f908` 末 6 位都是 `b7f908`）。
 #: 一条诗谜最多三个同谜底副本（13 组 Vera Cruz），所以最多列三个键；
-#: 单副本的组不写这个字段。
+#: 单副本的组写自己。
 ANS_KEY_RX = re.compile(r"^[0-9a-f]{8}$")
 
 #: clue 的类型：说明这条谜面的信息属于哪一类，也决定译者必须保住什么。
 ANS_CLUE_KINDS = ("pun", "direction", "count", "feature", "produce", "history", "exclude")
+
+#: certainty：这条谜底有多确定（见 09 卷第九十一节）。
+ANS_CERTAINTY = ("certain", "inferred", "disputed")
+
+#: source 的两份原文（GOG 版英文与法语）：`original-en` / `original-fr`。
+ANS_ORIGINALS = ("original-en", "original-fr")
+
+#: `retail-xx` / `fan-xx` 里允许的语言码：以 `src/orig` 里有原文表的语言为准。
+ANS_SOURCE_LANGS = ("de", "en", "es", "fr", "pl", "ru")
+
+#: 带指向的三类来源，以及只记类别、不带指向的 `cargo` / `map`。
+ANS_SOURCE_URLS = ("steam", "forum", "url")
+ANS_SOURCE_BARE = ("cargo", "map")
+
+#: 弯引号/全角引号：`_wide_char` 认不出它们（NFKC 不变），只在这些字符进到 source 时点名。
+_CURLY_QUOTES = "\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u201f\u00ab\u00bb\u300c\u300d"
+_QUOTE_PAIRS = {"'": "'", '"': '"'}
+#: manual 的摘要算法前缀允许值（12 位小写十六进制），语法上容得下换算法。
+_DIGEST_RX = re.compile(r"^(sha256|md5|blake2b)-([0-9a-f]{12})$")
+_ANCHOR_RX = re.compile(r"^(p\d+|ch\d+)$")
+_SHA_CACHE = {}
 
 
 #: 长得像减号、但不是 ASCII 减号的字符：中文输入法下的全角`－`、排版用的各种破折号。
@@ -452,6 +474,231 @@ def _group_tokens(raw, hid):
     return toks
 
 
+def _unbalanced(text):
+    """这个值里的半角引号有没有没配平的（单引号、双引号各数一次）。"""
+    for q in _QUOTE_PAIRS:
+        if text.count(q) % 2:
+            return True
+    return False
+
+
+def _join_source_parts(arg, hid):
+    """按 `;` 切字段，但 `source=` 值里**引号内**的 `;` 不算分隔。
+
+    只有 source 的 URL 引号里才可能出现 `;`（谜面与线索里的引号可能是原文的撇号，
+    不能当分隔符对待），所以先朴素切，再发现 source 的值引号没配平就把后面的字段
+    拼回来——其它字段一切照旧。
+    """
+    raw = arg.split(";")
+    parts = []
+    i = 0
+    while i < len(raw):
+        part = raw[i]
+        i += 1
+        if part.strip().startswith("source=") and _unbalanced(part.partition("=")[2]):
+            while i < len(raw) and _unbalanced(part.partition("=")[2]):
+                part += ";" + raw[i]
+                i += 1
+        parts.append(part)
+    return parts
+
+
+def _split_source_items(raw, hid):
+    """source 的值按 `+` / `&` 切成并列项；引号内的 `+`、`&` 原样保留。"""
+    items, buf, quote = [], [], None
+    for ch in raw:
+        if quote is None and ch in _QUOTE_PAIRS:
+            quote = ch
+        elif quote is not None and ch == quote:
+            quote = None
+        elif quote is None and ch in "+&":
+            items.append("".join(buf))
+            buf = []
+            continue
+        buf.append(ch)
+    if quote is not None:
+        raise MarkError("%s：source 里的引号没闭合（%r）" % (hid, raw))
+    items.append("".join(buf))
+    return [i.strip() for i in items]
+
+
+def _unquote(raw, hid, what="URL"):
+    """取引号里的内容：必须成对、同种、紧贴，里面不许再出现引号或弯引号。"""
+    text = raw.strip()
+    if not text or text[0] not in _QUOTE_PAIRS:
+        raise MarkError("%s：%s 要用引号包起来（半角单引号 '…' 或双引号 \"…\"，收到 %r）"
+                        % (hid, what, raw))
+    q = text[0]
+    if len(text) < 2 or text[-1] != q:
+        raise MarkError("%s：%s 的引号没成对（收到 %r）" % (hid, what, raw))
+    inner = text[1:-1]
+    for ch in _CURLY_QUOTES:
+        if ch in inner:
+            raise MarkError("%s：%s 里有弯引号/全角引号 %r——只认半角 ' 或 \""
+                            % (hid, what, ch))
+    for other in _QUOTE_PAIRS:
+        if other in inner:
+            raise MarkError("%s：%s 的引号里不能再出现 %r（要写就转义成 %%27 / %%22）"
+                            % (hid, what, other))
+    if not inner:
+        raise MarkError("%s：%s 的引号里是空的" % (hid, what))
+    return inner
+
+
+def _check_url(raw, category, hid):
+    """校验带引号的 URL，返回去掉引号与 `https:` 省略形式之后的完整串。"""
+    url = _unquote(raw, hid)
+    if any(c.isspace() for c in url) or ";" in url:
+        raise MarkError("%s：%s 的 URL 里不能有空白或裸 `;`（`;` 写 %%3B）"
+                        % (hid, category))
+    if url.startswith("//"):
+        url = "https:" + url
+    if url.startswith("https://"):
+        rest = url[len("https://"):]
+    elif url.startswith("http://"):
+        rest = url[len("http://"):]
+    else:
+        raise MarkError("%s：%s 的 URL 要以 https:// 开头（https 可省写 //）；http:// 不能省"
+                        % (hid, category))
+    host, sep, path = rest.partition("/")
+    if not host or "." not in host:
+        raise MarkError("%s：%s 的 URL 缺少域名（收到 %r）" % (hid, category, url))
+    if not sep or not path.strip():
+        raise MarkError("%s：%s 的 URL 只写了域名，没有路径（收到 %r）"
+                        % (hid, category, url))
+    if category == "steam" and not url.startswith("https://steamcommunity.com/"):
+        raise MarkError("%s：steam 的 URL 必须是 steamcommunity.com 的帖子（收到 %r）"
+                        % (hid, url))
+    if category == "forum" and host.endswith("steamcommunity.com"):
+        raise MarkError("%s：forum 专指非 steam 的论坛帖；steamcommunity 的写 steam:'…'"
+                        % hid)
+    return url
+
+
+def _digest12(path, algo):
+    """文件的摘要前 12 位（小写十六进制），带 mtime 缓存，重复校验同一文件只读一遍。"""
+    st = os.stat(path)
+    key = (path, algo, st.st_size, int(st.st_mtime))
+    if key in _SHA_CACHE:
+        return _SHA_CACHE[key]
+    h = {"sha256": hashlib.sha256, "md5": hashlib.md5, "blake2b": hashlib.blake2b}[algo]()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    got = h.hexdigest()[:12]
+    _SHA_CACHE[key] = got
+    return got
+
+
+def _check_manual(tail, hid):
+    """`manual:仓库内路径@sha256-<12 位>[#pNN|#chNN]`：路径必须在仓库内、摘要必须对得上。"""
+    if "@" not in tail:
+        raise MarkError("%s：manual 要写成 路径@sha256-<12 位>（缺 @摘要）" % hid)
+    path, _, rest = tail.partition("@")
+    path = path.strip()
+    if not path:
+        raise MarkError("%s：manual 缺路径" % hid)
+    if path.startswith("/") or re.match(r"^[A-Za-z]:", path):
+        raise MarkError("%s：manual 只收仓库内的相对路径（收到绝对路径 %r）" % (hid, path))
+    if ".." in path.replace("\\", "/").split("/"):
+        raise MarkError("%s：manual 的路径不许跳出仓库（去不掉 `..`）" % hid)
+    rest = rest.strip()
+    anchor = None
+    if "#" in rest:
+        rest, _, anchor = rest.partition("#")
+        anchor = anchor.strip()
+        if not _ANCHOR_RX.match(anchor):
+            raise MarkError("%s：manual 的锚点只写 #pNN（页）或 #chNN（章），收到 %r"
+                            % (hid, anchor))
+    m = _DIGEST_RX.match(rest)
+    if not m:
+        raise MarkError("%s：manual 的摘要要写成 sha256-<12 位小写十六进制>（收到 %r）"
+                        % (hid, rest))
+    full = os.path.join(ROOT, path.replace("\\", "/").replace("/", os.sep))
+    if not os.path.isfile(full):
+        raise MarkError("%s：manual 的路径 %r 不在仓库里（仓库根 %s）" % (hid, path, ROOT))
+    got = _digest12(full, m.group(1))
+    if got != m.group(2):
+        raise MarkError("%s：manual 的 %s 对不上：写的是 %s，文件里算出来是 %s"
+                        % (hid, m.group(1), m.group(2), got))
+    return (path, rest, anchor)
+
+
+def _check_source_item(item, hid):
+    """解析一个来源项，返回 (类别, 目标)。写错抛 MarkError。"""
+    if item[:1] in _QUOTE_PAIRS:
+        return ("url", _check_url(item, "url", hid))
+    cat, sep, tail = item.partition(":")
+    cat, tail = cat.strip(), tail.strip()
+    if not sep:
+        tail = ""
+    if cat in ANS_ORIGINALS:
+        if tail:
+            raise MarkError("%s：%s 不带指向（收到 %r）" % (hid, cat, item))
+        return ("original", cat)
+    if cat in ANS_SOURCE_BARE:
+        if tail:
+            raise MarkError("%s：%s 先只记类别，不带指向（收到 %r）" % (hid, cat, item))
+        return (cat, None)
+    if cat.startswith("retail-") or cat.startswith("fan-"):
+        lang = cat.split("-", 1)[1].strip()
+        if lang not in ANS_SOURCE_LANGS:
+            raise MarkError("%s：%s 的语言码 %r 不认识（只有 %s）"
+                            % (hid, cat, lang, " / ".join(ANS_SOURCE_LANGS)))
+        if tail and not ANS_KEY_RX.match(tail):
+            raise MarkError("%s：%s 的指向要写 8 位小写十六进制键（收到 %r）"
+                            % (hid, cat, tail))
+        return (cat.split("-", 1)[0], cat if not tail else (cat, tail))
+    if cat in ANS_SOURCE_URLS:
+        if not tail:
+            raise MarkError("%s：%s 后面要跟引号包的 URL（%s:'https://…'）"
+                            % (hid, cat, cat))
+        return (cat, _check_url(tail, cat, hid))
+    if cat == "manual":
+        if not tail:
+            raise MarkError("%s：manual 后面要写 路径@sha256-<12 位>" % hid)
+        return ("manual", _check_manual(tail, hid))
+    if cat == "riddle":
+        toks = [t.strip() for t in tail.split("+")]
+        if any(not t for t in toks):
+            raise MarkError("%s：riddle 的键列表里 `+` 两侧都要写键（收到 %r）"
+                            % (hid, tail))
+        for t in toks:
+            if not ANS_KEY_RX.match(t):
+                raise MarkError("%s：riddle 指向的键要写 8 位小写十六进制（收到 %r）"
+                                % (hid, t))
+        if len(set(toks)) != len(toks):
+            raise MarkError("%s：riddle 的键列表里有重复（%r）" % (hid, tail))
+        if toks != sorted(toks):
+            raise MarkError("%s：riddle 的键要按升序写（收到 %r）" % (hid, tail))
+        return ("riddle", tuple(toks))
+    raise MarkError("%s：source 没有类别 %r（只有 %s）"
+                    % (hid, cat, " / ".join(ANS_ORIGINALS + ANS_SOURCE_URLS
+                                            + ("manual", "riddle") + ANS_SOURCE_BARE
+                                            + ("retail-xx", "fan-xx"))))
+
+
+def _check_source(raw, hid):
+    """校验整个 source 值，返回 [(类别, 目标)…]。"""
+    items = _split_source_items(raw, hid)
+    if any(not i for i in items):
+        raise MarkError("%s：source 里有空项（多打了 `+` 或 `&`？）" % hid)
+    # `riddle:a+b` 里的 `+` 既切并列来源，也切同一项的多个键：裸 8 位键接回前一项。
+    merged = []
+    for item in items:
+        if merged and ANS_KEY_RX.match(item) and merged[-1].startswith("riddle:"):
+            merged[-1] = merged[-1] + "+" + item
+            continue
+        merged.append(item)
+    for ch in _CURLY_QUOTES:
+        if ch in raw and ch not in "".join(_unquote(i, hid) for i in merged
+                                           if i[:1] in _QUOTE_PAIRS):
+            raise MarkError("%s：source 里有弯引号/全角引号 %r——只认半角 ' 或 \""
+                            % (hid, ch))
+    return [_check_source_item(i, hid) for i in merged]
+    return [_check_source_item(i, hid) for i in items]
+
+
 def _split_ans(arg, hid="", warns=None):
     """`[riddle:answer=城|城;group=00000001+00000002;clue=direction:东,count:四座+第三座]`
     → ([(类型|None, 值)…], [同组其余副本的键…], [(类型|None, 词)…])。
@@ -472,7 +719,7 @@ def _split_ans(arg, hid="", warns=None):
     fields = {}
     kind = None
     has_answer = False
-    for part in arg.split(";"):
+    for part in _join_source_parts(arg, hid):
         part = part.strip()
         if not part:
             raise MarkError("%s：ans 里有空字段（多打了 `;`？）" % hid)
@@ -549,15 +796,31 @@ def _split_ans(arg, hid="", warns=None):
         raise MarkError(
             "%s：ans 缺 group（group 必填：列全组含本条自己；单副本写 group=%s）"
             % (hid, hid[2:] if hid.startswith("0x") else (hid or "<本条键>")))
-    return answers, group, clues, (kind or "answer")
+
+    certainty = None
+    if "certainty" in fields:
+        certainty = fields["certainty"].strip()
+        if certainty not in ANS_CERTAINTY:
+            raise MarkError("%s：certainty 只能写 %s（收到 %r）"
+                            % (hid, " / ".join(ANS_CERTAINTY), certainty))
+    sources = _check_source(fields["source"], hid) if "source" in fields else []
+    if certainty == "inferred":
+        # inferred 是「靠别的证据推出来的」，所以必须写清推自哪里，且不能只说原文。
+        if not sources:
+            raise MarkError("%s：certainty=inferred 必须写 source（推自哪份材料）" % hid)
+        if all(kind == "original" for kind, _t in sources):
+            raise MarkError("%s：certainty=inferred 的 source 不能只有 original-*"
+                            "（原文直接推得出就该写 certain）" % hid)
+    return answers, group, clues, (kind or "answer"), certainty, sources
 
 
 def _check_ans(arg, body, hid="", warns=None):
     """核对谜底与线索：线索必须逐条出现在谜面正文里。
 
-    返回 (候选 [(类型|None, 值)…], 本组全体成员的键, 线索, 谜底字段名)。写错抛 MarkError。
+    返回 (候选 [(类型|None, 值)…], 本组全体成员的键, 线索, 谜底字段名, certainty,
+    来源 [(类别, 目标)…])。写错抛 MarkError。
     """
-    answers, group, clues, field = _split_ans(arg, hid, warns=warns)
+    answers, group, clues, field, certainty, sources = _split_ans(arg, hid, warns=warns)
     text = (body or "").casefold()
     missing = [v for _, v in clues if v.casefold() not in text]
     if missing:
@@ -565,7 +828,7 @@ def _check_ans(arg, body, hid="", warns=None):
             "%s：ans 的谜底是 %r，但线索 %s 没出现在谜面里（谜面推不出这个答案，"
             "或者线索该换）" % (hid, "|".join(v for _, v in answers),
                                 " / ".join(repr(v) for v in missing)))
-    return answers, group, clues, field
+    return answers, group, clues, field, certainty, sources
 
 
 def expand(text, table, lang, hid="", terms=None, doc=None):
@@ -773,11 +1036,25 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
                 # 哪座城」无从核对，标注就退化成一条注释。答案本身不查译名：
                 # 诗里不照抄译名。
                 try:
-                    answers, group, _clues, field = _check_ans(
+                    answers, group, _clues, field, certainty, sources = _check_ans(
                         arg, _ANS_SPAN.sub("", text), hid, warns=warns)
                 except MarkError as e:
                     problems.append(str(e))
                     continue
+                # source 里指到别的诗谜时，目标必须存在、真带 riddle 标注、且不是自己。
+                for kind_src, target in sources:
+                    if kind_src != "riddle":
+                        continue
+                    for tok in target:
+                        key = "0x" + tok
+                        if key == hid:
+                            problems.append("%s：source 的 riddle 指向自己" % hid)
+                        elif key not in doc or not (doc[key] or "").strip():
+                            problems.append("%s：source 的 riddle 指向的键 %r 不存在"
+                                            % (hid, key))
+                        elif not _ANS_SPAN.search(doc[key] or ""):
+                            problems.append("%s：source 的 riddle 指向的键 %r 没有 riddle "
+                                            "标注（指向了不相干的文本）" % (hid, key))
                 sig = []
                 cmp_sig = []
                 for kind, value in answers:

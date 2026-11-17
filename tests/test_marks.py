@@ -786,5 +786,116 @@ class TestDoc(unittest.TestCase):
         self.assertEqual(M.used_names(doc), {"Charleston", "Havana"})
 
 
+def _riddle(tail, body="He went north in August."):
+    """拼一条最小可用的诗谜标注：尾巴放 certainty / source。"""
+    return ("[riddle:answer=St. Augustine;group=00000001;clue=direction:north%s]%s"
+            % ((";" + tail) if tail else "", body))
+
+
+class TestCertaintyAndSource(unittest.TestCase):
+    """certainty / source：取值域、引号、并列、URL 形状、manual 摘要、riddle 升序。"""
+
+    def ok(self, tail):
+        return M.expand(_riddle(tail), TABLE, "zh")
+
+    def bad(self, tail, needle):
+        with self.assertRaises(M.MarkError) as ctx:
+            self.ok(tail)
+        self.assertIn(needle, str(ctx.exception))
+        return str(ctx.exception)
+
+    def test_certainty_values(self):
+        for v in M.ANS_CERTAINTY:
+            if v == "inferred":
+                # inferred 自带「必须写 source」的规则，单独测
+                continue
+            self.assertEqual(self.ok("certainty=" + v), "He went north in August.")
+        self.assertEqual(self.ok("certainty=inferred;source=original-en&cargo"),
+                         "He went north in August.")
+
+    def test_certainty_unknown_value(self):
+        self.bad("certainty=maybe", "certainty 只能写")
+
+    def test_inferred_requires_source(self):
+        self.bad("certainty=inferred", "必须写 source")
+
+    def test_inferred_rejects_only_original(self):
+        self.bad("certainty=inferred;source=original-en&original-fr", "不能只有 original-*")
+
+    def test_inferred_accepts_other_evidence(self):
+        self.assertEqual(self.ok("certainty=inferred;source=original-en&cargo"),
+                         "He went north in August.")
+
+    def test_original_and_retail(self):
+        self.assertEqual(self.ok("certainty=certain;source=original-en"), "He went north in August.")
+        self.assertEqual(self.ok("source=retail-de"), "He went north in August.")
+        self.bad("source=retail-xx", "语言码")
+
+    def test_quoted_url_both_quote_styles(self):
+        self.assertEqual(self.ok("source=steam:'https://steamcommunity.com/app/1/x'"),
+                         "He went north in August.")
+        self.assertEqual(self.ok('source=steam:"https://steamcommunity.com/app/1/x"'),
+                         "He went north in August.")
+
+    def test_url_unquoted_rejected(self):
+        self.bad("source=steam:https://steamcommunity.com/app/1", "要用引号包起来")
+
+    def test_https_scheme_may_be_omitted(self):
+        self.assertEqual(self.ok("source=steam:'//steamcommunity.com/app/1/x'"),
+                         "He went north in August.")
+
+    def test_http_scheme_may_not_be_omitted(self):
+        # `//` 只能代表 https；裸写域名（没路径）直接报错
+        self.assertEqual(self.ok("source=url:'//example.com/a'"), "He went north in August.")
+        self.bad("source=url:'https://example.com'", "只写了域名")
+
+    def test_steam_must_be_steamcommunity(self):
+        self.bad("source=steam:'https://example.com/a'", "steamcommunity.com")
+
+    def test_forum_rejects_steamcommunity(self):
+        self.bad("source=forum:'https://steamcommunity.com/app/1/x'", "写 steam")
+
+    def test_bare_url_item_equals_url(self):
+        self.assertEqual(self.ok("source='https://example.com/a?b=1'"), "He went north in August.")
+
+    def test_semicolon_inside_quotes_is_rejected(self):
+        # 引号内一律按字面，但 `;` 例外：它必须写 %3B，否则字段边界无从判断
+        self.bad("source=forum:'https://example.com/a;jsessionid=1'", "`;`")
+
+    def test_ampersand_and_plus_are_equivalent(self):
+        self.assertEqual(self.ok("source=original-en&original-fr"), "He went north in August.")
+        self.assertEqual(self.ok("source=original-en+original-fr"), "He went north in August.")
+        self.bad("source=original-en+", "空项")
+
+    def test_ampersand_inside_quotes_kept(self):
+        self.assertEqual(self.ok("source='https://example.com/a?x=1&y=2'"),
+                         "He went north in August.")
+
+    def test_curly_quote_rejected(self):
+        self.bad("source=\u201chttps://example.com/a\u201d", "弯引号")
+
+    def test_quote_unbalanced(self):
+        self.bad("source='https://example.com/a", "没闭合")
+
+    def test_riddle_keys_must_ascend(self):
+        self.bad("source=riddle:00000002+00000001", "升序")
+        self.assertEqual(self.ok("source=riddle:00000001+00000002"), "He went north in August.")
+        self.bad("source=riddle:00000001+00000001", "重复")
+
+    def test_manual_path_and_digest(self):
+        path = os.path.join("glossary", "verse_ans.toml")
+        import hashlib
+        with open(os.path.join(M.ROOT, path), "rb") as fh:
+            dg = hashlib.sha256(fh.read()).hexdigest()[:12]
+        self.assertEqual(self.ok("source=manual:%s@sha256-%s#p12" % (path, dg)),
+                         "He went north in August.")
+        self.bad("source=manual:%s@sha256-%s" % (path, "0" * 12), "对不上")
+        self.bad("source=manual:/etc/passwd@sha256-%s" % dg, "相对路径")
+        self.bad("source=manual:../x.toml@sha256-%s" % dg, "跳出仓库")
+
+    def test_unknown_source_category(self):
+        self.bad("source=hearsay", "没有类别")
+
+
 if __name__ == "__main__":
     unittest.main()
