@@ -4,7 +4,8 @@
 谜面在 09 卷第六十四节定义的 verse 区间里，整片不挂 town/ref/lit/term，只允许
 [riddle:answer=谜底;group=同组其余键;clue=线索,…]（`;` 分字段；`answer` 里 `|` 是「或」，
 `group` 里 `+` 连其余副本的键，`clue` 里 `,` 分项、`+` 同类并值；见 09 卷第七十八、
-七十九、八十一、八十三节）。`answer` 正常不写类型前缀：方位键直接写，其余按城镇查表。
+七十九、八十一、八十三节）。谜底正常写 `answer=`，靠值推断类型；要明写类型就把字段名
+换成 `town=`（城名）或 `direction=`（方位），此时省掉 `answer=`（见第八十六节）。
 `clue` 每项必写 `<标签>:<正文>`：七个已知类型有校验，`_` 开头的自造标签静默，
 字母开头的自造标签报 warning，裸写报错。
 这个工具只管那一件事：
@@ -206,11 +207,11 @@ def cmd_apply():
             register_entity(ans, tid, rows)
             print("登记实体 %s（城镇行 %s）" % (ans, tid))
 
-        # answer 正常不写前缀：方位键直接写（east / -north），其余按城镇查表。
-        # 只有当城名恰好与方位键同名（目前 0 例）才补 town: 消歧。
-        answer_item = ans
+        # 谜底字段：方位与城名默认写 answer=（靠值推断）；只有城名恰好与方位键同名
+        # （目前 0 例）才改写成 town= 字段，把类型说明白。
+        answer_field = "answer"
         if ans in MK.ANS_KEYS and towns.get(ans.lower()):
-            answer_item = "town:%s" % ans
+            answer_field = "town"
 
         wanted = {}
         for lang in LANGS:
@@ -229,8 +230,8 @@ def cmd_apply():
                     others = "+".join(sorted(
                         x[2:] if x.startswith("0x") else x for x in ids if x != k))
                     group_part = ";group=%s" % others
-                wanted[(lang, k)] = "[riddle:answer=%s%s;clue=%s]" % (
-                    answer_item, group_part, clue_part)
+                wanted[(lang, k)] = "[riddle:%s=%s%s;clue=%s]" % (
+                    answer_field, ans, group_part, clue_part)
 
         already = [ANS_MARK.match(rows[lang].get(k, "")) for k in ids for lang in LANGS]
         if [m.group(0) if m else None for m in already] == \

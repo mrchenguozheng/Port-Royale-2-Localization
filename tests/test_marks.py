@@ -154,7 +154,7 @@ class TestAnswerMark(unittest.TestCase):
     """[riddle:…] 是给翻译人看的谜底，展开必须为空；线索词必须真在谜面里。
 
     `answer` 正常不写类型：值在方位键里算方位，其余按城镇查 entities.toml，
-    只有撞名才写 town: / direction: 消歧（`kw` 已删）；`|` 是「或」的候选。
+    只有撞名才改用 town= / direction= 字段把类型写明（`kw` 已删）；`|` 是「或」的候选。
     `group` 列同组其余副本的文本键，`+` 连接，单副本不写。
     `clue` 的每一项必写 `<标签>:<正文>`：已知类型按类型校验，`_` 开头的自造标签
     静默，字母开头的自造标签报 warning；相邻同类型可用 `+` 并值，语义仍是「都要成立」。
@@ -348,49 +348,60 @@ class TestAnswerMark(unittest.TestCase):
             self.assertIn("direction", str(ctx.exception))
 
     def test_cardinal_single_letter_under_direction_is_accepted(self):
-        # 明写 direction: 时单字母一定是方向，N/E/S/W 及其否定形态都收
-        for spelling, key in (("direction:N", "north"), ("direction:E", "east"),
-                              ("direction:S", "south"), ("direction:W", "west"),
-                              ("direction:-N", "not north"), ("direction:-E", "not east")):
-            doc = {"0x00000001": "[riddle:answer=%s;clue=direction:north]north 侧只有水。"
+        # 明写 direction= 时单字母一定是方向，N/E/S/W 及其否定形态都收
+        for spelling, key in (("direction=N", "north"), ("direction=E", "east"),
+                              ("direction=S", "south"), ("direction=W", "west"),
+                              ("direction=-N", "not north"), ("direction=-E", "not east")):
+            doc = {"0x00000001": "[riddle:%s;clue=direction:north]north 侧只有水。"
                                  % spelling}
             problems = M.check_doc("zh", doc, entities={}, terms={})
             self.assertEqual(problems, [], spelling)
 
     def test_lowercase_cardinal_under_direction_is_rejected(self):
-        for bad in ("direction:n", "direction:-s"):
+        for bad in ("direction=n", "direction=-s"):
             with self.assertRaises(M.MarkError) as ctx:
-                M.expand("[riddle:answer=%s;clue=direction:north]north 侧只有水。" % bad,
+                M.expand("[riddle:%s;clue=direction:north]north 侧只有水。" % bad,
                          TABLE, "zh")
             self.assertIn("大写", str(ctx.exception))
 
     def test_answer_field_may_be_omitted_with_type(self):
-        # 省略 answer=：字段位置直接写 town:城 / direction:方位
-        doc = {"0x00000001": "[riddle:town:Vera Cruz;clue=count:三座]三座城镇，X 在最西。",
-               "0x00000002": "[riddle:direction:SE;clue=count:三座]三座城镇，去东南。"}
+        # 省略 answer=：字段名直接写 town= / direction=
+        doc = {"0x00000001": "[riddle:town=Vera Cruz;clue=count:三座]三座城镇，X 在最西。",
+               "0x00000002": "[riddle:direction=SE;clue=count:三座]三座城镇，去东南。"}
         problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
         self.assertEqual(problems, [])
 
     def test_typed_field_with_group_is_fine(self):
         # 省略 answer= 后 group/clue 照旧；group 只列其余副本，8 位不带 0x
-        doc = {"0x00000001": "[riddle:town:Vera Cruz;group=00000002;clue=count:三座]三座城镇。",
-               "0x00000002": "[riddle:town:Vera Cruz;group=00000001;clue=count:三座]三座城镇。"}
+        doc = {"0x00000001": "[riddle:town=Vera Cruz;group=00000002;clue=count:三座]三座城镇。",
+               "0x00000002": "[riddle:town=Vera Cruz;group=00000001;clue=count:三座]三座城镇。"}
         self.assertEqual(M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={}), [])
 
     def test_answer_and_typed_field_conflict(self):
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[riddle:answer=Vera Cruz;town:Havana;clue=count:三座]", TABLE, "zh")
-        self.assertIn("一处", str(ctx.exception))
+            M.expand("[riddle:answer=Vera Cruz;town=Havana;clue=count:三座]", TABLE, "zh")
+        self.assertIn("两处", str(ctx.exception))
 
     def test_two_typed_answer_fields_conflict(self):
         with self.assertRaises(M.MarkError):
-            M.expand("[riddle:town:Vera Cruz;town:Havana;clue=count:三座]", TABLE, "zh")
+            M.expand("[riddle:town=Vera Cruz;town=Havana;clue=count:三座]", TABLE, "zh")
 
     def test_bare_untyped_field_is_error(self):
-        # 不带 town:/direction: 的裸字段位置不认（否则「哪个是谜底」失去依据）
+        # 没有 = 的片段不认（否则「哪个是谜底」失去依据）
         with self.assertRaises(M.MarkError) as ctx:
             M.expand("[riddle:Vera Cruz;clue=count:三座]", TABLE, "zh")
-        self.assertIn("town:", str(ctx.exception))
+        self.assertIn("字段要写成", str(ctx.exception))
+
+    def test_colon_prefix_is_rejected(self):
+        # 类型声明改成字段后，值里不再收 `town:` / `direction:` 前缀
+        for bad in ("answer=town:Vera Cruz", "answer=direction:SE"):
+            with self.assertRaises(M.MarkError) as ctx:
+                M.expand("[riddle:%s;clue=count:三座]三座城镇。" % bad, TABLE, "zh")
+            self.assertIn("冒号", str(ctx.exception))
+        # 整段写成 `town:城`（没有 =）连字段都算不上
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:town:Vera Cruz;clue=count:三座]三座城镇。", TABLE, "zh")
+        self.assertIn("字段要写成", str(ctx.exception))
 
     def test_abbrev_normalizes_to_same_candidate(self):
         # NE 与 northeast 归一后是同一个候选，写两遍算重复
@@ -399,8 +410,8 @@ class TestAnswerMark(unittest.TestCase):
                      TABLE, "zh")
         self.assertIn("重复", str(ctx.exception))
 
-    def test_not_word_form_under_prefix_is_accepted(self):
-        doc = {"0x00000001": "[riddle:answer=direction:not north;clue=direction:北]"
+    def test_not_word_form_under_field_is_accepted(self):
+        doc = {"0x00000001": "[riddle:direction=not north;clue=direction:北]"
                              "北边什么也没有。"}
         self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
 
@@ -457,19 +468,20 @@ class TestAnswerMark(unittest.TestCase):
 
     def test_alternative_names_both_count_as_used(self):
         # `|` 是「或」：两个候选都算被引用，也都要登记，否则死条目会误报其中一城
-        doc = {"0x00000001": "[riddle:answer=San Juan|town:St. Juan;clue=feature:岛,direction:东南]"
+        doc = {"0x00000001": "[riddle:answer=San Juan|St. Juan;clue=feature:岛,direction:东南]"
                              "X 在一座岛上，望向东南。"}
         problems = M.check_doc("zh", doc, entities={"San Juan": {}, "St. Juan": {}}, terms={})
         self.assertEqual(problems, [])
 
     def test_alternative_name_unregistered_is_reported(self):
-        doc = {"0x00000001": "[riddle:answer=San Juan|town:Nowhere;clue=feature:岛]X 在一座岛上。"}
+        doc = {"0x00000001": "[riddle:answer=San Juan|Nowhere;clue=feature:岛]X 在一座岛上。"}
         problems = M.check_doc("zh", doc, entities={"San Juan": {}}, terms={})
         self.assertTrue(any("Nowhere" in p for p in problems), problems)
 
     def test_alternative_mixing_town_and_direction(self):
-        # 候选可以是不同类型：一座城或「不是北边」，两种都能解释谜面
-        doc = {"0x00000001": "[riddle:answer=San Juan|direction:-north;clue=direction:北]"
+        # 候选可以是不同类型：一座城或「不是北边」，两种都能解释谜面。
+        # 混类型只能写 answer=，让每个值各自推断；town=/direction= 里放不了别的类型。
+        doc = {"0x00000001": "[riddle:answer=San Juan|-north;clue=direction:北]"
                              "X 在北边什么也没有的地方。"}
         problems = M.check_doc("zh", doc, entities={"San Juan": {}}, terms={})
         self.assertEqual(problems, [])
