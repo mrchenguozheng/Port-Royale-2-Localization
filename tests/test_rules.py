@@ -170,20 +170,20 @@ class TestZhSpace(unittest.TestCase):
 
 
     def test_compact_cut_tag_becomes_space(self):
-        """`<k>` 是人工钉的断点：标记不落地，只换成一个普通空格。"""
+        """`[cut]` 是人工钉的断点：标记不落地，只换成一个普通空格。"""
         lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
-        t = "港口里停着三艘船，<k>船坞旁还有两艘正在修理。"
+        t = "港口里停着三艘船，[cut]船坞旁还有两艘正在修理。"
         out = zh_space.compact(t, lookup, 15)
-        self.assertNotIn("<k>", out)
-        self.assertIn("船 ", out.split("，")[0] + " ")   # 断在 <k> 那一刀上
+        self.assertNotIn("[cut]", out)
+        self.assertIn("船 ", out.split("，")[0] + " ")   # 断在 [cut] 那一刀上
         self.assertNotIn("  ", out)
 
     def test_compact_cut_tag_keeps_budget_short(self):
-        """`<k>` 处预算清零：它后面的片段不会和前面的字合并成超长 token。"""
+        """`[cut]` 处预算清零：它后面的片段不会和前面的字合并成超长 token。"""
         lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
-        t = "这是一段没有标点的长句子用来验证切断标记的作用<k>后面的内容重新开始算预算"
+        t = "这是一段没有标点的长句子用来验证切断标记的作用[cut]后面的内容重新开始算预算"
         out = zh_space.compact(t, lookup, 15)
-        self.assertNotIn("<k>", out)
+        self.assertNotIn("[cut]", out)
         for tok in out.split(" "):
             han = sum(1 for c in tok if "\u4e00" <= c <= "\u9fff")
             self.assertLessEqual(han, 15, tok)
