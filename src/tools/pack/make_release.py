@@ -184,6 +184,12 @@ def copy_fonts(lang, stage, mode, log, cache=True):
     # 俄语是自建的四个字体（正文 + 标题三档）；其余语言仍是三个 Noto 静态字重。
     copy_fonts_flat(src_lang, flat, log, expected=4 if lang == "ru" else 3)
     shutil.rmtree(src_lang)
+    if os.environ.get("PR2_ZH_THIN_SPACE") == "1" and lang == "zh":
+        from font import thin_space
+        for name in sorted(os.listdir(flat)):
+            if name.lower().endswith(".ttf"):
+                thin_space.rewrite(os.path.join(flat, name))
+        log("压窄半角空格（U+0020→0.05em，U+00A0→0.25em 新字形）")
     copy_font_map(stage, log)
     log("复制 Noto 实际字体文件（由 font-map.default.ini 映射逻辑名）")
 
