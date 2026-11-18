@@ -114,6 +114,35 @@ class TestZhSpace(unittest.TestCase):
         self.assertIn(" ", out)
         self.assertNotIn("英格兰 船", out)
 
+    def test_compact_budget_runs_across_punctuation(self):
+        """多短句段落：预算按「距上一个空格」算，每句都短也要断，否则整段空白。"""
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        t = "你可以在市场买货，也可以去酒馆打听消息，还可以去码头找船长领任务。"
+        out = zh_space.compact(t, lookup, 8)
+        self.assertIn(" ", out)
+        for tok in out.split(" "):
+            han = sum(1 for c in tok if "\u4e00" <= c <= "\u9fff")
+            self.assertLessEqual(han, 8, tok)
+
+    def test_compact_budget_runs_across_vars(self):
+        """`%1` 这类行内变量不能把预算清零，否则「9 字 + %1 + 16 字」仍是超长 token。"""
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        t = "那个恶名昭著的海盗%1所在的藏身处如今已不是什么秘密了。"
+        out = zh_space.compact(t, lookup, 10)
+        self.assertIn(" ", out)
+
+    def test_compact_keeps_name_intact(self):
+        """带间隔号的人名整体不被切开，也不能把整句吞成一个「人名」。"""
+        words = ["当时", "的", "捕海盗人", "罗伯特·梅纳德", "追踪", "到", "了",
+                 "他", "的", "单桅帆船"]
+        lookup = lambda run: words if run == "当时的捕海盗人罗伯特·梅纳德追踪到了他的单桅帆船" else list(run)
+        t = "当时的捕海盗人罗伯特·梅纳德追踪到了他的单桅帆船。"
+        out = zh_space.compact(t, lookup, 10)
+        self.assertIn("罗伯特·梅纳德", out)
+        for tok in out.split(" "):
+            han = sum(1 for c in tok if "\u4e00" <= c <= "\u9fff")
+            self.assertLessEqual(han, 10, tok)
+
 
 class TestSpecInterface(unittest.TestCase):
     """三段式接口：语言只声明 spec，engine_text 不认语言。"""

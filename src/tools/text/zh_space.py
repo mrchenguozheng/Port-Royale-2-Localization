@@ -17,11 +17,14 @@
 字符，仍比英文单行保守。这是推测值——偏小只是多断几处，偏大才可能溢出，
 所以宁可小不能大；真要校准只能实机量，而按定则不做像素判据。
 
-排版策略：默认不留空格（`compact()`）
-------------------------------------
+排版策略：按「距上一个空格」算预算（`compact()`）
+--------------------------------------------------
 旧路径 `spaced()` 逢词就插空格，全表 1719 条带空格、1214 条的空格紧贴标点
-（「我刚听说， 一艘满载移民的 英格兰船沉了。」）。现在只在「一段连续汉字
-长到超过预算」时才动手，标点不插空格。`ZhGroupSpacing` 保留为可回退的旧路径。
+（「我刚听说， 一艘满载移民的 英格兰船沉了。」）。`compact()` 只在某个位置
+离上一个空格超过预算时才动手，比它干净，但预算必须按整段算而不是按
+「连续汉字串」算：只用逗号分开的短句段落里一个空格都没有，整段就是一个
+超长 token，引擎照样整行丢弃。`<n>` 是唯一的清零点，`%1`/`<f:…>` 都算行内。
+`ZhGroupSpacing` 保留为可回退的旧路径。
 
 分词器只有 spaCy 一条路，兜底才机械切
 --------------------------------------
@@ -57,7 +60,10 @@ ROOT = os.path.dirname(os.path.dirname(TOOLS))
 #: 标签/占位符：占位符部分与校验用的 base.VAR 同源，避免两处各写一份。
 TAG = re.compile("(<[^>]*>|" + base.VAR.pattern + ")")
 CJK_RUN = re.compile(r"[\u4e00-\u9fff]+")
-NAME = re.compile(r"[\u4e00-\u9fff]+(?:·[\u4e00-\u9fff]+)+")
+#: 带间隔号的人名：每段 1～10 字，不能贪婪到吞下整句。
+#: 早先用 `[\u4e00-\u9fff]+`，只要句子里有一个 `·`，整个句子就被当成一个「名字」
+#: 整体保护起来，永远等不到断行——长文空白的一部分就是这么来的。
+NAME = re.compile(r"[\u4e00-\u9fff]{1,10}(?:·[\u4e00-\u9fff]{1,10})+")
 
 #: 单字虚词：粘在前一个词后面
 BIND_LEFT = set("的地得了着过是在和与及或而但也都不没把被给对从向为以于中上里外其之等们吗呢吧啊呀哦嗯")
@@ -196,44 +202,32 @@ def spaced(text, lookup, max_chars=MAX_CHARS):
 def collect_runs(texts, min_run=MIN_RUN):
     """收集需要分词的汉字串（去重、排序，便于一次调用分词器）。
 
-    间距号人名先换成非汉字占位（和 `spaced()` 的做法一致），这样这里收的
-    片段和 `spaced()` 之后要查的片段是**同一批字符串**；否则带人名的句子
-    查不到词表，只能按单字成组。
+    片段定义与 `compact()` 的拆件一致：连续汉字，间隔号人名算在同一片段里
+    （`_RUN_RX`）。两边必须是同一批字符串，否则 `lookup()` 查不到词表，
+    只能按单字成组，切出来就是「前私 / 掠者」这种断在词中间的结果。
     """
     runs = set()
     for t in texts:
         if not t:
             continue
-        for m in CJK_RUN.finditer(NAME.sub("\x00", t)):
+        for m in _RUN_RX.finditer(t):
             if len(m.group(0)) >= min_run:
                 runs.add(m.group(0))
     return sorted(runs)
 
 
 def fallback_wrap(text, min_run=MIN_RUN, step=MAX_CHARS):
-    """没有分词器时的兜底：超长汉字串按字数硬切。
+    """没有分词器时的兜底：按字数硬切。
 
     **不保证切在词界**（会切出「因 而」这种结果），所以只在
-    spaCy 不可用时使用。步长取 `MAX_CHARS`，兜底出来的组
-    也不超过同一份字数预算。
+    spaCy 不可用时使用。这里走和 `compact()` 同一套分段逻辑：
+    标点分段、按「距上一个空格」算预算，否则多短句的段落一条空格都没有，
+    长文在游戏里直接空白。词粒度退化成两字一块。
     """
-    particles = set("的了是在和与而或也就都但并且时后中上下里外为以于对把被将从到着过们吗呢吧啊呀哦嗯")
+    def lookup(run):
+        return [run[i:i + 2] for i in range(0, len(run), 2)] or [run]
 
-    def split_run(run):
-        out, s0 = [], run
-        while len(s0) > step:
-            cut = step
-            for k in range(step, max(5, step // 2), -1):
-                if s0[k - 1] in particles:
-                    cut = k
-                    break
-            out.append(s0[:cut])
-            s0 = s0[cut:]
-        out.append(s0)
-        return " ".join(out)
-
-    return re.sub(r"[\u4e00-\u9fff]{%d,}" % min_run,
-                  lambda m: split_run(m.group(0)), text)
+    return _compact_seg(text, lookup, step, [])
 
 
 #: 断在它后面最自然：优先「…移民的 / 英格兰船沉了」，而不是「…英格兰 / 船沉了」。
@@ -241,6 +235,21 @@ STOP_TAIL = set("的地得了着过们呢吧啊呀，、；：！？…")
 
 #: 这些字开头多半是补语（「打听/到」「拿/出来」），断在它前面会把词拆开。
 COMPLEMENT = set("到给出去起上下成开遍完掉")
+
+#: 句内停顿：`compact()` 找断点时先在这里落，标点后面不额外留空格。
+PAUSE = set("，。！？；：、…—")
+#: 收尾符号：永远跟在前一个字后面，不能单独成段。
+CLOSE = set("》」』）】〉〕”’")
+#: 拆件：名字占位符整体一件、汉字串一件、其余单字一件。
+_PIECE = re.compile(r"[\u4e00-\u9fff]+(?:·[\u4e00-\u9fff]+)*|.")
+_PLACEHOLDER = re.compile(r"\x00(\d+)\x00")
+_RUN_RX = re.compile(r"[\u4e00-\u9fff]+(?:·[\u4e00-\u9fff]+)*")
+
+#: 硬换行：只有 `<n>`（及真实换行）能把预算清零；`<c>`、`<f:…>` 都是行内标签。
+_HARD = re.compile(r"(<n>|\r?\n)", re.I)
+_HARD_TAG = re.compile(r"<n>|\r?\n", re.I)
+#: 行内原子：名字占位符、标签、变量（`%1`、`@P$PirateName$`）。
+_ATOM = re.compile(r"\x00\d+\x00|<[^>]*>|" + base.VAR.pattern)
 
 #: 中文正文里可以贴着空格的两个字符集（汉字与中文标点）。
 _TIGHT = "[\u4e00-\u9fff，。！？；：、…—（）()「」『』【】《》·]"
@@ -328,29 +337,121 @@ def _break_cost(words, i, j, n):
 
 
 def compact(text, lookup, max_chars=MAX_CHARS):
-    """中文紧凑排版：正文默认不留空格，只在会撑爆控件的片段里断行。
+    """中文紧凑排版：按「离上一个空格多远」算预算，不按汉字串算。
 
-    与 `spaced()` 的区别：`spaced()` 逢词就插空格（全表 1719 条带空格，
-    其中 1214 条的空格紧贴标点，「我刚听说， 一艘…」）；这里只在
-    「一段连续汉字长到超过预算」时才动手，标点本身不插空格——
-    中文标点自带停顿，加空格是英文排版的习惯。
+    引擎只在空格处折行，一长串没有空格的字符会被当成一个 token，超出控件
+    时整行被丢弃（屏幕上就是一片空白）。所以预算必须按「距上一个空格的字数」
+    算：只用标点分开的短句（「你可以在市场买货，也可以去酒馆打听，
+    还可以……」）中间一个空格都没有，整段就是一个超长 token，照样会空白。
+    旧实现只切「连续汉字串」，这类多短句段落一条空格都拿不到，正是长文空白的成因。
+
+    断点顺序：先按停顿标点（，。！？；：、…— 与收尾引号括号）分段，
+    段内放得下就不再动；放不下时用 `_groups()` 按词挑断点。标点本身不留空格，
+    空格只落在「已经放不下了」的位置上，比逢词插空格干净得多。
     """
-    names = []
-
-    def keep(m):
-        names.append(m.group(0))
-        return "\x00%d\x00" % (len(names) - 1)
-
-    text = NAME.sub(keep, text)
-    parts = TAG.split(text)
+    parts = _HARD.split(text)
     out = []
-    for i, p in enumerate(parts):
-        if i % 2 == 1:
+    for p in parts:
+        if _HARD_TAG.fullmatch(p):
             out.append(p)
             continue
-        p = _TIGHT_SPACE.sub("", p)
-        out.append(CJK_RUN.sub(
-            lambda m: (m.group(0) if len(m.group(0)) <= max_chars
-                       else _groups(m.group(0), lookup, max_chars)), p))
-    text = "".join(out)
-    return re.sub(r"\x00(\d+)\x00", lambda m: names[int(m.group(1))], text)
+        out.append(_compact_seg(_TIGHT_SPACE.sub("", p), lookup, max_chars, []))
+    return "".join(out)
+
+
+def _compact_seg(seg, lookup, max_chars, names):
+    """给一段（行内）文本排空格：预算穿过占位符累加，只有 `<n>` 才清零。"""
+    if not seg:
+        return seg
+    units = []          # [(文本, 权重, 是否强制断行), …]
+    hard = False
+    last = 0
+    for m in _ATOM.finditer(seg):
+        hard = _chunk_units(seg[last:m.start()], lookup, max_chars, names, hard, units)
+        units.append((m.group(0), _atom_weight(m.group(0), names), False))
+        hard = False
+        last = m.end()
+    _chunk_units(seg[last:], lookup, max_chars, names, hard, units)
+    return _pack(units, max_chars)
+
+
+def _chunk_units(chunk, lookup, max_chars, names, hard, units):
+    """把一段纯文本按停顿切成单位，追加进 units；返回「下一块是否强制断行」。"""
+    buf = []
+    for ch in chunk:
+        if ch.isspace():
+            if buf:
+                units.extend(_clause_units("".join(buf), lookup, max_chars, names, hard))
+                buf = []
+                hard = False
+            hard = True
+            continue
+        buf.append(ch)
+        if ch in PAUSE or ch in CLOSE:
+            units.extend(_clause_units("".join(buf), lookup, max_chars, names, hard))
+            buf = []
+            hard = False
+    if buf:
+        units.extend(_clause_units("".join(buf), lookup, max_chars, names, hard))
+        return False
+    return hard
+
+
+def _atom_weight(atom, names):
+    """行内原子的权重：标签不占位，变量按替换后的大致长度算。"""
+    if atom.startswith("<"):
+        return 0
+    m = _PLACEHOLDER.fullmatch(atom)
+    if m:
+        idx = int(m.group(1))
+        return len(names[idx]) if 0 <= idx < len(names) else 3
+    return 6 if atom.startswith("@") else 3
+
+
+def _pack(units, max_chars):
+    """把单位按预算拼回去：标点贴前字，其余超预算就插一个空格。"""
+    out, cur = [], 0
+    for text, weight, hard in units:
+        if text in PAUSE or text in CLOSE:      # 标点永远贴着前一个字
+            out.append(text)
+            cur += weight
+            continue
+        if cur and (hard or cur + weight > max_chars):
+            out.append(" ")
+            cur = 0
+        out.append(text)
+        cur += weight
+    return "".join(out)
+
+
+def _clause_units(clause, lookup, max_chars, names, hard):
+    """把一个短句拆成 [(文本, 权重, 强制断行)]：名字整体一件，长汉字串按词切。"""
+    units = []
+    first = hard
+    for piece in _PIECE.findall(clause):
+        m = _PLACEHOLDER.fullmatch(piece)
+        if m:
+            idx = int(m.group(1))
+            label = names[idx] if 0 <= idx < len(names) else piece
+            units.append((piece, len(label), first))
+            first = False
+            continue
+        if piece.isascii():
+            units.append((piece, len(piece), first))
+            first = False
+            continue
+        if piece[0] in PAUSE or piece[0] in CLOSE or len(piece) == 1 and not _is_han(piece[0]):
+            units.append((piece, len(piece), first))
+            first = False
+            continue
+        pieces = [piece]
+        if len(piece) > max_chars:
+            pieces = [p for p in _groups(piece, lookup, max_chars).split(" ") if p]
+        for k, sub in enumerate(pieces):
+            units.append((sub, len(sub), first if k == 0 else True))
+        first = False
+    return units
+
+
+def _is_han(ch):
+    return "\u4e00" <= ch <= "\u9fff"
