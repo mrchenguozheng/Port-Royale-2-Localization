@@ -31,6 +31,8 @@ src/tools/
 | `check.py` | 跑全部静态检查与单测（`check.ps1` 调它） |
 | `config_check.py` | 检查 locale/packs/translations/ui/font-map 的语言配置是否互相对得上；`release.ps1` 出包前也会跑 |
 | `pack/new_lang.py` | 命令行新建语言 |
+| `pack/split_batches.py` | 按 en 表内顺序切出可并行翻译的批次（术语/诗谜/原样/*.jsonl 12 块），落 `build/qa/batches/<语言>/` |
+| `pack/merge_batches.py` | 批次译文合并回 TOML：占位符/标签校验、同文回填、合并后编译，失败自动还原 |
 | `pack/compile_pack.py` | 把 `src/translations/*.toml` 排版后编译成 `build/runtime/PR2Localization/packs/*.txt`，引擎文本落在 `build/preview/engine_text/*.toml` |
 | `pack/check_breaks.py` | 编译后校验换行/占位符 |
 
