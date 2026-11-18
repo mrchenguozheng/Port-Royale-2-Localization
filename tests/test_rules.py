@@ -167,17 +167,30 @@ class TestZhSpace(unittest.TestCase):
             self.assertLessEqual(len(tok), 12, tok)
 
     def test_perchar_puts_one_space_between_han_chars(self):
-        """逐字模式：汉字之间一空格，标签/变量内不动，短引号标签不拆。"""
-        t = "你的目标<n>是从「关闭」按钮%@$Pos$开始。"
+        """逐字模式：长段汉字之间一空格，标签/变量内不动，短引号标签不拆。"""
+        t = "你的目标是从这里开始，然后慢慢成长为一个默默无闻的商人<n>接着%@$Pos$继续。"
         out = zh_space.perchar(t)
-        self.assertEqual(out, "你 的 目 标<n>是 从「关闭」按 钮%@$Pos$开 始。")
+        self.assertIn("你 的 目 标 是 从 这 里 开 始，", out)
+        self.assertIn("的 商 人<n>接 着%@$Pos$继 续。", out)
         self.assertNotIn("  ", out)
+
+    def test_perchar_skips_short_labels(self):
+        """短串不插空格：按钮名/人名/地名本来不需要断行点，插了只会撑爆控件。"""
+        for t in ("游戏菜单", "克拉斯", "德阿斯图里亚斯", "关闭编年史"):
+            self.assertEqual(zh_space.perchar(t), t)
+
+    def test_perchar_skips_res_font_span(self):
+        """`.res` 字体槽里的长段仍然要断行点，短标题才整块留着。"""
+        t = "<f:fonts/ELGRECO_26x26aaFHk.res>剧本目标<f:fonts/Tiepolo_bold14x14aaFH.res>"
+        out = zh_space.perchar(t)
+        self.assertEqual(out, t)
 
     def test_twospace_keeps_latin_words_on_wide_space(self):
         """两种空白：汉字之间 U+0020，贴着英文/数字的空格换成 U+00A0。"""
-        t = "欢迎来到 Port Royale 2 中。"
+        t = "我们来到加勒比海，这里是 Port Royale 2 的中心海域。"
         out = zh_space.perchar_twospace(t)
-        self.assertIn("欢 迎 来 到\u00a0Port\u00a0Royale\u00a02\u00a0中。", out)
+        self.assertIn("我 们 来 到 加 勒 比 海，", out)
+        self.assertIn("这 里 是\u00a0Port\u00a0Royale\u00a02\u00a0的 中 心 海 域。", out)
         self.assertEqual(out.count("\u00a0"), 4)
 
 
