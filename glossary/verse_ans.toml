@@ -33,17 +33,22 @@
 #
 # 谜面本身不要改：加 [riddle:] 只在行首加标注，正文一字不动。
 #
-# 本轮起（2026-11-18，见 09 卷第一百零九节）译文那边的 riddle 还要写两件依据：
+# 本轮起（2026-11-18，见 09 卷第一百零九、一百一十节）译文那边的 riddle 还要写三件依据：
+#   level=      谜题分级 direction / town / mixed —— 由谜底字段算出来、必须一致：
+#               只有方位键 = direction（玩家得自己找城），只给城镇名 = town，
+#               城名与方位齐备（`answer=城|-方位`）= mixed。本文件 ans 是分级的来源之一，
+#               但译文侧写错会被 check_doc 按自己的答案报错。
 #   certainty=  certain / inferred / either / disputed
-#   source=     依据，`+` 或 `&` 并列；类别 see marks.ANS_SOURCE_*：
+#   source=     依据，`+` 或 `&` 并列；类别见 marks.ANS_SOURCE_*：
 #               original-en / original-fr（原文本身，不带指向）、
 #               retail-xx / fan-xx（xx ∈ de,en,es,fr,pl,ru，可跟 8 位键）、
 #               url:'…' 或裸引号 URL、manual:路径@sha256-<12 位>#`小节标题`、
-#               riddle:键,键（推自别的谜面）、cargo / map / local（只记类别）。
-#               local 是本语言自写的谜面（不是从任何一版原文推来的），给自写副本一个
-#               合法归属；inferred 不能只有 original-*/local，必须有外部依据。
-#               构建前复核（text_lint）要求这两种必写；语法解析期不查，方便先写谜面。
-#               本文件只维护谜底/线索，不写 certainty/source——那是译文层的事。
+#               riddle:键,键（推自别的谜面）、cargo / map / authored（只记类别）。
+#               authored 是本语言自己编写/新编的谜面（不是从任何一版原文推来的），给自写
+#               副本一个合法归属（最初叫 local，后按「谁写的」改名）；inferred 不能只有
+#               original-*/authored，必须有外部依据。
+#               构建前复核（text_lint）要求这三种必写；语法解析期不查，方便先写谜面。
+#               本文件只维护谜底/线索，不写 level/certainty/source——那是译文层的事。
 #
 # 29 组谜底现状（2026-11-17）：24 组是城名，来源是 Selket 整理的「三线索寻宝」表
 # （Steam 帖 steamcommunity.com/app/12470/discussions/0/1354868867712622875/，

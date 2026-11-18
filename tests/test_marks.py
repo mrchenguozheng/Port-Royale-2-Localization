@@ -1056,9 +1056,10 @@ class TestCertaintyAndSource(unittest.TestCase):
         self.assertEqual(self.ok("source='https://example.com/it\\'s'"),
                          "He went north in August.")
 
-    def test_local_is_a_bare_category(self):
-        self.assertEqual(self.ok("source=original-en&local"), "He went north in August.")
-        self.bad("source=local:00000001", "不带指向")
+    def test_authored_is_a_bare_category(self):
+        self.assertEqual(self.ok("source=original-en&authored"), "He went north in August.")
+        self.bad("source=authored:00000001", "不带指向")
+        self.bad("source=local", "没有类别")
 
     def test_unknown_source_category(self):
         self.bad("source=hearsay", "没有类别")
@@ -1098,9 +1099,9 @@ class TestRiddleStricter(unittest.TestCase):
     """一条文本只许一个 riddle；certainty/source 在构建前复核档必写；local 是自写谜面。"""
 
     H = "0x00000001"
-    ONE = "[riddle:answer=San Juan;group=00000001;clue=island]An island."
-    TWO = ("[riddle:answer=San Juan;group=00000001;clue=island;certainty=certain"
-           ";source=original-en&local]An island.")
+    ONE = "[riddle:answer=San Juan;group=00000001;clue=island;level=town]An island."
+    TWO = ("[riddle:answer=San Juan;group=00000001;clue=island;level=town;certainty=certain"
+           ";source=original-en&authored]An island.")
 
     @staticmethod
     def _ent():
@@ -1113,30 +1114,77 @@ class TestRiddleStricter(unittest.TestCase):
 
     def test_expand_rejects_two_marks(self):
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[riddle:answer=San Juan;group=00000001;clue=island]An island. "
-                     "[riddle:answer=San Juan;group=00000001;clue=island]An island.",
-                     TABLE, "zh")
+            M.expand("[riddle:answer=San Juan;group=00000001;clue=island;level=town]"
+                     "An island. "
+                     "[riddle:answer=San Juan;group=00000001;clue=island;level=town]"
+                     "An island.", TABLE, "zh")
         self.assertIn("只能写一个", str(ctx.exception))
 
     def test_meta_required_only_in_strict_mode(self):
-        doc = {self.H: self.ONE}
+        bare = "[riddle:answer=San Juan;group=00000001;clue=island]An island."
+        doc = {self.H: bare}
         self.assertEqual(M.check_doc("zh", doc, entities=self._ent(), terms={}), [])
         problems = M.check_doc("zh", doc, entities=self._ent(), terms={},
                                require_ans_meta=True)
         self.assertTrue(any("certainty" in p for p in problems), problems)
         self.assertTrue(any("source" in p for p in problems), problems)
+        self.assertTrue(any("level" in p for p in problems), problems)
 
     def test_meta_complete_passes_strict(self):
         self.assertEqual(
             M.check_doc("zh", {self.H: self.TWO}, entities=self._ent(), terms={},
                         require_ans_meta=True), [])
 
-    def test_inferred_cannot_be_only_original_or_local(self):
-        for tail in ("source=original-en&local", "source=local"):
+    def test_inferred_cannot_be_only_original_or_authored(self):
+        for tail in ("source=original-en&authored", "source=authored"):
             with self.assertRaises(M.MarkError) as ctx:
-                M.expand("[riddle:answer=San Juan;group=00000001;clue=island"
+                M.expand("[riddle:answer=San Juan;group=00000001;clue=island;level=town"
                          ";certainty=inferred;%s]An island." % tail, TABLE, "zh")
             self.assertIn("没有外部依据", str(ctx.exception))
+
+    # ---- level：分级由谜底算出来，声明只能跟它一致 ----
+
+    def test_level_direction_ok(self):
+        text = ("[riddle:direction=north;group=00000001;clue=north;level=direction"
+                ";certainty=certain;source=original-en]He went north.")
+        self.assertEqual(M.check_doc("zh", {self.H: text}, entities=self._ent(), terms={},
+                                     require_ans_meta=True), [])
+
+    def test_level_mixed_needs_both_kinds(self):
+        text = ("[riddle:answer=San Juan|-north;group=00000001;clue=island,north;level=mixed"
+                ";certainty=either;source=original-en]An island, then north.")
+        self.assertEqual(M.check_doc("zh", {self.H: text}, entities=self._ent(), terms={},
+                                     require_ans_meta=True), [])
+
+    def test_level_must_match_answers(self):
+        text = ("[riddle:answer=San Juan;group=00000001;clue=island;level=direction"
+                ";certainty=certain;source=original-en]An island.")
+        problems = M.check_doc("zh", {self.H: text}, entities=self._ent(), terms={},
+                               require_ans_meta=True)
+        self.assertTrue(any("level 写的是 direction" in p for p in problems), problems)
+
+    def test_level_only_accepts_three_values(self):
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:answer=San Juan;group=00000001;clue=island;level=hard]"
+                     "An island.", TABLE, "zh")
+        self.assertIn("level 只能写", str(ctx.exception))
+
+    # ---- `+` 在 clue 里就是正文，不是并列 ----
+
+    def test_plus_in_bare_clue_is_literal(self):
+        self.assertEqual(
+            M.expand("[riddle:answer=San Juan;group=00000001;clue=a+b]Meet at a+b.",
+                     TABLE, "zh"), "Meet at a+b.")
+        # 引号里也一样，不需要为加号加引号
+        self.assertEqual(
+            M.expand("[riddle:answer=San Juan;group=00000001;clue=\"a+b\"]Meet at a+b.",
+                     TABLE, "zh"), "Meet at a+b.")
+
+    def test_plus_not_in_verse_points_to_comma(self):
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:answer=San Juan;group=00000001;clue=island+gold]An island.",
+                     TABLE, "zh")
+        self.assertIn("用半角 `,`", str(ctx.exception))
 
 
 if __name__ == "__main__":

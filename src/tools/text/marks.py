@@ -16,7 +16,7 @@
     [lit:%2 %1日]               字面照写，原文保留
     [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
     [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
-    [riddle:answer=Corpus Christi;group=35f48f6c;clue=荒凉,遗弃;
+    [riddle:answer=Corpus Christi;group=35f48f6c;clue=荒凉,遗弃;level=town;
             certainty=inferred;source=original-en&manual:docs/_src/x.md@sha256-ab12cd34ef56#"小节标题"]
                                 诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
                                 字段（`;` 分隔；answer=/town=/direction= 三选一，其余不重复）：
@@ -24,10 +24,12 @@
                                 `group=` 同组全体成员的文本键（`,` 分隔、含本条自己，
                                        单副本就写自己那一个键；一条文本只许一个 riddle），
                                 `clue=` 线索（`,` 分隔、每项都必须在谜面正文里出现），
+                                `level=` 谜题分级：direction / town / mixed（必须与谜底字段
+                                       算出来的一致——只有方位键、只有城镇名、两者齐备），
                                 `certainty=` certain / inferred / either / disputed，
                                 `source=` 依据（`+`/`&` 并列，类别见 ANS_SOURCE_*）。
-                                certainty 与 source 在构建前复核时必写（check_doc 的
-                                require_ans_meta，见 09 卷第一百零九节）。
+                                level / certainty / source 在构建前复核时必写（check_doc 的
+                                require_ans_meta，见 09 卷第一百零九、一百一十节）。
                                 answer 正常不写类型：方位键照写原词（east / -north / not north），
                                 其余一律按城镇查 entities.toml；只有城名与方位键撞名
                                 （目前 0 例）才写 town: / direction: 消歧。
@@ -36,9 +38,10 @@
                                    自造标签静默，字母开头的未知标签报 warning），
                                   裸写 `<正文>`（不带标签，直接当正文片段）。
                                 两种形状里的值都必须是**谜面正文里逐字出现的片段**；
-                                值里含 `:`／`+`／全角「，」就整项加引号——不加引号这三者是语法
-                                （标签分隔／已退役并值／误输入的分隔符），加了才是正文；`;` 例外，
-                                它在解析 clue 之前就切字段，引号保不住，只能改写或换词。
+                                值里含 `:` 就整项加引号（`:` 在裸写里是标签分隔）；`+` 不用——
+                                clue 里 `+` 已没有任何含义，裸写的加号就是正文（第一百一十节）；
+                                全角「，」是误输入的分隔符；`;` 例外，它在解析 clue 之前就切字段，
+                                引号保不住，只能改写或换词。
                                 引号三种半角等价（`"…"`／`'…'`／`` `…` ``），里可写另外两种；
                                 同种引号用反斜杠转义（`\"`、`\\`），见 09 卷第一百零八节。
                                 展开时逐条核对——
@@ -47,7 +50,7 @@
                                 否则既泄底又冻死用词（见 09 卷第六十三、六十四节）
                                 谜底也可以只写方位（`direction=east`，或 `answer=east`），
                                 那批谜面只说朝向，写不出城名（09 卷第七十二节）。
-                                字段语法见 09 卷第七十八、七十九、一百零九节。
+                                字段语法见 09 卷第七十八、七十九、一百零九、一百一十节。
 
 为什么不用成对标记
 ------------------
@@ -267,7 +270,14 @@ def _ref_target(arg, doc, hid=""):
 #: 谜底字段：`answer=` 靠值推断类型；`town=` / `direction=` 把类型明写出来，
 #: 因此可以省掉 `answer=`——两者只能出现一处。
 ANS_ANSWER_FIELDS = ("answer", "town", "direction")
-ANS_FIELDS = ANS_ANSWER_FIELDS + ("group", "clue", "certainty", "source")
+ANS_FIELDS = ANS_ANSWER_FIELDS + ("group", "clue", "certainty", "source", "level")
+
+#: 谜题分级（`level=`）：这条谜面把玩家指到多远——只有方位、只有城镇、还是两者混合。
+#: 值不是自由声明的精度，而是必须与谜底字段算出来的结果一致（`check_doc` 比对）：
+#: 方位键 → direction，城镇名 → town，`answer=城|-方位` 这种两项齐备 → mixed。
+#: 分级的意义在消费侧：方向级的谜面写不出城名，玩家得自己走到；报告/统计按这一档分开看。
+#: 所以它由谜底**决定**而不是由作者**选择**，写它等于把「这条谜面指到哪一档」显式记下来。
+ANS_LEVELS = ("direction", "town", "mixed")
 
 #: 谜底的两种类型。正常**不写**：值在方位键里就是方位，否则按城镇查 entities.toml；
 #: 只有城名与方位键撞名（目前 0 例）才需要在字段名上写明（`town=` / `direction=`）。
@@ -301,8 +311,10 @@ ANS_SOURCE_LANGS = ("de", "en", "es", "fr", "pl", "ru")
 #: 用域名互相排斥，而域名本来就写在 URL 里，分类等于让人多记一个词）。
 ANS_SOURCE_URLS = ("url",)
 #: 只记类别、不带指向的来源：`cargo` 是货物清单推出来的，`map` 是地图实测，
-#: `local` 是本语言自己写的谜面（不是从任何一版原文推来的，见 09 卷第一百零九节）。
-ANS_SOURCE_BARE = ("cargo", "map", "local")
+#: `authored` 是本语言自己编写/新编的谜面（不是从任何一版原文推来的，见 09 卷第一百零九节）。
+#: 用 `authored` 而不是 `local`：`local` 在工程语境里更像「本机/本地文件」，而这一栏要说的是
+#: 「谁写的」——本语言译者。
+ANS_SOURCE_BARE = ("cargo", "map", "authored")
 
 #: 弯引号/全角引号：`_wide_char` 认不出它们（NFKC 不变），只在这些字符进到 source 时点名。
 _CURLY_QUOTES = "\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u201f\u00ab\u00bb\u300c\u300d"
@@ -790,10 +802,10 @@ def _check_source(raw, hid):
     return [_check_source_item(i, hid) for i in items]
 
 
-#: clue 项里必须靠引号才写得进来的字符：`:` 是标签分隔、`+` 是已退役的并值符。裸写碰到
-#: 它们就要求整项加引号，否则读者分不清「这是分隔符还是正文」。`,` 不用列——它在项切分
-#: 那一步已经走掉了。
-_CLUE_NEEDS_QUOTE = ":+"
+#: clue 项里必须靠引号才写得进来的字符：只有 `:`（标签分隔）。`+` 不在其中——clue 里
+#: `+` 已经没有任何含义（并值在第一百零六节退役），裸写的加号就是正文，不必加引号；
+#: `,` 也不用列，它在项切分那一步已经走掉了。全角「，」是误输入的分隔符，单独报错。
+_CLUE_NEEDS_QUOTE = ":"
 
 
 def _clue_item_head(buf):
@@ -881,9 +893,8 @@ def _clue_item(part, hid, warns=None):
                         "（正文本身带它就整项加引号）" % hid)
     for ch in _CLUE_NEEDS_QUOTE:
         if ch in tail:
-            hint = ("多个片段用 `,` 分开（`+` 并值已退役）；正文本身带 + 就把整项用引号包起来"
-                    if ch == "+" else "正文本身带冒号就整项用引号包起来，例如 \"12:30\"")
-            raise MarkError("%s：clue 项 %r 里有 %r——%s" % (hid, tail, ch, hint))
+            raise MarkError("%s：clue 项 %r 里有 %r——正文本身带冒号就整项用引号包起来，"
+                            "例如 \"12:30\"" % (hid, tail, ch))
     if ";" in tail:
         raise MarkError("%s：clue 项里不能有 `;`（它切字段，引号也保不住）" % hid)
     return tag, tail
@@ -898,9 +909,12 @@ def _split_ans(arg, hid="", warns=None):
     唯一保留的已知标签是 `pun`；`_` 开头的自造标签静默，字母开头的未知标签（含已退役的
     direction / count / feature / produce / history / exclude）只当关键词并往 `warns`
     记一条（多半是拼错；lint 算 E 级，构建前必须清零）。
-    项里带逗号 `,`、冒号 `:` 或加号 `+` 时整项必须用引号包起来（`"Good, very good!"`、
-    `"12:30"`、`"a+b"`）：这些字符在裸写里是语法（项分隔 / 标签分隔 / 已退役的并值），
-    加引号才是正文。
+    项里带冒号 `:` 时整项必须用引号包起来（`"12:30"`）：`:` 在裸写里是标签分隔，加引号才是
+    正文。次要：`+` 在 clue 里已经没有任何含义（并值在第一百零六节退役），裸写就是正文，
+    不必加引号；但裸写里若出现「谜面正文里找不到、却恰好含 `+`」的值，报错会提示改用 `,`
+    并列——那是误用了旧写法，不是正文。
+    `level=` 是谜题分级（direction / town / mixed），必须与谜底字段算出来的结果一致：
+    这条只有方位键、只有城镇名、还是两者齐备。
     `answer` 正常不写类型（值在方位键里算方位，否则按城镇查表）；想明写类型就改用
     `town=` / `direction=` 这两个字段名，此时可以省掉 `answer=`：
     `[riddle:town=Vera Cruz;clue=…]` / `[riddle:direction=SE;clue=…]`。
@@ -967,13 +981,19 @@ def _split_ans(arg, hid="", warns=None):
         if certainty not in ANS_CERTAINTY:
             raise MarkError("%s：certainty 只能写 %s（收到 %r）"
                             % (hid, " / ".join(ANS_CERTAINTY), certainty))
+    level = None
+    if "level" in fields:
+        level = fields["level"].strip()
+        if level not in ANS_LEVELS:
+            raise MarkError("%s：level 只能写 %s（收到 %r）"
+                            % (hid, " / ".join(ANS_LEVELS), level))
     sources = _check_source(fields["source"], hid) if "source" in fields else []
     if certainty == "inferred":
         # inferred 是「靠别的证据推出来的」，所以必须写清推自哪里，且不能只说原文或自写。
         if not sources:
             raise MarkError("%s：certainty=inferred 必须写 source（推自哪份材料）" % hid)
-        if all(kind in ("original", "local") for kind, _t in sources):
-            raise MarkError("%s：certainty=inferred 的 source 不能只有 original-*/local"
+        if all(kind in ("original", "authored") for kind, _t in sources):
+            raise MarkError("%s：certainty=inferred 的 source 不能只有 original-*/authored"
                             "（没有外部依据就该写 certain）" % hid)
     # either 是「两个地点都成立」，答案用 `|` 列全。反向不设禁令：`|` 既可能是两座城，
     # 也可能同一座城的异写（`San Juan|St. Juan`），机器只数得出候选个数、分不清哪种，
@@ -984,24 +1004,29 @@ def _split_ans(arg, hid="", warns=None):
                             "（answer=A|B）；只有一个答案就写 certain / inferred" % hid)
         if not sources:
             raise MarkError("%s：certainty=either 必须写 source（凭哪份材料说两个都成立）" % hid)
-    return answers, group, clues, (kind or "answer"), certainty, sources
+    return answers, group, clues, (kind or "answer"), certainty, sources, level
 
 
 def _check_ans(arg, body, hid="", warns=None):
     """核对谜底与线索：线索必须逐条出现在谜面正文里。
 
     返回 (候选 [(类型|None, 值)…], 本组全体成员的键, 线索, 谜底字段名, certainty,
-    来源 [(类别, 目标)…])。写错抛 MarkError。
+    来源 [(类别, 目标)…], level)。写错抛 MarkError。
     """
-    answers, group, clues, field, certainty, sources = _split_ans(arg, hid, warns=warns)
+    answers, group, clues, field, certainty, sources, level = _split_ans(
+        arg, hid, warns=warns)
     text = (body or "").casefold()
     missing = [v for _, v in clues if v.casefold() not in text]
     if missing:
+        hint = ""
+        if any("+" in v for v in missing):
+            hint = ("（值里带 `+` 且整项不在谜面里：`+` 在 clue 里已不是并列符，要并列多个"
+                    "片段请用半角 `,`；正文里真有加号就整项加引号）")
         raise MarkError(
             "%s：ans 的谜底是 %r，但线索 %s 没出现在谜面里（谜面推不出这个答案，"
-            "或者线索该换）" % (hid, "|".join(v for _, v in answers),
-                                " / ".join(repr(v) for v in missing)))
-    return answers, group, clues, field, certainty, sources
+            "或者线索该换）%s" % (hid, "|".join(v for _, v in answers),
+                                  " / ".join(repr(v) for v in missing), hint))
+    return answers, group, clues, field, certainty, sources, level
 
 
 def expand(text, table, lang, hid="", terms=None, doc=None):
@@ -1224,7 +1249,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
                 # 哪座城」无从核对，标注就退化成一条注释。答案本身不查译名：
                 # 诗里不照抄译名。
                 try:
-                    answers, group, _clues, field, certainty, sources = _check_ans(
+                    answers, group, _clues, field, certainty, sources, level = _check_ans(
                         arg, _ANS_SPAN.sub("", text), hid, warns=warns)
                 except MarkError as e:
                     problems.append(str(e))
@@ -1237,7 +1262,10 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
                     if not sources:
                         problems.append(
                             "%s：ans 缺 source（original-* / retail-* / fan-* / url / manual / "
-                            "riddle / cargo / map / local 必写一项）" % hid)
+                            "riddle / cargo / map / authored 必写一项）" % hid)
+                    if level is None:
+                        problems.append(
+                            "%s：ans 缺 level（谜题分级 direction / town / mixed 必写）" % hid)
                 # source 里指到别的诗谜时，目标必须存在、真带 riddle 标注、且不是自己。
                 for kind_src, target in sources:
                     if kind_src != "riddle":
@@ -1254,6 +1282,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
                                             "标注（指向了不相干的文本）" % (hid, key))
                 sig = []
                 cmp_sig = []
+                kinds = set()
                 for kind, value in answers:
                     # 城名比对不计大小写、变音符号和多余空白；对上了就用登记名本身
                     # 作为规范值（组内比对、死条目统计都用它）。
@@ -1294,12 +1323,23 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
                     if kind == "town" and value in entities:
                         ans_used.add(value)
                     sig.append(value)
+                    if kind in ANS_NAME_KINDS:
+                        kinds.add(kind)
                     # 比对用的部分：「指明是城镇」的那几项。`answer=` 里夹着的方位候选
                     # 不参与（`|` 拆开后逐项看类型），`town=` 整字段参与，`direction=`
                     # 整字段不参与。两者落进同一个集合，所以一条写 answer=Vera Cruz、
                     # 另一条写 town=Vera Cruz 也算一致。
                     if field == "town" or (field == "answer" and kind == "town"):
                         cmp_sig.append(value)
+                # 分级由谜底算：只有方位键 = direction，只有城镇名 = town，两者齐备 = mixed。
+                # 声明（level=）只用来核对，不许跟谜底各说各话——否则「分级」就成了一句注释。
+                if kinds:
+                    derived = "mixed" if len(kinds) > 1 else sorted(kinds)[0]
+                    if level is not None and level != derived:
+                        problems.append(
+                            "%s：level 写的是 %s，但谜底字段算出来是 %s（只用方位键就写 "
+                            "direction，只给城镇名就写 town，城+方位齐备才写 mixed）"
+                            % (hid, level, derived))
                 ans_groups[hid] = (field, "|".join(sig), tuple(cmp_sig), group)
                 # 同文索引：同一段谜面在数据里出现多次时，用来反向查「谁漏写了 group」。
                 riddle_bodies.setdefault(_fold(_ANS_SPAN.sub("", text)), []).append(hid)
