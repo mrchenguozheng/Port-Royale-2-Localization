@@ -1,0 +1,82 @@
+# 版本差（定向）：en.gog_1.1.2.3 → fr.gog_1.1.2.42
+#
+# 语义：源版键集 **减** only_from **加** only_to == 目标版键集。
+# 这条差是「构建按哪个版本出包」的唯一依据，不是注释性文档：
+#   · only_from —— 源版有、目标版没有的键；目标包里不带这些条目
+#   · only_to   —— 源版没有、目标版才有的键；目标包里这些条目的原文是空占位
+#                  （`+++EMPTY+++`，任何语言版都没有正文，不需要译文）
+# 键必须按 8 位小写十六进制升序；两条定向差互为镜像（A→B 的 only_from
+# 就是 B→A 的 only_to），check 会核对，改一条必须同步改另一条。
+#
+# 数据来源：src/orig/en.gog_1.1.2.3.toml（3548 键）与 src/orig/fr.gog_1.1.2.42.toml（3571 键），
+# 由 scripts 之外的 one-off 脚本从两份 PR2.exe 的字符串表导出后生成。
+
+from = "en.gog_1.1.2.3"
+to = "fr.gog_1.1.2.42"
+
+only_from = [
+  "0x0204aa22",  # IDM_CONTEST_01_2004_LOG_00_TEXT
+  "0x09fa997d",  # (No Letter of Marque)
+  "0x0b715286",  # IDM_CONTEST_01_2004_LOG_02_TEXT
+  "0x0f3a5490",  # IDM_CONTEST_01_2004_POPUP_HDR
+  "0x25940110",  # IDM_CONTEST_01_2004_LOG_05_TEXT
+  "0x2e114d05",  # <gs:TEXTFLUSS_KEINEHOEHE><g:INTEXT_Kaperbrief_800x600.sc
+  "0x3426834a",  # IDM_CONTEST_01_2004_LOG_06_TEXT
+  "0xc7537475",  # IDM_CONTEST_01_2004_LOG_01_HDR
+  "0xccd432a5",  # IDM_CONTEST_01_2004_LOG_03_TEXT
+  "0xd10b5c36",  # IDM_CONTEST_01_2004_LOG_02_HDR
+  "0xdac343f7",  # IDM_CONTEST_01_2004_LOG_03_HDR
+  "0xdb66b4df",  # IDM_CONTEST_01_2004_LOG_04_TEXT
+  "0xe47b2bb8",  # IDM_CONTEST_01_2004_LOG_04_HDR
+  "0xee331379",  # IDM_CONTEST_01_2004_LOG_05_HDR
+  "0xf43f2856",  # PR2-Contest-01-2004
+  "0xf562862e",  # +++EMPTY+++
+  "0xf7eafb3a",  # IDM_CONTEST_01_2004_LOG_06_HDR
+  "0xf93656ab",  # IDM_CONTEST_01_2004_LOG_00_HDR
+  "0xfcded04c",  # IDM_CONTEST_01_2004_LOG_01_TEXT
+]
+
+only_to = [
+  "0x00b18dad",  # 目标版里是 +++EMPTY+++
+  "0x02ecd243",  # 目标版里是 +++EMPTY+++
+  "0x03e3f733",  # 目标版里是 +++EMPTY+++
+  "0x046aac19",  # 目标版里是 +++EMPTY+++
+  "0x08b11e13",  # 目标版里是 +++EMPTY+++
+  "0x0cd21f26",  # 目标版里是 +++EMPTY+++
+  "0x0d0b8e3a",  # 目标版里是 +++EMPTY+++
+  "0x0fe4ef9b",  # 目标版里是 +++EMPTY+++
+  "0x1415e583",  # 目标版里是 +++EMPTY+++
+  "0x2088fb2f",  # 目标版里是 +++EMPTY+++
+  "0x2656cee4",  # 目标版里是 +++EMPTY+++
+  "0x2a30cc5e",  # 目标版里是 +++EMPTY+++
+  "0x2d68fc9d",  # 目标版里是 +++EMPTY+++
+  "0x2d9c5bae",  # 目标版里是 +++EMPTY+++
+  "0x303d8239",  # 目标版里是 +++EMPTY+++
+  "0x30c7fbeb",  # 目标版里是 +++EMPTY+++
+  "0x37eb1dd7",  # 目标版里是 +++EMPTY+++
+  "0x3ab804b5",  # 目标版里是 +++EMPTY+++
+  "0xc5461916",  # 目标版里是 +++EMPTY+++
+  "0xc7bb0199",  # 目标版里是 +++EMPTY+++
+  "0xc96e8401",  # 目标版里是 +++EMPTY+++
+  "0xd167b6e5",  # 目标版里是 +++EMPTY+++
+  "0xda482263",  # 目标版里是 +++EMPTY+++
+  "0xdc2986f6",  # 目标版里是 +++EMPTY+++
+  "0xdde0f879",  # 目标版里是 +++EMPTY+++
+  "0xe1b635fc",  # 目标版里是 +++EMPTY+++
+  "0xe203de5d",  # 目标版里是 +++EMPTY+++
+  "0xe2ec8cd7",  # 目标版里是 +++EMPTY+++
+  "0xe2ed20bc",  # 目标版里是 +++EMPTY+++
+  "0xe3db824f",  # 目标版里是 +++EMPTY+++
+  "0xe9836f34",  # 目标版里是 +++EMPTY+++
+  "0xe9b2d47a",  # 目标版里是 +++EMPTY+++
+  "0xeb531997",  # 目标版里是 +++EMPTY+++
+  "0xeb6922cf",  # 目标版里是 +++EMPTY+++
+  "0xee198d24",  # 目标版里是 +++EMPTY+++
+  "0xee20fa7e",  # 目标版里是 +++EMPTY+++
+  "0xf17d8800",  # 目标版里是 +++EMPTY+++
+  "0xf7e0e3c1",  # 目标版里是 +++EMPTY+++
+  "0xf854e4de",  # 目标版里是 +++EMPTY+++
+  "0xfb3f51e3",  # 目标版里是 +++EMPTY+++
+  "0xfcf185ae",  # 目标版里是 +++EMPTY+++
+  "0xfda71da4",  # 目标版里是 +++EMPTY+++
+]

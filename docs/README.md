@@ -1,66 +1,86 @@
-# Documentation Index
+# 文档索引
 
-This is not the project introduction — it answers "which document do I need?".
-English translations cover the core workflow; specialist analysis documents remain
-Chinese-only for now.
+[项目 README](../README.md) · [维护指南](../AGENTS.md) · [English](../README.en.md)
 
-[中文文档索引](README.zh-CN.md) · [日本語](README.ja.md) · [Project README](../README.en.md)
+> **GOG 英文版 `1.1.2.3` 已实测；Steam 英文版 `1.1.2.3` 已通过宿主 DLL 代理实测。**
+> GOG 正式入口是 `PR2LocalizationGUI.exe`，不要直接双击 `PR2.exe`；Steam 用
+> `Ascaron.Logging-2.6.dll` + `PR2HostMount.ps1`，不再使用 `VERSION.dll`。
 
-> **Supported game build: GOG English `1.1.2.3` only.** Other builds are out of scope.
+文档只维护中文一套。英文入口只有根目录 [README.en.md](../README.en.md)，不镜像完整文档。
 
-## Players
+## 当前状态
 
-| Document | Contents |
+- 发行口径统一在[发行规范](发行规范.md)：版本号 `vMAJOR.MINOR.PATCH[-pre]`，
+  语言集读 `src/release-languages.txt`，`dist/` 只留 zip 与 `SHA256SUMS.txt`。
+- 发行包按 GOG / Steam 分成两个；GOG 不带 `VERSION.dll`。
+- 语言：包内只放 `packs/locale.default.ini`；用户活动 `locale.ini` 存在时优先，
+  空值也保留；部署/升级不覆盖，`packs/overrides/` 不删除。
+- 字体：实际字体平铺在 `PR2Localization/fonts/`；包内放 `font-map.default.ini`，
+  用户 `font-map.ini` 按项覆盖默认；不按语言开子目录，不覆盖根目录原版字体。
+- 运行时空值不表示“原版英文”：空值只会回到内置 `zh`；原版入口是
+  `PR2Localization.exe --vanilla` 或 GUI「启动原版」。
+
+## 玩家
+
+| 文档 | 内容 |
 |---|---|
-| [Player guide](en/user-guide.md) | Download, extract, launch, uninstall, troubleshooting |
+| [玩家指南](玩家指南.md) | 下载、解压、启动、切换语言、卸载、常见问题 |
 
-## Build and release
+## 构建与发行
 
-| Document | When to read |
+| 文档 | 内容 |
 |---|---|
-| [Release](en/release.md) | Per-language zips, package layout, font licenses, GitHub Releases |
-| [Build & Install](en/build-and-install.md) | Workbench, install wizard, build/deploy/launch, scripts |
-| [Fonts & distribution](en/fonts-and-distribution.md) | Whether Noto / stitched fonts may be redistributed |
-| [New language fonts](en/new-language-fonts.md) | Fonts and tools required for a new language |
+| [构建与安装](构建与安装.md) | 构建、部署、启动、脚本一览 |
+| [发行规范](发行规范.md) | 版本号、发行语言集、产物与校验和、tag、门禁 |
+| [发行版](发行版.md) | 两个发行包的结构、字体、语言设置、GitHub Actions |
+| [发行构建计划](发行构建计划.md) | 发行包构建的分步计划与验收项 |
+| [字体与分发](字体与分发.md) | 字体只做映射、Noto 许可、`font-map` 映射、禁止分发 |
+| [新语言](新语言.md) | 从准备字体到翻译、构建、部署、验收、出包 |
 
-## Development
+## 开发与原理
 
-| Document | When to read |
+| 文档 | 内容 |
 |---|---|
-| [Architecture](en/architecture.md) | Layers, file contracts, refactor record, remaining boundaries |
-| [Injector](en/injection.md) | How the DLL hooks text lookups and how the launcher injects it |
-| [Translations & packs](en/translation-and-packs.md) | TOML format, `hash = text`, editor workflow |
-| [New language](en/new-language.md) | Add a language from scratch |
-| [Language collaboration](en/language-collaboration.md) | Translator/maintainer split, handoff and verification |
-| [Translator workbench](en/translator-workbench.md) | Minimal package with only the translation page |
+| [架构与重构](架构与重构.md) | 分层、文件契约、当前边界、已知问题 |
+| [注入组件](注入组件.md) | DLL 如何 hook 取字、启动器如何注入 |
+| [译文与语言包](译文与语言包.md) | 语言包格式、`hash = 译文`、TOML 编辑流程 |
+| [文本变量码表](文本变量码表.md) | `@码$变量名$` 的 19 个码、67 个变量名、三档置信度与查询工具 |
+| [语言规则接口](语言规则接口.md) | 标点 / 分词 / 补空格三段式；中文补空格细节 |
+| [开发依赖](开发依赖.md) | Python、fontTools、Rust 等 |
+| [翻译局限](翻译局限.md) | 哪些文本改不了、排版为什么只能实机看 |
 
-## Translation notes
+## 翻译数据与历史
 
-| Document | Contents |
+| 文档 | 内容 |
 |---|---|
-| [Speaker tiers](en/speaker-tiers.md) | Which lines identify a speaker, which are guesses |
-| [Tone proposals](en/tone-proposal.md) | 41 confident speakers plus entries for review |
-| [Translation limits](en/translation-limits.md) | What cannot be fixed, verified coverage, hook trade-offs |
-| [Pending](en/pending.md) | Steam, untested French build, hook offsets |
+| [说话人分级](说话人分级.md) | 角色语气分级 |
+| [语体拟改清单](语体拟改清单.md) | 待统一语体的条目 |
+| [语音与映射](语音与映射.md) | 语音文件清单、语音 ↔ hash ↔ NPC 映射 |
+| [中文文本改动对比](中文文本改动对比.md) | 历史改字台账 |
+| [西语译文审计](西语译文审计.md) | 西语覆盖、残留分类、验收结果与口径 |
+| [俄语译文审计](俄语译文审计.md) | 俄语覆盖、残留分类、零售错误清单与验收结果 |
+| [德语术语基线](德语术语基线.md) | 零售德语质量实测、术语表、法语对照改定与批次队列 |
+| [德语译文质量报告](德语译文质量报告.md) | 德语覆盖与校验、质量偏低处的分级清单、未验证项 |
+| [德语条目索引](德语条目索引.md) | 德语条目按界面与批次的反查索引 |
+| [德语校对流程](德语校对流程.md) | 德语采集、比对、落盘的流程 |
+| [德语校对清单](德语校对清单.md) | 德语逐条校对状态清单 |
+| [德语交叉核对](德语交叉核对.md) | 英文基准 + 法文 + 零售德语的机械核对结果与噪声判定 |
+| [待定](待定.md) | 尚未完成或未验证的方向 |
+| [历史重构记录](历史重构记录.md) | 已完成的阶段重构、旧路由变化和 C++ 迁移对照 |
 
-## Specialist / Chinese-only
+## CSV 数据
 
-These are detailed analysis documents kept in Chinese:
+分析、审校、语音等数据统一放在 [csv/](csv/README.md)，不混在文档根目录。
 
-| Document | Contents |
-|---|---|
-| [语音清单](语音清单.md) / [语音映射](语音映射.md) | Voice inventory and hash mapping |
-| [中文分词方案](中文分词方案.md) | Chinese tokenization and spacing |
-| [中文文本改动对比](中文文本改动对比.md) | Historical Chinese text diffs |
-| [CSV data](csv/README.md) | Analysis, voice, review and generated CSV files |
+## 当前契约
 
-## Current contracts
+- 游戏语言：`PR2Localization/packs/locale.default.ini` 是发行默认；用户
+  `locale.ini` 存在时优先，空值也保留。
+- 语言包元数据：`<语言>.txt` 开头的 `# pack-meta alias=…` /
+  `min_runtime=…`。
+- 字体：`PR2Localization/fonts/` 放实际字体和默认映射 `font-map.default.ini`；
+  用户 `font-map.ini` 按项覆盖默认；实际字体必须位于该目录，不读系统字体目录。
+- 启动器界面：固定 `PR2Localization/ui/ui.default.ini`；用户 `ui.ini` 按项覆盖。
+- 运行时版本：`src/injector-rs/pr2_common/src/lib.rs`；发行包根目录 `RUNTIME-VERSION`。
 
-- Game language: `PR2Packs/locale.ini` → `language=`
-- Pack display name / GUI language / minimum runtime: `PR2Packs/<lang>.txt`
-  header (`# pack-meta alias=…`, `gui=…`, `min_runtime=…`)
-- Fonts: four TTF files in `fonts/<lang>/`; never overwrite the originals in `fonts/`
-- Launcher UI translations: `ui/<lang>.ini`
-- Runtime version: `src/injector/pr2_version.h`; `RUNTIME-VERSION` in release zips
-
-See [Architecture](en/architecture.md) for the full contract.
+旧的 `launcher.ini`、`lang/aliases.ini` 已移除；旧语言包不再兼容。

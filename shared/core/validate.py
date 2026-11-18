@@ -1,46 +1,184 @@
 # -*- coding: utf-8 -*-
-"""Placeholder and tag checks shared by the editor and build tools."""
-import re
+"""占位符与标签规则的唯一实现。
 
+编辑器（src/editor、editor）、编译脚本（pack/compile_pack）与
+tools/translate 都从这里取，不再各写一份。合并之前同一条规则散在四处，
+各处的口径其实不一样，而且**都不报错**，只会让同一个文件在两个界面里
+得出不同结论：translate 把 %02 归一成 %2（错 —— 那个 0 是补零宽度）；
+<n> 与正文里的 " | " 算同一个换行只有 src/editor 做过；那边比对标签用的
+正则还会把连续的 <n><n> 吞成一个不存在的名字 "n><n"。
+
+下面几个坑是这份实现必须绕开的（实测踩过）：
+
+1) 剥标签必须**用空格替换**，不能删空 —— 原文 <c><ts:175>%2<t>…%1 剥掉
+   <t> 后两个占位符紧邻成 "%2%1"，用一条贪婪正则去搜索会读成一个根本
+   不存在的 "%21"。
+2) **不许归一化**。"%02u"（自动存档编号，2 位补零）与 "%2u" 不是一个
+   写法：0 就是 printf 的补零宽度，译文写成 "%2" 出来会少一个前导零。
+   所以 token 一律按字面取，%02 与 %2 必须报不一致。
+
+标签另算：比「轮廓」，即名字与数量，不比 <o:0xFF...> 里的颜色值（译文
+可以换颜色）。<n> 与正文里的 " | " 是同一个换行，比对时算同一种 ——
+否则「原文写 |、译文写 <n>」会被判成擅自加标签。译文自身不再接受裸 `|`，
+换行统一写 <n>。
+"""
+import re
+from collections import Counter
+
+#: 脚本变量 @前缀$变量名$ —— 首尾两个 $ 都是必需的。
+#: 实测 3548 条原文里共 770 处引用，**770 处全部带尾 $，零例外**，
+#: 所以这里用必需的 $ 而不是 \$? —— 漏掉尾 $ 必须报错，不能静默放过。
+#: 比对时用**完整 token**：@P$TeacherName$ 与 @N$TeacherName$ 是两个
+#: 不同的引用（同一变量名配不同前缀），别只比变量名。
 RE_SCRIPT = re.compile(r"@[A-Za-z]\$[A-Za-z_][A-Za-z_0-9]*\$")
-RE_POS = re.compile(r"%\d+")
-RE_PAD = re.compile(r"%(0?\d+)%(?!\d)")
-RE_FONT = re.compile(r"<f:[^>]*>")
-RE_TAG = re.compile(r"<[^>]*>")
+
+#: 任何排版标签（剥标签用）。含 <f:fonts\A.res> 这类字体标记 ——
+#: 不剥它，全量里 67 条会被误认成占位符。
+RE_TAG_ALL = re.compile(r"</?[a-zA-Z][^>]*>")
+
+#: 位置参数（查找用）。剥标签时已用空格隔开紧邻情况，所以可以直接查。
+#: %0* 这段是为了让 "%02u" 整段作为一个 token 取出（"%02"），**不是**
+#: 为了归一成 "%2" —— 前导零要原样保留，见模块注释第 2 条。
+RE_POS = re.compile(r"%0*\d+")
+
+#: 轮廓里认的标签名（<o:0xFFF2FAAD>、<ts:175> 取冒号前的部分）。
+TAG_NAMES = ("n", "o", "f", "t", "c", "tc", "ts")
+
+#: 正文里的段落/换行分隔符（" | "）。排除 <|> 里的字面竖线。
+RE_PIPE_BREAK = re.compile(r"(?<!<)\s*\|\s*(?!>)")
+
+#: 未翻译条目的占位文本形态：8 位 hash + 竖线（编译时据此跳过校验）。
 RE_PLACEHOLDER = re.compile(r"^0x[0-9a-f]{8} \| ", re.I)
+
+#: 宽松版：原文里的 hash 有时被截成 6~7 位，还带空格。
+PH_RE = re.compile(r"^\s*0x[0-9a-fA-F]{6,8}\s*\|")
 
 
 def tokens(text):
-    text = RE_FONT.sub("", text)
-    text = RE_TAG.sub("", text)
-    text = RE_PAD.sub(r"%\1", text)
-    return set(RE_SCRIPT.findall(text)) | set(RE_POS.findall(text))
+    """占位符集合，**按字面**取（%02 与 %2 不同）。顺序不管，各语言语序不同。"""
+    if text is None:
+        return set()
+    t = RE_TAG_ALL.sub(" ", str(text))
+    out = set(RE_SCRIPT.findall(t))
+    out |= set(RE_POS.findall(t))
+    return out
 
 
 def tag_counts(text):
-    text = RE_FONT.sub("", text)
-    return {tag: text.count(tag) for tag in set(RE_TAG.findall(text))}
+    """各标签出现次数。<n> 与正文里的 " | " 都记为 "|"。
+
+    逐个 <...> 取，不靠一条大的名字正则：连续标签（<n><n>）会被
+    `<n[^>]*>` 这类写法吞成一整段，拼出 "n><n" 这种不存在的名字
+    （旧编辑器里的 tag_profile 正是这个毛病）。
+    """
+    t = str(text or "")
+    c = Counter()
+    for m in RE_TAG_ALL.finditer(t):
+        raw = m.group(0)                        # <n> / </c> / <o:0xFFF2FAAD>
+        closing = raw.startswith("</")
+        name = raw[2 if closing else 1:].split(">")[0].split(":")[0].strip().lower()
+        if name not in TAG_NAMES:
+            continue
+        if name == "n" and not closing:
+            c["|"] += 1
+            continue
+        c[("/" if closing else "") + name] += 1
+    c["|"] += len(RE_PIPE_BREAK.findall(t))
+    return c
 
 
-def check_text(text, english):
-    """Return UI-ready issues: [{'level': 'error'|'warn', 'text': ...}]."""
-    out = []
+def tag_profile(text):
+    """标签轮廓：把 tag_counts 展开成排序后的名字列表，便于整体比对。"""
+    if text is None:
+        return []
+    return sorted(tag_counts(text).elements())
+
+
+def is_placeholder(text):
+    return bool(RE_PLACEHOLDER.match(text or ""))
+
+
+#: 英文原文是开发残留标识符（`IDM_CONTEST_01_2004_LOG_06_TEXT` 这类）。
+#: 这些键的英文侧从来不是句子，占位符、标签的比对都没有基准 ——
+#: 德语零售版里 `LOG_06_TEXT` 带 `@g$PirateGold$`，中文照译就会被判成
+#: 「多了占位符」「模板不一致」。只认「首字母大写 + 全大写 ASCII/数字/下划线
+#: 且够长」，不猜别的形状，短标签（OK／CTRL）不会落进来。
+RE_IDENTIFIER = re.compile(r"^[A-Z][A-Z0-9_]{7,}$")
+
+
+def is_identifier(text):
+    """原文是不是开发残留标识符。是则跳过「拿原文当模板」的比对。"""
+    return bool(RE_IDENTIFIER.match(str(text or "")))
+
+
+def has_bare_pipe(text):
+    """是否还有旧写法 `|` 换行（`<|>` 这种字面竖线不算）。
+
+    旧版编译会把它自动改成 `<n>`；现在不再兜底，源文件里出现就当错误，
+    免得“看起来是换行、游戏里却显示竖线”这种静默差异。
+    """
+    return bool(RE_PIPE_BREAK.search(str(text or "")))
+
+
+#: 消息按界面语言分表。规则只有一份，措辞才分语言。
+MESSAGES = {
+    "en": {
+        "empty": "Empty; the game will show English.",
+        "placeholder": "Untranslated placeholder.",
+        "missing": "Missing placeholder(s): %s",
+        "extra": "Extra placeholder(s): %s",
+        "extra_tag": "Extra tag: %s",
+        "missing_tag": "Missing tag: %s",
+        "bare_pipe": "Contains a bare |; use <n> for line breaks",
+    },
+    "zh": {
+        "empty": "这一条是空的（游戏里显示英文）",
+        "placeholder": "还没翻（仍是占位文本）",
+        "missing": "译文少了占位符：%s（游戏里会显示成字面量）",
+        "extra": "译文多了占位符：%s（确认是刻意为之的话可忽略）",
+        "extra_tag": "译文擅自新增标签 %s（换行只允许 <n>）",
+        "missing_tag": "标签比原文少：%s",
+        "bare_pipe": "译文含未转换的 |（换行请用 <n>）",
+    },
+}
+
+
+def check_text(text, english, lang="en"):
+    """比对一条译文，返回 [{level, text}]，level 为 error 或 warn。
+
+    【少 = 警告，多 = 错误】两种都会让引擎出乱码，但性质不同：
+      * 少了：多半是手滑漏掉，改回来就行；
+      * 多了：可能是刻意的 —— 原文是字面数字（"a discount of 5%"），
+        译文改用 %1 动态传参完全合理，实测已有译文这么干。
+    所以只报，不自动改，判断权交给译者。
+    """
+    msg = MESSAGES.get(lang) or MESSAGES["en"]
     if not text:
-        return [{"level": "warn", "text": "Empty; the game will show English."}]
-    if RE_PLACEHOLDER.match(text):
-        return [{"level": "warn", "text": "Untranslated placeholder."}]
+        return [{"level": "warn", "text": msg["empty"]}]
+    if PH_RE.match(text):
+        return [{"level": "warn", "text": msg["placeholder"]}]
+    # 开发标识符占位（`IDM_CONTEST_01_2004_LOG_00_TEXT`）：英文原文就是这串，
+    # 译文原样照抄时不能算「已翻译」—— 玩家会直接看到标识符。
+    # 只判「与原文逐字相同」，避免误伤 OK／ESC／F1 这类本来就该照抄的短标签
+    # （它们的原文同样不是句子，但长度不够进 is_identifier）。
+    if is_identifier(text) and str(text) == str(english or "").strip():
+        return [{"level": "error", "text": msg["placeholder"]}]
+
+    out = []
+    if has_bare_pipe(text):
+        out.append({"level": "error", "text": msg["bare_pipe"]})
     a, b = tokens(english), tokens(text)
-    missing, extra = a - b, b - a
-    if missing:
+    if a - b:
         out.append({"level": "warn",
-                    "text": "Missing placeholder(s): " + " ".join(sorted(missing))})
-    if extra:
+                    "text": msg["missing"] % " ".join(sorted(a - b))})
+    if b - a:
         out.append({"level": "error",
-                    "text": "Extra placeholder(s): " + " ".join(sorted(extra))})
+                    "text": msg["extra"] % " ".join(sorted(b - a))})
+
     ta, tb = tag_counts(english), tag_counts(text)
     for tag in sorted(set(ta) | set(tb)):
-        if tb.get(tag, 0) > ta.get(tag, 0):
-            out.append({"level": "error", "text": "Extra tag: " + tag})
-        elif tb.get(tag, 0) < ta.get(tag, 0):
-            out.append({"level": "warn", "text": "Missing tag: " + tag})
+        if tb[tag] > ta[tag]:
+            out.append({"level": "error", "text": msg["extra_tag"] % tag})
+        elif tb[tag] < ta[tag]:
+            out.append({"level": "warn", "text": msg["missing_tag"] % tag})
     return out

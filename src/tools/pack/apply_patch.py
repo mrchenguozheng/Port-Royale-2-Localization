@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """apply_patch.py —— 开发流程用：一条命令把当前译文构建并打补丁到游戏目录。
 
-做四件事，任何一步失败就停：
+做三件事，任何一步失败就停：
 
-1. 归一化译文（normalize_text）
-2. 校验换行/占位符（check_breaks --strict）
-3. 编译语言包 + 字体（compile_pack）
-4. 复制到游戏目录并核对（deploy + SHA-256 比对）
+1. 校验换行/占位符（check_breaks --strict）
+2. 编译语言包 + 字体（compile_pack，排版规则在编译期套用）
+3. 复制到游戏目录并核对（deploy + SHA-256 比对）
+
+归一化标点是单独的手工步骤（`text/normalize_text.py`），不在这条命令里：
+它会改译文文件，构建只读译文。
 
 用法
 ----
@@ -34,7 +36,7 @@ sys.path.insert(0, HERE)
 from install import pr2ctl as B  # noqa: E402
 from build_artifacts import compile_pack  # noqa: E402
 
-PACK_OUT = os.path.join(ROOT, "build", "PR2Packs")
+PACK_OUT = os.path.join(ROOT, "build", "runtime", "PR2Localization", "packs")
 
 
 def sha256(path):
@@ -82,29 +84,18 @@ def pick_game_dir(explicit):
     for d in cand:
         if d and B.is_game_dir(d):
             return d
-    sys.exit("找不到游戏目录：用 --game-dir 指定，或先在 start.bat 里选一次。")
-
-
-def spacy_python():
-    explicit = os.environ.get("PR2_SPACY_PYTHON")
-    if explicit:
-        return explicit
-    local = os.path.join(ROOT, ".venv-spacy", "Scripts", "python.exe")
-    return local if os.path.isfile(local) else ""
+    sys.exit("找不到游戏目录：用 --game-dir 指定一次，会被记住。")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--langs", default="", help="逗号分隔，默认 ja,zh")
     ap.add_argument("--game-dir", default="", help="游戏目录（含 PR2.exe）")
-    ap.add_argument("--no-normalize", action="store_true", help="跳过 normalize_text")
     ap.add_argument("--no-check", action="store_true", help="跳过 check_breaks")
     ap.add_argument("--no-fonts", action="store_true", help="编译时不重裁字体")
     ap.add_argument("--launch", action="store_true", help="部署完成后启动游戏")
     ap.add_argument("--locale", default="",
                     help="部署后把游戏语言设为该代码（默认保持现有 locale.ini）")
-    ap.add_argument("--dep", action="store_true",
-                    help="中文：用依存句法给 ≥60 字的段落补空格（需要 .venv-spacy）")
     ap.add_argument("--dry-run", action="store_true", help="只打印计划，不写文件")
     args = ap.parse_args()
 
@@ -126,7 +117,7 @@ def main():
         print("\n[计划] deploy -> %s（复制 %s）" % (target, "、".join(langs)))
         return 0
 
-    # 1) 校验 + 编译（live/ 是编辑器直接维护的文本，构建不再改写它）
+    # 1) 校验 + 编译（translations/ 是唯一手改层，构建不再回写它）
     for lang in langs:
         if not args.no_check:
             run("校验换行 %s" % lang,
@@ -136,10 +127,10 @@ def main():
                         on_line=print) != 0:
             sys.exit("[失败] 编译 %s" % lang)
 
-    # 2) 注入器产物必须已在 build\ 里
-    missing = [n for n in B.FLAT_FILES if not os.path.isfile(os.path.join(ROOT, "build", n))]
+    # 2) 注入器产物必须已在 build\runtime\ 里
+    missing = [n for n in B.FLAT_FILES if not os.path.isfile(os.path.join(B.RUNTIME, n))]
     if missing:
-        sys.exit("缺少注入器产物：%s\n先运行 build_injector.bat（需要 Visual Studio）。"
+        sys.exit("缺少注入器产物：%s\n先运行 src\\build_injector.ps1（需要 Rust rustup + i686-pc-windows-msvc）。"
                  % "、".join(missing))
 
     # 3) 部署
@@ -150,12 +141,18 @@ def main():
     print("   " + msg.replace("\n", "\n   "))
 
     # 4) locale.ini：默认不动，只有显式 --locale 才改
-    ini = os.path.join(target, B.PACK_DIR, "locale.ini")
     if args.locale:
         B.set_game_language(target, args.locale)
         primary = args.locale
     else:
-        primary = B.read_ini_language(ini) or B.get_language() or langs[0]
+        primary = B.read_locale_language(target)
+        has_locale = (
+            os.path.isfile(os.path.join(target, B.PACK_DIR, B.LOCALE_FILE))
+            or os.path.isfile(os.path.join(target, B.PACK_DIR,
+                                          B.LOCALE_DEFAULT_FILE))
+        )
+        if primary is None and not has_locale:
+            primary = B.get_language() or langs[0]
         print("   保持游戏语言：%s（要改加 --locale <代码>）" % (primary or "（空）"))
 
     # 5) 比对：构建产物 vs 游戏目录里实际文件
@@ -165,15 +162,15 @@ def main():
         src = os.path.join(PACK_OUT, "%s.txt" % lang)
         dst = os.path.join(target, B.PACK_DIR, "%s.txt" % lang)
         same = sha256(src) == sha256(dst) and os.path.isfile(dst)
-        print("   %-24s %s" % ("PR2Packs\\%s.txt" % lang, "一致" if same else "不一致"))
+        print("   %-24s %s" % ("PR2Localization\\packs\\%s.txt" % lang, "一致" if same else "不一致"))
         bad += 0 if same else 1
     for name in B.FLAT_FILES:
-        src = os.path.join(ROOT, "build", name)
+        src = os.path.join(B.RUNTIME, name)
         dst = os.path.join(target, name)
         same = sha256(src) == sha256(dst)
         print("   %-24s %s" % (name, "一致" if same else "不一致"))
         bad += 0 if same else 1
-    print("   %-24s %s" % ("locale.ini language", B.read_ini_language(ini) or "（空）"))
+    print("   %-24s %s" % ("locale language", B.read_locale_language(target) or "（空）"))
     if bad:
         sys.exit("\n[失败] %d 个文件与构建产物不一致" % bad)
 

@@ -1,0 +1,21 @@
+[package]
+name = "pr2_launcher"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "PR2Localization"
+path = "src/main.rs"
+
+[dependencies]
+pr2_common = { path = "../pr2_common" }
+sha2 = "0.11"
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Console",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+] }

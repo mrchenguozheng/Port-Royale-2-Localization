@@ -2,7 +2,7 @@
 """build_artifacts.py —— 构建语言包产物的统一入口。
 
 目前只收口最常重复的一步：在子进程里调用 compile_pack.py。
-字体仍由调用方按场景选择（发行用 Noto，本机开发用缝合）。
+字体只做映射：用 Noto 替换字体（mode = noto），不再缝合原版字体。
 """
 import os
 import subprocess
@@ -12,7 +12,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 COMPILE = os.path.join(HERE, "compile_pack.py")
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 BUILD = os.path.join(ROOT, "build")
-FONT_DIR = os.path.join(BUILD, "fonts")
+RUNTIME = os.path.join(BUILD, "runtime")
+FONT_DIR = os.path.join(RUNTIME, "PR2Localization", "fonts")
 
 
 def _line(raw):
@@ -36,19 +37,17 @@ def run_stream(cmd, on_line=None, env=None):
 
 
 def compile_pack(lang, out_dir, no_fonts=True, on_line=None, env=None):
-    """把一个语言编成 PR2Packs/<lang>.txt；返回退出码。"""
+    """把一个语言编成 PR2Localization\\packs\\<lang>.txt；返回退出码。"""
     cmd = [sys.executable, COMPILE, "--lang", lang, "--out", out_dir]
     if no_fonts:
         cmd.append("--no-fonts")
     return run_stream(cmd, on_line=on_line, env=env)
 
 
-def build_fonts(langs, out_dir=None, mode="stitch", log=None, force=False, cache=True):
-    """生成字体：mode = stitch（本机开发）| noto（发行）。
+def build_fonts(langs, out_dir=None, mode="noto", log=None, cache=True):
+    """生成字体：mode = noto（替换字体，唯一方式）| none（跳过）。
 
-    stitch 输出到 <out_dir>/<语言>/，与 subset_fonts 一致；
-    noto 也输出到 <out_dir>/<语言>/，与发行包布局一致。
-    返回 (ok, message)。
+    输出到 <out_dir>/<语言>/，与发行包布局一致。返回 (ok, message)。
     """
     log = log or (lambda m: None)
     langs = list(langs or [])
@@ -56,19 +55,23 @@ def build_fonts(langs, out_dir=None, mode="stitch", log=None, force=False, cache
         return True, "跳过字体"
     if not langs:
         return False, "没有语言"
+    if mode != "noto":
+        return False, "不支持的字体模式：%s（只支持 noto / none）" % mode
 
     font_tools = os.path.join(ROOT, "src", "tools", "font")
     if font_tools not in sys.path:
         sys.path.insert(0, font_tools)
 
-    if mode == "noto":
-        import make_noto_fonts
-        for lang in langs:
-            dst = os.path.join(out_dir or FONT_DIR, lang)
-            log("生成 Noto 替换字体 %s …" % lang)
-            make_noto_fonts.ensure_noto_fonts(lang, dst, log=log, cache=cache)
-        return True, "Noto 字体：%s" % "、".join(langs)
-
-    import subset_fonts
-    return subset_fonts.ensure_fonts(
-        out_dir=out_dir or FONT_DIR, langs=langs, log=log, force=force)
+    import make_noto_fonts
+    import build_cyr_fonts
+    for lang in langs:
+        dst = os.path.join(out_dir or FONT_DIR, lang)
+        if lang == "ru":
+            log("生成俄语字体 %s …（正文 Liberation Sans，标题 Noto Serif 压缩）" % lang)
+            ok, msg = build_cyr_fonts.build(dst, log=log)
+            if not ok:
+                return False, msg
+            continue
+        log("生成 Noto 替换字体 %s …" % lang)
+        make_noto_fonts.ensure_noto_fonts(lang, dst, log=log, cache=cache)
+    return True, "字体：%s" % "、".join(langs)

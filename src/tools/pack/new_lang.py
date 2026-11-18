@@ -6,7 +6,7 @@
 
 **加一种语言就是复制 en.gog_1.1.2.3.toml 再逐条改译文**，所以本脚本只做这一件事：
 
-    src/orig/en.gog_1.1.2.3.toml  ->  src/live/<代码>.toml
+    src/orig/en.gog_1.1.2.3.toml  ->  src/translations/<代码>.toml
 
 复制出来的每一行右边都是英文原文，也就是「未译」状态。逐条把右边改成
 译文即可；没改的那些游戏里就显示英文。
@@ -24,7 +24,7 @@
 
 不带参数时走这条路，从 `editor/data/editor-data.json` 重新生成
 en / fr / zh 三份文件。只在初次建立或**换游戏版本**（英法原文变了）时用。
-日常改译文直接编辑 `src/live/<语言>.toml`，不要跑它
+日常改译文直接编辑 `src/translations/<语言>.toml`，不要跑它
 —— 它会用旧数据覆盖你的改动。
 """
 
@@ -42,15 +42,17 @@ ROOT = os.path.dirname(SRC)                     # 仓库根
 sys.path.insert(0, HERE)
 
 REF_JSON = os.path.join(ROOT, "editor", "data", "editor-data.json")
-ZH_TXT = os.path.join(ROOT, "build", "PR2Packs", "zh.txt")
-STRINGS = os.path.join(SRC, "live")
+ZH_TXT = os.path.join(ROOT, "build", "runtime", "PR2Localization", "packs", "zh.txt")
+STRINGS = os.path.join(SRC, "translations")
 #: 只读参考（英/法/中文文本源）在 src\references\
 REFS = os.path.join(SRC, "orig")
 #: 基准语言：id 顺序以它为准，且 write-toml 拒写它
 #: 文件名带来源与版本：references\en.gog_1.1.2.3.toml
 BASE = "en.gog_1.1.2.3"
 #: 只读参考语言：英法原文，不参与编辑，也不生成语言包
-REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42")
+REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42",
+                   "de.retail-1.0.0", "es.retail-1.0.0",
+                   "pl.retail-1.0.0", "ru.retail-1.0.0")
 
 #: 未翻译时的占位译文：hash | 英文前 N 个**单词**
 PLACEHOLDER_WORDS = 10
@@ -171,18 +173,6 @@ def new_lang(code, source=None):
         f.write(txt)
     print("已复制 %s -> %s（%d 条）" % (spath, dpath, txt.count("\n")))
     print("接下来把每行右边的原文改成译文；没改的会显示英文。")
-    try:
-        fdir = os.path.join(TOOLS, "font")
-        if fdir not in sys.path:
-            sys.path.insert(0, fdir)
-        import subset_fonts
-        info = subset_fonts.add_language_presets(code, src.split(".")[0])
-        if info.get("added"):
-            print("已生成字体配置：%s（模板 %s）" % (info["path"], info["source"]))
-        else:
-            print("字体配置已存在：%s" % info["path"])
-    except Exception as exc:
-        print("字体配置未生成：%s" % exc)
     return 0
 
 

@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = [
+    "pr2_common",
+    "pr2_text_source",
+    "pr2_launcher",
+    "pr2_launcher_gui",
+    "pr2_proxy",
+    "pr2_host_proxy",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

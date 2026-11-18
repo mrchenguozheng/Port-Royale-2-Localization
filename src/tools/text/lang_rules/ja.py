@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""日文规则（标点 + 可选助词空格）。"""
+"""日文规则：标点 + 分词器 + 补空格策略（三段式接口见 lang_rules/spec.py）。"""
 
 import re
 
 from . import base
+from . import spec as S
 
 LANG = "ja"
 
@@ -36,9 +37,32 @@ SPLIT_RX = re.compile(r"(<[^<>]*>|@[A-Za-z]\$[^$]*\$|%[0-9A-Za-z]+)")
 NO_SPACE_AFTER = "、。！？…：；～—」』）"
 IDIOM_TAIL = ("つい", "つき", "よっ", "より", "とっ", "おい", "かか", "わた",
               "対", "伴", "応", "関", "際", "先立", "向け", "通じ", "基づ",
-              "限", "代わ", "加え", "従", "即", "照", "いう", "いっ")
+              "限", "代わ", "加え", "従", "即", "照", "いう", "いっ",
+              # 「〜にある」「〜がいる」「〜がない」这类存在句/否定，助词后不留在断点，
+              # 否则会出现「北の島に あるポートロワイヤル」这种切开惯用搭配的写法。
+              "ある", "いる", "ない")
 
 _TOK = None
+
+
+class _Tagger:
+    """形态素分析器：janome → fugashi → 无。`tag()` 统一成 [(surface, pos)]。"""
+
+    def __init__(self, name, tok=None):
+        self.name = name
+        self.tok = tok
+
+    def tag(self, text):
+        if self.name == "janome":
+            return [(t.surface, t.part_of_speech) for t in self.tok.tokenize(text)]
+        if self.name == "fugashi":
+            out = []
+            for w in self.tok(text):
+                f = w.feature
+                pos = getattr(f, "pos1", "") or (f[0] if isinstance(f, (list, tuple)) else "")
+                out.append((w.surface, pos))
+            return out
+        return None
 
 
 def _tagger():
@@ -47,17 +71,17 @@ def _tagger():
         return _TOK
     try:
         from janome.tokenizer import Tokenizer
-        _TOK = ("janome", Tokenizer())
+        _TOK = _Tagger("janome", Tokenizer())
         return _TOK
     except Exception:
         pass
     try:
         import fugashi
-        _TOK = ("fugashi", fugashi.Tagger())
+        _TOK = _Tagger("fugashi", fugashi.Tagger())
         return _TOK
     except Exception:
         pass
-    _TOK = ("none", None)
+    _TOK = _Tagger("none")
     return _TOK
 
 
@@ -66,10 +90,10 @@ def space_particles(text):
     return JA_PART_RX.sub(lambda m: m.group(1) + " ", text)
 
 
-def space_particles_analyzer(text):
+def space_particles_analyzer(text, tagger=None):
     """形态素版：只给「名词/代词/数词 + 助词」补空格；不可用时退回正则。"""
-    kind, tok = _tagger()
-    if kind == "none":
+    tok = tagger or _tagger()
+    if tok.name == "none":
         return space_particles(text)
     out = []
     for part in SPLIT_RX.split(text):
@@ -85,14 +109,7 @@ def space_particles_analyzer(text):
             out.append(part)
             continue
         part = core
-        if kind == "janome":
-            toks = [(t.surface, t.part_of_speech) for t in tok.tokenize(part)]
-        else:
-            toks = []
-            for w in tok(part):
-                f = w.feature
-                pos = getattr(f, "pos1", "") or (f[0] if isinstance(f, (list, tuple)) else "")
-                toks.append((w.surface, pos))
+        toks = tok.tag(part) or []
         res = []
         for i, (surf, pos) in enumerate(toks):
             res.append(surf)
@@ -119,11 +136,55 @@ def space_particles_analyzer(text):
     return "".join(out)
 
 
-def normalize(text, particles=False, date_format=False):
-    """标点 → 占位符 → <n>，日文的完整规范化。particles=True 时先补助词空格。"""
-    if particles:
-        text = space_particles_analyzer(text)
+def normalize_punct(text, date_format=False):
+    """标点 → 占位符 → <n>，不含助词空格。"""
     text = base.fix_ascii_punct(text, ASCII, CJK_RX)
     if date_format:
         return base.clean_n(FMT(text))
     return base.clean_n(base.fix_vars(FMT(text), PUNCT_CHARS, CJK_RX))
+
+
+def normalize(text, particles=False, date_format=False):
+    """兼容旧调用：particles=True 时先补助词空格。新代码请用 spec() 的补空格策略。"""
+    if particles:
+        text = space_particles_analyzer(text)
+    return normalize_punct(text, date_format=date_format)
+
+
+class JaSegmenter(S.Segmenter):
+    """日文分词器：janome → fugashi → 无（无分词器时助词空格退回正则版）。"""
+
+    def __init__(self):
+        self.name = _tagger().name
+
+    def tag(self, text):
+        return _tagger().tag(text)
+
+
+class JaParticleSpacing(S.Spacing):
+    """日文补空格：形态素判「名詞/代名詞/数詞 + 助詞」，在助词后加一格。
+
+    它必须发生在标点规范化**之前**（`pre_punct`）：标点自己也会加空格，
+    顺序反了会和标点空格互相干扰。
+    """
+
+    mode = "particle"
+
+    def __init__(self, segmenter):
+        self.segmenter = segmenter
+
+    def pre_punct(self, text):
+        return space_particles_analyzer(text, self.segmenter)
+
+
+def spec():
+    """给 engine_text / apply_*_rules 用的语言声明。"""
+    seg = JaSegmenter()
+    return S.LangSpec(
+        code=LANG,
+        punct=S.Punctuation(normalize_punct, {"lang": LANG, **PUNCT}),
+        segmenter=seg,
+        spacing=JaParticleSpacing(seg),
+    )
+
+

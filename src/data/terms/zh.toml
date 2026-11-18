@@ -1,0 +1,64 @@
+# 术语锁定：<语言>_<原词> → 该语言译词。
+#
+# 键一律 ASCII 小写、以语言前缀开头（en_ / de_ / fr_），原形大小写与重音写在注释里。
+# 英文词只收「同一语境里只有一个义项」的；同词两义改用**把义项分开的那门参考语言**
+# 做键 —— 哪门语言分得开就用哪门，分不开的不进表。
+#
+# 用法：译文里写 [term:en_business]，展开查这张表；查不到直接 MarkError，构建失败。
+
+en_business = "产业"        # en: business / businesses
+en_tools    = "工具"        # en: tools
+
+# General：英文两义，德语分开（Allgemein / General）；法语两处都是 Général，帮不上忙。
+# 设置页 0xd1b2a54f 德语 Allgemein
+de_allgemein = "常规"
+# 人物头衔 0xf3da810c / 0x070bef26 德语 General
+de_general   = "将军"
+
+# normal：德语两处都是 normal；法语分开（normal / Medium）。
+# 0x00c0bb39 法语 normal
+fr_normal = "正常"
+# 0x28ef24c1 法语 Medium（画质三档的中档）
+fr_medium = "中"
+
+# Wealth：德语两处都是 Wohlstand；法语分开（Aisé / Fortune）。
+# 0xd2d0a578 城镇状态 法语 Aisé
+fr_aise    = "富裕"
+# 0xfaa28418 统计项 法语 Fortune
+fr_fortune = "财富"
+
+# Normal（0x02e0acdf 难度中档 / 0x22385c1c 夹在 Ship 与 Gold 之间）：
+# 德语、法语两处都写作 Normal，没有任何参考语言把这两个义项分开，因此不进本表——
+# 不给它自造义项名。判读见 09 卷第三十节。
+
+# ---- 定夺过、但仍可能被后来者改回去的三条（297 批） ----
+
+# en: plague of rats。7 条全译「鼠患」，不写「鼠疫」。注意与 plague（瘟疫）是两个概念：
+# 0xe53c68dd 鼠患 / 0xcb9b3a82 鼠患爆发 / 0xd1afec1a %1爆发鼠患
+en_plague_of_rats  = "鼠患"
+
+# en: quality of life。11 条全译「生活品质」，不写「生活质量」（全表 0 处）。
+# 0xdacb8ff6 你城镇的生活品质 / 0xc88c67fb 与 0xc557fe31 句中使用
+en_quality_of_life = "生活品质"
+
+# en: Accuracy。船长四项技能之一（Trading experience / Accuracy / Charisma /
+# Swordsmanship）@0x31b9fe94，德语 Treffsicherheit 对得上，法语作 Militaire 属偏离、
+# 记不改。锁「精准」，不写「准确度」（「准确」7 处都是罗盘、方位、位置，另一个词）。
+en_accuracy        = "精准"
+
+# ---- 核心概念（第 322 批补）----
+# 都是「同一语境里只有一个义项」的词，且全表译法已统一。括号里是启用时的实测覆盖率：
+# 英文锚词出现的条目里，有多少条用了这个译法。没到 100% 的几条缺的都是占位符
+# （`@T$Town$` 这类地名占位在中文里只留占位、不重复写「城镇」），不是解释成别的词。
+
+en_pirate      = "海盗"      # pirate / pirates，143/143
+en_governor    = "总督"      # governor / governors，110/110
+en_warehouse   = "仓库"      # warehouse，59/59
+en_colony      = "殖民地"    # colony / colonies，9/9
+en_convoy      = "船队"      # convoy / convoys，394/396（缺 2 条是纯占位地名）
+en_buccaneer   = "私掠者"    # buccaneer，62/64（另 2 条指私掠许可证，另一概念）
+en_captain     = "船长"      # captain，112/113
+en_sailor      = "水手"      # sailor / sailors，39/40
+en_hideout     = "藏身处"    # hideout，游戏对象义；「藏身之处」这类散文用法不算
+en_trade_route = "贸易路线"  # trade route，27→30 条（第 322 批把 3 条「贸易航线」并入）
+en_market      = "市场"      # market / marketplace，34→42 条（第 322 批把 8 条市集／集市并入）

@@ -1,0 +1,111 @@
+# 中文译名表。键与 src/data/names/entities.toml 一致。
+# 值写成英文原文本身 = 决定不译（例如厂商名）。
+# 需要词形变化的语言在这里加形态，中文只用 default。
+
+["Port Royale"]
+default = "皇家港"
+
+["Charleston"]
+default = "查尔斯顿"
+
+["Charles Towne"]
+default = "查尔斯陶恩"
+
+["Tortuga"]
+default = "托尔图加"
+
+["Cartagena"]
+default = "卡塔赫纳"
+
+["Havana"]
+default = "哈瓦那"
+
+["Margarita"]
+default = "玛格丽塔"
+
+["Miles Sound System"]
+default = "Miles Sound System"
+
+["Port Royal"]
+default = "皇家港"
+
+["Guadeloupe"]
+default = "瓜德罗普"
+
+["Biloxi"]
+default = "比洛克西"
+
+["St. Augustine"]
+default = "圣奥古斯丁"
+
+["Grand Bahama"]
+default = "大巴哈马"
+
+["Turk Islands"]
+default = "特克群岛"
+
+["Corpus Christi"]
+default = "科珀斯克里斯蒂"
+
+["New Orleans"]
+default = "新奥尔良"
+
+["Pensacola"]
+default = "彭萨科拉"
+
+["Fort Caroline"]
+default = "卡罗琳堡"
+
+["Cancun"]
+default = "坎昆"
+
+["Gibara"]
+default = "吉巴拉"
+
+["San Juan"]
+default = "圣胡安"
+
+["Vera Cruz"]
+default = "韦拉克鲁斯"
+
+["Roatán"]
+default = "罗阿坦"
+
+["Cayman"]
+default = "开曼"
+
+["Santo Domingo"]
+default = "圣多明各"
+
+["Providence"]
+default = "普罗维登斯"
+
+["Santa Marta"]
+default = "圣玛尔塔"
+
+["Maracaibo"]
+default = "马拉开波"
+
+["Caracas"]
+default = "加拉加斯"
+
+["Port of Spain"]
+default = "西班牙港"
+
+["Gibraltar"]
+default = "直布罗陀"
+
+["San Thoma"]
+default = "圣托马斯"
+
+["Martinique"]
+default = "马提尼克"
+
+["Tampa"]
+default = "坦帕"
+
+["Eleuthera"]
+default = "伊留瑟拉"
+
+["Tampico"]
+default = "坦皮科"

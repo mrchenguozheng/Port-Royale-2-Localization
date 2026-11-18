@@ -10,7 +10,7 @@
 
 **生成物不进仓库**：表是从 terms.toml + translations\\ 现算出来的，
 改了译文重新跑一次就同步；提交进 git 只会多一份会过期的副本。
-默认写到 build\\glossary\\（和语言包、字体一样属于产物）。
+默认写到 build\\preview\\glossary\\（和语言包、字体一样属于产物）。
 
 数据从哪来
 ----------
@@ -42,14 +42,19 @@ SRC = os.path.dirname(HERE)
 ROOT = os.path.dirname(SRC)
 GLOSSARY = os.path.join(ROOT, "glossary")
 TERMS = os.path.join(GLOSSARY, "terms.toml")
-OUT_DIR = os.path.join(ROOT, "build", "glossary")
+OUT_DIR = os.path.join(ROOT, "build", "preview", "glossary")
 
 sys.path.insert(0, HERE)
 import translate as T          # 复用语言列表与基准文件，别再抄一份规则
 
 #: 表头里用的语言显示名（代码 -> 中文名），以后加语言在这里补一行。
 LANG_NAMES = {"zh": "中文", "ja": "日本語", "fr": "法语", "test_en": "English",
-              "en.gog_1.1.2.3": "English", "fr.gog_1.1.2.42": "法语（原版）"}
+              "ko": "한국어",
+              "en.gog_1.1.2.3": "English", "fr.gog_1.1.2.42": "法语（原版）",
+              "de.retail-1.0.0": "德语（零售参考）",
+              "es.retail-1.0.0": "西语（零售参考）",
+              "pl.retail-1.0.0": "波兰语（零售参考）",
+              "ru.retail-1.0.0": "俄语（零售参考）"}
 
 
 def lang_name(code):
@@ -109,7 +114,7 @@ def render(target, target_doc, groups, en, others):
     lines.append("# 术语对照表（%s）" % lang_name(target))
     lines.append("")
     srcs = ["`src\\translations\\%s.toml`" % target]
-    srcs += ["`src\\references\\%s.toml`" % c for c, _l, _d in others]
+    srcs += ["`src\\orig\\%s.toml`" % c for c, _l, _d in others]
     lines.append("> 由 `src\\tools\\glossary.py` 生成，数据来自 %s。"
                  "改译文后重新生成，不要手改本文件。" % "、".join(srcs))
     lines.append("")
@@ -155,9 +160,9 @@ def main():
     ap.add_argument("--lang", action="append", default=[],
                     help="语言代码，可重复；默认所有可编辑语言")
     ap.add_argument("--with", dest="extra", action="append", default=[],
-                    help="并排对照的其它语言（默认带 references 里的法文原本）")
+                    help="并排对照的其它语言（默认只带英语/法语的原文参考）")
     ap.add_argument("--csv", action="store_true", help="同时导出 .csv")
-    ap.add_argument("--out", default=OUT_DIR, help="输出目录（默认 build\\glossary）")
+    ap.add_argument("--out", default=OUT_DIR, help="输出目录（默认 build\\preview\\glossary）")
     args = ap.parse_args()
 
     groups = load_terms()
@@ -170,7 +175,7 @@ def main():
     if not langs:
         raise SystemExit("translations\\ 下没有可编辑的译文")
 
-    extra_codes = args.extra or [c for c in T.REFERENCE_LANGS
+    extra_codes = args.extra or [c for c in T.PRIMARY_REFERENCE_LANGS
                                  if c != T.BASE_LANG and os.path.isfile(T.lang_path(c))]
     others = []
     for c in extra_codes:

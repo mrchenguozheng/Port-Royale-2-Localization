@@ -1,13 +1,25 @@
 name: Release
 
-# Only release-* tags trigger a build. Normal version tags such as v0.9.0 do not.
+# Tag release-v* on main builds and publishes the per-language GOG/Steam packages
+# listed in src/release-languages.txt. Manual runs build the same artifacts but
+# keep them as workflow artifacts. Tags must sit on main or release/*.
 on:
   push:
     tags:
       - "release-v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, for example v1.0.0"
+        required: true
+        default: "v1.0.0"
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 env:
   PYTHONUTF8: "1"
@@ -18,55 +30,143 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 需要完整历史：tag 校验要判断提交是否是 main / release/* 的祖先。
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install fontTools
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: i686-pc-windows-msvc
+
+      - name: Install Python dependencies
         run: python -m pip install --disable-pip-version-check fonttools
 
-      - name: Install Noto CJK fonts
+      - name: Download Noto variable fonts
         shell: pwsh
         run: |
           $dir = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts"
           New-Item -ItemType Directory -Force -Path $dir | Out-Null
           $fonts = @{
-            "NotoSansSC-VF.ttf"   = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
-            "NotoSerifSC-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf"
-            "NotoSansJP-VF.ttf"   = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf"
-            "NotoSerifJP-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf"
+            "NotoSansSC-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
+            "NotoSerifSC-VF.ttf" = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf"
+            "NotoSansJP-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf"
+            "NotoSerifJP-VF.ttf" = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf"
+            "NotoSansKR-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf"
+            "NotoSerifKR-VF.ttf" = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifkr/NotoSerifKR%5Bwght%5D.ttf"
           }
           foreach ($name in $fonts.Keys) {
-            Invoke-WebRequest -Uri $fonts[$name] -OutFile (Join-Path $dir $name)
+            $out = Join-Path $dir $name
+            curl.exe --fail --location --retry 3 --retry-delay 3 --silent --show-error --output $out $fonts[$name]
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $out) -or (Get-Item -LiteralPath $out).Length -lt 1024) {
+              throw "字体下载失败：$name"
+            }
+            Write-Host "$name $((Get-Item -LiteralPath $out).Length) B"
           }
 
-      - name: Build injector
-        shell: cmd
-        run: src\build_injector.bat --no-pause
+      - name: Derive version
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:EVENT_NAME -eq "workflow_dispatch") {
+            $version = $env:INPUT_VERSION
+          } elseif ($env:REF_NAME -match '^release-(v[0-9].*)$') {
+            $version = $Matches[1]
+          } else {
+            throw "无法从触发事件推导版本"
+          }
+          if ($version -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$') {
+            throw "版本号不合法：$version；应为 vMAJOR.MINOR.PATCH[-prerelease]"
+          }
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "VERSION=$version"
 
-      - name: Derive version from tag
+      - name: Verify the tagged commit is on the release line
+        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}".Replace("release-", "")
-          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          # 发版线只有 main 与 release/*；dev 上的 tag 不发布。
+          git fetch --no-tags origin "+refs/heads/*:refs/remotes/origin/*"
+          $sha = (git rev-parse HEAD).Trim()
+          $candidates = @(git for-each-ref --format='%(refname:short)' refs/remotes/origin) |
+            Where-Object { $_ -eq 'origin/main' -or $_ -match '^origin/release/' }
+          if (-not $candidates) {
+            throw "找不到 origin/main 或 origin/release/* 分支，无法校验 tag 来源"
+          }
+          foreach ($ref in $candidates) {
+            git merge-base --is-ancestor $sha $ref
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "tag 提交在 $ref 上：$sha"
+              exit 0
+            }
+          }
+          throw "tag 提交不在 origin/main 或 origin/release/* 上：$sha；请在 main 上打 tag"
 
-      - name: Build game packs
+      - name: Read release languages
+        shell: pwsh
         run: |
-          python src\tools\pack\make_release.py --lang zh --version $env:VERSION
-          python src\tools\pack\make_release.py --lang ja --version $env:VERSION
+          $list = Join-Path "src" "release-languages.txt"
+          $names = @()
+          foreach ($raw in Get-Content -LiteralPath $list -Encoding utf8) {
+            $line = ($raw -split '#', 2)[0].Trim()
+            if (-not $line) { continue }
+            $names += @($line -split '[,\s]+' | Where-Object { $_ })
+          }
+          $names = @($names | Select-Object -Unique)
+          if ($names.Count -eq 0) { throw "发行语言清单为空：$list" }
+          "LANGS=$($names -join ',')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "LANGS=$($names -join ',')"
 
-      - name: Build translator workbench
+      - name: Pin build time
+        shell: pwsh
         run: |
-          python src\tools\pack\make_translator.py --out "dist\PR2Translator-$env:VERSION"
-          Compress-Archive -Path "dist\PR2Translator-$env:VERSION\*" -DestinationPath "dist\PR2Translator-$env:VERSION.zip"
+          # 固定时间源：同一 tag 重建出的包逐字节相同，校验和可比对。
+          $epoch = (git log -1 --format=%ct).Trim()
+          "SOURCE_DATE_EPOCH=$epoch" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "SOURCE_DATE_EPOCH=$epoch"
 
-      - name: Publish release
+      - name: Build release packages
+        shell: pwsh
+        run: |
+          $langs = $env:LANGS -split ','
+          .\release.ps1 -Version $env:VERSION -Edition all -Lang $langs -NoPause
+
+      - name: Verify release assets
+        shell: pwsh
+        run: |
+          $langs = $env:LANGS -split ','
+          $expected = @()
+          foreach ($lang in $langs) {
+            $expected += "dist/PR2-$lang-gog-$env:VERSION.zip"
+            $expected += "dist/PR2-$lang-steam-$env:VERSION.zip"
+          }
+          $expected += "dist/SHA256SUMS.txt"
+          foreach ($path in $expected) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "缺少发行产物：$path" }
+          }
+          Get-Content -LiteralPath "dist/SHA256SUMS.txt" | ForEach-Object { Write-Host $_ }
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PR2-${{ env.VERSION }}
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/release-v')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            dist/PR2-zh-${{ env.VERSION }}.zip
-            dist/PR2-ja-${{ env.VERSION }}.zip
-            dist/PR2Translator-${{ env.VERSION }}.zip
+            dist/*.zip
+            dist/SHA256SUMS.txt

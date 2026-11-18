@@ -14,9 +14,23 @@ janome>=0.5.0
 fugashi>=1.5.2
 unidic-lite>=1.0.8
 
-# 字体裁剪（subset_fonts.py）。本机目前装在 WorkBuddy 的 Python 环境里，
-# 脚本会自动找到；想统一就装进主环境。
+# 韩语形态分析（text_lint.py --lang ko 的助词收音检查）。缺了只跳过该条检查，
+# 占位符后接助词那条纯正则，不依赖它：
+#   pip install kiwipiepy        # 0.24.x，Apache-2.0，随带约 100 MB 模型
+# 换 mecab-ko 也行，但 Windows 要自己编译引擎与词典，pip 装不了。
+
+# 字体生成与调整（make_noto_fonts.py / build_cyr_fonts.py / squeeze_fonts.py）。
+# 本机目前装在 WorkBuddy 的 Python 环境里，脚本会自动找到；想统一就装进主环境。
 fonttools>=4.0
 
-# 可选：space_words.py 给中文按词补空格
-# jieba
+# 中文分词（text/zh_space.py，构建期按词补空格用）。只有一个选择：spaCy。
+#   没有它会退回「按字数机械切」，照样能构建，只是可能切在词中间。
+#   装法（Python 3.9～3.13，仓库根的 .venv-spacy 会被自动发现）：
+#     python -m venv .venv-spacy
+#     .venv-spacy\Scripts\python -m pip install spacy
+#     .venv-spacy\Scripts\python -m spacy download zh_core_web_sm
+#
+# 【禁止】不要引入 jieba。它最后一次提交停在 2020-02-15，issues 累积 649 个、
+#   基本无人处理；把它当构建依赖，等于把中文分词锁在一个不再维护的词典上。
+#   理由与替代方案见 docs/构建与安装.md 的「不要用 jieba」一节。
+# spacy>=3.8

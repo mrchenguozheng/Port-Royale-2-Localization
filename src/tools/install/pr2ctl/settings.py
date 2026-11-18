@@ -2,7 +2,7 @@
 """pr2ctl.settings —— 记住游戏目录与上次选择。"""
 
 from .base import *  # noqa: F401,F403
-from .detect import read_ini_language, write_ini_language
+from .detect import read_locale_language, write_ini_language
 
 def settings_path():
     """设置文件：优先 %LOCALAPPDATA%，没有就放仓库 build\\ 下。"""
@@ -62,13 +62,16 @@ def set_game_language(target, code):
     if os.path.isdir(os.path.dirname(game_ini)):
         ok = write_ini_language(game_ini, code)
 
-    build_ini = os.path.join(BUILD, PACK_DIR, "locale.ini")
+    build_ini = os.path.join(PACK_OUT, "locale.ini")
     if os.path.isdir(os.path.dirname(build_ini)):
         write_ini_language(build_ini, code)
     return ok, code
 
 
 def game_language(target):
-    """游戏目录当前语言：优先 locale.ini，其次设置里记住的。"""
-    ini = os.path.join(target, PACK_DIR, "locale.ini")
-    return read_ini_language(ini) or get_language()
+    """游戏目录当前语言：活动文件/默认文件存在就以其为准，否则用记住的选择。"""
+    if (os.path.isfile(os.path.join(target, PACK_DIR, LOCALE_FILE))
+            or os.path.isfile(os.path.join(target, PACK_DIR,
+                                           LOCALE_DEFAULT_FILE))):
+        return read_locale_language(target) or ""
+    return get_language()

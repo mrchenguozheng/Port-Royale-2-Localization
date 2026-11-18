@@ -22,7 +22,7 @@ import tomllib
 TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, TOOLS)
 ROOT = os.path.dirname(os.path.dirname(TOOLS))
-TRANS = os.path.join(ROOT, "src", "live")
+TRANS = os.path.join(ROOT, "src", "translations")
 REF = os.path.join(ROOT, "src", "orig")
 
 TAG = re.compile(r"<[^>]*>|@[A-Za-z]\$[A-Za-z0-9_]+\$|%0?\d+[A-Za-z]?|%[A-Za-z]")

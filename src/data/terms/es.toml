@@ -1,0 +1,31 @@
+# 术语表骨架：由 table_sync 从 zh 生成，键集合与源表一致。
+# 值为空 = 待译；填完把引号里的内容补上即可，键与注释不要改。
+# 术语锁定：<语言>_<原词> → 该语言译词。
+#
+# 键一律 ASCII 小写、以语言前缀开头（en_ / de_ / fr_），原形大小写与重音写在注释里。
+# 英文词只收「同一语境里只有一个义项」的；同词两义改用**把义项分开的那门参考语言**
+# 做键 —— 哪门语言分得开就用哪门，分不开的不进表。
+#
+# 用法：译文里写 [term:en_business]，展开查这张表；查不到直接 MarkError，构建失败。
+"en_business" = "Negocios"
+"en_tools" = "Herramientas"
+"de_allgemein" = "General"
+"de_general" = "General"
+"fr_normal" = "normal"
+"fr_medium" = "Media"
+"fr_aise" = "Abundancia"
+"fr_fortune" = "Riqueza"
+"en_plague_of_rats" = "Plaga de ratas"
+"en_quality_of_life" = "Calidad de vida"
+"en_accuracy" = "Puntería"
+"en_pirate" = "Pirata"
+"en_governor" = "Gobernador"
+"en_warehouse" = "Almacén"
+"en_colony" = "Colonia"
+"en_convoy" = "Convoy"
+"en_buccaneer" = "Bucanero"
+"en_captain" = "Capitán"
+"en_sailor" = "Marinero"
+"en_hideout" = "Escondite"
+"en_trade_route" = "Ruta comercial"
+"en_market" = "Mercado"

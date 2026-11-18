@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""给 space_words.py 用的分词子进程：读 JSON 字符串数组，输出 JSON 词数组的数组。
+"""给 zh_space.py 用的分词子进程：读 JSON 字符串数组，输出 JSON 词数组的数组。
 
 必须用装了 spaCy + zh_core_web_sm 的 Python 3.11 运行（spaCy 的依赖在 3.14 上
 还没有轮子）。space_words.py 会通过 PR2_SPACY_PYTHON 指定的解释器调用它。

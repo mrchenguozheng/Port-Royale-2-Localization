@@ -13,11 +13,22 @@
 
 # 一致性检查时整条跳过的条目（与术语无关的误命中）：
 #   0xfc512ea5 版权声明里的 “RAD Game Tools, Inc.”
-#   0x35f48f70/72/73 “Holy August” 其实是人名圣奥古斯丁，不是八月
-ignore = ["0xfc512ea5", "0x35f48f70", "0x35f48f72", "0x35f48f73",
-          "0xd4cd0f44",
-          # 职员表分区标题 "Tools"：保留英文，不是货物「工具」，会污染术语基准
-          "0x37329032"]
+#   0xd4cd0f44 职员表分区标题 "Tools"：保留英文，不是货物「工具」，会污染术语基准
+#   0xc77f4eb7 特立尼达的城镇名 Port of Spain：含 Spain，但不是国家
+ignore = ["0xfc512ea5", "0xd4cd0f44", "0xc77f4eb7"]
+
+# 诗谜：藏宝图的打油诗谜面。这类文本的用词由韵脚、音节数和「藏一步线索」共同决定，
+# 与术语一致性天然冲突——`Holy August` 里的 August 是人不是八月，`northward bound`
+# 里的 bound 只为押 found。所以整片不查，而不是把撞上的词一个个加进 ignore：
+# 那样等于让术语表去管诗，诗人就没法换词了。
+#
+# 判据是「这一片是押韵的谜面」，不是「这条撞了术语」——新写一条谜面不用再回来登记。
+verse = [["0x35f48f6c", "0x35f48f75"],
+         ["0x35f48fdd", "0x35f48fe3"],
+         ["0x35f48fe4", "0x35f48fe6"],
+         ["0x35f4904e", "0x35f49057"],
+         ["0x35f490bf", "0x35f490c8"],
+         ["0x35f49130", "0x35f49137"]]
 
 [[group]]
 name = "货物"
@@ -48,17 +59,21 @@ range = ["0xc77f4c7a", "0xc77f4e47"]
 max_len = 26
 
 # Port Royale 也是游戏名，标题里保留英文不算错
+# Turk Islands 的俄语：正文按俄语习惯写「острова Теркс」，不是音译全名「Теркс-Айленд」；
+# 只给 ru 放行，别的语言没有这个说法
 [group.alt]
 "0xc77f4e45" = ["Port Royale"]
+"0xc77f4dcf" = {ru = ["Теркс"]}
 
 [[group]]
 name = "国家"
 note = "游戏里实际出现的国家名"
 ids = ["0xf90d7ea2", "0xf90d7ea3", "0xf90d7ea5"]
 
-# England 在叙事里常写成“英国”，和城镇/舰队语境一致，两种都算对
+# England：中文在叙事里常写成“英国”，和城镇/舰队语境一致；法语在句子里用形容词
+# anglaises / anglais（「les défenses anglaises」），不是名词 Angleterre
 [group.alt]
-"0xf90d7ea2" = ["英国"]
+"0xf90d7ea2" = {zh = ["英国"], fr = ["anglais", "anglaises"]}
 
 [[group]]
 name = "月份"
@@ -77,9 +92,14 @@ ids = ["0x136970b1", "0x06b2378b", "0xfbdd7fd6", "0x1155d401",
 
 [[group]]
 name = "建筑"
+note = "生产建筑与公共建筑的名字。两块生产建筑是连续区：0xdd6d3667–0xdd6d3670（农场与工场）、0xdd6d36d8–0xdd6d36dd（种植园）"
 ids = ["0xdc939a60", "0x12015c3c", "0xef65aaec", "0xc96a80a4",
-       "0xcf2f93ca", "0x2ebaaed0", "0xcbe3c595", "0xdd6d3669",
-       "0xdd6d3670"]
+       "0xcf2f93ca", "0x2ebaaed0", "0xcbe3c595",
+       "0xdd6d3667", "0xdd6d3668", "0xdd6d3669", "0xdd6d366a",
+       "0xdd6d366b", "0xdd6d366c", "0xdd6d366d", "0xdd6d366e",
+       "0xdd6d366f", "0xdd6d3670",
+       "0xdd6d36d8", "0xdd6d36d9", "0xdd6d36da", "0xdd6d36db",
+       "0xdd6d36dc", "0xdd6d36dd"]
 
 # 「Catholic Church」在叙述里译成「教会」是通顺的，和「教堂」这个建筑名不冲突
 [group.alt]
@@ -92,3 +112,45 @@ note = "菜单与面板上的常用词；Load 在这套译文里有「装载（�
 ids = ["0xca6a6869", "0x1426f58b", "0xff075dec", "0xec815821",
        "0xcbc60959", "0xe1598619", "0xc618cdea", "0xc595352c",
        "0x2fec4614", "0xc638ee24"]
+
+[[group]]
+name = "船队与货载"
+note = "船队/仓库/船只列表这几个面板的高频词；Convoy 既指玩家编的船队也指 NPC 商队，统一译「船队」"
+ids = ["0x23f33e8d", "0x081e1857", "0xfad1c2f1"]
+
+[[group]]
+name = "任务与场景"
+note = "任务界面的标题词；只收 Missions —— 「scenario」在长篇战役简报的正文里也出现（In this scenario…），逐条强判会把改写过的叙述全部报出来，Scenario 单列在后面那组"
+ids = ["0xf3734971"]
+
+[[group]]
+name = "剧本"
+check = false
+note = "Scenario 是剧本界面的标题词，译文固定「剧本」；这个词在战役简报正文里同样出现，正文里译成「这场战役/本章」都通，所以只登记对照、不做一致性检查"
+ids = ["0xc722eeb6"]
+
+[[group]]
+name = "战斗"
+note = "火炮与决斗；Cannon/Cannons 是同一件东西的单复数，译法必须一样"
+ids = ["0x340c9536", "0x3473dad4", "0xc92566a4"]
+
+[[group]]
+name = "港口"
+note = "Harbor 只指港口设施，不带城镇义"
+ids = ["0x2d1232d0"]
+
+[[group]]
+name = "贸易航线"
+note = "Trade route 是玩家设的自动贸易线，不是「交易」这个动作"
+ids = ["0xe1eb8b92"]
+
+[[group]]
+name = "身份"
+note = "叙事里反复出现的三种身份；Captain 作称谓一律「船长」，人名里的 Captain 由专名条目整条跳过"
+ids = ["0x36132c58", "0xf90d7ea6", "0xddfa621b"]
+
+[[group]]
+name = "国别"
+check = false
+note = "English/French/Dutch/Spanish 这四个标签条目在句子里多以形容词出现（English ship、anglais、español），性数变化和中文「英国/英格兰」两种说法都不是精确匹配能判的，只做对照表"
+ids = ["0xd10ed290", "0xd10ed291", "0xd10ed292", "0xd10ed293"]

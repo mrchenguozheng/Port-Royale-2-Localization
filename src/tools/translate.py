@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
-r"""src/tools/translate.py — src/live\<语言>.toml 的翻译流水线
+r"""src/tools/translate.py — 译文数据层：合并、进度
 
-    python src/tools/translate.py export --out work.jsonl   # 导出待译条目
-    python src/tools/translate.py check  work.jsonl         # 校验译文（占位符/标签）
-    python src/tools/translate.py status                    # 看进度
+    python src/tools/translate.py status                    # 看翻译进度
 
 为什么要有这个脚本
 ------------------
@@ -12,6 +10,19 @@ r"""src/tools/translate.py — src/live\<语言>.toml 的翻译流水线
 占位符 %1 少一个、游戏里就显示字面 "%1"；标签坏了、超宽的整行
 **直接不显示**。所以「翻译」这件事必须配一个机械的校验环节，
 而不是直接改文件。
+
+【本脚本的定位】数据层，不是给译者用的工作流：
+  * load_toml —— 合并层，编译、编辑器、审计都走它，形态只有一份；
+  * status —— 看进度。编辑器只显示「第 N 页 / 共 X 条」，
+    不显示「已译多少」，这个命令补上那一块；
+  * 占位符与标签规则**不在本文件**，在 shared\core\validate.py ——
+    那里是唯一一份实现，编译脚本与两个编辑器后端都调它，
+    本文件只是把 tokens / tag_profile 原样借出来给旧调用点用。
+
+以前这里还有 export / check 两个子命令，走的是「导出成 JSONL →
+在别处翻译 → 校验 JSONL」的流程。但那条流程**没有写回的一步**，
+导出后回不去。编辑器（src\editor\）已经接管校验与写回，
+而且比这条命令更严：校验 /api/check、写回 /api/save，所以已删除。
 
 占位符的两条判定
 ----------------
@@ -26,41 +37,68 @@ r"""src/tools/translate.py — src/live\<语言>.toml 的翻译流水线
 """
 
 import argparse
-import io
-import json
 import os
-import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.dirname(HERE)                     # 仓库的 src\
 ROOT = os.path.dirname(SRC)                     # 仓库根
-STRINGS_DIR = os.path.join(SRC, "live")
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+# 占位符与标签规则只有一份，在 shared\core\validate.py。
+# 这里转出来，是为了让 `import translate as T` 的老调用点（编辑器、
+# 审计脚本）继续能用 T.tokens / T.tag_profile。
+from shared.core.validate import PH_RE, tag_profile, tokens  # noqa: E402
+
+STRINGS_DIR = os.path.join(SRC, "translations")
 REFERENCES_DIR = os.path.join(SRC, "orig")
 
-#: 译文主源：translations\<语言>.toml，**每条一行**：
+#: 译文**唯一手改层**：translations\<语言>.toml，**每条一行**：
 #:     "0xd2d0a572" = "萧条"
 #: 文件名以语言代码开头，没有块头也没有字段名，所以语言代码与文件里
 #: 的内容是同一个名字，不需要任何映射表。
-#: 只读参考原文放在 references\ 子目录：
-#:     references\en.gog_1.1.2.3.toml    英文原文（GOG 1.1.2.3 原版表），合并基准
-#:     references\fr.gog_1.1.2.42.toml   法文原文（GOG 1.1.2.42 原版表）
+#: 引擎文本（补空格、全角标点、`<n>` 之类的排版加工）是**构建产物**，
+#: 由 src\tools\text\engine_text.py 生成到 build\preview\engine_text\<语言>.toml，
+#: 不进仓库 —— 所以这里只读译文层，不存在第二份成品文本。
+#: 只读参考原文放在 orig\ 目录：
+#:     orig\en.gog_1.1.2.3.toml    英文原文（GOG 1.1.2.3 原版表），合并基准
+#:     orig\fr.gog_1.1.2.42.toml   法文原文（GOG 1.1.2.42 原版表）
 #: 文件名里带来源与版本：这两份是**从原版 exe 里原样提取**的，不经过我们的
 #: 导出/整理，所以 `<n>`、行尾空格都保持原样。版本号不同，两边条目数可能
 #: 对不齐（法语 3571 vs 英文 3548），合并时按 id 对齐、多退少空。
-#: 其余 translations\*.toml 是可编辑的译文，文件名即语言代码。
 #: 语言列表不写死 —— 加一种语言只需把 <代码>.toml 放进 translations\。
 BASE_LANG = "en.gog_1.1.2.3"
 
 #: 只读参考语言：参与 id 顺序与占位符校验，但不提供译文。
-REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42")
-#: 导出 / 校验里「法文那列」的字段名（导出产物仍沿用 en / fr 两个短键，
-#: 免得改掉外部脚本的约定）。
+#: 英语/法语是主参考；零售包只作补充对照，不优先采用。
+PRIMARY_REFERENCE_LANGS = ("en.gog_1.1.2.3", "fr.gog_1.1.2.42")
+RETAIL_REFERENCE_LANGS = (
+    "de.retail-1.0.0",
+    "es.retail-1.0.0",
+    "pl.retail-1.0.0",
+    "ru.retail-1.0.0",
+)
+REFERENCE_LANGS = PRIMARY_REFERENCE_LANGS + RETAIL_REFERENCE_LANGS
+#: 法文原文的字段名（合并结果里 lang 字段就是文件名，没有短键别名）。
 FR_LANG = "fr.gog_1.1.2.42"
 
 
+def set_src(src):
+    """把数据根指到另一份 src（测试用临时副本），重算派生路径。
+
+    只改路径，不改语言清单与规则：`target_langs()`、`all_langs()` 都是
+    现算的，所以换根之后自然跟着走。
+    """
+    global SRC, ROOT, STRINGS_DIR, REFERENCES_DIR
+    SRC = os.path.abspath(src)
+    ROOT = os.path.dirname(SRC)
+    STRINGS_DIR = os.path.join(SRC, "translations")
+    REFERENCES_DIR = os.path.join(SRC, "orig")
+
+
 def lang_path(code):
-    """语言代码 -> 文件路径。只读参考在 references\\ 子目录下。"""
+    """语言代码 -> 文件路径。只读参考在 orig\\ 目录下。"""
     base = REFERENCES_DIR if code in REFERENCE_LANGS else STRINGS_DIR
     return os.path.join(base, code + ".toml")
 
@@ -69,10 +107,8 @@ def target_langs():
     """可编辑的译文语言代码，按文件名排序（不含只读参考）。"""
     if not os.path.isdir(STRINGS_DIR):
         return []
-    # keep_original.toml 是「原样保留」清单，不是语言文件，跳过
     return sorted(f[:-5] for f in os.listdir(STRINGS_DIR)
                   if f.endswith(".toml") and not f.startswith("_")
-                  and f != "keep_original.toml"
                   and f[:-5] not in REFERENCE_LANGS)
 
 
@@ -83,9 +119,9 @@ def all_langs():
 
 
 def target_field():
-    """export / check / status 默认操作的那个译文语言字段名。
+    """status 默认操作的那个译文语言字段名。
 
-    取 translations\\ 下第一个可编辑语言；一个译文都没有时报错，
+    取 src\\translations 下第一个可编辑语言；一个译文都没有时报错，
     因为那样「已译 / 待译」根本没有对象。
     """
     langs = target_langs()
@@ -93,81 +129,12 @@ def target_field():
         raise SystemExit(r"%s 下没有任何可编辑的 *.toml 译文文件。" % STRINGS_DIR)
     return langs[0]
 
-#: 占位文本的标记形态。未翻译的都是这个形状：
-#: 开头是 8 位十六进制哈希（有时被截成 6~7 位），然后竖线。
-PH_RE = re.compile(r"^\s*0x[0-9a-fA-F]{6,8}\s*\|")
+# 占位符与标签规则已移到 shared\core\validate.py（tokens / tag_profile）。
+# 编译脚本与两个编辑器后端原先各有一份，取值口径互不相同。本文件只把
+# import 进来的转出去给老调用点。注意 %02 与 %2 按字面区分 —— 0 是补零
+# 宽度，别归一化（这里以前干过，是错的）。
 
-# ── 占位符 ──────────────────────────────────────────────────
-
-#: 脚本变量 @前缀$变量名$ —— 首尾两个 $ 都是必需的。
-#: 实测 3548 条原文里 770 处引用，770 处全部带尾 $，零例外。
-RE_SCRIPT = re.compile(r"@[A-Za-z]\$[A-Za-z_][A-Za-z_0-9]*\$")
-#: 位置参数起点。用查找切成一段一段，每段独占匹配。
-#: 【坑】剥掉标签后两个占位符会紧邻成 "%2%1"（原文 <c><ts:175>%2<t>…%1
-#: 剥掉 <t> 就是这样）。若直接用一条贪婪正则去搜索，"%2%1" 会被读成
-#: 一个根本不存在的 "%21"。所以先切段、再逐段整匹配。
-RE_POS_SPLIT = re.compile(r"%\d+")
-
-
-def _pos_tokens(s):
-    """提取位置参数，正确处理紧邻的情况。'%2%1' -> ['%2', '%1']"""
-    return [m.group(0) for m in RE_POS_SPLIT.finditer(s)]
-
-
-def tokens(text):
-    """把一段文本拆成「占位符 token 列表」，供比对用。
-
-    顺序会被排序，因为中文语序允许调整占位符先后 —— 比对的是
-    「种类与数量的集合」，不是先后。
-
-    ★ 两个必须绕开的坑：
-    1) 紧邻的位置参数：原文 <c><ts:175>%2<t>…%1<t> 剥掉标签后变成 "%2%1"，
-       用一条贪婪正则去搜会读成根本不存在的 "%21"。所以剥标签时**用空格
-       替换标签**，把紧邻情况天然隔开。
-    2) %02 这类补零写法：与 %2 是同一个参数，但字面不同。比对时先归一化
-       （去掉前导零），否则原文 %02、译文 %2 会被误报成不一致。
-    """
-    if text is None:
-        return []
-    t = str(text)
-    # 用空格替换标签：既剥掉 <n>/<o:..>，也把可能紧邻的占位符隔开
-    t = RE_TAG_ALL.sub(" ", t)
-    out = set()
-    for m in RE_SCRIPT.finditer(t):
-        out.add(m.group(0))
-    for m in RE_POS_ANY.finditer(t):
-        # 归一化：%02 -> %2、%002 -> %2。同一参数的不同写法不该算不一致。
-        out.add("%" + str(int(m.group(0)[1:])))
-    return sorted(out)
-
-
-#: 任意位置参数（查找用，先把紧邻情况隔开就安全了）
-RE_POS_ANY = re.compile(r"%0*\d+")
-#: 任何排版标签（用于剥离；不做结构判断）
-RE_TAG_ALL = re.compile(r"</?[a-zA-Z][^>]*>")
-
-
-#: 排版标签。比对时只看数量与配对，不看具体参数。
-RE_TAG = re.compile(r"<(/?)(n(?:[:>][^>]*)?|o(?::[^>]*)?|f[^>]*|t|c|tc|ts(?::[^>]*)?)\s*>")
-
-
-def tag_profile(text):
-    """标签的「轮廓」：排序后的标签名列表，用来比对结构是否一致。
-
-    只比数量与名字，不比 <o:0xFFF2FAAD> 里的颜色值 —— 译文可以换颜色。
-    但 <n> 的数量必须一致：少一个 <n> 可能导致整行超宽而不显示。
-    """
-    if text is None:
-        return []
-    names = []
-    for m in RE_TAG.finditer(str(text)):
-        closing, name = m.group(1), m.group(2)
-        base = name.split(":")[0]
-        names.append(("/" if closing else "") + base)
-    return sorted(names)
-
-
-# ── 导出 ────────────────────────────────────────────────────
+# ── 合并 ────────────────────────────────────────────────────
 
 def load_toml():
     """读取全部语言文件，按 hash 合并成 [{id, ctx, <语言>…}]。
@@ -254,77 +221,7 @@ def entries(doc):
     return doc.get("s", [])
 
 
-def cmd_export(args):
-    doc = load_toml()
-    field = args.lang or target_field()
-    out = []
-    for e in entries(doc):
-        txt = e.get(field, "")
-        if not PH_RE.match(txt):
-            continue        # 已译或已空，跳过
-        if args.limit and len(out) >= args.limit:
-            break
-        out.append({
-            "id": e.get("id", ""),
-            "en": e.get(BASE_LANG, ""),
-            "fr": e.get(FR_LANG, ""),
-            "ctx": e.get("ctx", ""),
-            field: txt,
-        })
-    with io.open(args.out, "w", encoding="utf-8", newline="\n") as f:
-        for o in out:
-            f.write(json.dumps(o, ensure_ascii=False) + "\n")
-    print("已导出 %d 条 -> %s" % (len(out), args.out))
-
-
-# ── 校验 ────────────────────────────────────────────────────
-
-def cmd_check(args):
-    field = args.lang or target_field()
-    rows = [json.loads(l) for l in io.open(args.file, encoding="utf-8") if l.strip()]
-    errors = []
-    ok = 0
-    for r in rows:
-        zh = r.get(field, "")
-        if not zh:
-            continue
-        if PH_RE.match(zh):
-            errors.append((r["id"], "译文仍是占位文本（没翻）"))
-            continue
-        # 占位符
-        en_t, zh_t = tokens(r["en"]), tokens(zh)
-        if en_t != zh_t:
-            miss = [t for t in en_t if t not in zh_t]
-            extra = [t for t in zh_t if t not in en_t]
-            errors.append((r["id"], "占位符不一致　缺 %s　多 %s" % (miss or "无", extra or "无")))
-            continue
-        # 标签结构：译文**不得**新增 <n>/<o>/<f>/<c>/<t> 任何标签。
-        # 换行只在原文已有 <n> 或 | 的位置换；中文自然要另起行时，
-        # 交给渲染器按宽度自动折行，不靠手工插 <n>。
-        en_p, zh_p = tag_profile(r["en"]), tag_profile(zh)
-        if en_p != zh_p:
-            add = [t for t in zh_p if zh_p.count(t) > en_p.count(t)]
-            miss = [t for t in en_p if en_p.count(t) > zh_p.count(t)]
-            hint = ""
-            if add:
-                hint = "　（译文擅自新增 %s）" % sorted(set(add))
-            errors.append((r["id"], "标签结构不一致　原文 %s　译文 %s%s"
-                           % (en_p, zh_p, hint)))
-            continue
-        ok += 1
-
-    if errors:
-        print("发现 %d 个问题（通过 %d 条）：" % (len(errors), ok))
-        for i, (h, m) in enumerate(errors[:60]):
-            print("  %s  %s" % (h, m))
-        if len(errors) > 60:
-            print("  … 还有 %d 条" % (len(errors) - 60))
-        return 1
-    print("全部通过：%d 条" % ok)
-    return 0
-
-
-# ── 写回 ────────────────────────────────────────────────────
+# ── 进度 ────────────────────────────────────────────────────
 
 
 def cmd_status(args):
@@ -333,24 +230,18 @@ def cmd_status(args):
     es = entries(doc)
     total = len(es)
     done = sum(1 for e in es if not PH_RE.match(e.get(field, "")))
-    print("[%s] 共 %d 条，已译 %d 条（%.1f%%），待译 %d 条"
-          % (field, total, done, 100.0 * done / max(1, total), total - done))
+    same = sum(1 for e in es if e.get(field, "") == e.get(BASE_LANG, ""))
+    extra = ""
+    if field != BASE_LANG:
+        extra = "，其中与英文原文相同 %d 条（尚未改写）" % same
+    print("[%s] 共 %d 条，已译 %d 条（%.1f%%），待译 %d 条%s"
+          % (field, total, done, 100.0 * done / max(1, total), total - done,
+             extra))
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
-
-    p = sub.add_parser("export", help="导出待译条目")
-    p.add_argument("--out", default=os.path.join(ROOT, "work", "strings.jsonl"))
-    p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
-    p.add_argument("--limit", type=int, default=0)
-    p.set_defaults(fn=cmd_export)
-
-    p = sub.add_parser("check", help="校验译文")
-    p.add_argument("file")
-    p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
-    p.set_defaults(fn=cmd_check)
 
     p = sub.add_parser("status", help="看进度")
     p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")

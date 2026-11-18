@@ -1,0 +1,15 @@
+# 版本基线：原版字符串表的键集。构建按这里列的每个版本各出一份语言包。
+#
+# id 就是 src/orig/<id>.toml 的文件名（去掉 .toml），也是定向差的 from/to。
+#   primary = true 的那份写进 packs/<语言>.txt（默认装的）；
+#   其余的写进 build/variants/<id>/<语言>.txt，按玩家的安装版本选。
+#
+# 加第三个版本时：在这里加一段，再补它与既有每个版本的两条定向差
+# （src/data/versions/<a>-to-<b>.toml、<b>-to-<a>.toml），check 会核对。
+
+[baselines."en.gog_1.1.2.3"]
+orig = "en.gog_1.1.2.3.toml"
+primary = true
+
+[baselines."fr.gog_1.1.2.42"]
+orig = "fr.gog_1.1.2.42.toml"
