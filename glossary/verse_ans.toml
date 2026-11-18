@@ -8,17 +8,18 @@
 #          自己在地图上走到那座城（理由见 09 卷第七十二节）。
 #   clues  线索词，逐语各写各的，至少一条，英文逗号分隔，禁止全角「，」；每条线索
 #          都必须真的出现在该语言的谜面正文里——展开时自动校验，推不出来就构建失败。
-#   kinds  **必填**。线索的标签，逐语给出、与该语 clues 条数一条对一条，每项都不能空。
-#          不给 kinds 或留空项 = 裸写，verse_ans.py --apply 直接停。
-#          写七个已知类型（pun/direction/count/feature/produce/history/exclude，
-#          见 marks.ANS_CLUE_KINDS）能拿到类型校验，也等于给译者一句硬约束：
-#          pun 要保住谐音、produce 要保住商品专名、direction 要保住方位词、exclude
-#          不许翻成肯定。写错或自造的类型不拦——展开侧只当标签，扫描冒号后的正文；
-#          标签只允许小写，且只允许 `_` 或字母开头。字母开头的自造标签（如 dirction）
-#          会在 text_lint 里记一条 W 级警告（多半是类型名拼错）；`_hello` 这种 `_`
-#          开头的显式自造标签静默通过。类型只对「译者看」有价值，不参与答案判定。
+#   kinds  可选。给了就按位置贴标签，条数必须与该语 clues 一条对一条；某一项写空串
+#          表示这条不贴标签（裸写）。整组不给 kinds 也等于全裸写——两种写法在展开侧
+#          完全等价，都是「值要在该语谜面正文里逐字出现」。
+#          已知类型只留 pun（双关，见 marks.ANS_CLUE_KINDS）：谜底靠谐音时，译文必须
+#          保住那个音。原先的 direction / count / feature / produce / history / exclude
+#          六类已退役：它们只做统计与提示，值本来就是正文片段，直接裸写即可
+#          （见 09 卷第一百零五节）。
+#          自造标签仍认：`_` 开头静默；字母开头的未知标签（含上述六个退役名）会在
+#          text_lint 里记一条 W 级警告（多半是拼错）。标签只对「译者看」有价值，
+#          不参与答案判定。
 #          俄语 90c5 漏译「白沙」、法语 90c6 把「海峡」译成 l'abondance，这两条只剩
-#          两条线索，kinds 就按两条给——不拿理想模板替译文补齐条数。
+#          两条线索——线索按两条给，不拿理想模板替译文补齐条数。
 #   ids    同组的文本键。**组内多于一条时**，--apply 会给每条译文加 `group=`，列出
 #          其余副本的键（`+` 连接、按 0x 串排序）；单条的组不写。ids 决定这组有几条，
 #          译文那边的 group 只做校验：两边对不上（缺一条、多一条、互指不对称）就失败。
@@ -36,42 +37,37 @@
 ids = ["0x35f48f6c", "0x35f48f74", "0x35f48f75"]
 ans = "Corpus Christi"
 clues = {zh = "荒凉,遗弃", de = "verlassen,öde", es = "desolado,abandonado", fr = "désolé,disgrâce", ja = "荒れ果てた,見捨てられた", ru = "отвергнут,забыт"}
-kinds = {zh = ["feature", "feature"], de = ["feature", "feature"], es = ["feature", "feature"], fr = ["feature", "feature"], ja = ["feature", "feature"], ru = ["feature", "feature"]}
 
 [[group]]
 # 02  A river from the wilds at the headland divides There lies a 
 ids = ["0x35f48f6d"]
 ans = "New Orleans"
 clues = {zh = "河流,海角", de = "Fluss,Vorgebirge", es = "río,cabo", fr = "fleuve,continent", ja = "川,岬", ru = "речка,утесу"}
-kinds = {zh = ["feature", "feature"], de = ["feature", "feature"], es = ["feature", "feature"], fr = ["feature", "feature"], ja = ["feature", "feature"], ru = ["feature", "feature"]}
 
 [[group]]
 # 03  Four towns sit on the bay together. Sail to the east, in the
 ids = ["0x35f48f6e"]
 ans = "Pensacola"
 clues = {zh = "四座,第三座,东", de = "Vier,dritte,Osten", es = "Cuatro,tercera,este", fr = "Quatre,troisième,l'est", ja = "四つ,三つ目,東", ru = "Четыре,третий,восток"}
-kinds = {zh = ["count", "count", "direction"], de = ["count", "count", "direction"], es = ["count", "count", "direction"], fr = ["count", "count", "direction"], ja = ["count", "count", "direction"], ru = ["count", "count", "direction"]}
 
 [[group]]
 # 04  Not the most northerly town can it be, but further north onl
 ids = ["0x35f48f6f", "0x35f48f71"]
 ans = "Fort Caroline"
 clues = {zh = "北", de = "Nördlich", es = "norte", fr = "nord", ja = "北", ru = "север"}
-kinds = {zh = ["exclude"], de = ["exclude"], es = ["exclude"], fr = ["exclude"], ja = ["exclude"], ru = ["exclude"]}
 
 [[group]]
 # 05  Holy August is now northward bound, very soon in the town is
 ids = ["0x35f48f70", "0x35f48f72", "0x35f48f73"]
 ans = "St. Augustine"
 clues = {zh = "圣奥古斯丁,北", de = "August,Norden", es = "Agustín,norte", fr = "Augustin,nord", ja = "オーガスティン,北", ru = "Август,север"}
-kinds = {zh = ["pun", "direction"], de = ["pun", "direction"], es = ["pun", "direction"], fr = ["pun", "direction"], ja = ["pun", "direction"], ru = ["pun", "direction"]}
+kinds = {zh = ["pun", ""], de = ["pun", ""], es = ["pun", ""], fr = ["pun", ""], ja = ["pun", ""], ru = ["pun", ""]}
 
 [[group]]
 # 06  Once long ago did other people here live, with their great t
 ids = ["0x35f48fe4"]
 ans = "Cancun"
 clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
-kinds = {zh = ["exclude"], de = ["exclude"], es = ["exclude"], fr = ["exclude"], ja = ["exclude"], ru = ["exclude"]}
 
 [[group]]
 # 07  Once long ago did other people here live, with their great t
@@ -79,28 +75,24 @@ kinds = {zh = ["exclude"], de = ["exclude"], es = ["exclude"], fr = ["exclude"],
 ids = ["0x35f48fe5"]
 ans = "-southwest"
 clues = {zh = "西南", de = "Südwesten", es = "suroeste", fr = "sud-ouest", ja = "南西", ru = "юго-запад"}
-kinds = {zh = ["exclude"], de = ["exclude"], es = ["exclude"], fr = ["exclude"], ja = ["exclude"], ru = ["exclude"]}
 
 [[group]]
 # 08  The distance from X to Nombre is not far, you have plenty of
 ids = ["0x35f48fe6"]
 ans = "Havana"
 clues = {zh = "朗姆酒,雪茄", de = "Rum,Zigarre", es = "ron,cigarro", fr = "rhum,cigares", ja = "ラム酒,葉巻", ru = "Сигары,ром"}
-kinds = {zh = ["produce", "produce"], de = ["produce", "produce"], es = ["produce", "produce"], fr = ["produce", "produce"], ja = ["produce", "produce"], ru = ["produce", "produce"]}
 
 [[group]]
 # 09  If off the cliffs to the north you should teeter, then in X 
 ids = ["0x35f4904e"]
 ans = "Gibara"
 clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "север"}
-kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}
 
 [[group]]
 # 10  Three little islands this area surround, but only on one are
 ids = ["0x35f4904f"]
 ans = "Turk Islands"
 clues = {zh = "三座小岛,缆绳", de = "Drei kleine Inseln,Seile", es = "Tres pequeñas islas,cuerdas", fr = "Trois petites îles,cordes", ja = "三つの小島,ロープ", ru = "Три острова,канаты"}
-kinds = {zh = ["count", "feature"], de = ["count", "feature"], es = ["count", "feature"], fr = ["count", "feature"], ja = ["count", "feature"], ru = ["count", "feature"]}
 
 [[group]]
 # 11  X lies on the island, it’s really quite small. But look to t
@@ -108,7 +100,6 @@ kinds = {zh = ["count", "feature"], de = ["count", "feature"], es = ["count", "f
 ids = ["0x35f49050", "0x35f490bf"]
 ans = "San Juan|San Thoma"
 clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
-kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}
 
 [[group]]
 # 12  Here in the island chain, you’ll see a break. To the west th
@@ -116,49 +107,42 @@ kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["dire
 ids = ["0x35f49051"]
 ans = "-north"
 clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "север"}
-kinds = {zh = ["exclude"], de = ["exclude"], es = ["exclude"], fr = ["exclude"], ja = ["exclude"], ru = ["exclude"]}
 
 [[group]]
 # 13  In a large bay lie some towns, there are three. X refers to 
 ids = ["0x35f49052", "0x35f490c1", "0x35f490c2", "0x35f49130"]
 ans = "Vera Cruz"
 clues = {zh = "三座,西", de = "drei,westlichste", es = "tres,occidental", fr = "trois,ouest", ja = "三つ,西", ru = "три,западн"}
-kinds = {zh = ["count", "direction"], de = ["count", "direction"], es = ["count", "direction"], fr = ["count", "direction"], ja = ["count", "direction"], ru = ["count", "direction"]}
 
 [[group]]
 # 14  In a large bay lie some towns, there are three. X refers to 
 ids = ["0x35f49053"]
 ans = "Roatán"
 clues = {zh = "三座,南", de = "drei,südlichste", es = "tres,meridional", fr = "trois,sud", ja = "三つ,南", ru = "три,юге"}
-kinds = {zh = ["count", "direction"], de = ["count", "direction"], es = ["count", "direction"], fr = ["count", "direction"], ja = ["count", "direction"], ru = ["count", "direction"]}
 
 [[group]]
 # 15  A bay holds two islands, one large and one small. The town o
 ids = ["0x35f49054"]
 ans = "Roatán"
 clues = {zh = "两个岛,较大", de = "zwei Inseln,großen", es = "dos islas,más grande", fr = "deux îles,plus grande", ja = "二つの島,大きい方", ru = "Два острова,большом"}
-kinds = {zh = ["count", "count"], de = ["count", "count"], es = ["count", "count"], fr = ["count", "count"], ja = ["count", "count"], ru = ["count", "count"]}
 
 [[group]]
 # 16  An island far off, small and remote. There is nowhere else f
 ids = ["0x35f49055"]
 ans = "Cayman"
 clues = {zh = "遥远,又小又偏", de = "weit draußen,allein", es = "lejana,remota", fr = "éloignée,lointaine", ja = "はるか遠く,孤島", ru = "далеко,маленький"}
-kinds = {zh = ["feature", "feature"], de = ["feature", "feature"], es = ["feature", "feature"], fr = ["feature", "feature"], ja = ["feature", "feature"], ru = ["feature", "feature"]}
 
 [[group]]
 # 17  X is a town that has streets paved with gold. Its majestic h
 ids = ["0x35f49056"]
 ans = "Port Royale"
 clues = {zh = "黄金,港口", de = "Straßen aus Gold,Hafen", es = "pavimentadas de oro,puerto", fr = "pavées d'or,port", ja = "黄金,港", ru = "златом,гавань"}
-kinds = {zh = ["produce", "feature"], de = ["produce", "feature"], es = ["produce", "feature"], fr = ["produce", "feature"], ja = ["produce", "feature"], ru = ["produce", "feature"]}
 
 [[group]]
 # 18  Four towns are situated around a volcano. The town in the so
 ids = ["0x35f49057"]
 ans = "Santo Domingo"
 clues = {zh = "四座,火山,东南", de = "Vier,Vulkan,Südosten", es = "Cuatro,volcán,sureste", fr = "Quatre,volcan,sud-est", ja = "四つ,火山,南東", ru = "Четыре,вулкан,юго-восток"}
-kinds = {zh = ["count", "feature", "direction"], de = ["count", "feature", "direction"], es = ["count", "feature", "direction"], fr = ["count", "feature", "direction"], ja = ["count", "feature", "direction"], ru = ["count", "feature", "direction"]}
 
 [[group]]
 # 19  On its sands, the sea is home to towns for which no one care
@@ -166,7 +150,6 @@ kinds = {zh = ["count", "feature", "direction"], de = ["count", "feature", "dire
 ids = ["0x35f490c0"]
 ans = "Guadeloupe|Martinique"
 clues = {zh = "无人关心,精良的货品", de = "niemand kümmert,feine Waren", es = "a nadie le importa,mercancías selectas", fr = "n'intéressent personne,biens de qualité", ja = "誰も顧みない,良い品", ru = "Забытый город,прекрасные товары"}
-kinds = {zh = ["feature", "produce"], de = ["feature", "produce"], es = ["feature", "produce"], fr = ["feature", "produce"], ja = ["feature", "produce"], ru = ["feature", "produce"]}
 
 [[group]]
 # 20  An island lies here, as though in a cradle. A peninsula from
@@ -174,35 +157,30 @@ kinds = {zh = ["feature", "produce"], de = ["feature", "produce"], es = ["featur
 ids = ["0x35f490c3", "0x35f490c4"]
 ans = "Providence"
 clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "северн"}
-kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}
 
 [[group]]
 # 21  White strand beside the jungle, a little river known to none
 ids = ["0x35f490c5"]
 ans = "Santa Marta"
 clues = {zh = "白沙,丛林,只有阳光", de = "Weißer Strand,Dschungel,nur die Sonne", es = "Blanca orilla,selva,solo ve el sol", fr = "Plage blanche,jungle,que le soleil", ja = "白い砂浜,ジャングル,太陽だけ", ru = "джунглей,солнце"}
-kinds = {zh = ["feature", "feature", "feature"], de = ["feature", "feature", "feature"], es = ["feature", "feature", "feature"], fr = ["feature", "feature", "feature"], ja = ["feature", "feature", "feature"], ru = ["feature", "feature"]}
 
 [[group]]
 # 22  Here lies the town, overlooking the sound. It guards the bay
 ids = ["0x35f490c6"]
 ans = "Maracaibo"
 clues = {zh = "海峡,海湾,船", de = "Sund,Bucht,Schiffen", es = "estrecho,bahía,barcos", fr = "baie,navires", ja = "海峡,湾,船", ru = "пролив,бухте,кораблей"}
-kinds = {zh = ["feature", "feature", "feature"], de = ["feature", "feature", "feature"], es = ["feature", "feature", "feature"], fr = ["feature", "feature"], ja = ["feature", "feature", "feature"], ru = ["feature", "feature", "feature"]}
 
 [[group]]
 # 23  Not far from the town, at the bottom of a cliff, lie the bat
 ids = ["0x35f490c7", "0x35f49136"]
 ans = "Caracas"
 clues = {zh = "沉船,崖底", de = "Schiffswracks,Klippe", es = "naufragado,acantilado", fr = "épave,falaise", ja = "難破船,崖の下", ru = "корабль разбитый,скал"}
-kinds = {zh = ["feature", "feature"], de = ["feature", "feature"], es = ["feature", "feature"], fr = ["feature", "feature"], ja = ["feature", "feature"], ru = ["feature", "feature"]}
 
 [[group]]
 # 24  Spain set up a harbor here once. You will find wood and bric
 ids = ["0x35f490c8"]
 ans = "Port of Spain"
 clues = {zh = "西班牙,木料,砖石,小麦", de = "Spanien,Holz,Ziegel,Weizen", es = "España,madera,ladrillos,trigo", fr = "L'Espagne,bois,briques,blé", ja = "スペイン,木材,レンガ,小麦", ru = "Испанцы,кирпичи,древесина,пшеницы"}
-kinds = {zh = ["history", "produce", "produce", "produce"], de = ["history", "produce", "produce", "produce"], es = ["history", "produce", "produce", "produce"], fr = ["history", "produce", "produce", "produce"], ja = ["history", "produce", "produce", "produce"], ru = ["history", "produce", "produce", "produce"]}
 
 [[group]]
 # 25  In a large bay lie some towns, there are three. X refers to 
@@ -210,28 +188,24 @@ kinds = {zh = ["history", "produce", "produce", "produce"], de = ["history", "pr
 ids = ["0x35f49131"]
 ans = "east"
 clues = {zh = "三座,东", de = "drei,östlichste", es = "tres,oriental", fr = "trois,l'est", ja = "三つ,東", ru = "три,восток"}
-kinds = {zh = ["count", "direction"], de = ["count", "direction"], es = ["count", "direction"], fr = ["count", "direction"], ja = ["count", "direction"], ru = ["count", "direction"]}
 
 [[group]]
 # 26  An island lies here, as though in a cradle. The land from th
 ids = ["0x35f49132", "0x35f49133"]
 ans = "Providence"
 clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "северн"}
-kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}
 
 [[group]]
 # 27  You come from the west, the bridge you cross over. The town 
 ids = ["0x35f49134"]
 ans = "Cartagena"
 clues = {zh = "西", de = "Westen", es = "oeste", fr = "ouest", ja = "西", ru = "запад"}
-kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}
 
 [[group]]
 # 28  Oh what a wondrous place. Nestled in a bay. Protected by tow
 ids = ["0x35f49135"]
 ans = "Gibraltar"
 clues = {zh = "海湾,峭壁", de = "Bucht,Klippen", es = "bahía,acantilados", fr = "baie,falaises", ja = "湾,崖", ru = "залив,скалы"}
-kinds = {zh = ["feature", "feature"], de = ["feature", "feature"], es = ["feature", "feature"], fr = ["feature", "feature"], ja = ["feature", "feature"], ru = ["feature", "feature"]}
 
 [[group]]
 # 29  Powerful river flowing so deep, on towards the east and into
@@ -239,4 +213,3 @@ kinds = {zh = ["feature", "feature"], de = ["feature", "feature"], es = ["featur
 ids = ["0x35f49137"]
 ans = "southeast"
 clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
-kinds = {zh = ["direction"], de = ["direction"], es = ["direction"], fr = ["direction"], ja = ["direction"], ru = ["direction"]}

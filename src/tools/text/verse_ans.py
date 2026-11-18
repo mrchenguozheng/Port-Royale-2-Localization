@@ -7,8 +7,8 @@
 见 09 卷第七十八、七十九、八十一、八十三节）。`group` 与 `clue` 都必填，单副本写
 `group=<自己的键>`（见第八十九节）。谜底正常写 `answer=`，靠值推断类型；要明写类型就把
 字段名换成 `town=`（城名）或 `direction=`（方位），此时省掉 `answer=`（见第八十六节）。
-`clue` 每项写成 `<标签>:<正文>` 或裸写 `<正文>`：七个已知类型有校验（只供统计/检索），
-`_` 开头的自造标签静默，字母开头的自造标签报 warning；裸写没有标签，整项就是正文片段。
+`clue` 每项写成 `<标签>:<正文>` 或裸写 `<正文>`：唯一保留的已知类型是 pun，`_` 开头的
+自造标签静默，字母开头的未知标签报 warning；裸写没有标签，整项就是正文片段。
 两种写法里 `+` 都表示并值，语义都是「都要出现在谜面正文里」。
 这个工具只管那一件事：
 
@@ -159,11 +159,12 @@ def cmd_list(all_langs=False):
 def clue_text(clues, kinds, lang):
     """把一语的线索拼成标注串。
 
-    `kinds` 缺省（空）就整组裸写：只给正文词，用 `+` 连成一项，展开侧按字面匹配。
-    给了就按位加前缀（条数与线索必须相等，空项等于没标签，不许）。前缀可以是七个已知
-    类型，也可以是自造标签：`_` 开头静默，字母开头的自造标签展开侧会报 warning
-    （这里不拦）。
-    相邻且同标签的几条并成一项：`feature:白沙+丛林`，与逐条重复等价。
+    `kinds` 缺省（空）就整组裸写：只给正文词，用 `+` 连成一项。
+    给了就按位贴标签，条数与线索必须相等；某一项给空串表示这条不贴标签（裸写），
+    所以「只有一条要标 pun」时也能逐位对齐。
+    标签可以是唯一的已知类型 `pun`，也可以是自造标签：`_` 开头静默，字母开头的未知
+    标签展开侧会报 warning（这里不拦）。
+    相邻且同标签的几条并成一项：`pun:August+Holy`，与逐条重复等价。
     """
     if not kinds:
         if not clues:
@@ -172,21 +173,24 @@ def clue_text(clues, kinds, lang):
     if len(kinds) != len(clues):
         raise SystemExit("%s 的线索 %d 条，kinds 给了 %d 条（逐语对齐）"
                          % (lang, len(clues), len(kinds)))
-    if not all(k for k in kinds):
-        raise SystemExit("%s 的 kinds 里有空项：没有标签就等于裸写，"
-                         "要么整组都不写 kinds" % lang)
     out = []
-    run_tag, run_vals = None, []
+    run_tag, run_vals = "", []
+    started = False
     for k, c in zip(kinds, clues):
-        if run_tag is not None and k == run_tag:
+        if started and k == run_tag:
             run_vals.append(c)
             continue
-        if run_tag is not None:
+        if started:
             out.append((run_tag, run_vals))
+        started = True
         run_tag, run_vals = k, [c]
-    if run_tag is not None:
+    if started:
         out.append((run_tag, run_vals))
-    return ",".join("%s:%s" % (k, "+".join(vals)) for k, vals in out)
+    parts = []
+    for k, vals in out:
+        joined = "+".join(vals)
+        parts.append("%s:%s" % (k, joined) if k else joined)
+    return ",".join(parts)
 
 
 def _fields(arg):
@@ -246,8 +250,13 @@ def _group_norm(raw):
 
 
 def _clue_norm(raw):
-    """clue 值 → 元组（标签, 正文元组）；裸写项标签记空串，分隔符两侧空白不计。"""
-    out = []
+    """clue 值 → ((标签, 值元组)…)；裸写项标签记空串。
+
+    同标签的值跨逗号项合并、并按值排序：`a+b,c` 与 `a+b+c` 在展开侧等价（都是「都要
+    出现」），`pun:X,pun:Y` 与 `pun:X+Y` 也等价，所以 `--apply` 的「已标成同值」判据
+    不能因分组或顺序不同误判成冲突。
+    """
+    groups = {}
     for part in (raw or "").split(","):
         part = part.strip()
         if not part:
@@ -256,8 +265,9 @@ def _clue_norm(raw):
             tag, _, tail = part.partition(":")
         else:
             tag, tail = "", part
-        out.append((tag.strip(), tuple(v.strip() for v in tail.split("+"))))
-    return tuple(out)
+        vals = [v.strip() for v in tail.split("+")]
+        groups.setdefault(tag.strip(), []).extend(vals)
+    return tuple((k, tuple(sorted(groups[k]))) for k in sorted(groups))
 
 
 def mark_key(text, ent_index):
