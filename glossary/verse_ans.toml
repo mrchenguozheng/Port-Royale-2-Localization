@@ -241,3 +241,26 @@ clues = {zh = "海湾,峭壁", de = "Bucht,Klippen", es = "bahía,acantilados", 
 ids = ["0x35f49137"]
 ans = "southeast"
 clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
+
+[[group]]
+# HT11  A lonely town lies in the west of the headland.
+#       原帖 Hunt Text 11（Solution 写 Grand Bahama，附注又说西边那座是 Tampa）；
+#       第三方韩文表也写作「Grand Bahama – Tampa 近处」，两个名字并列，故两个候选都留。
+ids = ["0x35f48fdd", "0x35f48fde"]
+ans = "Grand Bahama|Tampa"
+clues = {zh = "海角,孤零零", de = "Vorgebirges,einsame,Westen", es = "cabo,solitaria,oeste", fr = "continent,solitaire,ouest", ja = "岬,寂れた,西", ru = "мыса,одинокий,западу"}
+
+[[group]]
+# HT26* Here, you should go, if you would like to bake colorful, sweet corn fields
+#       with vegetables in the clay oven.（原帖 Hunt Text 26*，Solution 写 Eleuthera）
+#       四槽逐字同文，只留 hash 最小的 0x35f48fdf 带文本，其余写 [ref:]。
+ids = ["0x35f48fdf", "0x35f48fe0", "0x35f48fe1", "0x35f48fe2"]
+ans = "Eleuthera"
+clues = {zh = "黏土炉,甜玉米面包,水果", de = "Tonofen,Süßmaisbrot,Früchten", es = "horno de barro,pan de maíz dulce,fruta", fr = "four d'argile,pain de maïs,fruits", ja = "粘土窯,スイートコーンパン,果物", ru = "глиняной печи,сладкий хлеб,фруктами"}
+
+[[group]]
+# HT3*  It is the most western town in the region.（原帖 Hunt Text 3*，Solution 写 Tampico）
+#       原帖把这条记成「无诗谜」，实际诗就在，只是抄录时漏了。
+ids = ["0x35f48fe3"]
+ans = "Tampico"
+clues = {zh = "最西边,地区", de = "westlichste,Region", es = "occidental,región", fr = "ouest,région", ja = "最も西,地域", ru = "самом западе,город"}

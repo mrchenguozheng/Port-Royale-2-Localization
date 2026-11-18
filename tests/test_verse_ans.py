@@ -43,8 +43,10 @@ class TestVerseQueue(unittest.TestCase):
         self.assertEqual(set(got), want)
 
     def test_group_is_one_same_verse(self):
+        # 尾空白不算区别：0x35f48fdd 比 0x35f48fde 只多一个尾空格（09 卷第一百一十三节
+        # 已按同一条计），组里两条仍是同一首谜面。
         for g in self.groups:
-            texts = {self.en[k] for k in g["ids"]}
+            texts = {self.en[k].strip() for k in g["ids"]}
             self.assertEqual(len(texts), 1, g["ids"])
 
     def test_filled_groups_have_usable_clues(self):

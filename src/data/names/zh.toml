@@ -100,3 +100,12 @@ default = "圣托马斯"
 
 ["Martinique"]
 default = "马提尼克"
+
+["Tampa"]
+default = "坦帕"
+
+["Eleuthera"]
+default = "伊留瑟拉"
+
+["Tampico"]
+default = "坦皮科"

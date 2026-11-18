@@ -113,3 +113,12 @@ default = "San Thoma"
 
 ["Martinique"]
 default = "Martinique"
+
+["Tampa"]
+default = "Tampa"
+
+["Eleuthera"]
+default = "Eleuthera"
+
+["Tampico"]
+default = "Tampico"

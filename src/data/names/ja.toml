@@ -113,3 +113,12 @@ default = "サントマ"
 
 ["Martinique"]
 default = "マルティニーク"
+
+["Tampa"]
+default = "タンパ"
+
+["Eleuthera"]
+default = "エリューセラ"
+
+["Tampico"]
+default = "タンピコ"

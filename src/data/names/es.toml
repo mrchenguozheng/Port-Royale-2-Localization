@@ -113,3 +113,12 @@ default = "Santo Tomás"
 
 ["Martinique"]
 default = "Martinica"
+
+["Tampa"]
+default = "Tampa"
+
+["Eleuthera"]
+default = "Eleuthera"
+
+["Tampico"]
+default = "Tampico"
