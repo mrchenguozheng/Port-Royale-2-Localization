@@ -167,7 +167,7 @@ def main(argv):
     # 所以走 strict_warns：在构建之前必须清零，不能降级成 W 留着。
     mwarn = []
     for p in MK.check_doc(lang, tr_raw, entities=MK.load_entities(), warns=mwarn,
-                          strict_warns=True):
+                          strict_warns=True, require_ans_meta=True):
         E.append(("标注", "标注", p))
 
     # 诗谜整片不许挂 town/lit/term：谜面的用词由韵脚和字数决定，这几种标注会把词冻成

@@ -1032,6 +1032,34 @@ class TestCertaintyAndSource(unittest.TestCase):
         self.bad("source=manual:/etc/passwd@sha256-%s" % dg, "相对路径")
         self.bad("source=manual:../x.toml@sha256-%s" % dg, "跳出仓库")
 
+    def test_manual_anchor_is_a_real_heading(self):
+        # 锚点写真实小节标题：三种引号都收，标题必须逐字存在于目标文件里
+        import hashlib
+        path = "docs/_src/pr2-treasure-hunts.md"
+        with open(os.path.join(M.ROOT, path), "rb") as fh:
+            dg = hashlib.sha256(fh.read()).hexdigest()[:12]
+        for q in ("`", "'", '"'):
+            self.assertEqual(
+                self.ok("source=manual:%s@sha256-%s#%sHunt Text 12%s" % (path, dg, q, q)),
+                "He went north in August.")
+        self.bad("source=manual:%s@sha256-%s#`Hunt Text 99`" % (path, dg), "不在")
+        self.bad("source=manual:%s@sha256-%s#ch12" % (path, dg), "已退役")
+
+    def test_url_accepts_three_quotes(self):
+        for q in ("'", '"', "`"):
+            self.assertEqual(
+                self.ok("source=url:%shttps://example.com/a%s" % (q, q)),
+                "He went north in August.")
+            self.assertEqual(self.ok("source=%shttps://example.com/a%s" % (q, q)),
+                             "He went north in August.")
+        # 外层单引号里带撇号：转义成 \'
+        self.assertEqual(self.ok("source='https://example.com/it\\'s'"),
+                         "He went north in August.")
+
+    def test_local_is_a_bare_category(self):
+        self.assertEqual(self.ok("source=original-en&local"), "He went north in August.")
+        self.bad("source=local:00000001", "不带指向")
+
     def test_unknown_source_category(self):
         self.bad("source=hearsay", "没有类别")
 
@@ -1064,6 +1092,51 @@ class TestCertaintyAndSource(unittest.TestCase):
 
     def test_single_candidate_without_either_is_fine(self):
         self.assertEqual(self.ok("certainty=certain"), self.EITHER_BODY)
+
+
+class TestRiddleStricter(unittest.TestCase):
+    """一条文本只许一个 riddle；certainty/source 在构建前复核档必写；local 是自写谜面。"""
+
+    H = "0x00000001"
+    ONE = "[riddle:answer=San Juan;group=00000001;clue=island]An island."
+    TWO = ("[riddle:answer=San Juan;group=00000001;clue=island;certainty=certain"
+           ";source=original-en&local]An island.")
+
+    @staticmethod
+    def _ent():
+        return {"San Juan": {}}
+
+    def test_two_riddle_marks_in_one_text(self):
+        doc = {self.H: self.ONE + " [riddle:answer=Havana;group=00000001;clue=gold]Gold."}
+        problems = M.check_doc("zh", doc, entities={"San Juan": {}, "Havana": {}}, terms={})
+        self.assertTrue(any("只能写一个" in p for p in problems), problems)
+
+    def test_expand_rejects_two_marks(self):
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:answer=San Juan;group=00000001;clue=island]An island. "
+                     "[riddle:answer=San Juan;group=00000001;clue=island]An island.",
+                     TABLE, "zh")
+        self.assertIn("只能写一个", str(ctx.exception))
+
+    def test_meta_required_only_in_strict_mode(self):
+        doc = {self.H: self.ONE}
+        self.assertEqual(M.check_doc("zh", doc, entities=self._ent(), terms={}), [])
+        problems = M.check_doc("zh", doc, entities=self._ent(), terms={},
+                               require_ans_meta=True)
+        self.assertTrue(any("certainty" in p for p in problems), problems)
+        self.assertTrue(any("source" in p for p in problems), problems)
+
+    def test_meta_complete_passes_strict(self):
+        self.assertEqual(
+            M.check_doc("zh", {self.H: self.TWO}, entities=self._ent(), terms={},
+                        require_ans_meta=True), [])
+
+    def test_inferred_cannot_be_only_original_or_local(self):
+        for tail in ("source=original-en&local", "source=local"):
+            with self.assertRaises(M.MarkError) as ctx:
+                M.expand("[riddle:answer=San Juan;group=00000001;clue=island"
+                         ";certainty=inferred;%s]An island." % tail, TABLE, "zh")
+            self.assertIn("没有外部依据", str(ctx.exception))
 
 
 if __name__ == "__main__":

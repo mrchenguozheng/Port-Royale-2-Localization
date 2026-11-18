@@ -16,13 +16,19 @@
     [lit:%2 %1日]               字面照写，原文保留
     [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
     [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
-    [riddle:answer=Corpus Christi;clue=荒凉+遗弃]
+    [riddle:answer=Corpus Christi;group=35f48f6c;clue=荒凉,遗弃;
+            certainty=inferred;source=original-en&manual:docs/_src/x.md@sha256-ab12cd34ef56#"小节标题"]
                                 诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
-                                字段：`answer=` 谜底（`|` 是「或」的候选），
+                                字段（`;` 分隔；answer=/town=/direction= 三选一，其余不重复）：
+                                `answer=` 谜底（`|` 是「或」的候选），
                                 `group=` 同组全体成员的文本键（`,` 分隔、含本条自己，
-                                       单副本就写自己那一个键），
-                                `clue=` 线索（`,` 分隔、每项都必须在谜面正文里出现）。
-                                answer 正常不写类型：方位键照写原词（east / not_north），
+                                       单副本就写自己那一个键；一条文本只许一个 riddle），
+                                `clue=` 线索（`,` 分隔、每项都必须在谜面正文里出现），
+                                `certainty=` certain / inferred / either / disputed，
+                                `source=` 依据（`+`/`&` 并列，类别见 ANS_SOURCE_*）。
+                                certainty 与 source 在构建前复核时必写（check_doc 的
+                                require_ans_meta，见 09 卷第一百零九节）。
+                                answer 正常不写类型：方位键照写原词（east / -north / not north），
                                 其余一律按城镇查 entities.toml；只有城名与方位键撞名
                                 （目前 0 例）才写 town: / direction: 消歧。
                                 clue 的每一**项**两种形状都认：
@@ -30,15 +36,18 @@
                                    自造标签静默，字母开头的未知标签报 warning），
                                   裸写 `<正文>`（不带标签，直接当正文片段）。
                                 两种形状里的值都必须是**谜面正文里逐字出现的片段**；
-                                值里含 `,`／`:`／`+` 就把整项用引号包起来（`"…"`／`'…'`／`` `…` ``），
-                                引号里可以写另外两种引号、不能写同一种。
+                                值里含 `:`／`+`／全角「，」就整项加引号——不加引号这三者是语法
+                                （标签分隔／已退役并值／误输入的分隔符），加了才是正文；`;` 例外，
+                                它在解析 clue 之前就切字段，引号保不住，只能改写或换词。
+                                引号三种半角等价（`"…"`／`'…'`／`` `…` ``），里可写另外两种；
+                                同种引号用反斜杠转义（`\"`、`\\`），见 09 卷第一百零八节。
                                 展开时逐条核对——
                                 写不出线索就说明这条谜面根本推不到这个答案（或线索该改）。
                                 谜底/线索都不生成本文，也不许把答案照抄成 town，
                                 否则既泄底又冻死用词（见 09 卷第六十三、六十四节）
-                                谜底也可以只写方位（`direction:east`），那批谜面只说朝向，
-                                写不出城名（09 卷第七十二节）。
-                                字段语法见 09 卷第七十八、七十九节。
+                                谜底也可以只写方位（`direction=east`，或 `answer=east`），
+                                那批谜面只说朝向，写不出城名（09 卷第七十二节）。
+                                字段语法见 09 卷第七十八、七十九、一百零九节。
 
 为什么不用成对标记
 ------------------
@@ -261,11 +270,7 @@ ANS_ANSWER_FIELDS = ("answer", "town", "direction")
 ANS_FIELDS = ANS_ANSWER_FIELDS + ("group", "clue", "certainty", "source")
 
 #: 谜底的两种类型。正常**不写**：值在方位键里就是方位，否则按城镇查 entities.toml；
-#: 只有城名与方位键撞名（目前 0 例）才需要在字段名上写明。
-ANS_NAME_KINDS = ("town", "direction")
-
-#: answer 的类型前缀。正常**不写**：值在方位键里就是方位，否则按城镇查 entities.toml。
-#: 只有城名与方位键撞名（目前 0 例）才需要 `town:` / `direction:` 消歧。
+#: 只有城名与方位键撞名（目前 0 例）才需要在字段名上写明（`town=` / `direction=`）。
 ANS_NAME_KINDS = ("town", "direction")
 
 #: group 列的是「同组全体成员」的文本键：8 位小写十六进制、**不带 0x**，
@@ -295,14 +300,16 @@ ANS_SOURCE_LANGS = ("de", "en", "es", "fr", "pl", "ru")
 #: 带指向的网页来源：只有一个 `url`（`steam` / `forum` 已合并进来——那两个类别只是
 #: 用域名互相排斥，而域名本来就写在 URL 里，分类等于让人多记一个词）。
 ANS_SOURCE_URLS = ("url",)
-ANS_SOURCE_BARE = ("cargo", "map")
+#: 只记类别、不带指向的来源：`cargo` 是货物清单推出来的，`map` 是地图实测，
+#: `local` 是本语言自己写的谜面（不是从任何一版原文推来的，见 09 卷第一百零九节）。
+ANS_SOURCE_BARE = ("cargo", "map", "local")
 
 #: 弯引号/全角引号：`_wide_char` 认不出它们（NFKC 不变），只在这些字符进到 source 时点名。
 _CURLY_QUOTES = "\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u201f\u00ab\u00bb\u300c\u300d"
 _QUOTE_PAIRS = {"'": "'", '"': '"', "`": "`"}
 #: manual 的摘要算法前缀允许值（12 位小写十六进制），语法上容得下换算法。
 _DIGEST_RX = re.compile(r"^(sha256|md5|blake2b)-([0-9a-f]{12})$")
-_ANCHOR_RX = re.compile(r"^(p\d+|ch\d+)$")
+_ANCHOR_RX = re.compile(r"^p\d+$")
 _SHA_CACHE = {}
 
 
@@ -464,9 +471,9 @@ def _group_tokens(raw, hid):
     「单副本」也有明确写法（`group=<自己>`），于是没写 group 与写了但漏人分得清；
     组员集合可以直接拿两边的键列表相等来比，不用再补一条自己。
 
-    并列符与 `clue` 一致，只用 `,`：`group=00000001,00000002`。`+` 在这里退役（`+` 只在
-    `source=riddle:` 连键时还留着），理由与第一百零六节同——同一个符号不该在两个字段里
-    表示两种并列。
+    并列符与 `clue` 一致，只用 `,`：`group=00000001,00000002`。`+` 在这里退役，`source=`
+    的并列项另有 `+` / `&`（那是「几个来源」，不是同一种并列）——理由与第一百零六、
+    一百零八节同：同一个符号不在一个字段里表示两种并列。
     """
     toks = [t.strip() for t in raw.split(",")]
     if any(not t for t in toks):
@@ -638,8 +645,34 @@ def _digest12(path, algo):
     return got
 
 
+def _headings(full):
+    """目标文件里的 markdown 标题集合（`#`…`######` 后面那段文本，去两侧空白）。
+
+    带 mtime 缓存：同一份参考文件被几十条 source 反复指到，不该反复读盘。
+    """
+    st = os.stat(full)
+    key = (full, st.st_size, int(st.st_mtime))
+    if key in _SHA_CACHE:
+        return _SHA_CACHE[key]
+    with io.open(full, encoding="utf-8") as fh:
+        text = fh.read()
+    found = set()
+    for line in text.splitlines():
+        m = re.match(r"^#{1,6}[ \t]+(.*\S)\s*$", line)
+        if m:
+            found.add(m.group(1).strip())
+    _SHA_CACHE[key] = found
+    return found
+
+
 def _check_manual(tail, hid):
-    """`manual:仓库内路径@sha256-<12 位>[#pNN|#chNN]`：路径必须在仓库内、摘要必须对得上。"""
+    """`manual:仓库内路径@sha256-<12 位>[#"小节标题"|#pNN]`：路径在仓库内、摘要对得上、
+    指到的小节标题真在目标文件里。
+
+    锚点两种：`#"标题"` 指到 markdown 小节（三种半角引号都收，标题必须逐字存在于该文件
+    的同级标题里）；`#pNN` 只记页码形状、不校验（留给分页文档）。旧的 `#chNN` 已退役：
+    它只是自造编号，校验不了，等于把「指到哪一章」写成了一句无法核对的话。
+    """
     if "@" not in tail:
         raise MarkError("%s：manual 要写成 路径@sha256-<12 位>（缺 @摘要）" % hid)
     path, _, rest = tail.partition("@")
@@ -655,9 +688,17 @@ def _check_manual(tail, hid):
     if "#" in rest:
         rest, _, anchor = rest.partition("#")
         anchor = anchor.strip()
-        if not _ANCHOR_RX.match(anchor):
-            raise MarkError("%s：manual 的锚点只写 #pNN（页）或 #chNN（章），收到 %r"
-                            % (hid, anchor))
+        if anchor[:1] in _QUOTE_PAIRS:
+            title = _unquote(anchor, hid, "锚点")
+            anchor = ("title", title)
+        elif _ANCHOR_RX.match(anchor):
+            anchor = ("page", anchor)
+        elif re.match(r"^ch\d+$", anchor):
+            raise MarkError("%s：manual 的 #%s 这种自造章号已退役——写成 #\"小节标题\""
+                            "（标题必须真在目标文件里）" % (hid, anchor))
+        else:
+            raise MarkError("%s：manual 的锚点要么写 #\"小节标题\"，要么写 #pNN（页），"
+                            "收到 %r" % (hid, anchor))
     m = _DIGEST_RX.match(rest)
     if not m:
         raise MarkError("%s：manual 的摘要要写成 sha256-<12 位小写十六进制>（收到 %r）"
@@ -669,6 +710,16 @@ def _check_manual(tail, hid):
     if got != m.group(2):
         raise MarkError("%s：manual 的 %s 对不上：写的是 %s，文件里算出来是 %s"
                         % (hid, m.group(1), m.group(2), got))
+    if anchor and anchor[0] == "title":
+        heads = _headings(full)
+        if anchor[1] not in heads:
+            near = sorted(h for h in heads if anchor[1].split()[0] in h)[:3]
+            raise MarkError("%s：manual 指到的小节 %r 不在 %s 的标题里%s"
+                            % (hid, anchor[1], path,
+                               ("（相近的有：%s）" % " / ".join(near)) if near else ""))
+        anchor = anchor[1]
+    elif anchor:
+        anchor = anchor[1]
     return (path, rest, anchor)
 
 
@@ -731,13 +782,11 @@ def _check_source(raw, hid):
     items = _split_source_items(raw, hid)
     if any(not i for i in items):
         raise MarkError("%s：source 里有空项（多打了 `+` 或 `&`？）" % hid)
-    merged = items
     for ch in _CURLY_QUOTES:
-        if ch in raw and ch not in "".join(_unquote(i, hid) for i in merged
+        if ch in raw and ch not in "".join(_unquote(i, hid) for i in items
                                            if i[:1] in _QUOTE_PAIRS):
             raise MarkError("%s：source 里有弯引号/全角引号 %r——只认半角 ' 或 \""
                             % (hid, ch))
-    return [_check_source_item(i, hid) for i in merged]
     return [_check_source_item(i, hid) for i in items]
 
 
@@ -841,7 +890,7 @@ def _clue_item(part, hid, warns=None):
 
 
 def _split_ans(arg, hid="", warns=None):
-    """`[riddle:answer=城|城;group=00000001+00000002;clue=pun:August, "North, by sea"]`
+    """`[riddle:answer=城|城;group=00000001,00000002;clue=pun:August, "North, by sea"]`
     → ([(类型|None, 值)…], [同组其余副本的键…], [(类型|None, 词)…])。
 
     `answer` 里 `|` 是「或」（多个候选），`group` 里 `,` 连接本组全体成员的键（含本条）。
@@ -890,7 +939,7 @@ def _split_ans(arg, hid="", warns=None):
     if not has_answer:
         raise MarkError(
             "%s：ans 缺谜底字段（answer=城、town=城、direction=方位 三选一；"
-            "线索写 clue=direction:东,…）" % hid)
+            "线索写 clue=东,四座）" % hid)
     answers = _answer_items(fields["answer"], hid, kind)
     group = _group_tokens(fields["group"], hid) if "group" in fields else []
 
@@ -920,12 +969,12 @@ def _split_ans(arg, hid="", warns=None):
                             % (hid, " / ".join(ANS_CERTAINTY), certainty))
     sources = _check_source(fields["source"], hid) if "source" in fields else []
     if certainty == "inferred":
-        # inferred 是「靠别的证据推出来的」，所以必须写清推自哪里，且不能只说原文。
+        # inferred 是「靠别的证据推出来的」，所以必须写清推自哪里，且不能只说原文或自写。
         if not sources:
             raise MarkError("%s：certainty=inferred 必须写 source（推自哪份材料）" % hid)
-        if all(kind == "original" for kind, _t in sources):
-            raise MarkError("%s：certainty=inferred 的 source 不能只有 original-*"
-                            "（原文直接推得出就该写 certain）" % hid)
+        if all(kind in ("original", "local") for kind, _t in sources):
+            raise MarkError("%s：certainty=inferred 的 source 不能只有 original-*/local"
+                            "（没有外部依据就该写 certain）" % hid)
     # either 是「两个地点都成立」，答案用 `|` 列全。反向不设禁令：`|` 既可能是两座城，
     # 也可能同一座城的异写（`San Juan|St. Juan`），机器只数得出候选个数、分不清哪种，
     # 所以「多候选却没写 either」不报错，由作者自己交代清楚。
@@ -997,6 +1046,9 @@ def expand(text, table, lang, hid="", terms=None, doc=None):
     rest = "".join(out)
     if _ANY_BRACKET.search(rest):
         raise MarkError("%s：展开后仍残留方括号（正文里不许出现 `[` 或 `]`）" % hid)
+    if len(ans_args) > 1:
+        raise MarkError("%s：一条文本里只能写一个 [riddle:…]（收到 %d 个）"
+                        % (hid, len(ans_args)))
     for arg in ans_args:
         _check_ans(arg, rest, hid)
     return rest
@@ -1116,7 +1168,8 @@ def _dead_entries(problems, label, table, used, doc, lang):
             % (label, name))
 
 
-def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=False):
+def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=False,
+              require_ans_meta=False):
     """返回问题列表（空 = 通过）。构建前和 lint 共用这一份判据。
 
     town 查 names 表、term 查 terms 表、ref 查本语言译文（只许一层），两边都是
@@ -1126,6 +1179,9 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
     记进去。`strict_warns=True` 时这些条目同时算问题：构建前的复核走这一档，
     因为这种标签只做关键词扫描、没有任何校验，留在译文里等于放过拼错的类型名。
     `_` 开头的自造标签是显式声明，静默。
+
+    `require_ans_meta=True` 时每条 riddle 都必须写 `certainty=` 与 `source=`（构建前的
+    复核走这一档；语法解析期不强制，方便先写谜面再补依据）。见 09 卷第一百零九节。
     """
     problems = []
     warn_start = len(warns) if warns is not None else 0
@@ -1148,6 +1204,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
         except MarkError as e:
             problems.append(str(e))
             continue
+        riddle_marks = 0
         for key, arg in marks:
             if key == "term":
                 try:
@@ -1156,6 +1213,13 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
                     problems.append(str(e))
                 continue
             if key == "riddle":
+                riddle_marks += 1
+                if riddle_marks > 1:
+                    # 第二条 riddle 会把第一条的组信息覆盖掉（ans_groups[hid] 只留最后一个），
+                    # 组内比对与统计就看不见第一条了——一条文本只许一个谜底标注。
+                    problems.append("%s：一条文本里只能写一个 [riddle:…]（第二条会覆盖"
+                                    "第一条的组信息）" % hid)
+                    continue
                 # 谜底必须登记过实体，线索必须真的在谜面里——否则「这条谜面指向
                 # 哪座城」无从核对，标注就退化成一条注释。答案本身不查译名：
                 # 诗里不照抄译名。
@@ -1165,6 +1229,15 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
                 except MarkError as e:
                     problems.append(str(e))
                     continue
+                if require_ans_meta:
+                    if certainty is None:
+                        problems.append(
+                            "%s：ans 缺 certainty（certain / inferred / either / disputed 必写）"
+                            % hid)
+                    if not sources:
+                        problems.append(
+                            "%s：ans 缺 source（original-* / retail-* / fan-* / url / manual / "
+                            "riddle / cargo / map / local 必写一项）" % hid)
                 # source 里指到别的诗谜时，目标必须存在、真带 riddle 标注、且不是自己。
                 for kind_src, target in sources:
                     if kind_src != "riddle":
