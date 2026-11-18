@@ -19,8 +19,9 @@
     [riddle:answer=Corpus Christi;clue=荒凉+遗弃]
                                 诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
                                 字段：`answer=` 谜底（`|` 是「或」的候选），
-                                `group=` 同组其余副本的文本键（`+` 连接，单副本不写），
-                                `clue=` 线索（`,` 分隔、`+` 并值）。
+                                `group=` 同组全体成员的文本键（`,` 分隔、含本条自己，
+                                       单副本就写自己那一个键），
+                                `clue=` 线索（`,` 分隔、每项都必须在谜面正文里出现）。
                                 answer 正常不写类型：方位键照写原词（east / not_north），
                                 其余一律按城镇查 entities.toml；只有城名与方位键撞名
                                 （目前 0 例）才写 town: / direction: 消歧。
@@ -29,7 +30,8 @@
                                    自造标签静默，字母开头的未知标签报 warning），
                                   裸写 `<正文>`（不带标签，直接当正文片段）。
                                 两种形状里的值都必须是**谜面正文里逐字出现的片段**；
-                                `+` 并的多个值「都要出现」。值里含冒号就只能带标签写。
+                                值里含 `,`／`:`／`+` 就把整项用引号包起来（`"…"`／`'…'`／`` `…` ``），
+                                引号里可以写另外两种引号、不能写同一种。
                                 展开时逐条核对——
                                 写不出线索就说明这条谜面根本推不到这个答案（或线索该改）。
                                 谜底/线索都不生成本文，也不许把答案照抄成 town，
@@ -252,7 +254,7 @@ def _ref_target(arg, doc, hid=""):
 
 
 #: `[riddle:]` 的字段名。`;` 分字段：`answer=` 谜底（`|` 是「或」），
-#: `group=` 同组其余副本的键（`+` 连接），`clue=` 线索（`,` 分隔、`+` 同标签并值）。
+#: `group=` 同组全体成员的键（`,` 分隔、含自己），`clue=` 线索（`,` 分隔、每项都要出现）。
 #: 谜底字段：`answer=` 靠值推断类型；`town=` / `direction=` 把类型明写出来，
 #: 因此可以省掉 `answer=`——两者只能出现一处。
 ANS_ANSWER_FIELDS = ("answer", "town", "direction")
@@ -297,7 +299,7 @@ ANS_SOURCE_BARE = ("cargo", "map")
 
 #: 弯引号/全角引号：`_wide_char` 认不出它们（NFKC 不变），只在这些字符进到 source 时点名。
 _CURLY_QUOTES = "\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u201f\u00ab\u00bb\u300c\u300d"
-_QUOTE_PAIRS = {"'": "'", '"': '"'}
+_QUOTE_PAIRS = {"'": "'", '"': '"', "`": "`"}
 #: manual 的摘要算法前缀允许值（12 位小写十六进制），语法上容得下换算法。
 _DIGEST_RX = re.compile(r"^(sha256|md5|blake2b)-([0-9a-f]{12})$")
 _ANCHOR_RX = re.compile(r"^(p\d+|ch\d+)$")
@@ -461,10 +463,14 @@ def _group_tokens(raw, hid):
     `hid` 是本文键（`0x` 形式），比对时去掉前缀。列全组含自己有两个好处：
     「单副本」也有明确写法（`group=<自己>`），于是没写 group 与写了但漏人分得清；
     组员集合可以直接拿两边的键列表相等来比，不用再补一条自己。
+
+    并列符与 `clue` 一致，只用 `,`：`group=00000001,00000002`。`+` 在这里退役（`+` 只在
+    `source=riddle:` 连键时还留着），理由与第一百零六节同——同一个符号不该在两个字段里
+    表示两种并列。
     """
-    toks = [t.strip() for t in raw.split("+")]
+    toks = [t.strip() for t in raw.split(",")]
     if any(not t for t in toks):
-        raise MarkError("%s：ans 的 group 里 `+` 两侧都要写键（收到 %r）" % (hid, raw))
+        raise MarkError("%s：ans 的 group 里 `,` 两侧都要写键（收到 %r）" % (hid, raw))
     self_bare = hid[2:] if hid.startswith("0x") else hid
     for t in toks:
         if not ANS_KEY_RX.match(t):
@@ -474,7 +480,7 @@ def _group_tokens(raw, hid):
         raise MarkError("%s：ans 的 group 里有重复的键" % hid)
     if toks != sorted(toks):
         raise MarkError("%s：group 的键要按十六进制升序排列（收到 %s）"
-                        % (hid, "+".join(toks)))
+                        % (hid, ",".join(toks)))
     if self_bare and self_bare not in toks:
         raise MarkError("%s：group 里漏了本条自己（group 列整组含自己：单副本写 "
                         "group=%s）" % (hid, self_bare))
@@ -532,20 +538,21 @@ def _split_source_items(raw, hid):
 def _unquote(raw, hid, what="URL"):
     """取引号里的内容：必须成对、同种、紧贴；里面不能再出现同种引号。
 
-    另一种引号是允许的——双引号里可以写 `'`，单引号里可以写 `"`，这样正文里带撇号
-    的短语（`"l'abondance"`）和带双引号的短语各有可选的外层。弯引号一律不认。
+    另外两种引号是允许的——双引号里可以写 `'` 或 `` ` ``，单引号里可以写 `"` 或 `` ` ``，
+    反引号里可以写 `'` 或 `"`。这样正文里带撇号的短语（`"l'abondance"`）、带双引号的
+    短语（`'say "hi"'`）、两种都带的短语（`` `a "b" c'd` ``）各有可选的外层。弯引号一律不认。
     """
     text = raw.strip()
     if not text or text[0] not in _QUOTE_PAIRS:
-        raise MarkError("%s：%s 要用引号包起来（半角单引号 '…' 或双引号 \"…\"，收到 %r）"
-                        % (hid, what, raw))
+        raise MarkError("%s：%s 要用引号包起来（半角单引号 '…'／双引号 \"…\"／反引号 `…`，"
+                        "收到 %r）" % (hid, what, raw))
     q = text[0]
     if len(text) < 2 or text[-1] != q:
         raise MarkError("%s：%s 的引号没成对（收到 %r）" % (hid, what, raw))
     inner = text[1:-1]
     for ch in _CURLY_QUOTES:
         if ch in inner:
-            raise MarkError("%s：%s 里有弯引号/全角引号 %r——只认半角 ' 或 \""
+            raise MarkError("%s：%s 里有弯引号/全角引号 %r——只认半角 '／\"／`"
                             % (hid, what, ch))
     if q in inner:
         raise MarkError("%s：%s 的引号里不能再出现同种引号 %r（换另一种外层引号）"
@@ -723,7 +730,7 @@ def _clue_item_head(buf):
 def split_clue_items(raw, hid=""):
     """按顶层 `,` 切 clue 项，引号里的逗号不算分隔；返回原项串列表（引号原样保留）。
 
-    项可以整段用引号包起来（`"Good! Very good!"`），也可以裸写；引号只认半角 `'` / `"`，
+    项可以整段用引号包起来（`"Good! Very good!"`），也可以裸写；引号认半角 `'` / `"` / `` ` ``，
     且必须紧贴项首（标签前缀之后也算项首，`pun:"12:30"` 成立）。逗号后的空白不计。
     """
     items, buf, quote = [], [], None
@@ -791,13 +798,14 @@ def _split_ans(arg, hid="", warns=None):
     """`[riddle:answer=城|城;group=00000001+00000002;clue=pun:August, "North, by sea"]`
     → ([(类型|None, 值)…], [同组其余副本的键…], [(类型|None, 词)…])。
 
-    `answer` 里 `|` 是「或」（多个候选），`group` 里 `+` 连接本组全体成员的键（含本条）。
+    `answer` 里 `|` 是「或」（多个候选），`group` 里 `,` 连接本组全体成员的键（含本条）。
     `clue` 里 `,` 是唯一的并列符（每项都要在谜面正文里逐字出现）：`a,b,c` 三项。
     唯一保留的已知标签是 `pun`；`_` 开头的自造标签静默，字母开头的未知标签（含已退役的
     direction / count / feature / produce / history / exclude）只当关键词并往 `warns`
     记一条（多半是拼错；lint 算 E 级，构建前必须清零）。
-    项里带冒号 `:` 或加号 `+` 时整项必须用引号包起来（`"12:30"`、`"a+b"`）：这两个字符
-    在裸写里是语法（标签分隔 / 已退役的并值），加引号才是正文。
+    项里带逗号 `,`、冒号 `:` 或加号 `+` 时整项必须用引号包起来（`"Good, very good!"`、
+    `"12:30"`、`"a+b"`）：这些字符在裸写里是语法（项分隔 / 标签分隔 / 已退役的并值），
+    加引号才是正文。
     `answer` 正常不写类型（值在方位键里算方位，否则按城镇查表）；想明写类型就改用
     `town=` / `direction=` 这两个字段名，此时可以省掉 `answer=`：
     `[riddle:town=Vera Cruz;clue=…]` / `[riddle:direction=SE;clue=…]`。

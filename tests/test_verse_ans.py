@@ -96,10 +96,11 @@ class TestClueText(unittest.TestCase):
         self.assertEqual(VA.clue_text(["12:30", "I'm a captain", "a+b"], [], "en"),
                          "\"12:30\",I'm a captain,\"a+b\"")
         self.assertEqual(VA.clue_text(['say "hi"'], [], "en"), 'say "hi"')
-        # 值里有双引号又必须加引号时换单引号外层；两种都有就没法表示
+        # 值里有双引号又必须加引号时换单引号外层；再不行换反引号；三种都有才没法表示
         self.assertEqual(VA.clue_text(['say "hi", twice'], [], "en"), "'say \"hi\", twice'")
+        self.assertEqual(VA.clue_text(['a,b"c\'d'], [], "en"), '`a,b"c\'d`')
         with self.assertRaises(SystemExit):
-            VA.clue_text(['a,b"c\'d'], [], "en")
+            VA.clue_text(['a,b"c\'d`e'], [], "en")
 
     def test_count_mismatch_stops(self):
         with self.assertRaises(SystemExit):
@@ -141,8 +142,14 @@ class TestMarkKey(unittest.TestCase):
 
     def test_group_prefix_and_order_are_tolerated(self):
         self.assertEqual(
-            self.key("[riddle:answer=Vera Cruz;group=0x00000002+0x00000001;clue=count:三座]"),
-            self.key("[riddle:answer=Vera Cruz;group=00000001+00000002;clue=count:三座]"))
+            self.key("[riddle:answer=Vera Cruz;group=0x00000002,0x00000001;clue=count:三座]"),
+            self.key("[riddle:answer=Vera Cruz;group=00000001,00000002;clue=count:三座]"))
+
+    def test_old_group_plus_counts_as_same_value(self):
+        # 旧写法 `a+b` 只为让 --apply 把「分隔符变了」规范化，不当成冲突
+        self.assertEqual(
+            self.key("[riddle:answer=Vera Cruz;group=00000001+00000002;clue=count:三座]"),
+            self.key("[riddle:answer=Vera Cruz;group=00000001,00000002;clue=count:三座]"))
 
     def test_different_clue_still_differs(self):
         self.assertNotEqual(

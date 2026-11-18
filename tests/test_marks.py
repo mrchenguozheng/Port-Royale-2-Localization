@@ -155,10 +155,10 @@ class TestAnswerMark(unittest.TestCase):
 
     `answer` 正常不写类型：值在方位键里算方位，其余按城镇查 entities.toml，
     只有撞名才改用 town= / direction= 字段把类型写明（`kw` 已删）；`|` 是「或」的候选。
-    `group` 列同组其余副本的文本键，`+` 连接，单副本不写。
+    `group` 列同组全体成员的文本键（含本条自己），`,` 连接；单副本写自己那一个键。
     `clue` 的每一项两种形状都认：`<标签>:<正文>`（唯一已知类型是 `pun`，其余标签含退役的
     direction / feature 都只当关键词并记 warning；`_` 开头的自造标签静默）与裸写的
-    `<正文>`；`+` 并值，语义仍是「都要成立」。
+    `<正文>`；`,` 并列，每一项都要在谜面里出现；值里带 `,` `:` `+` 就整项加引号。
     """
 
     VERSE = "[riddle:answer=St. Augustine;group=00000001;clue=pun:August,north]He left for the north in August."
@@ -441,8 +441,8 @@ class TestAnswerMark(unittest.TestCase):
     def test_town_answer_case_variants_share_group_signature(self):
         # 组内副本用不同大小写写同一个城名，归一后是同一串谜底，不能报不一致
         ents = {"Vera Cruz": {}}
-        doc = {"0x00000001": "[riddle:town=vera cruz;group=00000001+00000002;clue=count:三座]三座城镇。",
-               "0x00000002": "[riddle:town=VERA CRUZ;group=00000001+00000002;clue=count:三座]三座城镇。"}
+        doc = {"0x00000001": "[riddle:town=vera cruz;group=00000001,00000002;clue=count:三座]三座城镇。",
+               "0x00000002": "[riddle:town=VERA CRUZ;group=00000001,00000002;clue=count:三座]三座城镇。"}
         self.assertEqual(M.check_doc("zh", doc, entities=ents, terms={}), [])
 
     def test_bare_answer_matching_town_is_lenient(self):
@@ -462,8 +462,8 @@ class TestAnswerMark(unittest.TestCase):
 
     def test_typed_field_with_group_is_fine(self):
         # 省略 answer= 后 group/clue 照旧；group 列全组含自己，8 位不带 0x
-        doc = {"0x00000001": "[riddle:town=Vera Cruz;group=00000001+00000002;clue=count:三座]三座城镇。",
-               "0x00000002": "[riddle:town=Vera Cruz;group=00000001+00000002;clue=count:三座]三座城镇。"}
+        doc = {"0x00000001": "[riddle:town=Vera Cruz;group=00000001,00000002;clue=count:三座]三座城镇。",
+               "0x00000002": "[riddle:town=Vera Cruz;group=00000001,00000002;clue=count:三座]三座城镇。"}
         self.assertEqual(M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={}), [])
 
     def test_answer_and_typed_field_conflict(self):
@@ -586,6 +586,24 @@ class TestAnswerMark(unittest.TestCase):
             M.expand("[riddle:answer=St. Augustine;group=00000001;clue=\"a \"b\" c\"]"
                      "a \"b\" c", TABLE, "zh")
 
+    def test_backtick_is_a_third_quote(self):
+        # 反引号也是外层引号：项里同时有单引号与双引号时用它包
+        body = "He said it's \"good, very good\" twice."
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;"
+                     "clue=`it's \"good, very good\"`]" + body, TABLE, "zh"),
+            body)
+        # 反引号里写反引号同样报错
+        with self.assertRaises(M.MarkError):
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=`a `b`]a `b",
+                     TABLE, "zh")
+        # URL 也共用
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=August;"
+                     "certainty=certain;source=url:`//example.com/it's`]He went north in August.",
+                     TABLE, "zh"),
+            "He went north in August.")
+
     def test_quoted_value_needs_pairing(self):
         for bad in ("\"白沙", "白沙\"", "\"\"", "白沙,"):
             with self.assertRaises(M.MarkError):
@@ -659,8 +677,8 @@ class TestAnswerGroup(unittest.TestCase):
     S = ";clue=count:三座]三座城镇，X 在最西。"
 
     def _g(self, *keys):
-        """整组的 group 段（含每个成员自己，升序）。"""
-        return ";group=%s" % "+".join(sorted(self._b(k) for k in keys))
+        """整组的 group 段（含每个成员自己，升序，`,` 连接）。"""
+        return ";group=%s" % ",".join(sorted(self._b(k) for k in keys))
 
     def test_symmetric_pair_passes(self):
         same = self._g(self.A, self.B) + self.S
@@ -695,9 +713,16 @@ class TestAnswerGroup(unittest.TestCase):
     def test_unordered_keys_are_error(self):
         # 升序是为了让「同组几条」一眼可比，也让人手写与 --apply 的结果一致
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[riddle:answer=Vera Cruz;group=%s+%s%s"
+            M.expand("[riddle:answer=Vera Cruz;group=%s,%s%s"
                      % (self._b(self.C), self._b(self.A), self.S), TABLE, "zh", self.A)
         self.assertIn("升序", str(ctx.exception))
+
+    def test_plus_in_group_is_gone(self):
+        # group 的并列符与 clue 统一为 `,`；`+` 在这里不再认，报键形错误
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:answer=Vera Cruz;group=%s+%s%s"
+                     % (self._b(self.A), self._b(self.B), self.S), TABLE, "zh", self.A)
+        self.assertIn("8 位小写十六进制", str(ctx.exception))
 
     def test_0x_prefix_is_error(self):
         # 有 0x 就比 8 位多两个字符，且大小写会分叉
@@ -711,9 +736,9 @@ class TestAnswerGroup(unittest.TestCase):
                      TABLE, "zh", self.A)
 
     def test_empty_token_is_error(self):
-        # `+` 两侧都要有键：多打一个 `+` 就是空项
-        for bad in ("%s+" % self._b(self.A), "+%s" % self._b(self.A),
-                    "%s++%s" % (self._b(self.A), self._b(self.B))):
+        # `,` 两侧都要有键：多打一个逗号就是空项；全角「，」不认
+        for bad in ("%s," % self._b(self.A), ",%s" % self._b(self.A),
+                    "%s,,%s" % (self._b(self.A), self._b(self.B))):
             with self.assertRaises(M.MarkError):
                 M.expand("[riddle:answer=Vera Cruz;group=%s%s" % (bad, self.S), TABLE, "zh")
 

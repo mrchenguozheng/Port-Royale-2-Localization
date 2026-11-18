@@ -3,13 +3,15 @@
 
 谜面在 09 卷第六十四节定义的 verse 区间里，整片不挂 town/ref/lit/term，只允许
 [riddle:answer=谜底;group=整组键含自己;clue=线索,…]（`;` 分字段；`answer` 里 `|` 是
-「或」，`group` 里 `+` 连本组全体成员（含本条），`clue` 里 `,` 分项、`+` 并值；
-见 09 卷第七十八、七十九、八十一、八十三节）。`group` 与 `clue` 都必填，单副本写
-`group=<自己的键>`（见第八十九节）。谜底正常写 `answer=`，靠值推断类型；要明写类型就把
-字段名换成 `town=`（城名）或 `direction=`（方位），此时省掉 `answer=`（见第八十六节）。
+「或」，`group` 里 `,` 连本组全体成员（含本条），`clue` 里 `,` 分项；
+见 09 卷第七十八、七十九、八十一、八十三、一百零六、一百零七节）。`group` 与 `clue`
+都必填，单副本写 `group=<自己的键>`（见第八十九节）。谜底正常写 `answer=`，靠值推断
+类型；要明写类型就把字段名换成 `town=`（城名）或 `direction=`（方位），此时省掉
+`answer=`（见第八十六节）。
 `clue` 每项写成 `<标签>:<正文>` 或裸写 `<正文>`：唯一保留的已知类型是 pun，`_` 开头的
 自造标签静默，字母开头的未知标签报 warning；裸写没有标签，整项就是正文片段。
-两种写法里 `+` 都表示并值，语义都是「都要出现在谜面正文里」。
+项里带 `,`／`:`／`+` 就用半角引号包起来（`"…"`／`'…'`／`` `…` ``），引号里可以写另外
+两种、不能写同一种；`I'm`、`l'abondance` 这类撇号在项中间，不必包。
 这个工具只管那一件事：
 
     python src\\tools\\text\\verse_ans.py --list     # 看 41 条 / 29 组，谁还没填
@@ -171,23 +173,28 @@ def clue_value_text(value):
     """一个线索值写进标注串时的形状：能裸写就裸写，需要才加引号。
 
     裸写里 `,` 是项分隔、`:` 是标签分隔、`+` 是已退役的并值符，正文里带这些字符就
-    整项包引号；项首是引号字符（`'tis`）也要包，否则会被当成引号起点。
-    外层优先双引号（英文撇号更常见），值里有 `"` 才换单引号；两种都有就没法表示。
+    整项包引号；项首是引号字符（`'tis`、`"quoted"`、`` `code` ``）也要包，否则会被当成
+    引号起点。外层按「值里没有的那种」挑：先双引号，再单引号，再反引号；三种都占满
+    （值里同时有 `'`、`"`、`` ` ``）就没法表示，只能拆条或改写法。
     """
     v = value or ""
     if not v.strip():
         raise SystemExit("线索值是空的")
     if ";" in v:
         raise SystemExit("线索 %r 里有 `;`：它切字段，加引号也保不住" % v)
-    need = (v != v.strip() or v[0] in "'\"" or
+    need = (v != v.strip() or v[0] in _QUOTE_LEAD or
             any(ch in v for ch in ",:+"))
     if not need:
         return v
-    if '"' not in v:
-        return '"%s"' % v
-    if "'" not in v:
-        return "'%s'" % v
-    raise SystemExit("线索 %r 里同时有单引号和双引号，没法加引号——拆成两条或改写法" % v)
+    for q in _QUOTE_LEAD:
+        if q not in v:
+            return q + v + q
+    raise SystemExit("线索 %r 里同时有单引号、双引号和反引号，没法加引号——"
+                     "拆成两条或改写法" % v)
+
+
+#: 可用的外层引号，按「优先用哪个」排：值里的竖线/撇号比反引号常见。
+_QUOTE_LEAD = "\"'`"
 
 
 def clue_text(clues, kinds, lang):
@@ -258,9 +265,13 @@ def with_tail(wanted, text):
 
 
 def _group_norm(raw):
-    """group 值 → 升序键元组；顺手吃掉 `0x` 前缀和大小写，用来比较而不是校验。"""
+    """group 值 → 升序键元组；顺手吃掉 `0x` 前缀、大小写与 `+`，用来比较而不是校验。
+
+    旧写法 `a+b` 也吃得下，只为让 `--apply` 能把「旧分隔符」当成同值规范化，而不是
+    报成冲突。校验只认 `,`（见 `marks._group_tokens`）。
+    """
     toks = []
-    for t in (raw or "").split("+"):
+    for t in (raw or "").replace("+", ",").split(","):
         t = t.strip().lower()
         if t.startswith("0x"):
             t = t[2:]
@@ -369,8 +380,8 @@ def cmd_apply():
                                      "——谜面推不出这个谜底，或者线索该换" % (lang, c, ids[0]))
             clue_part = clue_text(clues, kinds, lang)
             for k in ids:
-                # group 列全组含本条自己（8 位小写十六进制、不带 0x、升序）
-                members = "+".join(sorted(
+                # group 列全组含本条自己（8 位小写十六进制、不带 0x、升序、`,` 分隔）
+                members = ",".join(sorted(
                     x[2:] if x.startswith("0x") else x for x in ids))
                 wanted[(lang, k)] = "[riddle:%s=%s;group=%s;clue=%s]" % (
                     answer_field, ans, members, clue_part)
