@@ -212,13 +212,13 @@ class TestAnswerMark(unittest.TestCase):
         self.assertIn("kw", str(ctx.exception))
 
     def test_bare_clue_scans_value(self):
-        # 裸写认：没有标签，整项当正文片段匹配，`+` 并值仍是「都要出现」
+        # 裸写认：没有标签，整项当正文片段匹配；多个片段用 `,` 并列
         self.assertEqual(
             M.expand("[riddle:answer=St. Augustine;group=00000001;clue=north]He went north.",
                      TABLE, "zh"),
             "He went north.")
         self.assertEqual(
-            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=north+August]"
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=north,August]"
                      "He went north in August.", TABLE, "zh"),
             "He went north in August.")
         # 裸写与带标签可以混在同一条 clue 里
@@ -233,11 +233,17 @@ class TestAnswerMark(unittest.TestCase):
                      TABLE, "zh")
         self.assertIn("south", str(ctx.exception))
 
-    def test_bare_clue_plus_needs_both_values(self):
+    def test_plus_in_clue_is_gone(self):
+        # `+` 并值退役：逗号并列已经能写，「两套写法同语义」只会让 --apply 判不清谁规范
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=north+]He went north.",
-                     TABLE, "zh")
-        self.assertIn("裸写", str(ctx.exception))
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=north+August]"
+                     "He went north in August.", TABLE, "zh")
+        self.assertIn("+", str(ctx.exception))
+        # 正文本身带 + 就把整项包起来
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=\"a+b\"]He wrote a+b.",
+                     TABLE, "zh"),
+            "He wrote a+b.")
 
     def test_unknown_tag_scans_value(self):
         # 不是已知类型 → 只当标签：核对的是冒号后的正文，展开本身不失败
@@ -291,12 +297,12 @@ class TestAnswerMark(unittest.TestCase):
         self.assertIn("Pun", str(ctx.exception))
 
     def test_digit_start_is_error(self):
-        # `12:30` 不是标签（数字开头），裸写也不认 → 报错；要写就写 `_time:12:30`
+        # `12:30` 不是标签（数字开头）；裸写又带冒号，要写就整项加引号
         with self.assertRaises(M.MarkError):
             M.expand("[riddle:answer=St. Augustine;group=00000001;clue=12:30]He left at 12:30.",
                      TABLE, "zh")
         self.assertEqual(
-            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=_time:12:30]He left at 12:30.",
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=\"12:30\"]He left at 12:30.",
                      TABLE, "zh"),
             "He left at 12:30.")
 
@@ -534,19 +540,54 @@ class TestAnswerMark(unittest.TestCase):
         problems = M.check_doc("zh", ok, entities={}, terms={})
         self.assertTrue(any("kw" in p for p in problems), problems)
 
-    def test_plus_groups_same_kind(self):
-        # `feature:白沙+丛林` 与 `feature:白沙,丛林` 等价：两个词都要在谜面里
+    def test_comma_list_needs_every_value(self):
+        # 逗号并列：每一项都要在谜面里，少一个就报错
         self.assertEqual(
-            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=白沙+丛林]"
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=白沙,丛林]"
                      "白沙与丛林。", TABLE, "zh"),
             "白沙与丛林。")
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=白沙+峡谷]"
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=白沙,峡谷]"
                      "白沙与丛林。", TABLE, "zh")
         self.assertIn("峡谷", str(ctx.exception))
 
-    def test_plus_needs_value_on_both_sides(self):
-        for bad in ("feature:白沙+", "feature:+丛林", "feature:白+  +沙"):
+    def test_quoted_item_keeps_separators(self):
+        # 项里带逗号/冒号只能整项加引号；引号里的逗号不再切项
+        doc = ("He said \"Good, very good!\" at 12:30 to the captain."
+               "He said \"Good, very good!\" at 12:30 to the captain.")
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;"
+                     "clue=\"Good, very good!\", \"12:30\"]" + doc, TABLE, "zh"),
+            doc)
+        # 裸写里出现冒号要报错并提示加引号
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=12:30]" + doc,
+                     TABLE, "zh")
+        self.assertIn("引号", str(ctx.exception))
+
+    def test_apostrophe_is_not_a_quote(self):
+        # 项首不是引号位置就按普通字符：`I'm a captain` 里的撇号不开引号
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=I'm a captain, wine]"
+                     "I'm a captain, and I drink wine.", TABLE, "zh"),
+            "I'm a captain, and I drink wine.")
+
+    def test_quotes_may_hold_the_other_quote(self):
+        # 双引号里可以写单引号、单引号里可以写双引号；同种引号在里面就报错
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=\"l'abondance\"]"
+                     "Il parle de l'abondance.", TABLE, "zh"),
+            "Il parle de l'abondance.")
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue='say \"hi\"']"
+                     "They say \"hi\" twice.", TABLE, "zh"),
+            "They say \"hi\" twice.")
+        with self.assertRaises(M.MarkError):
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=\"a \"b\" c\"]"
+                     "a \"b\" c", TABLE, "zh")
+
+    def test_quoted_value_needs_pairing(self):
+        for bad in ("\"白沙", "白沙\"", "\"\"", "白沙,"):
             with self.assertRaises(M.MarkError):
                 M.expand("[riddle:answer=St. Augustine;group=00000001;clue=%s]白沙与丛林。" % bad,
                          TABLE, "zh")
@@ -859,6 +900,13 @@ class TestCertaintyAndSource(unittest.TestCase):
                          "He went north in August.")
         self.assertEqual(self.ok('source=url:"https://example.com/a"'),
                          "He went north in August.")
+
+    def test_quotes_may_hold_the_other_quote(self):
+        # 同一套引号规则：双引号里可以写单引号，单引号里可以写双引号
+        self.assertEqual(self.ok('source=url:"https://example.com/it\'s"'),
+                         "He went north in August.")
+        # 同种引号在里面就没法配平，报错
+        self.bad('source=url:"https://example.com/a"b"', "引号")
 
     def test_url_unquoted_rejected(self):
         self.bad("source=url:https://example.com/a", "要用引号包起来")

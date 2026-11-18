@@ -55,9 +55,8 @@ class TestVerseQueue(unittest.TestCase):
             for lang in LANGS:
                 clues = (g["clues"].get(lang) or "").strip()
                 self.assertTrue(clues, (ans, lang))
-                self.assertNotIn("，", clues, (ans, lang))
                 text = self.rows[lang][g["ids"][0]].casefold()
-                for c in [x.strip() for x in clues.split(",")]:
+                for c in VA.split_clues(clues, lang):
                     self.assertIn(c.casefold(), text, (ans, lang, c))
 
     def test_kinds_are_optional_but_aligned_when_given(self):
@@ -68,7 +67,7 @@ class TestVerseQueue(unittest.TestCase):
             kinds = g.get("kinds") or {}
             for lang, arr in kinds.items():
                 self.assertIn(lang, LANGS, g["ids"])
-                clues = [x for x in (g["clues"].get(lang) or "").split(",") if x.strip()]
+                clues = VA.split_clues(g["clues"].get(lang) or "", lang)
                 self.assertEqual(len(arr), len(clues), (g["ids"], lang))
                 for kind in arr:
                     self.assertTrue(kind == "" or kind in ok or kind.startswith("_"),
@@ -79,24 +78,28 @@ class TestClueText(unittest.TestCase):
     """kinds 可选：整组不给就全裸写，给了就按位贴标签，条数不等即停。"""
 
     def test_bare_is_allowed(self):
-        # 不给 kinds 就整组裸写：只给正文词，用 `+` 连成一项
-        self.assertEqual(VA.clue_text(["四座", "东"], [], "zh"), "四座+东")
+        # 不给 kinds 就整组裸写：只给正文词，用 `,` 并列
+        self.assertEqual(VA.clue_text(["四座", "东"], [], "zh"), "四座,东")
 
     def test_empty_kind_is_bare(self):
         # 逐位对齐时留空串＝这条不贴标签，输出裸写
         self.assertEqual(VA.clue_text(["四座"], [""], "zh"), "四座")
 
-    def test_pun_merges_adjacent(self):
-        # 相邻同标签并成一项：pun:August+Holy
+    def test_tag_repeats_per_item(self):
+        # 一项一段：同标签不合并（`+` 并值已退役），标签逐条重复
         self.assertEqual(VA.clue_text(["August", "Holy", "北"],
                                       ["pun", "pun", ""], "zh"),
-                         "pun:August+Holy,北")
+                         "pun:August,pun:Holy,北")
 
-    def test_pun_split_by_bare(self):
-        # 同标签不连续就不合并，只并相邻的
-        self.assertEqual(VA.clue_text(["August", "北", "Holy"],
-                                      ["pun", "", "pun"], "zh"),
-                         "pun:August,北,pun:Holy")
+    def test_quote_only_when_needed(self):
+        # 带逗号/冒号/加号的值才加引号；撇号或中段双引号裸写仍能读（quote 只在项首开）
+        self.assertEqual(VA.clue_text(["12:30", "I'm a captain", "a+b"], [], "en"),
+                         "\"12:30\",I'm a captain,\"a+b\"")
+        self.assertEqual(VA.clue_text(['say "hi"'], [], "en"), 'say "hi"')
+        # 值里有双引号又必须加引号时换单引号外层；两种都有就没法表示
+        self.assertEqual(VA.clue_text(['say "hi", twice'], [], "en"), "'say \"hi\", twice'")
+        with self.assertRaises(SystemExit):
+            VA.clue_text(['a,b"c\'d'], [], "en")
 
     def test_count_mismatch_stops(self):
         with self.assertRaises(SystemExit):

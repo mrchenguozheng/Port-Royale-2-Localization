@@ -121,12 +121,23 @@ def register_entity(name, town_id, rows):
 
 
 def split_clues(text, lang):
+    """把 `glossary/verse_ans.toml` 的 clues 串按顶层 `,` 切成值列表（引号里的逗号不算）。
+
+    glossary 的线索只给值、不带标签（标签写在 `kinds` 里），所以这里把标签解析也走一遍
+    只是为了统一引号口径；真写了 `pun:` 前缀会当标签吃掉并报错，免得悄悄变成值的一部分。
+    """
     text = (text or "").strip()
     if not text:
         raise SystemExit("%s 的线索是空的——至少写一条" % lang)
-    if "，" in text:
-        raise SystemExit("%s 的线索里有全角逗号，只收英文逗号" % lang)
-    clues = [c.strip() for c in text.split(",")]
+    try:
+        items = MK.split_clue_items(text, lang)
+        parsed = [MK._clue_item(part, lang) for part in items]
+    except MK.MarkError as exc:
+        raise SystemExit("%s：%s" % (lang, exc))
+    for tag, _value in parsed:
+        if tag:
+            raise SystemExit("%s 的线索不带标签（标签写在 kinds 里，收到 %r）" % (lang, tag))
+    clues = [value for _tag, value in parsed]
     if any(not c for c in clues):
         raise SystemExit("%s 的线索里有空项（连着两个逗号，或首尾多逗号）" % lang)
     return clues
@@ -156,40 +167,49 @@ def cmd_list(all_langs=False):
     print("\n%d 组，已标 %d 组，待填 %d 组" % (len(groups), done, len(groups) - done))
 
 
+def clue_value_text(value):
+    """一个线索值写进标注串时的形状：能裸写就裸写，需要才加引号。
+
+    裸写里 `,` 是项分隔、`:` 是标签分隔、`+` 是已退役的并值符，正文里带这些字符就
+    整项包引号；项首是引号字符（`'tis`）也要包，否则会被当成引号起点。
+    外层优先双引号（英文撇号更常见），值里有 `"` 才换单引号；两种都有就没法表示。
+    """
+    v = value or ""
+    if not v.strip():
+        raise SystemExit("线索值是空的")
+    if ";" in v:
+        raise SystemExit("线索 %r 里有 `;`：它切字段，加引号也保不住" % v)
+    need = (v != v.strip() or v[0] in "'\"" or
+            any(ch in v for ch in ",:+"))
+    if not need:
+        return v
+    if '"' not in v:
+        return '"%s"' % v
+    if "'" not in v:
+        return "'%s'" % v
+    raise SystemExit("线索 %r 里同时有单引号和双引号，没法加引号——拆成两条或改写法" % v)
+
+
 def clue_text(clues, kinds, lang):
     """把一语的线索拼成标注串。
 
-    `kinds` 缺省（空）就整组裸写：只给正文词，用 `+` 连成一项。
-    给了就按位贴标签，条数与线索必须相等；某一项给空串表示这条不贴标签（裸写），
-    所以「只有一条要标 pun」时也能逐位对齐。
+    `clue` 里 `,` 是唯一的并列符，每一项一段：`kinds` 缺省（空）就整组裸写；给了就按位
+    贴标签，条数与线索必须相等，某一项给空串表示这条不贴标签。不再用 `+` 并值——连写
+    两个值就是两段，与逗号并列完全重复，留两套写法只会让 `--apply` 判不清谁规范。
     标签可以是唯一的已知类型 `pun`，也可以是自造标签：`_` 开头静默，字母开头的未知
     标签展开侧会报 warning（这里不拦）。
-    相邻且同标签的几条并成一项：`pun:August+Holy`，与逐条重复等价。
     """
+    if not clues:
+        raise SystemExit("%s 的线索是空的" % lang)
     if not kinds:
-        if not clues:
-            raise SystemExit("%s 的线索是空的" % lang)
-        return "+".join(clues)
+        kinds = [""] * len(clues)
     if len(kinds) != len(clues):
         raise SystemExit("%s 的线索 %d 条，kinds 给了 %d 条（逐语对齐）"
                          % (lang, len(clues), len(kinds)))
-    out = []
-    run_tag, run_vals = "", []
-    started = False
-    for k, c in zip(kinds, clues):
-        if started and k == run_tag:
-            run_vals.append(c)
-            continue
-        if started:
-            out.append((run_tag, run_vals))
-        started = True
-        run_tag, run_vals = k, [c]
-    if started:
-        out.append((run_tag, run_vals))
     parts = []
-    for k, vals in out:
-        joined = "+".join(vals)
-        parts.append("%s:%s" % (k, joined) if k else joined)
+    for k, c in zip(kinds, clues):
+        val = clue_value_text(c)
+        parts.append("%s:%s" % (k, val) if k else val)
     return ",".join(parts)
 
 
@@ -250,24 +270,18 @@ def _group_norm(raw):
 
 
 def _clue_norm(raw):
-    """clue 值 → ((标签, 值元组)…)；裸写项标签记空串。
+    """clue 值 → ((标签, 值)…)（值折平），没有语法先按原串比。
 
-    同标签的值跨逗号项合并、并按值排序：`a+b,c` 与 `a+b+c` 在展开侧等价（都是「都要
-    出现」），`pun:X,pun:Y` 与 `pun:X+Y` 也等价，所以 `--apply` 的「已标成同值」判据
-    不能因分组或顺序不同误判成冲突。
+    一项一段、顺序与写法都留着：`a+b` 已经被语法禁掉（`+` 在裸写里报错），所以
+    `a+b,c` 与 `a+b+c` 这种「两套写法同语义」的歧义不存在——谁写了谁报错，不用猜。
+    引号里的值与裸写值比的是同一个东西（`"12:30"` 与 `12:30` 的正文一致）。
     """
-    groups = {}
-    for part in (raw or "").split(","):
-        part = part.strip()
-        if not part:
-            continue
-        if ":" in part:
-            tag, _, tail = part.partition(":")
-        else:
-            tag, tail = "", part
-        vals = [v.strip() for v in tail.split("+")]
-        groups.setdefault(tag.strip(), []).extend(vals)
-    return tuple((k, tuple(sorted(groups[k]))) for k in sorted(groups))
+    try:
+        items = MK.split_clue_items(raw or "")
+        parsed = [MK._clue_item(part, "") for part in items]
+    except MK.MarkError:
+        return ("RAW", raw)
+    return tuple((tag or "", value.casefold()) for tag, value in parsed)
 
 
 def mark_key(text, ent_index):

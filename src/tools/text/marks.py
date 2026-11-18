@@ -530,7 +530,11 @@ def _split_source_items(raw, hid):
 
 
 def _unquote(raw, hid, what="URL"):
-    """取引号里的内容：必须成对、同种、紧贴，里面不许再出现引号或弯引号。"""
+    """取引号里的内容：必须成对、同种、紧贴；里面不能再出现同种引号。
+
+    另一种引号是允许的——双引号里可以写 `'`，单引号里可以写 `"`，这样正文里带撇号
+    的短语（`"l'abondance"`）和带双引号的短语各有可选的外层。弯引号一律不认。
+    """
     text = raw.strip()
     if not text or text[0] not in _QUOTE_PAIRS:
         raise MarkError("%s：%s 要用引号包起来（半角单引号 '…' 或双引号 \"…\"，收到 %r）"
@@ -543,10 +547,9 @@ def _unquote(raw, hid, what="URL"):
         if ch in inner:
             raise MarkError("%s：%s 里有弯引号/全角引号 %r——只认半角 ' 或 \""
                             % (hid, what, ch))
-    for other in _QUOTE_PAIRS:
-        if other in inner:
-            raise MarkError("%s：%s 的引号里不能再出现 %r（要写就转义成 %%27 / %%22）"
-                            % (hid, what, other))
+    if q in inner:
+        raise MarkError("%s：%s 的引号里不能再出现同种引号 %r（换另一种外层引号）"
+                        % (hid, what, q))
     if not inner:
         raise MarkError("%s：%s 的引号里是空的" % (hid, what))
     return inner
@@ -697,24 +700,110 @@ def _check_source(raw, hid):
     return [_check_source_item(i, hid) for i in items]
 
 
+#: clue 项里必须靠引号才写得进来的字符：`:` 是标签分隔、`+` 是已退役的并值符。裸写碰到
+#: 它们就要求整项加引号，否则读者分不清「这是分隔符还是正文」。`,` 不用列——它在项切分
+#: 那一步已经走掉了。
+_CLUE_NEEDS_QUOTE = ":+"
+
+
+def _clue_item_head(buf):
+    """buf 是否还停在「项首」：空，或只写了一个待定的标签前缀（`xxx:`）。
+
+    引号只在项首才算开引号。这样正文里的撇号（`I'm a captain`、`l'abondance`）不会被当成
+    引号起点——它前面已经有字母，不在项首。
+    """
+    t = buf.strip()
+    if not t:
+        return True
+    if not t.endswith(":"):
+        return False
+    return bool(_TAG_RX.match(t[:-1]))
+
+
+def split_clue_items(raw, hid=""):
+    """按顶层 `,` 切 clue 项，引号里的逗号不算分隔；返回原项串列表（引号原样保留）。
+
+    项可以整段用引号包起来（`"Good! Very good!"`），也可以裸写；引号只认半角 `'` / `"`，
+    且必须紧贴项首（标签前缀之后也算项首，`pun:"12:30"` 成立）。逗号后的空白不计。
+    """
+    items, buf, quote = [], [], None
+    for ch in raw:
+        if quote is not None:
+            buf.append(ch)
+            if ch == quote:
+                quote = None
+            continue
+        if ch == ",":
+            items.append("".join(buf))
+            buf = []
+            continue
+        if ch in _QUOTE_PAIRS and _clue_item_head("".join(buf)):
+            quote = ch
+        buf.append(ch)
+    if quote is not None:
+        raise MarkError("%s：clue 的引号没闭合（%r）" % (hid, raw))
+    items.append("".join(buf))
+    return items
+
+
+def _clue_item(part, hid, warns=None):
+    """解析一个 clue 项（已按顶层逗号切开），返回 (标签|None, 值)。"""
+    part = part.strip()
+    if not part:
+        raise MarkError("%s：ans 的 clue 里有空项（多打了 `,`？）" % hid)
+    if part[0] in _QUOTE_PAIRS:
+        return None, _unquote(part, hid, "clue 项")
+    tag = None
+    if ":" in part:
+        raw_tag, _, tail = part.partition(":")
+        raw_tag, tail = raw_tag.strip(), tail.strip()
+        if not _TAG_RX.match(raw_tag):
+            raise MarkError("%s：clue 的标签 %r 不合法（只允许小写字母或 `_` 开头，后面只能是"
+                            "小写字母/数字/`_`/`-`）；正文本身含冒号时把整项用引号包起来"
+                            % (hid, raw_tag))
+        if raw_tag in ANS_CLUE_KINDS:
+            tag = raw_tag
+        elif not raw_tag.startswith("_") and warns is not None:
+            # 自造标签：`_` 开头是显式声明，静默；字母开头多半是拼错，记一条 warning。
+            warns.append("%s：clue 的标签 %r 不是已知类型，按关键词扫描"
+                         "（自造标签请用 `_` 开头）" % (hid, raw_tag))
+    else:
+        tail = part
+    if not tail:
+        raise MarkError("%s：clue 的 %s 项缺值（要写谜面里出现的原词）"
+                        % (hid, tag or "裸写"))
+    if tail[0] in _QUOTE_PAIRS:
+        return tag, _unquote(tail, hid, "clue 项")
+    if "，" in tail:
+        raise MarkError("%s：clue 项之间用英文逗号 `,`，不要用全角「，」"
+                        "（正文本身带它就整项加引号）" % hid)
+    for ch in _CLUE_NEEDS_QUOTE:
+        if ch in tail:
+            hint = ("多个片段用 `,` 分开（`+` 并值已退役）；正文本身带 + 就把整项用引号包起来"
+                    if ch == "+" else "正文本身带冒号就整项用引号包起来，例如 \"12:30\"")
+            raise MarkError("%s：clue 项 %r 里有 %r——%s" % (hid, tail, ch, hint))
+    if ";" in tail:
+        raise MarkError("%s：clue 项里不能有 `;`（它切字段，引号也保不住）" % hid)
+    return tag, tail
+
+
 def _split_ans(arg, hid="", warns=None):
-    """`[riddle:answer=城|城;group=00000001+00000002;clue=direction:东,count:四座+第三座]`
+    """`[riddle:answer=城|城;group=00000001+00000002;clue=pun:August, "North, by sea"]`
     → ([(类型|None, 值)…], [同组其余副本的键…], [(类型|None, 词)…])。
 
-    `answer` 里 `|` 是「或」（多个候选），`group` 里 `+` 连接本组全体成员的键（含本条），
-    `clue` 里 `,` 是「并列」（全部必须成立）、`+` 是「多个值」（展开后等价于把该项重复几遍）。
+    `answer` 里 `|` 是「或」（多个候选），`group` 里 `+` 连接本组全体成员的键（含本条）。
+    `clue` 里 `,` 是唯一的并列符（每项都要在谜面正文里逐字出现）：`a,b,c` 三项。
+    唯一保留的已知标签是 `pun`；`_` 开头的自造标签静默，字母开头的未知标签（含已退役的
+    direction / count / feature / produce / history / exclude）只当关键词并往 `warns`
+    记一条（多半是拼错；lint 算 E 级，构建前必须清零）。
+    项里带冒号 `:` 或加号 `+` 时整项必须用引号包起来（`"12:30"`、`"a+b"`）：这两个字符
+    在裸写里是语法（标签分隔 / 已退役的并值），加引号才是正文。
     `answer` 正常不写类型（值在方位键里算方位，否则按城镇查表）；想明写类型就改用
     `town=` / `direction=` 这两个字段名，此时可以省掉 `answer=`：
     `[riddle:town=Vera Cruz;clue=…]` / `[riddle:direction=SE;clue=…]`。
-    `clue` 的每一项两种形状都认：`<标签>:<正文>` 与裸写的 `<正文>`。带标签时只有 `pun`
-    算已知类型（tag 落在 `ANS_CLUE_KINDS` 里才记成类型），`_` 开头的自造标签静默通过，
-    字母开头的未知标签（包括已退役的 direction / count / feature / produce / history /
-    exclude）只当关键词并往 `warns` 记一条（多半是拼错；lint 把它算 E 级，构建前必须清零）。
-    裸写没有标签，整项就是正文片段；只是项里若含冒号，冒号左侧会被当作标签解析，所以
-    正文本身含冒号（`12:30`）时必须带标签写。
     `group` 与 `clue` 都必填：单副本写 `group=<自己的键>`。
-    空项、标签含大写/数字开头、已知类型缺值、`+` 两侧缺值、缺谜底、字段重名、
-    谜底写两处、全角逗号、group 漏了本条或键形不对，一律失败。
+    空项、标签含大写/数字开头、已知类型缺值、缺谜底、字段重名、谜底写两处、裸写里的
+    全角逗号、group 漏了本条或键形不对，一律失败。
     """
     fields = {}
     kind = None
@@ -755,43 +844,11 @@ def _split_ans(arg, hid="", warns=None):
     if not clue_raw:
         # clue 是必填：没有线索的谜底无从核对，标注就退化成一条注释。
         raise MarkError(
-            "%s：ans 缺 clue（谜面里能推出谜底的词要逐条写成 clue=direction:东,…）" % hid)
-    if "，" in clue_raw:
-        raise MarkError("%s：ans 的线索用英文逗号 `,` 分隔，不要用全角「，」" % hid)
+            "%s：ans 缺 clue（谜面里能推出谜底的词要逐条写成 clue=东,四座）" % hid)
     clues = []
-    for part in clue_raw.split(","):
-        part = part.strip()
-        if not part:
-            raise MarkError("%s：ans 的 clue 里有空项（多打了 `,`？）" % hid)
-        tag = None
-        if ":" in part:
-            raw_tag, _, tail = part.partition(":")
-            raw_tag, tail = raw_tag.strip(), tail.strip()
-            if not _TAG_RX.match(raw_tag):
-                raise MarkError("%s：clue 的标签 %r 不合法（只允许小写字母或 `_` 开头，"
-                                "后面只能是小写字母/数字/`_`/`-`；裸写正文本身含冒号时"
-                                "要带标签写）" % (hid, raw_tag))
-            known = raw_tag in ANS_CLUE_KINDS
-            if known:
-                tag = raw_tag
-            elif not raw_tag.startswith("_") and warns is not None:
-                # 自造标签：`_` 开头是显式声明，静默；字母开头多半是拼错，记一条 warning。
-                warns.append("%s：clue 的标签 %r 不是已知类型，按关键词扫描"
-                             "（自造标签请用 `_` 开头）" % (hid, raw_tag))
-        else:
-            # 裸写：没有标签，整项就是正文片段，按 `+` 拆成多个值。
-            tail = part
-        if not tail:
-            raise MarkError("%s：clue 的 %s 项缺值（要写谜面里出现的原词）"
-                            % (hid, tag or "裸写"))
-        # 并值：`feature:白沙+丛林` 等价于 `feature:白沙,feature:丛林`；
-        # 裸写 `白沙+丛林` 等价于 `白沙,丛林`。语义仍是「都要成立」。
-        values = [v.strip() for v in tail.split("+")]
-        if any(not v for v in values):
-            raise MarkError("%s：clue 的 %s 项里 `+` 两侧都要写值（收到 %r）"
-                            % (hid, tag or "裸写", tail))
-        for value in values:
-            clues.append((tag, value))
+    for part in split_clue_items(clue_raw, hid):
+        tag, value = _clue_item(part, hid, warns)
+        clues.append((tag, value))
     if not clues:
         raise MarkError(
             "%s：ans 只写了谜底 %r，没有 clue（谜面里能推出它的词要逐条写进来）"
