@@ -264,6 +264,8 @@ STICKY = set("的了着过地得们呢吧啊吗呀")
 CONJ = set("与和及或而")
 #: 标点字符集（前面能断、后面不能断的那种）。
 PUNCT_CHARS = PAUSE | CLOSE
+#: 可以出现在行首的标点：破折号与省略号不占「禁则」，断在它们前面是合法的。
+LINE_HEAD_OK = set("—…")
 #: 拆件：名字占位符整体一件、汉字串一件、其余单字一件。
 _PIECE = re.compile(r"[\u4e00-\u9fff]+(?:·[\u4e00-\u9fff]+)*|.")
 _PLACEHOLDER = re.compile(r"\x00(\d+)\x00")
@@ -489,7 +491,9 @@ def _cut_ok(block, i, j):
     所以不在这里拦；拦了反而会把「…享受<o:…>5%<o> / 的折扣」逼回无断点的长句。
     """
     head = block[j][0]
-    if head and head[0] in PUNCT_CHARS:
+    # 破折号「——」和省略号「…」可以起头（中文排版禁则只管逗号句号那一类），
+    # 拦掉它们会让「…印度人——」这种尾巴多出两格，窄框里就多占一格。
+    if head and head[0] in PUNCT_CHARS and head[0] not in LINE_HEAD_OK:
         return False
     tail = block[j - 1][0]
     if tail and tail[-1] in OPEN:

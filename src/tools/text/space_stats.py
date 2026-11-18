@@ -72,7 +72,7 @@ def cut_is_bad(tail, head):
         return True
     if tail[-1] in zh_space.LEAD:
         return True
-    if head[0] in zh_space.PUNCT_CHARS:
+    if head[0] in zh_space.PUNCT_CHARS and head[0] not in zh_space.LINE_HEAD_OK:
         return True
     if tail[-1] in zh_space.OPEN:
         return True
