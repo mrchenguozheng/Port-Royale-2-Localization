@@ -83,9 +83,9 @@ BIND_RIGHT = set("一二三四五六七八九十每各半几这那些不没未�
 #: （「你的目标是从 一个默默无闻的商人」）。12 是当年在编年史提示这条上量出来的：
 #: 12 估算 6 行（和原文对齐），15 涨到 7 行又开始裁。
 #:
-#: 现在改成 15 字必断一次：连续 15 个字之内必须有一个断点，让长段落少断几刀；
-#: 位置仍然交给 `_groups()` 的代价函数挑（标点后 > 虚词前 > 预算硬填）。窄控件里
-#: 需要更早断的地方，用显式切断标记 `CUT_TAG` 钉住，不再靠调小预算。
+#: 现在定成 15：每个没有空格的片段不超过 15 字，也就是连续 15 个字之内必有一刀，
+#: 长段落少断几刀。位置交给 `_dp_pack()` 按 `_cut_cost()` 挑（标点后 > 词界）。
+#: 窄控件里需要更早断的地方，用显式切断标记 `CUT_TAG` 钉住，不再靠调小预算。
 MAX_CHARS = 15
 #: 只处理这么长以上的汉字串。
 #:
@@ -246,15 +246,9 @@ def fallback_wrap(text, min_run=MIN_RUN, step=MAX_CHARS):
     return _compact_seg(text, lookup, step, [])
 
 
-#: 断在它后面最自然：优先「…移民的 / 英格兰船沉了」，而不是「…英格兰 / 船沉了」。
-STOP_TAIL = set("的地得了着过们呢吧啊呀，、；：！？…")
-
-#: 这些字开头多半是补语（「打听/到」「拿/出来」），断在它前面会把词拆开。
-COMPLEMENT = set("到给出去起上下成开遍完掉")
-
 #: 这些字是「往后粘」的介词/副词（「从/一个」「在/港口」「也/可以」）：
 #: 断在它后面，前半截就成了残句——「你的目标是从 一个默默无闻的商人」
-#: 就是这么来的。`_break_cost()` 对这类收尾加罚。
+#: 就是这么来的。`_cut_cost()` 对这类收尾加罚。
 LEAD = set("从以向与和在对把被将为于跟同给也都还就才又最更")
 
 #: 句内停顿：`compact()` 找断点时先在这里落，标点后面不额外留空格。
@@ -312,72 +306,6 @@ def _words(run, lookup):
     return bind(words) if words else [run]
 
 
-def _groups(run, lookup, budget=MAX_CHARS):
-    """在 ≤budget 的前提下挑断点：优先落在停顿字后，其次才按预算硬填。
-
-    用动态规划而不是贪心。贪心会把「一艘满载移民的英格兰」塞满 10 字，
-    断点落到「…英格兰 / 船沉了」（词中间，难看）；DP 允许这组只装 7 字就停，
-    让断点落在「…移民的 / 英格兰船沉了」。
-    """
-    words = _words(run, lookup)
-    n = len(words)
-    if n <= 1:
-        return run
-    pre = [0]
-    for w in words:
-        pre.append(pre[-1] + len(w))
-    INF = 1 << 30
-    dp = [INF] * (n + 1)
-    back = [0] * (n + 1)
-    dp[0] = 0
-    for i in range(n):
-        if dp[i] >= INF:
-            continue
-        j = i
-        while j < n and (j == i or pre[j + 1] - pre[i] <= budget):
-            j += 1
-            cost = dp[i] + 1 + _break_cost(words, i, j, n)
-            if cost < dp[j]:
-                dp[j] = cost
-                back[j] = i
-    if dp[n] >= INF:
-        return run
-    cuts, k = [], n
-    while k:
-        cuts.append(k)
-        k = back[k]
-    cuts.reverse()
-    out, prev = [], 0
-    for cp in cuts:
-        out.append("".join(words[prev:cp]))
-        prev = cp
-    return " ".join(out)
-
-
-def _break_cost(words, i, j, n):
-    """这一组的收尾代价：断点越不像自然停顿，代价越高。
-
-    * 末尾就结束 → 0；
-    * 下一个词以补语字开头（「打听 / 到」）→ 6，最不愿这样断；
-    * 组太短（孤字 4、两字 2）→ 加上去，免得出现「你的 / 船队」；
-    * 断在「的/了/，」后面 → 0，这是最自然的停顿。
-    """
-    size = sum(len(w) for w in words[i:j])
-    cost = 0
-    if size == 1:
-        cost += 4
-    elif size == 2 and j < n:
-        cost += 2
-    if j == n:
-        return cost
-    if words[j][0] in COMPLEMENT:
-        return cost + 6
-    if words[j - 1][-1] in LEAD:
-        return cost + 8
-    if words[j - 1][-1] in STOP_TAIL:
-        return cost
-    return cost + 2
-
 
 def compact(text, lookup, max_chars=MAX_CHARS):
     """中文紧凑排版：按「离上一个空格多远」算预算，不按汉字串算。
@@ -389,8 +317,8 @@ def compact(text, lookup, max_chars=MAX_CHARS):
     旧实现只切「连续汉字串」，这类多短句段落一条空格都拿不到，正是长文空白的成因。
 
     断点顺序：先按停顿标点（，。！？；：、…— 与收尾引号括号）分段，
-    段内放得下就不再动；放不下时用 `_groups()` 按词挑断点。标点本身不留空格，
-    空格只落在「已经放不下了」的位置上，比逢词插空格干净得多。
+    段内放得下就不再动；放不下时用 `_dp_pack()` 在词界里挑断点。标点本身不留
+    空格，空格只落在「已经放不下了」的位置上，比逢词插空格干净得多。
     """
     # 译文层写 `[cut]`，`marks.expand()` 会先换成 `CUT_TAG`；这里再收一次，
     # 让直接调用 `compact()` 的脚本和测试也能用作者层那套写法。
@@ -533,10 +461,6 @@ def _dp_pack(block, max_chars):
     return " ".join(out)
 
 
-def _is_tag(text):
-    return text.startswith("<") and not text.startswith("<n")
-
-
 def _cut_ok(block, i, j):
     """断点（units[j] 之前）是否合法：标点不能起头、开括号不能收尾、半角串不许拆开。
 
@@ -557,37 +481,26 @@ def _cut_ok(block, i, j):
 
 
 def _cut_cost(block, i, j, n):
-    """断点代价（越小越自然）：
+    """断点代价（越小越自然）：先算「多这一刀要付多少」，再按三张表微调。
 
-    * 收尾是标点（「，」「。」）→ 最自然，0；
+    * 每一刀都算 2：这一项让 DP 先求「刀数最少」，刀数打平时才看下面的罚分；
+    * 收尾是标点（「，」「。」）→ 不收这 2，标点后本来就是响亮停顿；
     * 收尾是「从/在/也」这类往后粘的字 → +8，会断出残句；
-    * 下一件以「的/了/着」开头 → +6，往左粘；
-    * 片段太短（孤字 4、两字 2）→ 加上去，免得满屏碎块；
-    * 其余 +2。
+    * 下一件以「的/了/着」起头、或是「与/和/或」这类并列连词 → +8。
+
+    只有这三条罚分有实测收益（消融记录见 docs/翻译局限.md）：补语字、
+    指示词+量词、孤字/两字组原来各是一张手写表，在 3548 条上对比坏断率
+    一动不动，已删。
     """
     if j >= n:
         return 0
-    size = sum(w for _, w, _ in block[i:j])
     cost = 0
-    if size == 1:
-        cost += 4
-    elif size == 2:
-        cost += 2
     head = block[j][0]
-    if head and head[0] in STICKY:
-        cost += 8
-    elif head and head[0] in COMPLEMENT:
-        cost += 6
-    elif head and head[0] in CONJ:
+    if head and (head[0] in STICKY or head[0] in CONJ):
         cost += 8
     tail = block[j - 1][0]
     if tail and tail[-1] in LEAD:
         cost += 8
-    # 指示词/数词 + 量词（「这座」「一座」）后面别断：「一座 / 属于」把名词短语也劈开了。
-    if len(tail) == 2 and tail[0] in "这那每各一二三四五六七八九十":
-        cost += 8
-    elif len(tail) == 1 and tail in "个座名位艘条张种份件次元只头匹":
-        cost += 6
     if tail and tail[-1] in PUNCT_CHARS:
         return cost
     return cost + 2
