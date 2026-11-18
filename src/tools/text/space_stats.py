@@ -115,21 +115,58 @@ def word_breaks(text, out, lookup):
     return cuts, mid
 
 
+def _segments(text):
+    """按 `<n>` 切段（段号用于和原文对齐）。"""
+    import re
+    return re.split(r"<n[^>]*>", text)
+
+
+def token_spans(text):
+    """[(段号, 段内非空白字位置, token), …]，位置用来判断这个空格是不是新插的。"""
+    out = []
+    for si, seg in enumerate(_segments(text)):
+        ns = 0
+        for t in seg.split(" "):
+            if t:
+                out.append((si, ns, t))
+                ns += len(t)
+    return out
+
+
+def source_gaps(text):
+    """原文里本来就有的空格：{(段号, 前面已有多少非空白字)}。"""
+    gaps = set()
+    for si, seg in enumerate(_segments(text)):
+        ns = 0
+        for ch in seg:
+            if ch == " ":
+                gaps.add((si, ns))
+            elif ch not in "\r\n":
+                ns += 1
+    return gaps
+
+
 def collect(label, texts, outputs, lookup):
-    """一批成品串 → 一行统计。`label` 是预算或「粗:细」组合。"""
+    """一批成品串 → 一行统计。`label` 是预算或「粗:细」组合。
+
+    `bad` 只数**我们插进去**的刀口：原文自带的中西文空隙（「在 18 世纪」）不是
+    排版决定，算进来会把读数抬高。
+    """
     lens, cuts, bad, with_space, narrow, longest, mid = [], 0, 0, 0, 0, 0, 0
     for text, out in zip(texts, outputs):
         toks = tokens_of(out)
         if len(toks) > 1:
             with_space += 1
         cuts += max(0, len(toks) - 1)
-        for i, tok in enumerate(toks):
+        spans = token_spans(out)
+        gaps = source_gaps(text)
+        for i, (si, ns, tok) in enumerate(spans):
             n_han = HAN(tok)
             lens.append(n_han)
             narrow += int(n_han > NARROW)
             longest = max(longest, n_han)
-            if i:
-                bad += int(cut_is_bad(toks[i - 1], tok))
+            if i and (si, ns) not in gaps:
+                bad += int(cut_is_bad(spans[i - 1][2], tok))
         _c, m = word_breaks(text, out, lookup)
         mid += m
     lens.sort()

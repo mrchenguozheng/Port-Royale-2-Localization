@@ -290,7 +290,10 @@ _ATOM = re.compile(r"\x00\d+\x00|<[^>]*>|" + base.VAR.pattern)
 
 #: 中文正文里可以贴着空格的两个字符集（汉字与中文标点）。
 _TIGHT = "[\u4e00-\u9fff，。！？；：、…—（）()「」『』【】《》·]"
-_TIGHT_SPACE = re.compile(r"(?<=%s)\s+|\s+(?=%s)" % (_TIGHT, _TIGHT))
+#: 只抹「两边都是汉字/全角标点」的空格（作者手打的多余空格）。
+#: 汉字与拉丁词、数字之间那点空隙要留着：中文与西文混排本来就该有间隔，
+#: 而引擎正好把空格当折行点，白送一个可断位置。
+_TIGHT_SPACE = re.compile(r"(?<=%s)\s+(?=%s)" % (_TIGHT, _TIGHT))
 
 
 def load_user_words(words):
@@ -331,7 +334,7 @@ def compact(text, lookup, max_chars=MAX_CHARS):
         if _HARD_TAG.fullmatch(p):
             out.append(p)
             continue
-        out.append(_compact_seg(_TIGHT_SPACE.sub("", p), lookup, max_chars, []))
+        out.append(_compact_seg(_TIGHT_SPACE.sub("", p).strip(), lookup, max_chars, []))
     return "".join(out)
 
 
