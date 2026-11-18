@@ -1,7 +1,8 @@
 name: Release
 
-# Tag release-v* builds and publishes the four GOG/Steam packages.
-# Manual runs build the same artifacts but keep them as workflow artifacts.
+# Tag release-v* on main builds and publishes the per-language GOG/Steam packages
+# listed in src/release-languages.txt. Manual runs build the same artifacts but
+# keep them as workflow artifacts. Tags must sit on main or release/*.
 on:
   push:
     tags:
@@ -29,6 +30,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 需要完整历史：tag 校验要判断提交是否是 main / release/* 的祖先。
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -82,6 +86,27 @@ jobs:
           }
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "VERSION=$version"
+
+      - name: Verify the tagged commit is on the release line
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          # 发版线只有 main 与 release/*；dev 上的 tag 不发布。
+          git fetch --no-tags origin "+refs/heads/*:refs/remotes/origin/*"
+          $sha = (git rev-parse HEAD).Trim()
+          $candidates = @(git for-each-ref --format='%(refname:short)' refs/remotes/origin) |
+            Where-Object { $_ -eq 'origin/main' -or $_ -match '^origin/release/' }
+          if (-not $candidates) {
+            throw "找不到 origin/main 或 origin/release/* 分支，无法校验 tag 来源"
+          }
+          foreach ($ref in $candidates) {
+            git merge-base --is-ancestor $sha $ref
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "tag 提交在 $ref 上：$sha"
+              exit 0
+            }
+          }
+          throw "tag 提交不在 origin/main 或 origin/release/* 上：$sha；请在 main 上打 tag"
 
       - name: Read release languages
         shell: pwsh

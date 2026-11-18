@@ -6,10 +6,11 @@
 #
 # 字体模式不需要在这里标注：release.ps1 默认 -Fonts auto，按 font-map.ini
 # 该语言的四项映射判断——全 none 的是 config（只带映射，用原版字体），
-# 其余是 noto（带实际字体）。de / es 属于前者，zh / ja / ko / ru 属于后者。
+# 其余是 noto（带实际字体）。de / es / fr 属于前者，zh / ja / ko / ru 属于后者。
 #
-# fr 仍未列出：src/translations/fr.toml 在，但 src/packs/fr.toml 与
-# src/font-map.ini [fr] 都还没有，出包会在语言三件套检查处失败。
+# fr 的译文是英文原文键位下的法语：3548 条里 3279 条与 GOG 法语版
+# （fr.gog_1.1.2.42）原文逐字相同，其余为补齐与修订；重音字符原版拉丁字体
+# 已覆盖，因此按 config 出包。
 #
 # 新增一门语言的顺序见 docs/新语言.md；验收后在这里加一行即可。
 
@@ -19,3 +20,4 @@ ko
 ru
 de
 es
+fr
