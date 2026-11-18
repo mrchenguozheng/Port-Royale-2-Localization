@@ -83,10 +83,10 @@ BIND_RIGHT = set("一二三四五六七八九十每各半几这那些不没未�
 #: （「你的目标是从 一个默默无闻的商人」）。12 是当年在编年史提示这条上量出来的：
 #: 12 估算 6 行（和原文对齐），15 涨到 7 行又开始裁。
 #:
-#: 现在定成 15：每个没有空格的片段不超过 15 字，也就是连续 15 个字之内必有一刀，
-#: 长段落少断几刀。位置交给 `_dp_pack()` 按 `_cut_cost()` 挑（标点后 > 词界）。
+#: 现在定成 13：每个没有空格的片段不超过 13 字，也就是连续 13 个字之内必有一刀。
+#: 位置交给 `_dp_pack()` 按 `_cut_cost()` 挑（标点后 > 词界）。
 #: 窄控件里需要更早断的地方，用显式切断标记 `CUT_TAG` 钉住，不再靠调小预算。
-MAX_CHARS = 15
+MAX_CHARS = 13
 #: 只处理这么长以上的汉字串。
 #:
 #: 断点现在按词挑（`_pack()` 的 DP），一个 8 字的片段照样会被拦腰断刀，所以
@@ -409,19 +409,25 @@ def _pack(units, max_chars):
     return " ".join(_dp_pack(b, max_chars) for b in blocks) if blocks else ""
 
 
-def _tail_punct_weight(block, i, j):
-    """片段末尾那串标点的权重：标点本身不能断，不该算进预算。"""
-    w = 0
-    k = j
-    while k > i and block[k - 1][0] and block[k - 1][0][-1] in PUNCT_CHARS \
-            and all(c in PUNCT_CHARS or c in "”’" for c in block[k - 1][0]):
-        w += block[k - 1][1]
-        k -= 1
-    return w
-
-
 def _dp_pack(block, max_chars):
-    """块内挑断点：token 权重 ≤ 预算（单个单位超预算时自成一组）。"""
+    """块内挑断点：token 权重 ≤ 预算（单个单位超预算时自成一组）。
+
+    先按硬约束求一次；求不出来（规则互相打架）再按软约束求一次，违规记重罚
+    而不是禁止。硬约束下会出现死锁的只有一种情形：开括号 + 一整段正好占满
+    预算的长串（「（」+ 13 字），「开括号不能收尾」和「不超过预算」两条同时
+    成立就没有合法断点——那样整块会退化成没有空格的长串，在窄控件里会被
+    引擎当成超宽 token 整行丢掉。软约束阶段宁可让「（」吊在行尾，也不让整
+    段失去断点。
+    """
+    for soft in (False, True):
+        out = _dp_solve(block, max_chars, soft)
+        if out is not None:
+            return out
+    return "".join(t for t, _, _ in block)
+
+
+def _dp_solve(block, max_chars, soft=False):
+    """一次 DP。无解返回 None；`soft=True` 时预算与 `_cut_ok()` 降级为罚分。"""
     n = len(block)
     if n == 1:
         return block[0][0]
@@ -437,18 +443,25 @@ def _dp_pack(block, max_chars):
             continue
         j = i + 1
         while j <= n:
-            if j > i + 1 and pre[j] - pre[i] - _tail_punct_weight(block, i, j) > max_chars:
+            over = pre[j] - pre[i] - max_chars
+            if not soft and j > i + 1 and over > 0:
                 break
-            if j < n and not _cut_ok(block, i, j):
+            legal = j >= n or _cut_ok(block, i, j)
+            if not soft and not legal:
                 j += 1
                 continue
             cost = dp[i] + _cut_cost(block, i, j, n)
+            if soft:
+                if over > 0:
+                    cost += 40 * over
+                if not legal:
+                    cost += 300 if _ascii_split(block, i, j) else 60
             if cost < dp[j]:
                 dp[j] = cost
                 back[j] = i
             j += 1
     if dp[n] >= INF:
-        return "".join(t for t, _, _ in block)
+        return None
     cuts, k = [], n
     while k:
         cuts.append(k)
@@ -459,6 +472,14 @@ def _dp_pack(block, max_chars):
         out.append("".join(t for t, _, _ in block[prev:cp]))
         prev = cp
     return " ".join(out)
+
+
+def _ascii_split(block, i, j):
+    """这一刀是不是切在两个半角字符之间（「5 %」「% 1」那种）。"""
+    tail = block[j - 1][0]
+    head = block[j][0]
+    return bool(tail and head and tail[-1].isascii() and not tail[-1].isspace()
+                and head[0].isascii() and not head[0].isspace())
 
 
 def _cut_ok(block, i, j):
@@ -526,10 +547,11 @@ def _clause_units(clause, lookup, max_chars, names, hard):
             units.append((piece, len(piece), first))
             first = False
             continue
-        if len(piece) > max_chars:
-            # 超预算的汉字串按词拆成单位，**不在这里定断点**：断点统一交给
-            # `_pack()` 的 DP 挑，否则这里选的边界会被当成死断点，外面再想
-            # 挪（比如躲开往左粘的「的」）就没有余地了。
+        if len(piece) >= max_chars:
+            # 刚好等于预算的汉字串也要按词拆：它自己一组放得下，但前后挨着
+            # 「（」「）」这类单位就凑不进去了，而「开括号不能收尾」又不许把
+            # 括号吊在行尾——那时整段就没有合法断点（预算 13 时撞到过两次）。
+            # 断点仍统一交给 `_pack()` 的 DP 挑，这里只把单位切细，不定边界。
             words = _words(piece, lookup)
             for k, w in enumerate(words):
                 units.append((w, len(w), first if k == 0 else False))
