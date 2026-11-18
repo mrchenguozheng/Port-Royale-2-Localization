@@ -90,7 +90,10 @@ class TestZhSpace(unittest.TestCase):
     def test_collect_runs(self):
         runs = zh_space.collect_runs(["短句", "这是一个足够长的中文句子用来收集并测试断行"])
         self.assertEqual(runs, ["这是一个足够长的中文句子用来收集并测试断行"])
-        self.assertEqual(zh_space.collect_runs(["胡安·德·塞普尔维达到来这里看看"]), [])
+        # 阈值 = MAX_CHARS + 1：会被切开的片段必须进分词器，否则只能按单字切
+        self.assertEqual(zh_space.collect_runs(["九个字的句子不用切"]), [])
+        self.assertEqual(zh_space.collect_runs(["胡安·德·塞普尔维达到来这里看看"]),
+                         ["胡安·德·塞普尔维达到来这里看看"])
 
     def test_fallback_wrap(self):
         t = "这是一个非常长的没有空格的中文句子用来测试自动断行"
@@ -102,7 +105,8 @@ class TestZhSpace(unittest.TestCase):
     def test_compact_leaves_short_text_alone(self):
         """紧凑排版：不到预算就一个字都不动，标点旁也不插空格。"""
         whole = lambda run: [run]
-        self.assertEqual(zh_space.compact("我刚听说，一艘船沉了。", whole),
+        self.assertEqual(zh_space.compact("我刚听说。", whole), "我刚听说。")
+        self.assertEqual(zh_space.compact("我刚听说，一艘船沉了。", whole, 20),
                          "我刚听说，一艘船沉了。")
 
     def test_compact_breaks_on_particle_not_mid_word(self):
