@@ -88,6 +88,123 @@ def half_width_punct(v):
     return sorted(set(hits))
 
 
+# ---------------------------------------------------------------------------
+# 非中文的语言层检查。原则：只做「判据由字形/音形决定、不依赖句法」的规则，
+# 一律 W 级——报出来代表「与主流写法不同」，不是「错」；参照语言（de/fr/es/ru）
+# 的译文不改，所以这些提示只留痕。
+#
+# 试过但未采纳（实测误报率过高，留在注释里省得以后再试一遍）：
+#   · de 名词未大写：用「句中大写词自建名词表」去查小写形式，38 条命中全是
+#     einen neuen / die eine 这类形容词、代词，自建词表没法分名词与动词变位；
+#   · fr 漏省音：`le e` / `de   e` 这类命中全部来自被剥掉的 [town:…] 标注与 %1，
+#     不是真漏省音；
+#   · ja 助词连用：格助词相邻 9 条，へと / をと / ノといった 都合法，
+#     真正的错（をを、はが）在这批语料里没有。
+# ---------------------------------------------------------------------------
+
+PH_ANY = re.compile(r"@[a-zA-Z]\$[^$]*\$|%[0-9]+|<[^>]*>")
+# 占位符后写并列助词（을(를)、은(는)…）是合规做法：运行时替换值末音节未知时用
+PH_PAIR = re.compile(r"(@[a-zA-Z]\$[^$]*\$|%[0-9]+)(을\(를\)|를\(을\)|은\(는\)|는\(은\)|"
+                     r"이\(가\)|가\(이\)|와\(과\)|과\(와\)|으로\(로\)|로\(으로\))")
+PH_BARE = re.compile(r"(@[a-zA-Z]\$[^$]*\$|%[0-9]+)(을|를|은|는|이|가|와|과|으로|로)(?![가-힣(])")
+JOSA_PAIR = {"JKS": ("이", "가"), "JKO": ("을", "를"),
+             "JX": ("은", "는"), "JKC": ("과", "와")}
+FILLER = "\u25cb"          # 占位符掩码：禾…不用；○ 不含收音，不影响掩码后的助词判定
+_KIWI = []
+
+
+def jong(ch):
+    """韩语音节末是否有收音；非谚文返回 None。"""
+    o = ord(ch)
+    if 0xAC00 <= o <= 0xD7A3:
+        return (o - 0xAC00) % 28 != 0
+    return None
+
+
+def ko_checks(tr, W):
+    """韩语：占位符后接助词（必改）+ 助词收音一致性（需 Kiwi，缺包自动跳过）。"""
+    for k, v in tr.items():
+        if k in KEEP or not v:
+            continue
+        if PH_PAIR.search(v):
+            continue
+        m = PH_BARE.search(v)
+        if m:
+            W.append((k, "占位符后接助词",
+                      "%s（替换值末音节未知；改写句式或写并列形）" % m.group(0)))
+
+    if not _KIWI:
+        try:
+            from kiwipiepy import Kiwi
+        except Exception:
+            return
+        _KIWI.append(Kiwi())
+    kiwi = _KIWI[0]
+    for k, v in tr.items():
+        if k in KEEP or not v:
+            continue
+        toks = kiwi.tokenize(PH_ANY.sub(FILLER, v))
+        for i, t in enumerate(toks):
+            pair = JOSA_PAIR.get(t.tag)
+            if not pair or t.form not in pair or i == 0:
+                continue
+            prev = toks[i - 1]
+            if prev.form == FILLER or prev.tag in ("SY", "SW", "SN", "SL", "SS", "UNK", "SF"):
+                continue
+            has = jong(prev.form[-1])
+            if has is None:
+                continue
+            want = pair[0] if has else pair[1]
+            if t.form != want:
+                W.append((k, "助词收音", "%s 应为 %s%s" % (prev.form + t.form, prev.form, want)))
+
+
+JA_POLITE = {"ます", "です", "ました", "でした", "ません", "ましょう", "ください",
+             "でしょう", "ませんでした", "ましょうか", "でしょうか"}
+JA_PLAIN = {"だ", "である", "だった", "だろう", "ではない", "じゃない", "じゃ"}
+
+
+def ja_checks(tr, W):
+    """日语：同一条译文内 です/ます体 与 だ体 混用（引文与语气词会有误报，只做提示）。"""
+    try:
+        from janome.tokenizer import Tokenizer
+    except Exception:
+        return
+    tk = Tokenizer()
+
+    def kind(sent):
+        toks = [t for t in tk.tokenize(sent) if t.surface.strip()]
+        for t in reversed(toks):
+            if t.part_of_speech.split(",")[0] in ("動詞", "助動詞", "形容詞", "形容動詞"):
+                for p in JA_POLITE:
+                    if t.surface.endswith(p):
+                        return "polite"
+                for p in JA_PLAIN:
+                    if t.surface == p or t.surface.endswith(p):
+                        return "plain"
+                return None
+        return None
+
+    for k, v in tr.items():
+        if k in KEEP or not v:
+            continue
+        kinds = [kind(x) for x in re.split(r"[。！？]", MARK_ANY.sub(" ", v)) if x.strip()]
+        kinds = [x for x in kinds if x]
+        if len(set(kinds)) > 1:
+            W.append((k, "语体混用", " / ".join(kinds)))
+
+
+def es_checks(tr, W):
+    """西语：¿¡ 与 ?! 必须成对，感叹句/疑问句缺倒置符号。"""
+    for k, v in tr.items():
+        if k in KEEP or not v:
+            continue
+        s = MARK_ANY.sub(" ", v)
+        if s.count("¿") != s.count("?") or s.count("¡") != s.count("!"):
+            W.append((k, "倒置符号不配对", "¿%d ?%d ¡%d !%d"
+                      % (s.count("¿"), s.count("?"), s.count("¡"), s.count("!"))))
+
+
 def main(argv):
     lang = "zh"
     show_all = "--all" in argv
@@ -161,6 +278,14 @@ def main(argv):
             if len(outs) > 1 and len(src) > 8:
                 W.append((sorted(keys)[0], "同原文异译 %d 种" % len(outs),
                           " / ".join(sorted(outs))[:120]))
+
+    # 语言层：只挂在对得上判据的语言上；缺分析器时各函数自己静默跳过
+    if lang == "ko":
+        ko_checks(tr, W)
+    elif lang == "ja":
+        ja_checks(tr, W)
+    elif lang == "es":
+        es_checks(tr, W)
 
     # 内联标注（[town:…] / [lit:…] / [term:…]）：未定义引用、缺形态、方括号写错、死条目
     # 自造 clue 标签（非 `_` 开头、也不是已知类型）只做关键词扫描、没有任何校验，
