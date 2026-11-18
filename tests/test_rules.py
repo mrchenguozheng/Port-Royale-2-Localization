@@ -147,6 +147,25 @@ class TestZhSpace(unittest.TestCase):
             han = sum(1 for c in tok if "\u4e00" <= c <= "\u9fff")
             self.assertLessEqual(han, 10, tok)
 
+    def test_compact_never_breaks_after_lead_char(self):
+        """断点不能落在「从/在/也/和」这类往后粘的字后面，否则前半截成了残句。"""
+        words = ["你的目标", "是", "从", "一个", "默默无闻", "的", "商人"]
+        lookup = lambda run: words if run == "你的目标是从一个默默无闻的商人" else list(run)
+        out = zh_space.compact("你的目标是从一个默默无闻的商人。", lookup, 9)
+        for prefix in ("从 ", "在 ", "也 ", "和 ", "与 ", "把 ", "被 ", "将 "):
+            self.assertNotIn(prefix, out)
+
+    def test_compact_treats_parameterized_break_as_hard(self):
+        """`<n:25>` 也算换行：预算要在它那里清零，不能把两段粘成一条超长 token。"""
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        t = "第一段话就在这里结束。<n:25>第二段话从这里重新开始算预算，不要接着上一段累加。"
+        out = zh_space.compact(t, lookup, 9)
+        self.assertIn("<n:25>", out)
+        head, tail = out.split("<n:25>")
+        self.assertTrue(tail)
+        for tok in tail.split(" "):
+            self.assertLessEqual(len(tok), 12, tok)
+
 
 class TestSpecInterface(unittest.TestCase):
     """三段式接口：语言只声明 spec，engine_text 不认语言。"""
