@@ -29,11 +29,10 @@
 | `src/injector-rs/` | Rust workspace：`pr2_common`、`pr2_proxy`、`pr2_text_source`、`pr2_launcher`、`pr2_launcher_gui`、`pr2_host_proxy` |
 | `src/injector-rs/ui/` | GUI 界面翻译 `zh.ini` / `en.ini` / `ja.ini` |
 | `src/translations/` | 唯一手改译文层：`zh.toml`、`ja.toml` 等 |
-| `src/editor/` | 最小译文编辑器：Astro 前端 + `server.py` + `api/` 分域模块 |
 | `src/tools/` | 语言包编译、字体、部署、校验和分析工具 |
 | `build/` | 构建产物；`build/runtime/` 是可整体复制的安装源 |
 | `docs/` | 维护文档；当前架构与历史重构记录已分开 |
-| `tests/` | Python 规则/API 测试与 Rust 测试 |
+| `tests/` | Python 规则测试与 Rust 测试 |
 
 Rust 产物：
 
@@ -68,13 +67,12 @@ Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
 
 ## 常用入口
 
-所有脚本都要求 **PowerShell 7（pwsh）**，在仓库根目录执行：
+所有脚本都要求 **PowerShell 7（pwsh）**，在仓库根目录执行。译文直接改
+`src/translations/<语言>.toml`，没有编辑器界面，构建与部署都走命令行：
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
+.\apply_patch.ps1                    # 归一化 → 校验 → 编译 → 部署 → 核对
 ```
-
-启动本地工作台，打开安装/译文编辑页；它**不会自动编译**。
 
 ```powershell
 .\build.ps1                         # 注入器 + 全部语言包（zh、ja）
@@ -135,7 +133,7 @@ git diff --check
 
 1. **先确认状态**：`git status --short`、当前提交、工作树是否已有未提交改动。
 2. **先读契约**：改 GUI/构建/语言包前读 `docs/架构与重构.md`；改译文前读
-   `docs/译文与语言包.md`；改 API 前读 `docs/agent-api.md` 和 `src/editor/api/`。
+   `docs/译文与语言包.md`。
 3. **做最小改动**：不要顺手重写无关模块；不要把历史重构细节重新塞回当前架构文档。
 4. **同步文档**：接口、文件路径、构建命令、支持范围或已知问题变化时，更新中文文档及相关入口。
 5. **验证**：按改动范围跑对应检查；不能只凭截图、像素或字体宽度判断排版。
@@ -149,8 +147,7 @@ git diff --check
 - 文档只维护中文一套；唯一英文文件是根目录 `README.en.md`，只写项目入口和支持语言，
   不复制完整文档。
 - 文档和脚本里不写本机绝对路径：游戏目录写 `<游戏目录>`，用户目录用环境变量。
-- 相对链接必须可解析；参考 `docs/agent-api.md` 当前 41 条路由的口径，路由变化时同时改
-  中文文档和测试。
+- 相对链接必须可解析；命令、脚本入口变化时同时改中文文档和测试。
 - 不要在文档里把“未验证”写成“已修复”，也不要把单次正常现象当成根因结论。
 
 ## 已知问题与验收口径
@@ -170,7 +167,7 @@ git diff --check
 - GUI 基准窗口为 `560x400`（96 DPI），当前系统 DPI 下实测过；更高 DPI 缩放未系统验证。
 - 控件宽度是否足够，必须以实机控件矩形或真实运行结果为准；**不得用像素/字体宽度当
   排版判据**。
-- 中文长句可能因引擎按空格切词而整条丢弃；这是已知引擎限制，不能只靠编辑器预览判断。
+- 中文长句可能因引擎按空格切词而整条丢弃；这是已知引擎限制，不能只靠构建产物预览判断。
 
 ## 安全与仓库卫生
 

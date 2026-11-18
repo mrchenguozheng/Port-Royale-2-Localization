@@ -70,27 +70,13 @@ Steam 版不再尝试 `VERSION.dll` 自然加载：`PR2.exe` 静态导入
 
 需要 Rust（rustup + `i686-pc-windows-msvc` target）+ Python 3.11 以上（当前用 3.15）+ PowerShell 7（`pwsh`）+ MSVC 链接器（Rust 32 位 target 需要；项目不含 C++ 源码）。
 
+开发时改译文直接编辑 `src\translations\<语言>.toml`，然后：
+
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1
 ```
 
-它启动本地工作台服务，打开浏览器到「安装与启动」页，**不自动编译**。
-
-页面顶部是五步安装向导：
-
-1. 准备游戏目录；
-2. 准备字体；
-3. 翻译内容；
-4. 生成语言包 + 字体；
-5. 安装并启动。
-
-也可以直接点下面的卡片：
-
-- **构建与部署**：编译注入器、编译语言包、部署到游戏目录；
-- **语言**：「设为游戏语言」写 `PR2Localization/packs/locale.ini`；发行包只带 `locale.default.ini`，已有活动文件不覆盖；
-- **译文编辑**：和安装页同一个工作台，顶部页签切换。
-
-开发时改完译文，也可以直接在 PowerShell 7 运行 `pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1`：归一化 → 校验 → 编译 → 部署 → 核对一次跑完。
+它一次跑完归一化 → 校验 → 编译 → 部署 → 核对。
 
 构建入口收成根目录两个脚本：
 
@@ -111,22 +97,18 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1
 SHA-256；出包前自校验，失败不出包。
 脚本位置和参数见[构建与安装](docs/构建与安装.md#脚本位置)。
 
-按钮细节见[构建与安装](docs/构建与安装.md)。
-
 ### 仓库结构
 
 ```
 pr2-localization/
-├─ start.ps1                  开发入口：启动工作台
 ├─ build.ps1                  构建入口：注入器 + 语言包
 ├─ release.ps1                发布入口：构建运行时 + 打 zip + 可选 tag
 ├─ apply_patch.ps1            归一化 → 校验 → 编译 → 部署
-├─ shared/                   编辑器与工具共用的存储/校验核心
+├─ shared/                   工具共用的存储/校验核心
 ├─ src/
-│  ├─ translations/          译文唯一手改层（编辑器保存到这里）
+│  ├─ translations/          译文唯一手改层（直接编辑 TOML）
 │  ├─ data/                  人工维护的数据（占位符语义、原样保留清单）
 │  ├─ orig/                  原版英文/法文（只读参照）
-│  ├─ editor/                译文编辑器（Astro 前端 + server.py，api/ 按域分模块）
 │  ├─ injector-rs/           注入组件源码（Rust workspace，含 ui/）
 │  └─ tools/
 │     ├─ pack/               编译、部署、新建语言
@@ -153,8 +135,8 @@ pr2-localization/
 
 不用碰注入器源码，流程是：
 
-1. 在 PowerShell 7 运行 `pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1`，在「译文编辑」页点语言下拉旁的「＋」，用现成语言当模板；
-2. 逐条翻译并保存（写进 `src/translations/<代码>.toml`）；
+1. 用 `python src\tools\pack\new_lang.py --lang <代码> --template en` 生成 `src/translations/<代码>.toml`；
+2. 直接编辑这个 TOML，逐条翻译；
 3. 在 `src/tools/font/make_noto_fonts.py` 加该语言的 Noto 字重，并在 `src/font-map.ini` 加 `[<代码>]` 四条映射；
 4. 构建字体、语言包并部署。
 
@@ -170,7 +152,7 @@ pr2-localization/
 |---|---|
 | [文档索引](docs/README.md) | 按“玩家/构建/开发/数据”分类，先查这里 |
 | [玩家指南](docs/玩家指南.md) | 下载 zip、解压、启动、卸载、常见问题 |
-| [构建与安装](docs/构建与安装.md) | 安装页、构建/部署/启动、脚本一览 |
+| [构建与安装](docs/构建与安装.md) | 构建/部署/启动、脚本一览 |
 | [新语言](docs/新语言.md) | 从字体准备到翻译、部署、验收、出包 |
 | [发行版](docs/发行版.md) | 按语言出 zip、Noto 字体、GitHub Actions |
 | [字体与分发](docs/字体与分发.md) | 字体映射、Noto 许可、禁止分发 |

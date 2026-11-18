@@ -84,7 +84,7 @@ def pick_game_dir(explicit):
     for d in cand:
         if d and B.is_game_dir(d):
             return d
-    sys.exit("找不到游戏目录：用 --game-dir 指定，或先在 start.ps1 里选一次。")
+    sys.exit("找不到游戏目录：用 --game-dir 指定一次，会被记住。")
 
 
 def main():

@@ -71,12 +71,12 @@ ids = ["0xf90d7ea2", "0xf90d7ea3", "0xf90d7ea5"]   # 零散分布的用 ids 精�
 游戏字符串表里同类条目常常连续排列（货物、船只、军衔、城镇都是），所以
 `range` 比一条条列 id 好维护；零散的那些再用 `ids`。
 
-**id 怎么找**：编辑器里选中条目会显示 id；或者用
-`python src\tools\translate.py --help` 里的搜索命令。
+**id 怎么找**：用 `python src\tools\pack\quick.py --lang zh --find "原文片段"`，
+或者用 `python src\tools\translate.py --help` 里的搜索命令。
 
 ## 以后加别的语言
 
-1. 在 `src\translations\` 放好 `<语言>.toml`（编辑器里「＋ 添加语言」即可）；
+1. 在 `src\translations\` 放好 `<语言>.toml`（`python src\tools\pack\new_lang.py --new-lang <代码> --from en`）；
 2. 跑一次 `python src\tools\glossary.py --lang <语言>`，生成 `build\glossary\<语言>.md`；
 3. `terms.toml` 一个字都不用动 —— 术语是按 id 认的，跟语言无关；
 4. 想让它显示成「法语」而不是代码，在 `src\tools\glossary.py` 的
@@ -101,7 +101,7 @@ python src\tools\glossary.py --lang fr.gog_1.1.2.42
 ```bat
 python src\tools\terms_check.py            :: 查所有可编辑语言
 python src\tools\terms_check.py --lang zh
-python src\tools\terms_check.py --json     :: 给编辑器/脚本用
+python src\tools\terms_check.py --json     :: 给脚本用
 python src\tools\terms_check.py --strict   :: 有问题时退出码 1（可进 CI）
 ```
 
@@ -130,5 +130,5 @@ check = false
 ignore = ["0xfc512ea5"]       # 版权声明里的 RAD Game Tools
 ```
 
-**编辑器里也接了**：打开编辑器时会自动跑一次，右上角状态显示
-「术语待统一 N 条」，对应行下面用橙色标出「Turk Islands：应为「特克群岛」」。
+**只走命令行**：`python src\tools\terms_check.py --lang zh` 列出待统一的条目，
+每条带「Turk Islands：应为「特克群岛」」的说明。

@@ -30,7 +30,7 @@ src/tools/
 | `pack/apply_patch.py` | 校验 → 编译 → 部署，一条命令跑完（`apply_patch.ps1` 调它） |
 | `check.py` | 跑全部静态检查与单测（`check.ps1` 调它） |
 | `config_check.py` | 检查 locale/packs/translations/ui/font-map 的语言配置是否互相对得上；`release.ps1` 出包前也会跑 |
-| `pack/new_lang.py` | 命令行新建语言（编辑器里也能建） |
+| `pack/new_lang.py` | 命令行新建语言 |
 | `pack/compile_pack.py` | 把 `src/translations/*.toml` 排版后编译成 `build/runtime/PR2Localization/packs/*.txt`，引擎文本落在 `build/preview/engine_text/*.toml` |
 | `pack/check_breaks.py` | 编译后校验换行/占位符 |
 
@@ -78,27 +78,9 @@ python src/tools/font/make_noto_fonts.py --lang zh --out <目录>
 
 | 路径 | 作用 |
 |---|---|
-| `install/pr2ctl/` | 构建/部署/启动的共享实现 |
-| `install/server_status.py` | 探测本机编辑器实例 |
+| `install/pr2ctl/` | 构建/部署/启动/设置的共享实现 |
 | `analysis/progress.py` | 进度显示 |
 | `lint_imports.py` | 跨模块引用检查 |
-
-## 编辑器服务
-
-`src/editor/server.py` 只留 HTTP 外壳（Handler、4 条元路由、启动与 CLI），其余按域
-放在 `src/editor/api/`，同时被编辑器前端和测试调用：
-
-| 模块 | 作用 |
-|---|---|
-| `api/store.py` | 读全部条目、单条/全量写回、按 mtime 缓存（`save_all`/`patch_all` 走 `text/toml_io.py`） |
-| `api/request.py` | `Req`：把一次请求的 query/body 交给路由函数，函数用 `req.send_json` 回答 |
-| `api/translate.py` | 译文域：校验、语境、规则轨迹、占位符、筛选、保存/补丁 |
-| `api/langs.py` | 语言域：语言列表/进度/新建语言、占位符含义、术语例外 |
-| `api/install.py` | 安装域：游戏目录、构建/部署/启动任务 |
-
-各模块导出 `ROUTES = {(方法, 路径): 函数}`，server 合并成 `ROUTER` 后查表分发；
-换数据根只走 `server.set_data_root()`（`--data` 由它落地）。
-HTTP 契约与拆分前一致，GET 清单见 `tests/test_server_api.py` 的 `GET_URLS`。
 
 ## 数据文件
 

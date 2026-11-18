@@ -5,10 +5,10 @@
     detect.py    版本识别、补丁状态、语言包盘点
     deploy.py    复制到游戏目录
     build.py     构建注入器与语言包
-    launch.py    启动游戏、拉起编辑器
+    launch.py    启动游戏
     settings.py  记住目录与选择
 
-Web 安装页（src/editor）与 apply_patch.py 都从这里取函数。
+apply_patch.py 与其它 CLI 从这里取函数。
 """
 
 from .base import *      # noqa: F401,F403

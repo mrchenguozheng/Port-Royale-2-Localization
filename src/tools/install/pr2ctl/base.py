@@ -5,10 +5,8 @@
 # coding: utf-8
 r"""pr2ctl.core — Port Royale 2 本地化工具的核心逻辑（无 UI 依赖）
 
-一个窗口分三段，段号就是步骤号：
-
-界面无关：版本识别、构建、部署、启动、设置读写都在这里。
-界面层（Web 安装页）只负责显示与回调。
+版本识别、构建、部署、启动、设置读写都在这里；
+调用方是 `src\tools` 下的 CLI 与发行版 GUI。
 """
 
 import ctypes
@@ -17,14 +15,10 @@ import json
 import os
 import queue
 import shutil
-import socket
 import subprocess
 import sys
 import threading
 import time
-import urllib.request
-import uuid
-import webbrowser
 
 
 
@@ -62,21 +56,8 @@ LAUNCHER = "PR2Localization.exe"
 LAUNCHER_GUI = "PR2LocalizationGUI.exe"
 #: 编译注入器。子进程里跑 PowerShell 7，结果读它的输出。
 INJECTOR_PS1 = os.path.join(SRC, "build_injector.ps1")
-#: 译文编辑器（本地 Web）。它跟上面三条链路都无关 —— 不编译、不复制、
-#: 不启动游戏，只改 src\translations\*.toml，所以自己一个按钮。
-EDITOR_DIR = os.path.join(SRC, "editor")
-#: 独立入口（不想开工具窗口时运行）。
-EDITOR_PS1 = os.path.join(EDITOR_DIR, "StartEditor.ps1")
 #: 所有构建/启动脚本统一要求 PowerShell 7。
 PWSH = shutil.which("pwsh.exe") or shutil.which("pwsh")
-EDITOR_DIST = os.path.join(EDITOR_DIR, "dist")
-#: 编辑器从 8777 起往上找空端口，所以探测也按这个范围来 ——
-#: 这样才能找到「上一次 start 留下、还在跑」的那个实例并复用它。
-EDITOR_PORT_BASE = 8777
-#: 扫得比 server.py 的候选范围（8777 + 20）再宽一点：端口被占时它会往上挪，
-#: 而上一轮留下的实例可能正好停在更上面。多扫几个端口很便宜（本地拒绝是
-#: 立刻返回的），漏扫的代价却是「没认出来 → 又起一个」。
-EDITOR_PORT_TRIES = 24
 #: 启动语言下拉里的「不指定」项：读 PR2Localization\packs\locale.ini 的 language=。
 FOLLOW_LANG = "跟随 locale.ini"
 
