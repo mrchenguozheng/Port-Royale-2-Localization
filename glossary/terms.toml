@@ -112,3 +112,45 @@ note = "菜单与面板上的常用词；Load 在这套译文里有「装载（�
 ids = ["0xca6a6869", "0x1426f58b", "0xff075dec", "0xec815821",
        "0xcbc60959", "0xe1598619", "0xc618cdea", "0xc595352c",
        "0x2fec4614", "0xc638ee24"]
+
+[[group]]
+name = "船队与货载"
+note = "船队/仓库/船只列表这几个面板的高频词；Convoy 既指玩家编的船队也指 NPC 商队，统一译「船队」"
+ids = ["0x23f33e8d", "0x081e1857", "0xfad1c2f1"]
+
+[[group]]
+name = "任务与场景"
+note = "任务界面的标题词；只收 Missions —— 「scenario」在长篇战役简报的正文里也出现（In this scenario…），逐条强判会把改写过的叙述全部报出来，Scenario 单列在后面那组"
+ids = ["0xf3734971"]
+
+[[group]]
+name = "剧本"
+check = false
+note = "Scenario 是剧本界面的标题词，译文固定「剧本」；这个词在战役简报正文里同样出现，正文里译成「这场战役/本章」都通，所以只登记对照、不做一致性检查"
+ids = ["0xc722eeb6"]
+
+[[group]]
+name = "战斗"
+note = "火炮与决斗；Cannon/Cannons 是同一件东西的单复数，译法必须一样"
+ids = ["0x340c9536", "0x3473dad4", "0xc92566a4"]
+
+[[group]]
+name = "港口"
+note = "Harbor 只指港口设施，不带城镇义"
+ids = ["0x2d1232d0"]
+
+[[group]]
+name = "贸易航线"
+note = "Trade route 是玩家设的自动贸易线，不是「交易」这个动作"
+ids = ["0xe1eb8b92"]
+
+[[group]]
+name = "身份"
+note = "叙事里反复出现的三种身份；Captain 作称谓一律「船长」，人名里的 Captain 由专名条目整条跳过"
+ids = ["0x36132c58", "0xf90d7ea6", "0xddfa621b"]
+
+[[group]]
+name = "国别"
+check = false
+note = "English/French/Dutch/Spanish 这四个标签条目在句子里多以形容词出现（English ship、anglais、español），性数变化和中文「英国/英格兰」两种说法都不是精确匹配能判的，只做对照表"
+ids = ["0xd10ed290", "0xd10ed291", "0xd10ed292", "0xd10ed293"]
