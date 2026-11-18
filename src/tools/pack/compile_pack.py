@@ -254,8 +254,15 @@ def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal):
         # 没有比对基准，但它**必须报错**（玩家会直接看到这串标识符）。
         en_ref = s.get(T.BASE_LANG, "") or ""
         ident_ph = is_identifier(txt) and txt.strip() == en_ref.strip()
+        # 原文侧本来就是开发标识符（1.1.2.3 的 IDM_CONTEST_01_2004_* 十五条）：
+        # 这类键没有可比对的句子，只能继承原版缺陷。原样保留给警告，
+        # 译文写了别的标识符串、或原文是句子而译文仍是标识符，才算没译。
         if ident_ph:
-            errors.append("%s 仍是开发标识符占位（%s），没有翻译" % (h, txt))
+            if is_identifier(en_ref):
+                warnings.append("%s 原文即开发标识符，继承原版（%s）" % (h, txt))
+                ident_ph = False
+            else:
+                errors.append("%s 仍是开发标识符占位（%s），没有翻译" % (h, txt))
         if not is_placeholder(txt) and not ident_ph:
             check_placeholders(h, en_ref, txt, errors, warnings)
         if has_bare_pipe(txt):

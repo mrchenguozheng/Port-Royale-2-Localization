@@ -52,7 +52,7 @@ ROOT = os.path.dirname(SRC)
 BUILD = os.path.join(ROOT, "build")
 RUNTIME = os.path.join(BUILD, "runtime")
 
-LABELS = {"zh": "简体中文", "ja": "日本語"}
+LABELS = {"zh": "简体中文", "ja": "日本語", "ko": "한국어"}
 DATA_DIR = "PR2Localization"
 FLAT_COMMON = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
                "PR2LocalizationCore.dll")

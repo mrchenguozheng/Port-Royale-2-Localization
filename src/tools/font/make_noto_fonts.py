@@ -43,6 +43,11 @@ LANGS = {
         "serif": ("NotoSerifJP", (700, 900)),
         "label": "Japanese",
     },
+    "ko": {
+        "sans": ("NotoSansKR", 400),
+        "serif": ("NotoSerifKR", (700, 900)),
+        "label": "Korean",
+    },
 }
 
 
