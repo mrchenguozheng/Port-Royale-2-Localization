@@ -27,7 +27,6 @@ SRC = os.path.join(ROOT, "src")
 
 GET_URLS = [
     "/api/health",
-    "/api/font-status",
     "/api/langs",
     "/api/count?lang=zh",
     "/api/count?filter=attention&lang=zh",
@@ -80,7 +79,6 @@ class TestServerApi(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.mkdtemp()
         cls.data = os.path.join(cls.tmp, "src")
-        cls.presets = os.path.join(cls.tmp, "presets")
         for sub in ("translations", "orig"):
             src = os.path.join(SRC, sub)
             dst = os.path.join(cls.data, sub)
@@ -95,20 +93,13 @@ class TestServerApi(unittest.TestCase):
             p = os.path.join(gloss, name)
             if os.path.isfile(p):
                 shutil.copy2(p, os.path.join(dst_g, name))
-        os.makedirs(cls.presets)
-        repo_presets = os.path.join(SRC, "data", "fontstitch", "presets")
-        if os.path.isdir(repo_presets):
-            for name in os.listdir(repo_presets):
-                if name.endswith(".toml"):
-                    shutil.copy2(os.path.join(repo_presets, name),
-                                 os.path.join(cls.presets, name))
 
         cls.repo_digests = {p: _digest(p) for p in _repo_files()}
 
         cls.port = _free_port()
         cls.proc = subprocess.Popen(
             [sys.executable, SERVER, "--no-open", "--port", str(cls.port),
-             "--data", cls.data, "--presets-dir", cls.presets],
+             "--data", cls.data],
             cwd=ROOT,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -176,9 +167,6 @@ class TestServerApi(unittest.TestCase):
         self.assertTrue(os.path.isfile(dst))
         with open(dst, "rb") as fh:
             self.assertEqual(len(tomllib.load(fh)), len(self._zh()))
-        preset = os.path.join(self.presets, "zzr1test.toml")
-        if body.get("presets") is not None:
-            self.assertTrue(os.path.isfile(preset), body)
         self.assertIn("zzr1test", self._get("/api/langs")[1]["editable"])
 
     def test_patch_writes_only_given_id(self):

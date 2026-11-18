@@ -323,8 +323,6 @@ export async function createLang() {
   toast('正在创建 ' + code + ' …');
   let made: {
     code: string; from: string; aligned: boolean; dropped: number; filled: number;
-    presets?: { added: boolean; source: string | null };
-    presets_error?: string;
   };
   try {
     made = await api<typeof made>(
@@ -351,15 +349,10 @@ export async function createLang() {
 
   fill($('lang'), S.langs, code);
   await reload();
-  const pmsg = made.presets?.added
-    ? `；字体 presets 已加（模板 ${made.presets.source || '空'}）`
-    : made.presets_error
-      ? `；字体 presets 未加：${made.presets_error}`
-      : '';
-  $('stat').textContent = `已新建 ${code}（复制自 ${from}），共 ${S.total} 条待改${pmsg}`;
+  $('stat').textContent = `已新建 ${code}（复制自 ${from}），共 ${S.total} 条待改`;
   toast(made.aligned
-    ? `已创建 ${code}${pmsg}`
-    : `已创建 ${code}：模板多 ${made.dropped} 条已忽略，缺 ${made.filled} 条用 ${made.from.split('.')[0]} 基准补齐${pmsg}`);
+    ? `已创建 ${code}`
+    : `已创建 ${code}：模板多 ${made.dropped} 条已忽略，缺 ${made.filled} 条用 ${made.from.split('.')[0]} 基准补齐`);
 }
 
 // ── 事件 ────────────────────────────────────────────────

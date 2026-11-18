@@ -19,7 +19,6 @@ import tomllib
 
 import translate as T           # noqa: E402
 from api.store import load_all  # noqa: E402
-from api.install import _font_module  # noqa: E402
 
 RE_LANG_CODE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,15}$")
 MEANINGS = os.path.join(os.path.dirname(SRC), "glossary", "placeholder_meanings.toml")
@@ -246,10 +245,6 @@ def new_lang(code, src):
 
     result = {"code": code, "from": src, "aligned": aligned,
               "dropped": dropped, "filled": filled}
-    try:
-        result["presets"] = _font_module().add_language_presets(code, src)
-    except Exception as exc:
-        result["presets_error"] = str(exc)
     return result
 
 

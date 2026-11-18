@@ -6,7 +6,7 @@
 src/tools/
 ├─ pack/       编译、部署、新建语言
 ├─ text/       归一化、中文/日文规则、分词
-├─ font/       字体缝合与导出
+├─ font/       字体生成、调整与导出
 ├─ analysis/   说话人、语气等分析
 ├─ install/    pr2ctl 构建/部署/启动
 ├─ data/       人名、地名、分词词典
@@ -62,16 +62,16 @@ src/tools/
 
 | 路径 | 作用 |
 |---|---|
-| `font/subset_fonts.py` | 字体缝合入口（进阶/自用，每个语言 `presets/<语言>.toml`） |
-| `font/make_noto_fonts.py` | 发行版 Noto 替换字体（完整字体，不裁剪） |
-| `font/extract_fonts.py` | 从游戏 `pr2_loca.cpr` 导出原版拉丁字体 |
-| `font/fontstitch/` | 缝合引擎、`presets/` 目录、校验工具 |
+| `font/make_noto_fonts.py` | Noto 静态字重，映射的实际文件来源（完整字体，不裁剪） |
+| `font/build_cyr_fonts.py` | 俄语四个自建字体（正文 + 标题三档） |
+| `font/squeeze_fonts.py` | 水平压缩字形（按原版度量调整，供日文等宽字符用） |
+| `font/extract_fonts.py` | 从游戏 `pr2_loca.cpr` 导出原版拉丁字体（只用于测度量） |
 | `pack/make_release.py` | 按语言和 GOG/Steam 入口生成发行 zip（GOG 不含宿主 DLL，Steam 带 `Ascaron.Logging-2.6.dll` 和 `PR2HostMount.ps1`） |
 
-字体前置检查：
+字体只做映射：`src/font-map.ini` 把四个逻辑名指到实际文件，没有缝合步骤。
 
 ```bash
-python src/tools/font/subset_fonts.py --check
+python src/tools/font/make_noto_fonts.py --lang zh --out <目录>
 ```
 
 ## 构建、安装与诊断
@@ -94,10 +94,10 @@ python src/tools/font/subset_fonts.py --check
 | `api/request.py` | `Req`：把一次请求的 query/body 交给路由函数，函数用 `req.send_json` 回答 |
 | `api/translate.py` | 译文域：校验、语境、规则轨迹、占位符、筛选、保存/补丁 |
 | `api/langs.py` | 语言域：语言列表/进度/新建语言、占位符含义、术语例外 |
-| `api/install.py` | 安装域：游戏目录、构建/部署/启动任务、字体状态 |
+| `api/install.py` | 安装域：游戏目录、构建/部署/启动任务 |
 
 各模块导出 `ROUTES = {(方法, 路径): 函数}`，server 合并成 `ROUTER` 后查表分发；
-换数据根只走 `server.set_data_root()`（`--data` / `--presets-dir` 由它落地）。
+换数据根只走 `server.set_data_root()`（`--data` 由它落地）。
 HTTP 契约与拆分前一致，GET 清单见 `tests/test_server_api.py` 的 `GET_URLS`。
 
 ## 数据文件

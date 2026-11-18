@@ -414,16 +414,12 @@ def main():
         lang = _default_lang()
     code = build(lang, a.out, a.strict, a.marks, a.baseline, a.variant_out)
 
-    # 编完语言包顺手检查字体：译文里出现新字（比如新补的「嫩」）时，
-    # 字体不重缝就会画成空白。字体出错不算构建失败 —— 语言包本身没问题。
+    # 编完语言包顺手检查字体：字体只做映射，按 Noto 替换字体生成。
+    # 字体出错不算构建失败 —— 语言包本身没问题。
     if code == 0 and not a.no_fonts:
         try:
-            fdir = os.path.join(TOOLS, "font")
-            if fdir not in sys.path:
-                sys.path.insert(0, fdir)
-            import subset_fonts
-            ok, msg = subset_fonts.ensure_fonts(
-                langs=[lang], log=lambda m: print(m))
+            from build_artifacts import build_fonts
+            ok, msg = build_fonts([lang], mode="noto", log=lambda m: print(m))
             print("字体：" + msg)
             if not ok:
                 print("（部署时字体不会更新；详见上一行提示）")

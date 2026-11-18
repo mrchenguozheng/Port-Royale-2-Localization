@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""""安装"域：游戏目录、构建/部署/启动任务、字体状态与导出。
+""""安装"域：游戏目录、构建/部署/启动任务。
 
 任务用后台线程跑，状态放在 START_JOB；这一块没有 HTTP 代码。
 """
@@ -23,10 +23,6 @@ from install import pr2ctl as P  # noqa: E402
 START_JOB = {"running": False, "lines": [], "done": False, "ok": False,
              "kind": "", "error": ""}
 START_LOCK = threading.Lock()
-
-
-def set_presets_dir(path):
-    _font_module().PRESETS_DIR = os.path.abspath(path)
 
 
 def known_dirs():
@@ -116,62 +112,11 @@ def start_run(kind, fn):
     return {"ok": True, "kind": kind}
 
 
-def _font_module():
-    """按需把 src/tools/font 加进 sys.path，返回 subset_fonts 模块。"""
-    fdir = os.path.join(TOOLS, "font")
-    if fdir not in sys.path:
-        sys.path.insert(0, fdir)
-    import subset_fonts
-    return subset_fonts
-
-
-def font_status():
-    """安装页「第一次用」卡片的字体状态（按语言）。"""
-    sf = _font_module()
-    langs = sf.list_presets()
-    base_missing = [n for n in sf.FONTS
-                    if not os.path.isfile(os.path.join(sf.DEFAULT_SRC, n))]
-    rows = []
-    problems = []
-    for lang in langs:
-        donors, _fallback = sf.load_preset(lang)
-        donor_rows = [{"path": sf._resolve(d), "exists": os.path.isfile(sf._resolve(d))}
-                      for d, _idx in donors]
-        built = sum(1 for n in sf.FONTS
-                    if os.path.isfile(os.path.join(sf.DEFAULT_OUT, lang, n)))
-        rows.append({"lang": lang, "donors": donor_rows,
-                     "built": built, "total": len(sf.FONTS)})
-        miss = [d for d in donor_rows if not d["exists"]]
-        if miss:
-            problems.append("%s 缺 %d 个 donor" % (lang, len(miss)))
-    if base_missing:
-        problems.append("缺 %d 个原版字体（需要从游戏导出）" % len(base_missing))
-    if not sf._fonttools():
-        problems.append("缺 fontTools")
-    if not langs:
-        problems.append("没有 presets/<语言>.toml（可从 presets.example.toml 复制）")
-    return {
-        "ok": not problems,
-        "fonttools": bool(sf._fonttools()),
-        "base": {"dir": sf.DEFAULT_SRC, "missing": base_missing,
-                 "total": len(sf.FONTS)},
-        "languages": rows,
-        "problems": problems,
-        "presets_dir": sf.PRESETS_DIR,
-    }
-
-
 def get_start_running(req):
     query = req.query
     body = req.body
     procs = P.game_processes()
     return req.send_json({"running": bool(procs), "procs": procs})
-
-
-def get_font_status(req):
-    query = req.query
-    body = req.body
-    return req.send_json(font_status())
 
 
 def get_start_status(req):
@@ -191,24 +136,6 @@ def get_start_job(req):
     body = req.body
     with START_LOCK:
         return req.send_json(dict(START_JOB))
-
-
-def post_font_export(req):
-    query = req.query
-    body = req.body
-    game = (body.get("dir") or "").strip()
-    if not game:
-        return req.send_json({"ok": False, "error": "先填写游戏目录"})
-    out = os.path.join(os.path.dirname(SRC), "assets", "fonts", "original")
-    script = os.path.join(TOOLS, "font", "extract_fonts.py")
-    proc = subprocess.run(
-        [sys.executable, script, "--game-dir", game, "--out", out],
-        cwd=os.path.dirname(SRC), capture_output=True,
-        text=True, encoding="utf-8", errors="replace")
-    output = (proc.stdout or "") + (proc.stderr or "")
-    return req.send_json({"ok": proc.returncode == 0,
-                           "output": output,
-                           "status": font_status()})
 
 
 def post_start_pick(req):
@@ -348,11 +275,9 @@ def post_start_launch(req):
 
 ROUTES = {
     ("GET", "/api/start/running"): get_start_running,
-    ("GET", "/api/font-status"): get_font_status,
     ("GET", "/api/start/status"): get_start_status,
     ("GET", "/api/start/dirs"): get_start_dirs,
     ("GET", "/api/start/job"): get_start_job,
-    ("POST", "/api/font/export"): post_font_export,
     ("POST", "/api/start/pick"): post_start_pick,
     ("POST", "/api/start/use"): post_start_use,
     ("POST", "/api/start/forget"): post_start_forget,

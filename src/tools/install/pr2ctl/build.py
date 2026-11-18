@@ -182,7 +182,7 @@ def run_build(langs, events):
             from pack import build_artifacts
             events.put(("line", "检查字体…"))
             ok, msg = build_artifacts.build_fonts(
-                langs, mode="stitch",
+                langs, mode="noto",
                 log=lambda m: events.put(("line", m)))
             events.put(("line", "字体：" + msg))
         except Exception as exc:                  # 字体失败不该让构建失败

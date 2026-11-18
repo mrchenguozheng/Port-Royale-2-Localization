@@ -131,7 +131,7 @@ pr2-localization/
 │  └─ tools/
 │     ├─ pack/               编译、部署、新建语言
 │     ├─ text/               归一化、中文/日文规则、分词
-│     ├─ font/               字体缝合与导出（含 fontstitch/）
+│     ├─ font/               字体生成、调整与导出
 │     ├─ analysis/           说话人、语气等分析
 │     ├─ install/            pr2ctl 构建/部署/启动实现
 │     └─ data/               人名、地名、分词词典
@@ -155,8 +155,7 @@ pr2-localization/
 
 1. 在 PowerShell 7 运行 `pwsh -NoProfile -ExecutionPolicy Bypass -File .\start.ps1`，在「译文编辑」页点语言下拉旁的「＋」，用现成语言当模板；
 2. 逐条翻译并保存（写进 `src/translations/<代码>.toml`）；
-3. 创建语言时会自动生成 `presets/<代码>.toml`（donor 以模板语言的文件为模板），
-   再按语种检查/替换 donor；
+3. 在 `src/tools/font/make_noto_fonts.py` 加该语言的 Noto 字重，并在 `src/font-map.ini` 加 `[<代码>]` 四条映射；
 4. 构建字体、语言包并部署。
 
 完整步骤（含每步验收点）见[新语言](docs/新语言.md)。
@@ -174,7 +173,7 @@ pr2-localization/
 | [构建与安装](docs/构建与安装.md) | 安装页、构建/部署/启动、脚本一览 |
 | [新语言](docs/新语言.md) | 从字体准备到翻译、部署、验收、出包 |
 | [发行版](docs/发行版.md) | 按语言出 zip、Noto 字体、GitHub Actions |
-| [字体与分发](docs/字体与分发.md) | 缝合原理、donor 许可、禁止分发 |
+| [字体与分发](docs/字体与分发.md) | 字体映射、Noto 许可、禁止分发 |
 | [注入组件](docs/注入组件.md) | 运行时原理、hook 三条路径、源码职责、编译 |
 | [架构与重构](docs/架构与重构.md) | 分层、文件契约、重构记录、已知边界 |
 | [译文与语言包](docs/译文与语言包.md) | toml 格式、校验规则、加一种语言 |
@@ -195,9 +194,9 @@ pr2-localization/
 - **字体统一放在 `PR2Localization\fonts\`。** 实际字体文件（默认保留 Noto 原始文件名）平铺，
   不按语言子目录；同一次安装只放一个语言。四个游戏逻辑名由 `font-map.ini` 映射到这些文件，
   发行包只带 `font-map.default.ini`；用户自定义的 `font-map.ini` 按项覆盖，解压升级不覆盖它。
-  映射只接受 fonts 内的文件。开发用缝合版，发行用完整 Noto；部署时复制到游戏
-  `PR2Localization\fonts\`，不覆盖根目录原版。译文新增生僻字时，
-  构建会自动重缝，缺字就会显示空白。
+  映射只接受 fonts 内的文件。字体只做映射：直接用完整 Noto（俄语用四个自建文件），
+  部署时复制到游戏 `PR2Localization\fonts\`，不覆盖根目录原版；没有缝合步骤，
+  译文新增生僻字由完整字重本身覆盖。
 
 ---
 
@@ -222,5 +221,5 @@ pr2-localization/
 
 仓库里的文档与脚本**不写本机绝对路径**：游戏目录一律写作 `<游戏目录>`，
 用户目录用 `%USERPROFILE%` 之类的环境变量表示。
-`subset_fonts.py` 需要的原版字体默认读仓库内 `assets/fonts/original/`（已在 `.gitignore` 中忽略），
-不再指向某台机器的安装位置。
+`extract_fonts.py` 需要的原版字体默认读仓库内 `assets/fonts/original/`（已在 `.gitignore` 中忽略），
+不再指向某台机器的安装位置；它只用于测量原版字体度量。

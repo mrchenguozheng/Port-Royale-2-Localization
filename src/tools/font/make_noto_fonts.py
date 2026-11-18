@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""make_noto_fonts.py —— 为发行版生成 Noto 替换字体。
+"""make_noto_fonts.py —— 生成 Noto 替换字体（字体只做映射）。
 
-发行版不缝合，直接把完整 Noto 字体以原始文件名放进 fonts 目录，
+把完整 Noto 字体以原始文件名放进 fonts 目录，
 再由 font-map.default.ini 把游戏请求的四个逻辑名映射到这些文件，例如：
 
     ARIAL.TTF          -> NotoSansSC-Regular.ttf

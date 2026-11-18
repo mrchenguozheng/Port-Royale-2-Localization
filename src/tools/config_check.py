@@ -9,7 +9,7 @@
   origin/ai_assisted/review_status/source_lang；
 - `src/translations/<code>.toml` 是否存在；
 - `src/injector-rs/ui/ui.default.ini` 是否存在、是否有重复键；
-- `src/font-map.ini` / `src/font-map-stitch.ini` 的逻辑名、坏行和禁用字体；
+- `src/font-map.ini` 的逻辑名、坏行和禁用字体；
 - `src/data/placeholder_roles/<code>.toml` 是否存在且可解析。
 
 这些检查只保证配置之间对得上；字体文件是否真的存在由 release/build 阶段
@@ -195,14 +195,6 @@ def _check_font_maps(src, packs, errors, warnings):
         if missing:
             errors.append("src/font-map.ini：[%s] 缺少 %s"
                           % (code, ", ".join(missing)))
-
-    stitch_path = os.path.join(src, "font-map-stitch.ini")
-    if os.path.isfile(stitch_path):
-        stitch = _parse_font_map(stitch_path, ROOT, errors)
-        for code, _doc in packs.items():
-            if code.lower() not in stitch:
-                warnings.append("src/font-map-stitch.ini：缺少 [%s]"
-                                % code)
 
 
 def _check_translations(src, packs, errors):

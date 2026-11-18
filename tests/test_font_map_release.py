@@ -27,15 +27,15 @@ class TestFontMapPackaging(unittest.TestCase):
         with open(user_map, "w", encoding="utf-8", newline="\n") as fh:
             fh.write("[zh]\nARIAL.TTF=my-font.ttf\n")
 
-        make_release.copy_font_map(self.stage, lambda _m: None, mode="noto")
+        make_release.copy_font_map(self.stage, lambda _m: None)
 
         self.assertTrue(os.path.isfile(
             os.path.join(self.fonts, "font-map.default.ini")))
         with open(user_map, encoding="utf-8") as fh:
             self.assertEqual(fh.read(), "[zh]\nARIAL.TTF=my-font.ttf\n")
 
-    def test_config_mode_also_uses_default_name(self):
-        make_release.copy_font_map(self.stage, lambda _m: None, mode="config")
+    def test_no_user_map_written(self):
+        make_release.copy_font_map(self.stage, lambda _m: None)
         self.assertTrue(os.path.isfile(
             os.path.join(self.fonts, "font-map.default.ini")))
         self.assertFalse(os.path.isfile(

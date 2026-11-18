@@ -182,21 +182,18 @@ def post_shutdown(req):
 
 
 
-def set_data_root(path, presets_dir=None):
+def set_data_root(path):
     r"""把数据根（默认仓库 src\）指到别处，主要用于测试隔离。
 
     这里没有第二份路径表：`translate` 的 SRC\ 是唯一的根，译文、原文都
-    由它派生；`glossary\` 两文件按「根的同级」算；字体 presets 目录可以
-    单独指定（它不在 src\ 的同一层）。换根之后所有按 mtime 的缓存都要清，
-    否则拿到的还是旧文件的内容。
+    由它派生；`glossary\` 两文件按「根的同级」算。换根之后所有按 mtime
+    的缓存都要清，否则拿到的还是旧文件的内容。
     """
     global DATA_ROOT
     DATA_ROOT = os.path.abspath(path)
     T.set_src(DATA_ROOT)
     ST._ALL_CACHE.update(key=None, rows=None)
     LG.set_root(DATA_ROOT)
-    if presets_dir:
-        IN.set_presets_dir(presets_dir)
 
 
 # ---------------------------------------------------------------- HTTP
@@ -414,17 +411,13 @@ def main():
                     help="前端目录；默认使用 src/editor/dist")
     ap.add_argument("--data", default=None,
                     help="译文/原文的根目录（默认 src\\）；测试用临时副本")
-    ap.add_argument("--presets-dir", default=None,
-                    help="字体 presets 目录；默认 src\\data\\fontstitch\\presets")
     a = ap.parse_args()
 
     global DIST
     if a.web_dir:
         DIST = os.path.abspath(a.web_dir)
     if a.data:
-        set_data_root(a.data, a.presets_dir)
-    elif a.presets_dir:
-        set_data_root(DATA_ROOT, a.presets_dir)
+        set_data_root(a.data)
 
     if not os.path.isdir(DIST):
         _say("注意：找不到前端产物 %s" % DIST)

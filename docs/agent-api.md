@@ -260,24 +260,22 @@ GET /api/health
 
   `filled` 是模板缺、用英文补的 id 数。语言代码已存在时返回 400，
 
-  不会覆盖。可能附带 `presets`（字体预设生成结果）或 `presets_error`。
+  不会覆盖。
 
 * 术语表的 `skip_terms` 只影响 `/api/terms` 与 `attention` 的术语部分，
 
   不改变占位符 / 标签校验。
 
-## 4. 安装、构建与部署（16 条）
+## 4. 安装、构建与部署（15 条）
 
 
 
 | 方法   | 路径                          | 参数                        | 返回                                                   |
 | ---- | --------------------------- | ------------------------- | ---------------------------------------------------- |
 | GET  | `/api/start/running`        | 无                         | `{"running":bool,"procs":[{"name","pid"}]}`          |
-| GET  | `/api/font-status`          | 无                         | 字体就绪状态，见下                                            |
 | GET  | `/api/start/status`         | 无                         | 当前游戏目录状态，见下                                          |
 | GET  | `/api/start/dirs`           | 无                         | `{"dirs":[{sha,dir,label,last_used,current,valid}]}` |
 | GET  | `/api/start/job`            | 无                         | 后台任务快照 `{running,lines,done,ok,kind,error}`          |
-| POST | `/api/font/export`          | `{"dir": 游戏目录}`           | 运行 `extract_fonts.py`，返回 `{ok,output,status}`        |
 | POST | `/api/start/pick`           | 无                         | 打开系统目录选择框；`{ok,path}` 或 `{ok:false,"error":"已取消"}`   |
 | POST | `/api/start/use`            | `{"sha"}`                 | `{"ok":true, …start_status}`                         |
 | POST | `/api/start/forget`         | `{"sha"}`                 | `{"ok":true,"dirs":[…]}`                             |
@@ -312,18 +310,6 @@ GET /api/health
 ```
 
 `version`、`sha`、`patches`、`packs`、`locale` 只在 `valid:true` 时出现。
-
-`/api/font-status`：
-
-
-
-```
-{"ok":bool,"fonttools":bool,
- "base":{"dir":"…","missing":["…"],"total":…},
- "languages":[{"lang":"zh","donors":[{"path":"…","exists":true}],"built":…,"total":…}],
- "problems":["…"],
- "presets_dir":"…"}
-```
 
 ### 后台任务
 
@@ -360,10 +346,6 @@ GET /api/health
 * `/api/start/kill` 结束 `PR2.exe` / `PR2Localization.exe`；`launch` 的
 
   `vanilla:true` 启动无注入的原版。
-
-* `/api/font/export` 会写 `assets/fonts/original/`，并从游戏目录抽字体；
-
-  `dir` 为空时返回 `ok:false`。
 
 * 这些接口有真实副作用（写文件、起进程、改 `locale.ini`）。agent 只在
 

@@ -97,62 +97,11 @@ const S = { status: null, timer: 0 };
         : (langs.includes(st.locale) ? st.locale : (langs[0] || 'zh'));
     }
 
-    function setFontStatus(st) {
-      const base = $('fontBaseState');
-      if (base) {
-        const miss = (st.base && st.base.missing) ? st.base.missing.length : 0;
-        base.textContent = miss
-          ? `缺 ${miss} 个（需从游戏导出）`
-          : `已就绪（${st.base.total}/${st.base.total}）`;
-        base.className = 'step-state ' + (miss ? 'bad' : 'ok');
-      }
-      const rows = st.languages || [];
-      const donor = $('fontDonorState');
-      if (donor) {
-        const parts = rows.map((r) => {
-          const all = r.donors || [];
-          const have = all.filter((d) => d.exists).length;
-          return `${r.lang} ${have}/${all.length}`;
-        });
-        donor.textContent = (parts.join(' · ') || '无 presets') +
-          ` · fontTools ${st.fonttools ? '已装' : '缺'}`;
-        const allOk = rows.length > 0 && rows.every(
-          (r) => (r.donors || []).length && (r.donors || []).every((d) => d.exists));
-        donor.className = 'step-state ' + (allOk ? 'ok' : 'bad');
-      }
-      const built = $('wizBuildState');
-      if (built) {
-        const lang = wizLang();
-        const row = rows.find((r) => r.lang === lang);
-        built.textContent = row
-          ? `${lang} ${row.built}/${row.total}`
-          : `${lang} 无 presets`;
-        built.className = 'step-state ' + (row && row.built === row.total ? 'ok' : 'bad');
-      }
-      const msg = $('fontMsg');
-      if (msg) {
-        msg.textContent = (st.problems && st.problems.length)
-          ? '待处理：' + st.problems.join('；')
-          : '字体前置条件齐全。';
-      }
-    }
-
-    async function loadFontStatus() {
-      try {
-        setFontStatus(await api('/api/font-status'));
-      } catch (err) {
-        const msg = $('fontMsg');
-        if (msg) msg.textContent = '读取字体状态失败：' + err.message;
-      }
-    }
-
     async function loadWizard() {
       try {
         const st = await api('/api/start/status');
         fillStatus(st);
         fillWizLangs(st);
-        const fs = await api('/api/font-status');
-        setFontStatus(fs);
         const lang = wizLang();
 
         const dir = $('wizDirState');
@@ -179,14 +128,15 @@ const S = { status: null, timer: 0 };
           dep.className = 'step-state ' + (packOk ? 'ok' : 'bad');
         }
 
-        const row = (fs.languages || []).find((r) => r.lang === lang);
-        const missDonor = (fs.languages || []).some(
-          (r) => (r.donors || []).some((d) => !d.exists));
+        const built = $('wizBuildState');
+        if (built) {
+          built.textContent = packOk ? `已生成 ${lang}` : `未生成 ${lang}`;
+          built.className = 'step-state ' + (packOk ? 'ok' : 'bad');
+        }
+
         let next = '启动游戏验证';
         if (!st.valid) next = '选择游戏目录';
-        else if ((fs.base.missing || []).length) next = '导出原版字体';
-        else if (!fs.fonttools || missDonor) next = '准备 donor 字体';
-        else if (!packOk || !row || row.built < row.total) next = '生成语言包 + 字体';
+        else if (!packOk) next = '生成语言包 + 字体';
         else if (st.locale !== lang) next = '部署并设为游戏语言';
         const hint = $('wizHint');
         if (hint) hint.textContent = '下一步：' + next;
@@ -372,28 +322,6 @@ const S = { status: null, timer: 0 };
     $('buildInjector').addEventListener('click', () => void runJob('build-injector', {}));
     $('buildPacks').addEventListener('click', () => void runJob('build', { langs: chosenLangs() }));
     $('deploy').addEventListener('click', () => void runJob('deploy', { langs: chosenLangs() }));
-
-    $('fontCheck').addEventListener('click', () => void loadFontStatus());
-
-    $('fontExport').addEventListener('click', () => {
-      void (async () => {
-        const dir = ($('dir') as HTMLInputElement).value.trim();
-        if (!dir) { toast('先填写游戏目录'); return; }
-        const btn = $('fontExport') as HTMLButtonElement;
-        btn.disabled = true;
-        $('log').textContent = '导出原版字体…';
-        try {
-          const r = await api('/api/font/export', { dir });
-          $('log').textContent = r.output || (r.ok ? '导出完成' : '导出失败');
-          setFontStatus(r.status);
-          toast(r.ok ? '原版字体已导出' : '导出失败，见日志');
-        } catch (err) {
-          $('log').textContent = (err as Error).message;
-        } finally {
-          btn.disabled = false;
-        }
-      })();
-    });
 
     $('wizDir').addEventListener('click', () => {
       const dir = $('dir') as HTMLInputElement;

@@ -21,11 +21,9 @@
 GOG 版不带宿主 DLL；Steam 版带 Ascaron.Logging-2.6.dll 代理，安装时
 必须先把原版备份成 Ascaron.Logging-2.6.orig.dll。PR2HostMount.ps1 负责
 校验大小/哈希、备份、挂载和还原；校验不通过时不会覆盖原文件。
-发行包不包含游戏本体，也不包含缝合字体。想用原版字形的人可以走
-``--fonts stitch``（仅自用/私有包，不要公开分发）。字体模式：
-``noto`` 默认静态 Noto，并附带 font-map.default.ini；``config`` 只带默认映射；
-用户可另建 font-map.ini 按项覆盖它，解压升级不会覆盖这个文件。
-``none`` 不带字体。
+发行包不包含游戏本体。字体只做映射：默认 ``noto``（静态 Noto 替换字体 +
+``font-map.default.ini``）；``config`` 只带默认映射；用户可另建 font-map.ini
+按项覆盖它，解压升级不会覆盖这个文件。``none`` 不带字体。
 
     python src\\tools\\pack\\make_release.py --lang zh --edition gog --version v1.0.0
     python src\\tools\\pack\\make_release.py --lang zh --edition steam --version v1.0.0
@@ -37,7 +35,7 @@ import shutil
 import sys
 import zipfile
 
-FONT_NAMES = ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf", "Tiepolo_bold.ttf")
+
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -87,9 +85,8 @@ def copy_runtime(stage, edition, log):
         log("复制 %s" % name)
 
 
-def copy_font_map(stage, log, mode="noto"):
-    name = "font-map-stitch.ini" if mode == "stitch" else "font-map.ini"
-    src = os.path.join(SRC, name)
+def copy_font_map(stage, log):
+    src = os.path.join(SRC, "font-map.ini")
     if not os.path.isfile(src):
         raise FileNotFoundError("缺字体映射模板：%s" % src)
     dst = os.path.join(stage, DATA_DIR, "fonts", "font-map.default.ini")
@@ -120,24 +117,11 @@ def copy_fonts(lang, stage, mode, log, cache=True):
         log("跳过字体（发行包不含字体）")
         return
     if mode == "config":
-        copy_font_map(stage, log, mode="config")
+        copy_font_map(stage, log)
         log("不打包字体文件")
         return
     flat = os.path.join(stage, DATA_DIR, "fonts")
     from build_artifacts import build_fonts
-    if mode == "stitch":
-        src_flat = os.path.join(RUNTIME, DATA_DIR, "fonts")
-        if not all(os.path.isfile(os.path.join(src_flat, name))
-                   for name in FONT_NAMES):
-            ok, msg = build_fonts([lang], out_dir=None, mode="stitch", log=log)
-            if not ok:
-                raise FileNotFoundError(msg)
-            src_flat = os.path.join(RUNTIME, DATA_DIR, "fonts", lang)
-        copy_fonts_flat(src_flat, flat, log, expected=4)
-        log("复制缝合字体（仅限私有/自用包）")
-        copy_font_map(stage, log, mode="stitch")
-        return
-
     ok, msg = build_fonts([lang], out_dir=flat, mode="noto",
                           log=log, cache=cache)
     if not ok:
@@ -150,7 +134,7 @@ def copy_fonts(lang, stage, mode, log, cache=True):
     # 俄语是自建的四个字体（正文 + 标题三档）；其余语言仍是三个 Noto 静态字重。
     copy_fonts_flat(src_lang, flat, log, expected=4 if lang == "ru" else 3)
     shutil.rmtree(src_lang)
-    copy_font_map(stage, log, mode="noto")
+    copy_font_map(stage, log)
     log("复制 Noto 实际字体文件（由 font-map.default.ini 映射逻辑名）")
 
 
@@ -166,7 +150,6 @@ def write_readme(lang, stage, mode, edition):
     edition_label = "GOG 版" if edition == "gog" else "Steam 版"
     font_line = {
         "noto": "字体：Noto Sans / Noto Serif 原始文件名（SIL OFL 1.1），完整静态字体；font-map.default.ini 负责映射四个逻辑名。",
-        "stitch": "字体：本地缝合版（沿用游戏原版文件名，font-map.default.ini 做同名映射；仅限自用，不要公开分发）。",
         "none": "字体：本包不含字体，也无法通过映射读取系统字体。",
         "config": "字体：PR2Localization\\fonts\\font-map.default.ini 把逻辑名映射到 fonts 内的实际文件；本包不含字体，需要自己放入。",
     }[mode]
@@ -263,7 +246,7 @@ def write_readme(lang, stage, mode, edition):
   详见同目录 OFL.txt 或 https://openfontlicense.org/
   Liberation Sans 为未修改副本；标题字体是 Noto Serif 的压缩衍生版本，
   已改族名（PR2 Cyrillic Display *），不沿用 Noto 的保留字体名。"""
-    elif mode in ("noto", "stitch"):
+    elif mode == "noto":
         license_help = """字体许可：
   Noto 字体使用 SIL Open Font License 1.1，详见同目录 OFL.txt
   或 https://openfontlicense.org/"""
@@ -312,7 +295,7 @@ def write_readme(lang, stage, mode, edition):
 
 
 def copy_license(stage, log, mode="noto"):
-    if mode not in ("noto", "stitch"):
+    if mode != "noto":
         return
     for rel in (os.path.join("assets", "fonts", "OFL.txt"),
                 "OFL.txt",
@@ -390,7 +373,7 @@ def main():
                     help="发行入口：gog 不带宿主 DLL；steam 带宿主 DLL 和挂载脚本")
     ap.add_argument("--version", default="dev")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
-    ap.add_argument("--fonts", choices=("noto", "stitch", "config", "none"),
+    ap.add_argument("--fonts", choices=("noto", "config", "none"),
                     default="noto")
     ap.add_argument("--no-font-cache", action="store_true",
                     help="忽略 build/cache/noto 里的 Noto 字体缓存")
