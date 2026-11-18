@@ -3,18 +3,28 @@
 #  PR2 Localization - one-command release entry
 #
 #    .\release.ps1 -Version v1.0.0
+#    .\release.ps1 -Version 1.0.0            # 自动归一化成 v1.0.0
 #    .\release.ps1 -Version v1.0.0 -Lang zh
 #    .\release.ps1 -Version v1.0.0 -Edition gog
 #    .\release.ps1 -Version v1.0.0 -Edition steam
 #    .\release.ps1 -Version v1.0.0 -Tag
 #    .\release.ps1 -Version v1.0.0 -Tag -Push
 #
+#  规范见 docs\发行规范.md，要点：
+#    - 版本号只接受 vMAJOR.MINOR.PATCH[-prerelease]；不带 v 会自动补上，
+#      文件名、manifest、README、tag 都用归一化后的同一串。
+#    - 发行语言由 src\release-languages.txt 决定，不再自动扫翻译目录。
+#    - 产物是 dist\PR2-<lang>-<edition>-<version>.zip 加 dist\SHA256SUMS.txt；
+#      stage 目录打包后删除。
+#    - tag 名为 release-<version>，annotated；-Tag 要求工作树干净。
+#
 #  Default flow:
 #    1. build the injector into build\runtime
 #    2. compile each language and assemble
 #       dist\PR2-<lang>-gog-<version>.zip and
 #       dist\PR2-<lang>-steam-<version>.zip
-#    3. (optional) create release-<version> tag; -Push also pushes it
+#    3. write dist\SHA256SUMS.txt
+#    4. (optional) create release-<version> tag; -Push also pushes it
 #
 #  The pack assembly implementation stays in:
 #    src\tools\pack\make_release.py
@@ -58,6 +68,14 @@ if ($Push) { $Tag = $true }
 
 $ErrorActionPreference = 'Stop'
 
+# 版本号规范化：不带 v 自动补，校验统一的正则。python 侧 release_version.py
+# 用同一条规则再校验一次；这里只为了在出包前给出可读的报错和正确文件名。
+$Version = $Version.Trim()
+if (-not $Version.StartsWith('v')) { $Version = 'v' + $Version }
+if ($Version -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$') {
+    throw "版本号不合法：$Version；只接受 vMAJOR.MINOR.PATCH[-prerelease]，例如 v1.0.0、v1.2.3-rc.1"
+}
+
 $Repo = $PSScriptRoot
 $Src = Join-Path $Repo 'src'
 $ReleaseScript = Join-Path $Src 'tools\pack\make_release.py'
@@ -83,18 +101,47 @@ function Get-ReleaseLanguages {
         return @($names | Select-Object -Unique)
     }
 
-    $translationDir = Join-Path $Src 'translations'
-    $files = @(Get-ChildItem -LiteralPath $translationDir -Filter '*.toml' -File |
-        Where-Object { $_.BaseName -notlike 'test_*' } |
-        Sort-Object Name)
-    return @($files | ForEach-Object { $_.BaseName })
+    # 发行语言只认 src\release-languages.txt：有 pack 但没验收的语言（de/es/fr/ko）
+    # 不进正式包，避免自动发现把未完成语言也打进去。
+    $listPath = Join-Path $Src 'release-languages.txt'
+    if (-not (Test-Path -LiteralPath $listPath)) {
+        throw "缺发行语言清单：$listPath"
+    }
+    $names = @()
+    foreach ($raw in Get-Content -LiteralPath $listPath -Encoding utf8) {
+        $line = ($raw -split '#', 2)[0].Trim()
+        if (-not $line) { continue }
+        $names += @($line -split '[,\s]+' | Where-Object { $_ })
+    }
+    return @($names | Select-Object -Unique)
+}
+
+function Assert-ReleaseLanguages {
+    param([string[]]$Names)
+    $problems = @()
+    foreach ($name in $Names) {
+        if ($name -notmatch '^[a-z]{2,3}$') {
+            $problems += "语言代码不合法：$name"
+            continue
+        }
+        if (-not (Test-Path -LiteralPath (Join-Path $Src "packs\$name.toml"))) {
+            $problems += "缺 src\packs\$name.toml"
+        }
+        if (-not (Test-Path -LiteralPath (Join-Path $Src "translations\$name.toml"))) {
+            $problems += "缺 src\translations\$name.toml"
+        }
+    }
+    if ($problems.Count -gt 0) {
+        throw ("发行语言不全：" + ($problems -join '；'))
+    }
 }
 
 $Pwsh = Get-PwshPath
 $languages = @(Get-ReleaseLanguages)
 if ($languages.Count -eq 0) {
-    throw '没有找到语言：src\translations\*.toml 为空，且没有显式给 -Lang。'
+    throw '没有发行语言：src\release-languages.txt 为空，且没有显式给 -Lang。'
 }
+Assert-ReleaseLanguages -Names $languages
 
 $Python = @(& (Join-Path $Src 'find_python.ps1'))[0]
 if ($LASTEXITCODE -ne 0 -or -not $Python) {
@@ -109,6 +156,12 @@ $OutDir = if ([System.IO.Path]::IsPathRooted($Out)) {
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 $editions = if ($Edition -eq 'all') { @('gog', 'steam') } else { @($Edition) }
+
+# 上一次中断留下的 stage 目录（PR2-<lang>-<edition>-<version>\）不属于发行产物，
+# 重新出包前清掉，保证 dist 里只有 zip 和校验和。
+foreach ($dir in @(Get-ChildItem -LiteralPath $OutDir -Directory -Filter 'PR2-*-v*' -ErrorAction SilentlyContinue)) {
+    Remove-Item -LiteralPath $dir.FullName -Recurse -Force
+}
 
 Write-Host "[release] 版本：$Version"
 Write-Host "[release] 语言：$($languages -join ', ')"
@@ -166,11 +219,20 @@ if ($zips.Count -eq 0) {
     throw "没有找到生成的 zip：$OutDir\PR2-*-$Version.zip"
 }
 
+# 校验和与产物同目录，格式与 sha256sum 一致：<大写 HEX><两个空格><文件名>。
+$sumsPath = Join-Path $OutDir 'SHA256SUMS.txt'
+$sumLines = foreach ($zip in $zips) {
+    $hash = (Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash
+    '{0}  {1}' -f $hash, $zip.Name
+}
+Set-Content -LiteralPath $sumsPath -Value $sumLines -Encoding utf8NoBOM
+
 Write-Host ''
 Write-Host '[release] 已生成：'
 foreach ($zip in $zips) {
-    Write-Host "  $($zip.FullName)"
+    Write-Host ("  {0}  ({1:N1} MB)" -f $zip.FullName, ($zip.Length / 1MB))
 }
+Write-Host "  $sumsPath"
 
 if ($Tag) {
     $gitCmd = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue
@@ -183,16 +245,22 @@ if ($Tag) {
     $git = $gitCmd.Source
     $tagName = "release-$Version"
 
+    # 脏工作树打 tag 会把未提交的改动留在“已发布”版本里，直接拒绝。
+    $porcelain = @(& $git -C $Repo status --porcelain)
+    if ($porcelain.Count -gt 0) {
+        throw ("工作树有未提交改动，先提交再打 tag：`n" + ($porcelain -join "`n"))
+    }
+
     $existing = @(& $git -C $Repo tag -l $tagName)
     if ($existing.Count -gt 0) {
         throw "tag 已存在：$tagName"
     }
 
-    & $git -C $Repo tag $tagName
+    & $git -C $Repo tag -a $tagName -m "PR2 Localization $Version"
     if ($LASTEXITCODE -ne 0) {
         throw "创建 tag 失败：$tagName"
     }
-    Write-Host "[release] 已创建 tag：$tagName"
+    Write-Host "[release] 已创建 annotated tag：$tagName"
 
     if ($Push) {
         & $git -C $Repo push origin $tagName

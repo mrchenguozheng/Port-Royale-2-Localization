@@ -12,9 +12,12 @@
 `font-map.default.ini` 读取，不依赖这份 JSON。
 """
 
+import datetime
 import hashlib
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tomllib
 
@@ -126,6 +129,37 @@ def iter_release_files(stage):
             yield rel, full
 
 
+def _git(*args):
+    """调用 git；找不到 git 时返回 None。"""
+    exe = shutil.which("git")
+    if not exe and os.path.isfile(r"C:\Program Files\Git\cmd\git.exe"):
+        exe = r"C:\Program Files\Git\cmd\git.exe"
+    if not exe:
+        return None
+    try:
+        out = subprocess.run([exe] + list(args), cwd=ROOT, text=True,
+                             encoding="utf-8", errors="replace",
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                             timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    return out.stdout.strip()
+
+
+def _build_info():
+    """构建元信息：时间、源码提交、工作树是否有未提交改动。"""
+    commit = _git("rev-parse", "--short=7", "HEAD")
+    status = _git("status", "--porcelain", "--untracked-files=no")
+    return {
+        "at": datetime.datetime.now(datetime.timezone.utc)
+              .strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "commit": commit or None,
+        "dirty": None if status is None else bool(status),
+    }
+
+
 def build_manifest(stage, lang, version, edition, font_mode, package_id=None):
     stage = os.path.abspath(stage)
     package_id = package_id or os.path.basename(os.path.normpath(stage))
@@ -147,6 +181,7 @@ def build_manifest(stage, lang, version, edition, font_mode, package_id=None):
         "version": version,
         "runtime_version": _runtime_version(stage),
         "font_mode": font_mode,
+        "build": _build_info(),
         "target": _target(edition),
         "translation": translation,
         "source": _source(translation["source_lang"]),

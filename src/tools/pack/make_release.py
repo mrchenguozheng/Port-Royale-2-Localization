@@ -31,6 +31,7 @@ GOG 版不带宿主 DLL；Steam 版带 Ascaron.Logging-2.6.dll 代理，安装�
 
 import argparse
 import os
+import re
 import shutil
 import sys
 import zipfile
@@ -50,7 +51,10 @@ ROOT = os.path.dirname(SRC)
 BUILD = os.path.join(ROOT, "build")
 RUNTIME = os.path.join(BUILD, "runtime")
 
-LABELS = {"zh": "简体中文", "ja": "日本語", "ko": "한국어"}
+LABELS = {
+    "zh": "简体中文", "ja": "日本語", "ko": "한국어", "ru": "Русский",
+    "de": "Deutsch", "es": "Español", "fr": "Français",
+}
 DATA_DIR = "PR2Localization"
 FLAT_COMMON = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
                "PR2LocalizationCore.dll")
@@ -58,6 +62,27 @@ HOST_DLL = "Ascaron.Logging-2.6.dll"
 HOST_MOUNT_SCRIPT = "PR2HostMount.ps1"
 FLAT_STEAM = FLAT_COMMON + (HOST_DLL, HOST_MOUNT_SCRIPT)
 RUNTIME_VERSION = 1  # 与 src/injector-rs/pr2_common/src/lib.rs 的 RUNTIME_VERSION 保持一致
+RUST_RUNTIME_SOURCE = os.path.join(
+    SRC, "injector-rs", "pr2_common", "src", "lib.rs")
+
+
+def check_runtime_version(log=print):
+    """``RUNTIME_VERSION`` 与 Rust 常量必须一致，否则发行包会与语言包契约错位。"""
+    if not os.path.isfile(RUST_RUNTIME_SOURCE):
+        raise FileNotFoundError("缺运行时版本常量：%s" % RUST_RUNTIME_SOURCE)
+    with open(RUST_RUNTIME_SOURCE, "r", encoding="utf-8") as fh:
+        text = fh.read()
+    match = re.search(r"pub\s+const\s+RUNTIME_VERSION\s*:\s*u32\s*=\s*(\d+)\s*;",
+                      text)
+    if not match:
+        raise RuntimeError("在 %s 里找不到 RUNTIME_VERSION" % RUST_RUNTIME_SOURCE)
+    rust_version = int(match.group(1))
+    if rust_version != RUNTIME_VERSION:
+        raise RuntimeError(
+            "RUNTIME_VERSION 不一致：make_release.py=%d，lib.rs=%d"
+            % (RUNTIME_VERSION, rust_version))
+    return RUNTIME_VERSION
+
 
 
 def build_pack(lang, stage, log):
@@ -145,7 +170,7 @@ def write_runtime_version(stage, log):
     log("写入 RUNTIME-VERSION (%d)" % RUNTIME_VERSION)
 
 
-def write_readme(lang, stage, mode, edition):
+def write_readme(lang, stage, mode, edition, version=""):
     label = LABELS.get(lang, lang)
     edition_label = "GOG 版" if edition == "gog" else "Steam 版"
     font_line = {
@@ -258,6 +283,7 @@ def write_readme(lang, stage, mode, edition):
   已有 locale.ini（GUI 选语言时写入）优先，解压升级不会覆盖它。
   packs\\overrides\\ 是本机临时译文覆盖目录，安装/升级不会删除。"""
     text = """Port Royale 2 本地化 - %s（%s）
+版本：%s（运行时版本 %d）
 
 %s
 
@@ -287,7 +313,8 @@ def write_readme(lang, stage, mode, edition):
   - %s
 
 %s
-""" % (label, edition_label, support_line, install_step, lang, font_help,
+""" % (label, edition_label, version, RUNTIME_VERSION, support_line,
+       install_step, lang, font_help,
        locale_help, uninstall_line, font_line, license_help)
     with open(os.path.join(stage, "README.txt"), "w",
               encoding="utf-8", newline="\n") as fh:
@@ -321,7 +348,9 @@ def make_zip(stage, out_dir):
 
 
 def make_release(lang, version, out_dir, mode, edition, log=None, cache=True):
+    import release_version
     log = log or print
+    version = release_version.normalize(version)
     stage = os.path.join(out_dir, "PR2-%s-%s-%s" % (lang, edition, version))
     if os.path.isdir(stage):
         shutil.rmtree(stage)
@@ -341,7 +370,7 @@ def make_release(lang, version, out_dir, mode, edition, log=None, cache=True):
     os.makedirs(os.path.join(stage, DATA_DIR, "logs"), exist_ok=True)
     log("复制 PR2Localization\\ui\\")
     copy_fonts(lang, stage, mode, log, cache=cache)
-    write_readme(lang, stage, mode, edition)
+    write_readme(lang, stage, mode, edition, version)
     copy_license(stage, log, mode)
     import release_manifest
     release_manifest.write_release_manifest(stage, lang, version, edition, mode)
@@ -350,12 +379,15 @@ def make_release(lang, version, out_dir, mode, edition, log=None, cache=True):
         raise RuntimeError("发布清单校验失败：%s" % "；".join(manifest_errors))
     log("写入并校验 manifest.json（目标 exe、来源、逐文件 SHA-256）")
     zip_path = make_zip(stage, out_dir)
+    # 发行目录只留 zip 和校验和；stage 目录是中间产物，打包后立刻删掉。
+    shutil.rmtree(stage, ignore_errors=True)
     log("完成：%s" % zip_path)
     return zip_path
 
 
 def main():
     import config_check
+    import release_version
 
     errors, warnings = config_check.check_repository()
     for warning in warnings:
@@ -371,16 +403,28 @@ def main():
                     help="语言代码，可重复")
     ap.add_argument("--edition", choices=("gog", "steam"), required=True,
                     help="发行入口：gog 不带宿主 DLL；steam 带宿主 DLL 和挂载脚本")
-    ap.add_argument("--version", default="dev")
+    ap.add_argument("--version", required=True,
+                    help="发行版本号，规范形式 vMAJOR.MINOR.PATCH[-prerelease]")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
     ap.add_argument("--fonts", choices=("noto", "config", "none"),
                     default="noto")
     ap.add_argument("--no-font-cache", action="store_true",
                     help="忽略 build/cache/noto 里的 Noto 字体缓存")
     args = ap.parse_args()
+    try:
+        version = release_version.normalize(args.version)
+    except ValueError as exc:
+        print("拒绝出包：%s" % exc)
+        return 2
+    print("发行版本：%s（运行时版本 %d）" % (version, check_runtime_version()))
     os.makedirs(args.out, exist_ok=True)
     for lang in args.lang:
-        make_release(lang, args.version, args.out, args.fonts, args.edition)
+        problems = release_version.check_language(SRC, lang)
+        if problems:
+            print("拒绝出包：%s 不作为发行语言：%s" % (lang, "；".join(problems)))
+            return 2
+    for lang in args.lang:
+        make_release(lang, version, args.out, args.fonts, args.edition)
     return 0
 
 

@@ -10,6 +10,8 @@
 
 ## 当前状态
 
+- 发行口径统一在[发行规范](发行规范.md)：版本号 `vMAJOR.MINOR.PATCH[-pre]`，
+  语言集读 `src/release-languages.txt`，`dist/` 只留 zip 与 `SHA256SUMS.txt`。
 - 发行包按 GOG / Steam 分成两个；GOG 不带 `VERSION.dll`。
 - 语言：包内只放 `packs/locale.default.ini`；用户活动 `locale.ini` 存在时优先，
   空值也保留；部署/升级不覆盖，`packs/overrides/` 不删除。
@@ -29,6 +31,7 @@
 | 文档 | 内容 |
 |---|---|
 | [构建与安装](构建与安装.md) | 构建、部署、启动、脚本一览 |
+| [发行规范](发行规范.md) | 版本号、发行语言集、产物与校验和、tag、门禁 |
 | [发行版](发行版.md) | 两个发行包的结构、字体、语言设置、GitHub Actions |
 | [发行构建计划](发行构建计划.md) | 发行包构建的分步计划与验收项 |
 | [字体与分发](字体与分发.md) | 字体只做映射、Noto 许可、`font-map` 映射、禁止分发 |

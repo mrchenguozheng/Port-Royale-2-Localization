@@ -75,34 +75,55 @@ jobs:
           } else {
             throw "无法从触发事件推导版本"
           }
-          if ($version -notmatch '^v[0-9]') { throw "版本号必须以 v 开头：$version" }
+          if ($version -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$') {
+            throw "版本号不合法：$version；应为 vMAJOR.MINOR.PATCH[-prerelease]"
+          }
           "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "VERSION=$version"
 
+      - name: Read release languages
+        shell: pwsh
+        run: |
+          $list = Join-Path "src" "release-languages.txt"
+          $names = @()
+          foreach ($raw in Get-Content -LiteralPath $list -Encoding utf8) {
+            $line = ($raw -split '#', 2)[0].Trim()
+            if (-not $line) { continue }
+            $names += @($line -split '[,\s]+' | Where-Object { $_ })
+          }
+          $names = @($names | Select-Object -Unique)
+          if ($names.Count -eq 0) { throw "发行语言清单为空：$list" }
+          "LANGS=$($names -join ',')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "LANGS=$($names -join ',')"
+
       - name: Build release packages
         shell: pwsh
-        run: .\release.ps1 -Version $env:VERSION -Edition all -Lang @('zh','ja') -NoPause
+        run: |
+          $langs = $env:LANGS -split ','
+          .\release.ps1 -Version $env:VERSION -Edition all -Lang $langs -NoPause
 
       - name: Verify release assets
         shell: pwsh
         run: |
-          $expected = @(
-            "dist/PR2-zh-gog-$env:VERSION.zip",
-            "dist/PR2-zh-steam-$env:VERSION.zip",
-            "dist/PR2-ja-gog-$env:VERSION.zip",
-            "dist/PR2-ja-steam-$env:VERSION.zip"
-          )
-          foreach ($path in $expected) {
-            if (-not (Test-Path -LiteralPath $path)) { throw "缺少发行包：$path" }
-            $sha = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
-            Write-Host "$path $sha"
+          $langs = $env:LANGS -split ','
+          $expected = @()
+          foreach ($lang in $langs) {
+            $expected += "dist/PR2-$lang-gog-$env:VERSION.zip"
+            $expected += "dist/PR2-$lang-steam-$env:VERSION.zip"
           }
+          $expected += "dist/SHA256SUMS.txt"
+          foreach ($path in $expected) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "缺少发行产物：$path" }
+          }
+          Get-Content -LiteralPath "dist/SHA256SUMS.txt" | ForEach-Object { Write-Host $_ }
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PR2-${{ env.VERSION }}
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -112,7 +133,5 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            dist/PR2-zh-gog-${{ env.VERSION }}.zip
-            dist/PR2-zh-steam-${{ env.VERSION }}.zip
-            dist/PR2-ja-gog-${{ env.VERSION }}.zip
-            dist/PR2-ja-steam-${{ env.VERSION }}.zip
+            dist/*.zip
+            dist/SHA256SUMS.txt
