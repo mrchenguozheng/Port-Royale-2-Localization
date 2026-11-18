@@ -469,3 +469,59 @@ def _clause_units(clause, lookup, max_chars, names, hard):
 
 def _is_han(ch):
     return "\u4e00" <= ch <= "\u9fff"
+
+
+def perchar(text):
+    """逐字断行：两个汉字之间一律插一个半角空格，其余位置不动。
+
+    引擎只在空格处折行，每字一空格等于每个字后面都有断行点，行能填满、
+    也不会把词切开（已经没有词了）。标签 `<…>`、变量 `@…@`/`%…%` 内部
+    不插；标点两侧不留（标点自带全角宽度，行首行尾也不该挂孤立标点）；
+    引号里的短标签（`「关闭」`）也不拆，免得按钮名里出现缝。
+
+    代价是空格本身有宽度（当前字体 0.224 em），整段会变成均匀疏排。
+    """
+    if not text:
+        return text
+    out = []
+    last = 0
+    for m in _ATOM.finditer(text):
+        out.append(_perchar_chunk(text[last:m.start()]))
+        out.append(m.group(0))
+        last = m.end()
+    out.append(_perchar_chunk(text[last:]))
+    return "".join(out)
+
+
+def _perchar_chunk(chunk):
+    """纯文本片段：汉字之间插空格；引号里的短标签整块留着。"""
+    if not chunk:
+        return chunk
+    protect = _quoted_spans(chunk)
+    out = []
+    prev = None
+    prev_i = None
+    for i, ch in enumerate(chunk):
+        if (prev is not None and _is_han(prev) and _is_han(ch)
+                and not (prev_i in protect and i in protect)):
+            out.append(" ")
+        out.append(ch)
+        prev = ch
+        prev_i = i
+    return "".join(out)
+
+
+_QUOTE_PAIRS = (("「", "」"), ("『", "』"), ("（", "）"), ("《", "》"), ("【", "】"),
+                ("“", "”"))
+
+
+def _quoted_spans(text):
+    """找出「短引号标签」内部的字符下标：这些位置不插空格。"""
+    idx = set()
+    for a, b in _QUOTE_PAIRS:
+        rx = re.compile("%s([^%s]{1,6})%s" % (
+            re.escape(a), re.escape(a + b), re.escape(b)))
+        for m in rx.finditer(text):
+            if all(_is_han(c) for c in m.group(1)):
+                idx.update(range(m.start(1), m.end(1)))
+    return idx
