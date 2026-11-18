@@ -488,9 +488,19 @@ def _group_tokens(raw, hid):
 
 
 def _unbalanced(text):
-    """这个值里的半角引号有没有没配平的（单引号、双引号各数一次）。"""
+    """这个值里的半角引号有没有没配平的（`\\` 后面的引号算正文，不计数）。"""
     for q in _QUOTE_PAIRS:
-        if text.count(q) % 2:
+        n, esc = 0, False
+        for ch in text:
+            if esc:
+                esc = False
+                continue
+            if ch == "\\":
+                esc = True
+                continue
+            if ch == q:
+                n += 1
+        if n % 2:
             return True
     return False
 
@@ -517,9 +527,17 @@ def _join_source_parts(arg, hid):
 
 
 def _split_source_items(raw, hid):
-    """source 的值按 `+` / `&` 切成并列项；引号内的 `+`、`&` 原样保留。"""
-    items, buf, quote = [], [], None
+    """source 的值按 `+` / `&` 切成并列项；引号内的 `+`、`&` 与转义后的字符原样保留。"""
+    items, buf, quote, esc = [], [], None, False
     for ch in raw:
+        if esc:
+            buf.append(ch)
+            esc = False
+            continue
+        if quote is not None and ch == "\\":
+            buf.append(ch)
+            esc = True
+            continue
         if quote is None and ch in _QUOTE_PAIRS:
             quote = ch
         elif quote is not None and ch == quote:
@@ -530,17 +548,20 @@ def _split_source_items(raw, hid):
             continue
         buf.append(ch)
     if quote is not None:
+        if esc:
+            raise MarkError("%s：source 里的引号以反斜杠结尾——正文要一个反斜杠就写 `\\\\`"
+                            % hid)
         raise MarkError("%s：source 里的引号没闭合（%r）" % (hid, raw))
     items.append("".join(buf))
     return [i.strip() for i in items]
 
 
 def _unquote(raw, hid, what="URL"):
-    """取引号里的内容：必须成对、同种、紧贴；里面不能再出现同种引号。
+    """取引号里的内容：必须成对、同种、紧贴；里面可以写另外两种引号。
 
-    另外两种引号是允许的——双引号里可以写 `'` 或 `` ` ``，单引号里可以写 `"` 或 `` ` ``，
-    反引号里可以写 `'` 或 `"`。这样正文里带撇号的短语（`"l'abondance"`）、带双引号的
-    短语（`'say "hi"'`）、两种都带的短语（`` `a "b" c'd` ``）各有可选的外层。弯引号一律不认。
+    三种引号等价（`"…"`、`'…'`、`` `…` ``）。里面有同种引号时用反斜杠转义：
+    `"say \"hi\""`；`\\` 表示正文里的一个反斜杠；其它 `\\x` 一律原样保留（URL、路径里
+    本身可能带反斜杠，不当转义）。弯引号一律不认。
     """
     text = raw.strip()
     if not text or text[0] not in _QUOTE_PAIRS:
@@ -554,12 +575,31 @@ def _unquote(raw, hid, what="URL"):
         if ch in inner:
             raise MarkError("%s：%s 里有弯引号/全角引号 %r——只认半角 '／\"／`"
                             % (hid, what, ch))
-    if q in inner:
-        raise MarkError("%s：%s 的引号里不能再出现同种引号 %r（换另一种外层引号）"
-                        % (hid, what, q))
-    if not inner:
+    out = []
+    i = 0
+    while i < len(inner):
+        ch = inner[i]
+        if ch == "\\":
+            if i + 1 >= len(inner):
+                raise MarkError("%s：%s 的引号里以反斜杠结尾——正文要一个反斜杠就写 "
+                                "`\\\\`" % (hid, what))
+            nxt = inner[i + 1]
+            if nxt in (q, "\\"):
+                out.append(nxt)
+                i += 2
+                continue
+            out.append(ch)
+            i += 1
+            continue
+        if ch == q:
+            raise MarkError("%s：%s 的引号里出现同种引号 %r——写成 \\%s 转义，或换另一种外层引号"
+                            % (hid, what, q, q))
+        out.append(ch)
+        i += 1
+    value = "".join(out)
+    if not value:
         raise MarkError("%s：%s 的引号里是空的" % (hid, what))
-    return inner
+    return value
 
 
 def _check_url(raw, hid):
@@ -667,9 +707,9 @@ def _check_source_item(item, hid):
             raise MarkError("%s：manual 后面要写 路径@sha256-<12 位>" % hid)
         return ("manual", _check_manual(tail, hid))
     if cat == "riddle":
-        toks = [t.strip() for t in tail.split("+")]
+        toks = [t.strip() for t in tail.split(",")]
         if any(not t for t in toks):
-            raise MarkError("%s：riddle 的键列表里 `+` 两侧都要写键（收到 %r）"
+            raise MarkError("%s：riddle 的键列表里 `,` 两侧都要写键（收到 %r）"
                             % (hid, tail))
         for t in toks:
             if not ANS_KEY_RX.match(t):
@@ -691,13 +731,7 @@ def _check_source(raw, hid):
     items = _split_source_items(raw, hid)
     if any(not i for i in items):
         raise MarkError("%s：source 里有空项（多打了 `+` 或 `&`？）" % hid)
-    # `riddle:a+b` 里的 `+` 既切并列来源，也切同一项的多个键：裸 8 位键接回前一项。
-    merged = []
-    for item in items:
-        if merged and ANS_KEY_RX.match(item) and merged[-1].startswith("riddle:"):
-            merged[-1] = merged[-1] + "+" + item
-            continue
-        merged.append(item)
+    merged = items
     for ch in _CURLY_QUOTES:
         if ch in raw and ch not in "".join(_unquote(i, hid) for i in merged
                                            if i[:1] in _QUOTE_PAIRS):
@@ -728,13 +762,22 @@ def _clue_item_head(buf):
 
 
 def split_clue_items(raw, hid=""):
-    """按顶层 `,` 切 clue 项，引号里的逗号不算分隔；返回原项串列表（引号原样保留）。
+    """按顶层 `,` 切 clue 项，引号里的逗号不算分隔；返回原项串列表（引号与转义原样保留）。
 
     项可以整段用引号包起来（`"Good! Very good!"`），也可以裸写；引号认半角 `'` / `"` / `` ` ``，
-    且必须紧贴项首（标签前缀之后也算项首，`pun:"12:30"` 成立）。逗号后的空白不计。
+    且必须紧贴项首（标签前缀之后也算项首，`pun:"12:30"` 成立）。引号里可以用 `\\` 转义
+    同种引号（`"say \"hi\""`），转义后紧跟的字符不再当闭合引号。逗号后的空白不计。
     """
-    items, buf, quote = [], [], None
+    items, buf, quote, esc = [], [], None, False
     for ch in raw:
+        if esc:
+            buf.append(ch)
+            esc = False
+            continue
+        if quote is not None and ch == "\\":
+            buf.append(ch)
+            esc = True
+            continue
         if quote is not None:
             buf.append(ch)
             if ch == quote:
@@ -748,6 +791,9 @@ def split_clue_items(raw, hid=""):
             quote = ch
         buf.append(ch)
     if quote is not None:
+        if esc:
+            raise MarkError("%s：clue 的引号里以反斜杠结尾——正文要一个反斜杠就写 `\\\\`"
+                            % hid)
         raise MarkError("%s：clue 的引号没闭合（%r）" % (hid, raw))
     items.append("".join(buf))
     return items

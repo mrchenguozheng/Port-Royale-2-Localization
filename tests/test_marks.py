@@ -604,6 +604,39 @@ class TestAnswerMark(unittest.TestCase):
                      TABLE, "zh"),
             "He went north in August.")
 
+    def test_backslash_escapes_the_delimiter(self):
+        # 引号里写同种引号要转义：\" "、\' '、\` `
+        body = 'He said "hi" and left.'
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;"
+                     "clue=\"said \\\"hi\\\"\"]" + body, TABLE, "zh"), body)
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue='it\\'s']"
+                     "He says it's fine.", TABLE, "zh"), "He says it's fine.")
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=`a\\`b`]"
+                     "Code a`b runs.", TABLE, "zh"), "Code a`b runs.")
+
+    def test_backslash_backslash_is_one_backslash(self):
+        # `\\` 表示正文里的一个反斜杠；其它 `\x` 原样保留（URL/路径里本来就可能带）
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=\"a\\\\b\"]"
+                     "It reads a\\b here.", TABLE, "zh"), "It reads a\\b here.")
+
+    def test_trailing_backslash_in_quotes_is_error(self):
+        # 值本身以反斜杠结尾（没闭合）要明确报「反斜杠结尾」，不能只说引号没配平
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=\"a\\]"
+                     "It reads ab.", TABLE, "zh")
+        self.assertIn("反斜杠结尾", str(ctx.exception))
+
+    def test_escaped_quote_keeps_item_split(self):
+        # 转义后的引号不再当闭合引号，所以后面的逗号仍属于这一项
+        body = 'He said "a, b" twice.'
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;"
+                     "clue=\"said \\\"a, b\\\"\"]" + body, TABLE, "zh"), body)
+
     def test_quoted_value_needs_pairing(self):
         for bad in ("\"白沙", "白沙\"", "\"\"", "白沙,"):
             with self.assertRaises(M.MarkError):
@@ -979,9 +1012,14 @@ class TestCertaintyAndSource(unittest.TestCase):
         self.bad("source='https://example.com/a", "没闭合")
 
     def test_riddle_keys_must_ascend(self):
-        self.bad("source=riddle:00000002+00000001", "升序")
-        self.assertEqual(self.ok("source=riddle:00000001+00000002"), "He went north in August.")
-        self.bad("source=riddle:00000001+00000001", "重复")
+        self.bad("source=riddle:00000002,00000001", "升序")
+        self.assertEqual(self.ok("source=riddle:00000001,00000002"), "He went north in August.")
+        self.bad("source=riddle:00000001,00000001", "重复")
+
+    def test_riddle_keys_use_comma(self):
+        # `+` 在 riddle 的键列表里也退役：整段会被切成两个并列来源，后一个不是类别
+        self.bad("source=riddle:00000001+00000002", "没有类别")
+        self.bad("source=riddle:00000001,", "`,` 两侧都要写键")
 
     def test_manual_path_and_digest(self):
         path = os.path.join("glossary", "verse_ans.toml")
