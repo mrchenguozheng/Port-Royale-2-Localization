@@ -511,36 +511,6 @@ def _perchar_chunk(chunk):
     return "".join(out)
 
 
-#: 宽空格：U+00A0 在中文包里被改成了 0.25 em 的独立字形，专门留给
-#: 英文词内部与中英之间的空隙。
-WIDE_SPACE = "\u00a0"
-_ASCII_KEEP = set(".,+&/'+-")
-
-
-def _ascii_word(ch):
-    """能靠它撑起“这是英文/数字”的判断：字母、数字和常见并列符号。"""
-    return bool(ch) and ch.isascii() and (ch.isalnum() or ch in _ASCII_KEEP)
-
-
-def perchar_twospace(text):
-    """逐字断行 + 宽空格：汉字之间 U+0020（0.05 em），英文词内 U+00A0。
-
-    `U+0020` 在中文包里已被压到 0.05 em，只当断行标记用；凡是贴着英文、
-    数字的空格都换成 `U+00A0`（0.25 em），词距保持正常。
-    """
-    text = perchar(text)
-    out = []
-    for i, ch in enumerate(text):
-        if ch == " ":
-            left = text[i - 1] if i else ""
-            right = text[i + 1] if i + 1 < len(text) else ""
-            if _ascii_word(left) or _ascii_word(right):
-                out.append(WIDE_SPACE)
-                continue
-        out.append(ch)
-    return "".join(out)
-
-
 _QUOTE_PAIRS = (("「", "」"), ("『", "』"), ("（", "）"), ("《", "》"), ("【", "】"),
                 ("“", "”"))
 

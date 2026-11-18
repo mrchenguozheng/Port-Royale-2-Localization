@@ -173,13 +173,6 @@ class TestZhSpace(unittest.TestCase):
         self.assertEqual(out, "你 的 目 标<n>是 从「关闭」按 钮%@$Pos$开 始。")
         self.assertNotIn("  ", out)
 
-    def test_twospace_keeps_latin_words_on_wide_space(self):
-        """两种空白：汉字之间 U+0020，贴着英文/数字的空格换成 U+00A0。"""
-        t = "欢迎来到 Port Royale 2 中。"
-        out = zh_space.perchar_twospace(t)
-        self.assertIn("欢 迎 来 到\u00a0Port\u00a0Royale\u00a02\u00a0中。", out)
-        self.assertEqual(out.count("\u00a0"), 4)
-
 
 class TestSpecInterface(unittest.TestCase):
     """三段式接口：语言只声明 spec，engine_text 不认语言。"""

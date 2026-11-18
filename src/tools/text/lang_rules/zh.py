@@ -121,31 +121,6 @@ class ZhPerCharSpacing(S.Spacing):
         return zh_space.perchar(text)
 
 
-class ZhTwoSpaceSpacing(S.Spacing):
-    """两种空白（试验）：汉字之间 0.05 em 的 U+0020，英文词内 0.25 em 的 U+00A0。
-
-    配合 `src/tools/font/thin_space.py` 改过的中文包字体：U+0020 被压到
-    0.05 em，只当折行标记，所以中文看起来是连续的；U+00A0 换成独立的
-    0.25 em 空格字形，`Port Royale 2` 这种词的词距保持正常。
-
-    `PR2_ZH_SPACING=twospace` 打开，字体侧还要 `PR2_ZH_THIN_SPACE=1`。
-    """
-
-    mode = "twospace"
-
-    def setup(self, doc):
-        return None
-
-    def before(self, text):
-        return text, {"conj": 0, "name": 0}
-
-    def prepare(self, texts, segmenter):
-        return None
-
-    def apply(self, text, ctx):
-        return zh_space.perchar_twospace(text)
-
-
 class ZhGroupSpacing(S.Spacing):
     """中文补空格：先连词/人名/数字标签，再按词成组（每组 ≤ max_chars 字）。"""
 
@@ -188,12 +163,7 @@ def spec():
     """给 engine_text / apply_*_rules 用的语言声明。"""
     import os
     mode = os.environ.get("PR2_ZH_SPACING", "").strip().lower()
-    if mode == "perchar":
-        spacing = ZhPerCharSpacing()
-    elif mode == "twospace":
-        spacing = ZhTwoSpaceSpacing()
-    else:
-        spacing = ZhCompactSpacing()
+    spacing = ZhPerCharSpacing() if mode == "perchar" else ZhCompactSpacing()
     return S.LangSpec(
         code=LANG,
         punct=S.Punctuation(normalize, {"lang": LANG, **PUNCT}),
