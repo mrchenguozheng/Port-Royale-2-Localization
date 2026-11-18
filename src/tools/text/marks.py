@@ -16,19 +16,21 @@
     [lit:%2 %1日]               字面照写，原文保留
     [term:en_business]          术语：键是 <语言>_<原词>，查 src/data/terms/<lang>.toml
     [term:de_general]           同词两义时换成「把义项分开的那门语言」做键
-    [riddle:answer=Corpus Christi;clue=feature:荒凉+遗弃]
+    [riddle:answer=Corpus Christi;clue=荒凉+遗弃]
                                 诗谜的谜底（只给翻译人看，展开为空，玩家看不到）
                                 字段：`answer=` 谜底（`|` 是「或」的候选），
                                 `group=` 同组其余副本的文本键（`+` 连接，单副本不写），
-                                `clue=` 线索（`,` 分隔、`+` 同标签并值）。
+                                `clue=` 线索（`,` 分隔、`+` 并值）。
                                 answer 正常不写类型：方位键照写原词（east / not_north），
                                 其余一律按城镇查 entities.toml；只有城名与方位键撞名
                                 （目前 0 例）才写 town: / direction: 消歧。
-                                clue 的每一项必写 `<标签>:<正文>`，
-                                pun / direction / count / feature / produce / history /
-                                exclude 是已知类型，值必须是**谜面正文里逐字出现的片段**；
-                                `_` 开头的自造标签静默，字母开头的自造标签报 warning，
-                                裸写报错。
+                                clue 的每一**项**两种形状都认：
+                                  `<标签>:<正文>`（pun / direction / count / feature /
+                                   produce / history / exclude 是已知类型；`_` 开头的自造
+                                   标签静默，字母开头的自造标签报 warning），
+                                  裸写 `<正文>`（不带标签，直接当正文片段）。
+                                两种形状里的值都必须是**谜面正文里逐字出现的片段**；
+                                `+` 并的多个值「都要出现」。值里含冒号就只能带标签写。
                                 展开时逐条核对——
                                 写不出线索就说明这条谜面根本推不到这个答案（或线索该改）。
                                 谜底/线索都不生成本文，也不许把答案照抄成 town，
@@ -697,16 +699,17 @@ def _split_ans(arg, hid="", warns=None):
     → ([(类型|None, 值)…], [同组其余副本的键…], [(类型|None, 词)…])。
 
     `answer` 里 `|` 是「或」（多个候选），`group` 里 `+` 连接本组全体成员的键（含本条），
-    `clue` 里 `,` 是「并列」（全部必须成立）、`+` 是「同一个标签下的多个值」
-    （展开后等价于把该项重复几遍）。
+    `clue` 里 `,` 是「并列」（全部必须成立）、`+` 是「多个值」（展开后等价于把该项重复几遍）。
     `answer` 正常不写类型（值在方位键里算方位，否则按城镇查表）；想明写类型就改用
     `town=` / `direction=` 这两个字段名，此时可以省掉 `answer=`：
     `[riddle:town=Vera Cruz;clue=…]` / `[riddle:direction=SE;clue=…]`。
-    `clue` 的每一项必须写成 `<标签>:<正文>`：标签是七个已知类型就按类型校验，
-    `_` 开头的自造标签静默通过，字母开头的自造标签只当关键词并往 `warns` 记一条
-    （多半是拼错；lint 把它算 E 级，构建前必须清零）。
+    `clue` 的每一项两种形状都认：`<标签>:<正文>` 与裸写的 `<正文>`。带标签时标签是七个
+    已知类型就按类型校验（只供统计/检索，不影响匹配），`_` 开头的自造标签静默通过，
+    字母开头的自造标签只当关键词并往 `warns` 记一条（多半是拼错；lint 把它算 E 级，
+    构建前必须清零）。裸写没有标签，整项就是正文片段；只是项里若含冒号，冒号左侧会被
+    当作标签解析，所以正文本身含冒号（`12:30`）时必须带标签写。
     `group` 与 `clue` 都必填：单副本写 `group=<自己的键>`。
-    裸写、标签含大写/数字开头、已知类型缺值、`+` 两侧缺值、缺谜底、字段重名、
+    空项、标签含大写/数字开头、已知类型缺值、`+` 两侧缺值、缺谜底、字段重名、
     谜底写两处、全角逗号、group 漏了本条或键形不对，一律失败。
     """
     fields = {}
@@ -756,31 +759,35 @@ def _split_ans(arg, hid="", warns=None):
         part = part.strip()
         if not part:
             raise MarkError("%s：ans 的 clue 里有空项（多打了 `,`？）" % hid)
-        if ":" not in part:
-            raise MarkError("%s：ans 的 clue 项要写成 <标签>:<正文>，不接受裸写（收到 %r）"
-                            % (hid, part))
-        tag, _, tail = part.partition(":")
-        tag, tail = tag.strip(), tail.strip()
-        if not _TAG_RX.match(tag):
-            raise MarkError("%s：clue 的标签 %r 不合法（只允许小写字母或 `_` 开头，"
-                            "后面只能是小写字母/数字/`_`/`-`）" % (hid, tag))
+        tag = None
+        if ":" in part:
+            raw_tag, _, tail = part.partition(":")
+            raw_tag, tail = raw_tag.strip(), tail.strip()
+            if not _TAG_RX.match(raw_tag):
+                raise MarkError("%s：clue 的标签 %r 不合法（只允许小写字母或 `_` 开头，"
+                                "后面只能是小写字母/数字/`_`/`-`；裸写正文本身含冒号时"
+                                "要带标签写）" % (hid, raw_tag))
+            known = raw_tag in ANS_CLUE_KINDS
+            if known:
+                tag = raw_tag
+            elif not raw_tag.startswith("_") and warns is not None:
+                # 自造标签：`_` 开头是显式声明，静默；字母开头多半是拼错，记一条 warning。
+                warns.append("%s：clue 的标签 %r 不是已知类型，按关键词扫描"
+                             "（自造标签请用 `_` 开头）" % (hid, raw_tag))
+        else:
+            # 裸写：没有标签，整项就是正文片段，按 `+` 拆成多个值。
+            tail = part
         if not tail:
             raise MarkError("%s：clue 的 %s 项缺值（要写谜面里出现的原词）"
-                            % (hid, tag))
-        # 同类型并值：`feature:白沙+丛林` 等价于 `feature:白沙,feature:丛林`。
-        # `+` 只在标签内部起作用，语义仍是「都要成立」，省掉重复标签。
+                            % (hid, tag or "裸写"))
+        # 并值：`feature:白沙+丛林` 等价于 `feature:白沙,feature:丛林`；
+        # 裸写 `白沙+丛林` 等价于 `白沙,丛林`。语义仍是「都要成立」。
         values = [v.strip() for v in tail.split("+")]
         if any(not v for v in values):
             raise MarkError("%s：clue 的 %s 项里 `+` 两侧都要写值（收到 %r）"
-                            % (hid, tag, tail))
-        known = tag in ANS_CLUE_KINDS
-        if not known:
-            # 自造标签：`_` 开头是显式声明，静默；字母开头多半是拼错，记一条 warning。
-            if not tag.startswith("_") and warns is not None:
-                warns.append("%s：clue 的标签 %r 不是已知类型，按关键词扫描"
-                             "（自造标签请用 `_` 开头）" % (hid, tag))
+                            % (hid, tag or "裸写", tail))
         for value in values:
-            clues.append((tag if known else None, value))
+            clues.append((tag, value))
     if not clues:
         raise MarkError(
             "%s：ans 只写了谜底 %r，没有 clue（谜面里能推出它的词要逐条写进来）"

@@ -156,8 +156,9 @@ class TestAnswerMark(unittest.TestCase):
     `answer` 正常不写类型：值在方位键里算方位，其余按城镇查 entities.toml，
     只有撞名才改用 town= / direction= 字段把类型写明（`kw` 已删）；`|` 是「或」的候选。
     `group` 列同组其余副本的文本键，`+` 连接，单副本不写。
-    `clue` 的每一项必写 `<标签>:<正文>`：已知类型按类型校验，`_` 开头的自造标签
-    静默，字母开头的自造标签报 warning；相邻同类型可用 `+` 并值，语义仍是「都要成立」。
+    `clue` 的每一项两种形状都认：`<标签>:<正文>`（已知类型按类型校验，`_` 开头的自造
+    标签静默，字母开头的自造标签报 warning）与裸写的 `<正文>`；`+` 并值，语义仍是
+    「都要成立」。
     """
 
     VERSE = "[riddle:answer=St. Augustine;group=00000001;clue=pun:August,direction:north]He left for the north in August."
@@ -210,10 +211,32 @@ class TestAnswerMark(unittest.TestCase):
                      TABLE, "zh")
         self.assertIn("kw", str(ctx.exception))
 
-    def test_bare_clue_is_error(self):
-        # 裸写不认：clue 每项都得有标签，写不出类型就写 `_` 开头的自造标签
+    def test_bare_clue_scans_value(self):
+        # 裸写认：没有标签，整项当正文片段匹配，`+` 并值仍是「都要出现」
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=north]He went north.",
+                     TABLE, "zh"),
+            "He went north.")
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=north+August]"
+                     "He went north in August.", TABLE, "zh"),
+            "He went north in August.")
+        # 裸写与带标签可以混在同一条 clue 里
+        self.assertEqual(
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=pun:August,north]"
+                     "He went north in August.", TABLE, "zh"),
+            "He went north in August.")
+
+    def test_bare_clue_missing_is_error(self):
         with self.assertRaises(M.MarkError) as ctx:
-            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=north]He went north.", TABLE, "zh")
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=south]He went north.",
+                     TABLE, "zh")
+        self.assertIn("south", str(ctx.exception))
+
+    def test_bare_clue_plus_needs_both_values(self):
+        with self.assertRaises(M.MarkError) as ctx:
+            M.expand("[riddle:answer=St. Augustine;group=00000001;clue=north+]He went north.",
+                     TABLE, "zh")
         self.assertIn("裸写", str(ctx.exception))
 
     def test_unknown_tag_scans_value(self):

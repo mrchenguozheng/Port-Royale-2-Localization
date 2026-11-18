@@ -78,10 +78,9 @@ class TestVerseQueue(unittest.TestCase):
 class TestClueText(unittest.TestCase):
     """kinds 可选：没给就只拼关键词，给了就逐条套类型，条数不等即停。"""
 
-    def test_bare_is_error(self):
-        # 不给 kinds 就是裸写，不许
-        with self.assertRaises(SystemExit):
-            VA.clue_text(["四座", "东"], [], "zh")
+    def test_bare_is_allowed(self):
+        # 不给 kinds 就整组裸写：只给正文词，用 `+` 连成一项
+        self.assertEqual(VA.clue_text(["四座", "东"], [], "zh"), "四座+东")
 
     def test_empty_kind_is_error(self):
         with self.assertRaises(SystemExit):

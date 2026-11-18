@@ -3,12 +3,13 @@
 
 谜面在 09 卷第六十四节定义的 verse 区间里，整片不挂 town/ref/lit/term，只允许
 [riddle:answer=谜底;group=整组键含自己;clue=线索,…]（`;` 分字段；`answer` 里 `|` 是
-「或」，`group` 里 `+` 连本组全体成员（含本条），`clue` 里 `,` 分项、`+` 同类并值；
+「或」，`group` 里 `+` 连本组全体成员（含本条），`clue` 里 `,` 分项、`+` 并值；
 见 09 卷第七十八、七十九、八十一、八十三节）。`group` 与 `clue` 都必填，单副本写
 `group=<自己的键>`（见第八十九节）。谜底正常写 `answer=`，靠值推断类型；要明写类型就把
 字段名换成 `town=`（城名）或 `direction=`（方位），此时省掉 `answer=`（见第八十六节）。
-`clue` 每项必写 `<标签>:<正文>`：七个已知类型有校验，`_` 开头的自造标签静默，
-字母开头的自造标签报 warning，裸写报错。
+`clue` 每项写成 `<标签>:<正文>` 或裸写 `<正文>`：七个已知类型有校验（只供统计/检索），
+`_` 开头的自造标签静默，字母开头的自造标签报 warning；裸写没有标签，整项就是正文片段。
+两种写法里 `+` 都表示并值，语义都是「都要出现在谜面正文里」。
 这个工具只管那一件事：
 
     python src\\tools\\text\\verse_ans.py --list     # 看 41 条 / 29 组，谁还没填
@@ -158,19 +159,22 @@ def cmd_list(all_langs=False):
 def clue_text(clues, kinds, lang):
     """把一语的线索拼成标注串。
 
-    `kinds` 缺省（空）时整组都算出错——clue 每项都必须带标签，裸写不允许；
-    给了就按位加前缀。前缀可以是七个已知类型，也可以是自造标签：`_` 开头静默，
-    字母开头的自造标签展开侧会报 warning（这里不拦）。
+    `kinds` 缺省（空）就整组裸写：只给正文词，用 `+` 连成一项，展开侧按字面匹配。
+    给了就按位加前缀（条数与线索必须相等，空项等于没标签，不许）。前缀可以是七个已知
+    类型，也可以是自造标签：`_` 开头静默，字母开头的自造标签展开侧会报 warning
+    （这里不拦）。
     相邻且同标签的几条并成一项：`feature:白沙+丛林`，与逐条重复等价。
     """
     if not kinds:
-        raise SystemExit("%s 的线索没有 kinds：clue 每项都要写 <标签>:<正文>，"
-                         "裸写不允许（自造标签用 `_` 开头）" % lang)
+        if not clues:
+            raise SystemExit("%s 的线索是空的" % lang)
+        return "+".join(clues)
     if len(kinds) != len(clues):
         raise SystemExit("%s 的线索 %d 条，kinds 给了 %d 条（逐语对齐）"
                          % (lang, len(clues), len(kinds)))
     if not all(k for k in kinds):
-        raise SystemExit("%s 的 kinds 里有空项：没有标签就等于裸写" % lang)
+        raise SystemExit("%s 的 kinds 里有空项：没有标签就等于裸写，"
+                         "要么整组都不写 kinds" % lang)
     out = []
     run_tag, run_vals = None, []
     for k, c in zip(kinds, clues):
@@ -242,13 +246,16 @@ def _group_norm(raw):
 
 
 def _clue_norm(raw):
-    """clue 值 → 元组（标签, 正文元组）；标签保留原样，分隔符两侧空白不计。"""
+    """clue 值 → 元组（标签, 正文元组）；裸写项标签记空串，分隔符两侧空白不计。"""
     out = []
     for part in (raw or "").split(","):
         part = part.strip()
         if not part:
             continue
-        tag, _, tail = part.partition(":")
+        if ":" in part:
+            tag, _, tail = part.partition(":")
+        else:
+            tag, tail = "", part
         out.append((tag.strip(), tuple(v.strip() for v in tail.split("+"))))
     return tuple(out)
 
