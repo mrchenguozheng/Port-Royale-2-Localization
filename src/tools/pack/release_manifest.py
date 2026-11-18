@@ -12,7 +12,6 @@
 `font-map.default.ini` 读取，不依赖这份 JSON。
 """
 
-import datetime
 import hashlib
 import json
 import os
@@ -20,6 +19,8 @@ import shutil
 import subprocess
 import sys
 import tomllib
+
+import build_time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -150,12 +151,14 @@ def _git(*args):
 
 
 def _build_info():
-    """构建元信息：时间、源码提交、工作树是否有未提交改动。"""
+    """构建元信息：时间、源码提交、工作树是否有未提交改动。
+
+    ``SOURCE_DATE_EPOCH`` 有值时 ``at`` 也取该时间，同一 commit 可复现出同一清单。
+    """
     commit = _git("rev-parse", "--short=7", "HEAD")
     status = _git("status", "--porcelain", "--untracked-files=no")
     return {
-        "at": datetime.datetime.now(datetime.timezone.utc)
-              .strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "at": build_time.utc_timestamp(),
         "commit": commit or None,
         "dirty": None if status is None else bool(status),
     }

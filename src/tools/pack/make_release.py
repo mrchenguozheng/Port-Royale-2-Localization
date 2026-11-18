@@ -36,6 +36,8 @@ import shutil
 import sys
 import zipfile
 
+import build_time
+
 
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -135,6 +137,29 @@ def copy_fonts_flat(src_dir, flat_dir, log, expected=None):
             "字体文件数量不对：%s 下应有 %d 个 TTF，实际 %d 个" % (
                 src_dir, expected, n))
     log("平铺字体 %d 个文件到 PR2Localization\\fonts\\" % n)
+
+
+def resolve_font_mode(lang, mode):
+    """``auto`` 按 font-map.ini 里该语言的四项映射决定：全 none → config，否则 noto。
+
+    这样 de/es（原版拉丁字体已覆盖）自动出“只带映射”的包，zh/ja/ko/ru
+    自动带实际字体，不需要在 release.ps1 或 CI 里为每种语言各传一个 -Fonts。
+    """
+    if mode != "auto":
+        return mode
+    import configparser
+    path = os.path.join(SRC, "font-map.ini")
+    cfg = configparser.ConfigParser()
+    cfg.read(path, encoding="utf-8")
+    if not cfg.has_section(lang):
+        return "noto"
+    values = {}
+    for key in ("ARIAL.TTF", "ELGRECO_.TTF", "Tiepolo_black.ttf",
+                "Tiepolo_bold.ttf"):
+        values[key] = cfg.get(lang, key, fallback="").strip().lower()
+    if all(v in ("none", "-") for v in values.values()):
+        return "config"
+    return "noto"
 
 
 def copy_fonts(lang, stage, mode, log, cache=True):
@@ -350,18 +375,29 @@ def copy_license(stage, log, mode="noto"):
 def make_zip(stage, out_dir):
     name = os.path.basename(stage.rstrip("\\/"))
     zip_path = os.path.join(out_dir, name + ".zip")
+    # 可复现：SOURCE_DATE_EPOCH 有值时，zip 条目统一用它当 mtime，
+    # 同一 commit 重建出的包逐字节相同（manifest 的 build.at 也走同一时间）。
+    epoch = build_time.zip_date_time()
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for root, _dirs, files in os.walk(stage):
-            for fn in files:
+            for fn in sorted(files):
                 full = os.path.join(root, fn)
-                rel = os.path.relpath(full, stage)
-                zf.write(full, rel)
+                rel = os.path.relpath(full, stage).replace(os.sep, "/")
+                if epoch is None:
+                    zf.write(full, rel)
+                    continue
+                info = zipfile.ZipInfo(rel, date_time=epoch)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o644 << 16
+                with open(full, "rb") as fh:
+                    zf.writestr(info, fh.read())
     return zip_path
 
 
 def make_release(lang, version, out_dir, mode, edition, log=None, cache=True):
     import release_version
     log = log or print
+    mode = resolve_font_mode(lang, mode)
     version = release_version.normalize(version)
     stage = os.path.join(out_dir, "PR2-%s-%s-%s" % (lang, edition, version))
     if os.path.isdir(stage):
@@ -418,8 +454,9 @@ def main():
     ap.add_argument("--version", required=True,
                     help="发行版本号，规范形式 vMAJOR.MINOR.PATCH[-prerelease]")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
-    ap.add_argument("--fonts", choices=("noto", "config", "none"),
-                    default="noto")
+    ap.add_argument("--fonts", choices=("auto", "noto", "config", "none"),
+                    default="auto",
+                    help="字体模式：auto 按 font-map.ini 该语言的映射自动决定")
     ap.add_argument("--no-font-cache", action="store_true",
                     help="忽略 build/cache/noto 里的 Noto 字体缓存")
     args = ap.parse_args()

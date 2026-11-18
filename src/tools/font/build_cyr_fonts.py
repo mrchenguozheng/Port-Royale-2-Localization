@@ -6,8 +6,9 @@
 原版大（实测平均 advance / cap height 见下表），长一点的俄语串就会撑出
 木板。这里的做法不是再去缩文案，而是把 Noto 的字形改成原版的度量：
 
-- 正文（ARIAL）：用 Liberation Sans。它与 Arial 的 advance 逐字相同
-  （西里尔 64 字实测差 0 em），自带西里尔，UPM 2048，OFL 可分发。
+- 正文（ARIAL）：Noto Sans 按原版 ARIAL 的度量缩放（俄语用字平均 advance 0.578 /
+  cap 0.716 / 纵向 0.905 / -0.212）。Noto Sans 自带西里尔，OFL 可分发；
+  目标是“本机与 CI 用同一份 Noto 源”，不依赖系统里是否装了某款西里尔字体。
 - 标题（ELGRECO / Tiepolo_black / Tiepolo_bold）：每个逻辑字体各出一个文件，
   把 Noto Serif 的轮廓按 sy 纵向缩放到原版 cap height，再按 sx 横向压到原版
   平均 advance；ELGRECO 是窄而高的花体（avg 0.343 / cap 0.724），单独出
@@ -44,6 +45,14 @@ RU_TOML = os.path.join(ROOT, "src", "translations", "ru.toml")
 
 #: Noto Serif 静态字重的 cap height（em）。
 NOTO_CAP = 0.714
+#: 正文用 Noto Sans 缩放，目标取原版 ARIAL 在俄语用字上的实测值：
+#: 平均 advance 0.578、cap height 0.716；纵向度量也照 ARIAL 写回。
+BODY_AVG = 0.578
+BODY_CAP = 0.716
+BODY_WIN_ASC = 0.905
+BODY_WIN_DESC = 0.212
+BODY_ASCENT = 0.905
+BODY_DESCENT = -0.212
 #: Tiepolo 两个槽位在原版平均 advance 之上再压的比例：俄语串比英文长，
 #: 实测按原版宽度会撑出木板挂牌（主菜单、Esc 各一处），因此牺牲 12% 宽度。
 SLOT_SQUEEZE = 0.88
@@ -60,8 +69,6 @@ DISPLAY = [
      "PR2CyrDisplay-Head.ttf", "Head", 0.928, 0.308, 0.833, -0.250),
 ]
 
-BODY_SRC = os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts",
-                        "LiberationSans-Regular.ttf")
 BODY_OUT = "PR2CyrBody-Regular.ttf"
 
 
@@ -188,12 +195,27 @@ def build(out, noto_dir=None, log=None, charset=None):
     os.makedirs(out, exist_ok=True)
     noto_dir = noto_dir or NOTO_CACHE
 
-    if not os.path.isfile(BODY_SRC):
-        return False, "缺少 Liberation Sans：%s" % BODY_SRC
-    shutil.copyfile(BODY_SRC, os.path.join(out, BODY_OUT))
-    log("正文 %s ← %s" % (BODY_OUT, BODY_SRC))
-
     charset = charset if charset is not None else (_charset() if os.path.isfile(RU_TOML) else set())
+
+    # 正文：Noto Sans 按原版 ARIAL 的度量缩放。Noto Sans 自带的西里尔用字比原文
+    # 平均 advance 只差 2%（0.588 vs 0.578），缩放后视觉上与直接换字体几乎无差，
+    # 好处是不再依赖系统里的 Liberation Sans——本机和 CI 用同一份 Noto 源，
+    # 同 commit 重建能逐字节一致。
+    body_src = os.path.join(noto_dir, "NotoSans-Regular.ttf")
+    if not os.path.isfile(body_src):
+        return False, "缺少 Noto 源文件：%s" % body_src
+    noto = TTFont(body_src, lazy=True)
+    body_avg = _avg_advance(noto, charset) if charset else 0.0
+    noto.close()
+    if not body_avg:
+        return False, "无法测量 NotoSans-Regular 的平均 advance（用字表为空）"
+    _scale_font(body_src, os.path.join(out, BODY_OUT),
+                BODY_AVG / body_avg, BODY_CAP / NOTO_CAP,
+                "PR2 Cyrillic Body", charset=charset,
+                win_asc=BODY_WIN_ASC, win_desc=BODY_WIN_DESC,
+                ascent=BODY_ASCENT, descent=BODY_DESCENT)
+    log("正文 %s ← NotoSans-Regular.ttf  sx=%.3f sy=%.3f（目标 avg %.3f cap %.3f）"
+        % (BODY_OUT, BODY_AVG / body_avg, BODY_CAP / NOTO_CAP, BODY_AVG, BODY_CAP))
 
     for entry in DISPLAY:
         (src_name, target_avg, target_cap, out_name, weight,
@@ -226,7 +248,7 @@ def build(out, noto_dir=None, log=None, charset=None):
                                       "".join(missing[:12])))
     if missing_total:
         return False, "生成字体缺字 %d 个" % missing_total
-    return True, "俄语字体 4 个（正文 Liberation Sans，标题 Noto Serif 三档压缩）"
+    return True, "俄语字体 4 个（正文 Noto Sans 按 ARIAL 度量缩放，标题 Noto Serif 三档压缩）"
 
 
 def main():

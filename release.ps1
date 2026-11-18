@@ -42,8 +42,8 @@ param(
 
     [string]$Out = 'dist',
 
-    [ValidateSet('noto', 'config', 'none')]
-    [string]$Fonts = 'noto',
+    [ValidateSet('auto', 'noto', 'config', 'none')]
+    [string]$Fonts = 'auto',
 
     [switch]$SkipInjector,
 

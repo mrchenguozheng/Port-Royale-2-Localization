@@ -3,10 +3,19 @@
 # 一行一个语言代码；`#` 起为注释，逗号或空格分隔同样有效。
 # 只有列在这里、并且 src/packs/<lang>.toml、src/translations/<lang>.toml、
 # src/font-map.ini [<lang>] 三样齐全的语言，才会进 release.ps1 与 CI 的发行包。
-# 试点中的语言（de / es / fr / ko）暂不列出：有 pack 但字体或译文未验收，
-# 列进来会让出包在字体阶段失败，或被当成正式发行。
+#
+# 字体模式不需要在这里标注：release.ps1 默认 -Fonts auto，按 font-map.ini
+# 该语言的四项映射判断——全 none 的是 config（只带映射，用原版字体），
+# 其余是 noto（带实际字体）。de / es 属于前者，zh / ja / ko / ru 属于后者。
+#
+# fr 仍未列出：src/translations/fr.toml 在，但 src/packs/fr.toml 与
+# src/font-map.ini [fr] 都还没有，出包会在语言三件套检查处失败。
 #
 # 新增一门语言的顺序见 docs/新语言.md；验收后在这里加一行即可。
 
 zh
 ja
+ko
+ru
+de
+es

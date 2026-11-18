@@ -51,6 +51,8 @@ jobs:
             "NotoSerifSC-VF.ttf" = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf"
             "NotoSansJP-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf"
             "NotoSerifJP-VF.ttf" = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf"
+            "NotoSansKR-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf"
+            "NotoSerifKR-VF.ttf" = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifkr/NotoSerifKR%5Bwght%5D.ttf"
           }
           foreach ($name in $fonts.Keys) {
             $out = Join-Path $dir $name
@@ -95,6 +97,14 @@ jobs:
           if ($names.Count -eq 0) { throw "发行语言清单为空：$list" }
           "LANGS=$($names -join ',')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "LANGS=$($names -join ',')"
+
+      - name: Pin build time
+        shell: pwsh
+        run: |
+          # 固定时间源：同一 tag 重建出的包逐字节相同，校验和可比对。
+          $epoch = (git log -1 --format=%ct).Trim()
+          "SOURCE_DATE_EPOCH=$epoch" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "SOURCE_DATE_EPOCH=$epoch"
 
       - name: Build release packages
         shell: pwsh

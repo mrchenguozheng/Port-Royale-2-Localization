@@ -75,7 +75,7 @@ Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
 ```
 
 ```powershell
-.\build.ps1                         # 注入器 + 全部语言包（zh、ja）
+.\build.ps1                         # 注入器 + 全部语言包（清单见 src\release-languages.txt）
 .\build.ps1 -Target Packs -Lang zh  # 只编中文语言包
 .\build.ps1 -Target Injector        # 只编 Rust 注入器
 
