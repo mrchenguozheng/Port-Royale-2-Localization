@@ -55,7 +55,7 @@ def build_pack(lang, out_dir, events):
     这里仍查一次条目数兜底：空包装进游戏等于没生效，而 GUI 是
     会把它复制过去的最后一道关口。
     """
-    # 构建入口统一在 pack.build_artifacts；字体由 run_build 最后统一做一次。
+    # 构建入口统一在 pack.build_artifacts；编辑器只编语言包，不碰字体。
     from pack import build_artifacts
     events.put(("line", "[%s] 编译中…" % lang))
     code = build_artifacts.compile_pack(
@@ -176,17 +176,9 @@ def run_build(langs, events):
             events.put(("line", "已按 %s 建立 %s\\locale.default.ini"
                         % (os.path.basename(LOCALE_INI), PACK_DIR)))
 
-        # 字体：语言包编完后统一检查一次。译文里出现新字而字体没跟上，
-        # 游戏里就画成空白 —— 所以并进同一个构建动作，别让人单记一步。
-        try:
-            from pack import build_artifacts
-            events.put(("line", "检查字体…"))
-            ok, msg = build_artifacts.build_fonts(
-                langs, mode="noto",
-                log=lambda m: events.put(("line", m)))
-            events.put(("line", "字体：" + msg))
-        except Exception as exc:                  # 字体失败不该让构建失败
-            events.put(("line", "字体检查跳过：%s" % exc))
+        # 字体不在这里生成：编辑器只管译文与语言包，字体由
+        # src\tools\font\make_noto_fonts.py（或 build_cyr_fonts.py）在仓库侧做好。
+        events.put(("line", "字体不随编辑器构建生成；需要时用 font/make_noto_fonts.py --lang <代码>"))
 
         # 术语对照表：同样是「跟着译文走」的产物，顺手重生成一份，
         # 省得改完译文忘了同步。产物在 build\preview\glossary\，不进仓库。

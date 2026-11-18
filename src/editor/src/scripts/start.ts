@@ -136,7 +136,7 @@ const S = { status: null, timer: 0 };
 
         let next = '启动游戏验证';
         if (!st.valid) next = '选择游戏目录';
-        else if (!packOk) next = '生成语言包 + 字体';
+        else if (!packOk) next = '生成语言包';
         else if (st.locale !== lang) next = '部署并设为游戏语言';
         const hint = $('wizHint');
         if (hint) hint.textContent = '下一步：' + next;
