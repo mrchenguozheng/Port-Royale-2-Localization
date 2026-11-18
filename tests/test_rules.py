@@ -90,8 +90,10 @@ class TestZhSpace(unittest.TestCase):
     def test_collect_runs(self):
         runs = zh_space.collect_runs(["短句", "这是一个足够长的中文句子用来收集并测试断行"])
         self.assertEqual(runs, ["这是一个足够长的中文句子用来收集并测试断行"])
-        # 阈值 = MAX_CHARS + 1：会被切开的片段必须进分词器，否则只能按单字切
-        self.assertEqual(zh_space.collect_runs(["九个字的句子不用切"]), [])
+        # 阈值 = MIN_RUN（6）：断点按词挑，短片段也会被断，所以也得进分词器；
+        # 低于阈值的仍不送出去，免得拖慢分词。
+        self.assertEqual(zh_space.collect_runs(["短句"]), [])
+        self.assertEqual(zh_space.collect_runs(["六个字的句子"]), ["六个字的句子"])
         self.assertEqual(zh_space.collect_runs(["胡安·德·塞普尔维达到来这里看看"]),
                          ["胡安·德·塞普尔维达到来这里看看"])
 
@@ -165,6 +167,36 @@ class TestZhSpace(unittest.TestCase):
         self.assertTrue(tail)
         for tok in tail.split(" "):
             self.assertLessEqual(len(tok), 12, tok)
+
+
+    def test_compact_cut_tag_becomes_space(self):
+        """`<k>` 是人工钉的断点：标记不落地，只换成一个普通空格。"""
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        t = "港口里停着三艘船，<k>船坞旁还有两艘正在修理。"
+        out = zh_space.compact(t, lookup, 15)
+        self.assertNotIn("<k>", out)
+        self.assertIn("船 ", out.split("，")[0] + " ")   # 断在 <k> 那一刀上
+        self.assertNotIn("  ", out)
+
+    def test_compact_cut_tag_keeps_budget_short(self):
+        """`<k>` 处预算清零：它后面的片段不会和前面的字合并成超长 token。"""
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        t = "这是一段没有标点的长句子用来验证切断标记的作用<k>后面的内容重新开始算预算"
+        out = zh_space.compact(t, lookup, 15)
+        self.assertNotIn("<k>", out)
+        for tok in out.split(" "):
+            han = sum(1 for c in tok if "\u4e00" <= c <= "\u9fff")
+            self.assertLessEqual(han, 15, tok)
+
+    def test_compact_no_run_longer_than_budget(self):
+        """连续 15 个字之内必须有一个断点：没有任何标点的长句也得被切开。"""
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        t = "他沿着海岸线一路向北航行经过无数个无名小岛最后抵达了那片传说中的海域"
+        out = zh_space.compact(t, lookup, 15)
+        for tok in out.split(" "):
+            han = sum(1 for c in tok if "\u4e00" <= c <= "\u9fff")
+            self.assertLessEqual(han, 15, tok)
+        self.assertGreaterEqual(out.count(" "), 2)
 
 
 class TestSpecInterface(unittest.TestCase):

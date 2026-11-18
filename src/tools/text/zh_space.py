@@ -65,10 +65,14 @@ CJK_RUN = re.compile(r"[\u4e00-\u9fff]+")
 #: 整体保护起来，永远等不到断行——长文空白的一部分就是这么来的。
 NAME = re.compile(r"[\u4e00-\u9fff]{1,10}(?:·[\u4e00-\u9fff]{1,10})+")
 
-#: 单字虚词：粘在前一个词后面
-BIND_LEFT = set("的地得了着过是在和与及或而但也都不没把被给对从向为以于中上里外其之等们吗呢吧啊呀哦嗯")
-#: 单字指示/量词：粘到后一个词前面
-BIND_RIGHT = set("一二三四五六七八九十每各半几这那些")
+#: 单字虚词：粘在前一个词后面。不能收「不/没/都/也」这类否定与副词 ——
+#: 它们管的是后面那个动词，粘左会拼出「城镇不 / 能是」；介词（从/在/把/被/给）
+#: 管的是宾语，粘左会拼出「目标是从 / 一个」。
+BIND_LEFT = set("的地得了着过是等们吗呢吧啊呀哦嗯中上里外其之")
+#: 单字指示/量词/否定/副词/前缀/介词/连词：粘到后一个词前面
+#: （「这座」「不能」「总建筑师」「从一个」「或副王」）。
+BIND_RIGHT = set("一二三四五六七八九十每各半几这那些不没未别很太更最都也还就才总副前"
+                 "在把被给对从向为于跟同与和及或而")
 
 #: 默认每组最多多少字（预算，不是像素）。
 #:
@@ -76,14 +80,19 @@ BIND_RIGHT = set("一二三四五六七八九十每各半几这那些")
 #: 太大（早先 16）时，教程框那种一行十来字的窄控件里一个片段就占满一行，行数比
 #: 原文多，超高文本区把最后一句裁掉（编年史提示的「现在点标着 X 的按钮」就是这么
 #: 丢的）；太小（9）确实不再裁，但正文每隔八九个字就断一次，读起来碎
-#: （「你的目标是从 一个默默无闻的商人」）。
-#: 12 是在编年史提示这条上量出来的：12 估算 6 行（和原文对齐），15 涨到 7 行又开始裁。
-MAX_CHARS = 12
-#: 只处理这么长以上的汉字串：= MAX_CHARS + 1。
-#: 必须比 MAX_CHARS 大 1 而且不能再高 —— 只要一个片段会被切成两组，
-#: 它就必须进分词器；否则 lookup 拿不到词表，只能按单字成组，
-#: 于是出现「进口货 物」这种切在词中间的结果。
-MIN_RUN = MAX_CHARS + 1
+#: （「你的目标是从 一个默默无闻的商人」）。12 是当年在编年史提示这条上量出来的：
+#: 12 估算 6 行（和原文对齐），15 涨到 7 行又开始裁。
+#:
+#: 现在改成 15 字必断一次：连续 15 个字之内必须有一个断点，让长段落少断几刀；
+#: 位置仍然交给 `_groups()` 的代价函数挑（标点后 > 虚词前 > 预算硬填）。窄控件里
+#: 需要更早断的地方，用显式切断标记 `CUT_TAG` 钉住，不再靠调小预算。
+MAX_CHARS = 15
+#: 只处理这么长以上的汉字串。
+#:
+#: 断点现在按词挑（`_pack()` 的 DP），一个 8 字的片段照样会被拦腰断刀，所以
+#: 短片段也得进分词器，否则「在/之前/攻/占/一座」这种单字单位会让断点落在词中间。
+#: 6 是折中：再往下 spaCy 要处理的片段数涨得比收益快。
+MIN_RUN = 6
 
 
 def spacy_python():
@@ -142,9 +151,9 @@ def segment(runs):
     def lookup(run):
         words = seg.get(run)
         if words is None:
-            # 比预算还短的片段本来就不需要切，按单字也无所谓；
-            # 超过预算的片段没进分词器，才是「切在词中间」的信号。
-            if len(run) > MAX_CHARS:
+            # 比 MIN_RUN 还短的片段本来就不需要分词；进了收集范围却没结果，
+            # 才是「只能按单字成组、可能切在词中间」的信号。
+            if len(run) >= MIN_RUN:
                 missed.append(run)
             return list(run)
         return words
@@ -252,6 +261,15 @@ LEAD = set("从以向与和在对把被将为于跟同给也都还就才又最�
 PAUSE = set("，。！？；：、…—")
 #: 收尾符号：永远跟在前一个字后面，不能单独成段。
 CLOSE = set("》」』）】〉〕”’")
+#: 开括号：不能落在一行末尾（「「 / X」」）。
+OPEN = set("「『（［【〈〔")
+#: 往左粘的字（「…的 / 按钮」跨行读起来是残句）：断在它前面要加罚。
+#: 只收虚词，不收「而/或/及/与」这类可以起头的连词。
+STICKY = set("的了着过地得们呢吧啊吗呀")
+#: 字面并列的连词：断在它前后都会把「A 或 B」拆开。
+CONJ = set("与和及或而")
+#: 标点字符集（前面能断、后面不能断的那种）。
+PUNCT_CHARS = PAUSE | CLOSE
 #: 拆件：名字占位符整体一件、汉字串一件、其余单字一件。
 _PIECE = re.compile(r"[\u4e00-\u9fff]+(?:·[\u4e00-\u9fff]+)*|.")
 _PLACEHOLDER = re.compile(r"\x00(\d+)\x00")
@@ -260,6 +278,12 @@ _RUN_RX = re.compile(r"[\u4e00-\u9fff]+(?:·[\u4e00-\u9fff]+)*")
 #: 硬换行：`<n>` 与 `<n:25>` 这类带参数的换行都要清零；`<c>`、`<f:…>` 是行内标签。
 _HARD = re.compile(r"(<n[^>]*>|\r?\n)", re.I)
 _HARD_TAG = re.compile(r"<n[^>]*>|\r?\n", re.I)
+#: 显式切断标记：放在两个汉字之间表示「这里必须能断」。构建期由 `compact()`
+#: 吃掉并换成一个普通空格；它和 `<n>` 的区别是**不换行**，只提供一个断点。
+#: 用途是「预算 15 字」之外的人工干预：窄控件里必须更早断、或者自动挑出来的
+#: 位置读着别扭时，在源文的词界钉一刀，不用整体把预算调小。
+CUT_TAG = "<k>"
+_CUT = re.compile(r"<k>", re.I)
 #: 行内原子：名字占位符、标签、变量（`%1`、`@P$PirateName$`）。
 _ATOM = re.compile(r"\x00\d+\x00|<[^>]*>|" + base.VAR.pattern)
 
@@ -374,7 +398,11 @@ def compact(text, lookup, max_chars=MAX_CHARS):
 
 
 def _compact_seg(seg, lookup, max_chars, names):
-    """给一段（行内）文本排空格：预算穿过占位符累加，只有 `<n>` 才清零。"""
+    """给一段（行内）文本排空格：预算穿过占位符累加，只有 `<n>` 才清零。
+
+    `<k>`（`CUT_TAG`）是人工钉下的断点：预算在这里清零、标记本身不落地，
+    只留一个普通空格；<n> 才是换行。
+    """
     if not seg:
         return seg
     units = []          # [(文本, 权重, 是否强制断行), …]
@@ -382,7 +410,12 @@ def _compact_seg(seg, lookup, max_chars, names):
     last = 0
     for m in _ATOM.finditer(seg):
         hard = _chunk_units(seg[last:m.start()], lookup, max_chars, names, hard, units)
-        units.append((m.group(0), _atom_weight(m.group(0), names), False))
+        atom = m.group(0)
+        if _CUT.fullmatch(atom):
+            hard = True
+            last = m.end()
+            continue
+        units.append((atom, _atom_weight(atom, names), hard))
         hard = False
         last = m.end()
     _chunk_units(seg[last:], lookup, max_chars, names, hard, units)
@@ -423,19 +456,133 @@ def _atom_weight(atom, names):
 
 
 def _pack(units, max_chars):
-    """把单位按预算拼回去：标点贴前字，其余超预算就插一个空格。"""
-    out, cur = [], 0
-    for text, weight, hard in units:
-        if text in PAUSE or text in CLOSE:      # 标点永远贴着前一个字
-            out.append(text)
-            cur += weight
+    """把单位按预算拼回去：预算内不插空格，超了才挑一个最像停顿的位置断。
+
+    断点由 DP 挑，不再「填满就断」：贪心会在「…「X」/的按钮」这种地方落刀，
+    前半截成了残句。代价函数见 `_cut_cost()`；`hard`（来自 `<k>` 或原文空格）
+    是死断点，先把 units 切块，块内再各自挑。
+    """
+    blocks, cur = [], []
+    for u in units:
+        if u[2] and cur:
+            blocks.append(cur)
+            cur = []
+        cur.append(u)
+    if cur:
+        blocks.append(cur)
+    return " ".join(_dp_pack(b, max_chars) for b in blocks) if blocks else ""
+
+
+def _tail_punct_weight(block, i, j):
+    """片段末尾那串标点的权重：标点本身不能断，不该算进预算。"""
+    w = 0
+    k = j
+    while k > i and block[k - 1][0] and block[k - 1][0][-1] in PUNCT_CHARS \
+            and all(c in PUNCT_CHARS or c in "”’" for c in block[k - 1][0]):
+        w += block[k - 1][1]
+        k -= 1
+    return w
+
+
+def _dp_pack(block, max_chars):
+    """块内挑断点：token 权重 ≤ 预算（单个单位超预算时自成一组）。"""
+    n = len(block)
+    if n == 1:
+        return block[0][0]
+    pre = [0]
+    for _, w, _ in block:
+        pre.append(pre[-1] + w)
+    INF = 1 << 30
+    dp = [INF] * (n + 1)
+    back = [0] * (n + 1)
+    dp[0] = 0
+    for i in range(n):
+        if dp[i] >= INF:
             continue
-        if cur and (hard or cur + weight > max_chars):
-            out.append(" ")
-            cur = 0
-        out.append(text)
-        cur += weight
-    return "".join(out)
+        j = i + 1
+        while j <= n:
+            if j > i + 1 and pre[j] - pre[i] - _tail_punct_weight(block, i, j) > max_chars:
+                break
+            if j < n and not _cut_ok(block, i, j):
+                j += 1
+                continue
+            cost = dp[i] + _cut_cost(block, i, j, n)
+            if cost < dp[j]:
+                dp[j] = cost
+                back[j] = i
+            j += 1
+    if dp[n] >= INF:
+        return "".join(t for t, _, _ in block)
+    cuts, k = [], n
+    while k:
+        cuts.append(k)
+        k = back[k]
+    cuts.reverse()
+    out, prev = [], 0
+    for cp in cuts:
+        out.append("".join(t for t, _, _ in block[prev:cp]))
+        prev = cp
+    return " ".join(out)
+
+
+def _is_tag(text):
+    return text.startswith("<") and not text.startswith("<n")
+
+
+def _cut_ok(block, i, j):
+    """断点（units[j] 之前）是否合法：标点不能起头、开括号不能收尾、半角串不许拆开。
+
+    行内标签（`<o:…>`、`<c>`、`<f:…>`）不占位、渲染成空，断在它前后都无所谓，
+    所以不在这里拦；拦了反而会把「…享受<o:…>5%<o> / 的折扣」逼回无断点的长句。
+    """
+    head = block[j][0]
+    if head and head[0] in PUNCT_CHARS:
+        return False
+    tail = block[j - 1][0]
+    if tail and tail[-1] in OPEN:
+        return False
+    # 数字、单位、`%`、`$` 这类半角串必须连在一起（「5 %」「% 1」都是坏的）。
+    if tail and head and tail[-1].isascii() and not tail[-1].isspace() \
+            and head[0].isascii() and not head[0].isspace():
+        return False
+    return True
+
+
+def _cut_cost(block, i, j, n):
+    """断点代价（越小越自然）：
+
+    * 收尾是标点（「，」「。」）→ 最自然，0；
+    * 收尾是「从/在/也」这类往后粘的字 → +8，会断出残句；
+    * 下一件以「的/了/着」开头 → +6，往左粘；
+    * 片段太短（孤字 4、两字 2）→ 加上去，免得满屏碎块；
+    * 其余 +2。
+    """
+    if j >= n:
+        return 0
+    size = sum(w for _, w, _ in block[i:j])
+    cost = 0
+    if size == 1:
+        cost += 4
+    elif size == 2:
+        cost += 2
+    head = block[j][0]
+    if head and head[0] in STICKY:
+        cost += 8
+    elif head and head[0] in COMPLEMENT:
+        cost += 6
+    elif head and head[0] in CONJ:
+        cost += 8
+    tail = block[j - 1][0]
+    if tail and tail[-1] in LEAD:
+        cost += 8
+    # 指示词/数词 + 量词（「这座」「一座」）后面别断：「一座 / 属于」把名词短语也劈开了。
+    if len(tail) == 2 and tail[0] in "这那每各一二三四五六七八九十":
+        cost += 8
+    elif len(tail) == 1 and tail in "个座名位艘条张种份件次元只头匹":
+        cost += 6
+    if tail and tail[-1] in PUNCT_CHARS:
+        return cost
+    return cost + 2
 
 
 def _clause_units(clause, lookup, max_chars, names, hard):
@@ -458,11 +605,15 @@ def _clause_units(clause, lookup, max_chars, names, hard):
             units.append((piece, len(piece), first))
             first = False
             continue
-        pieces = [piece]
         if len(piece) > max_chars:
-            pieces = [p for p in _groups(piece, lookup, max_chars).split(" ") if p]
-        for k, sub in enumerate(pieces):
-            units.append((sub, len(sub), first if k == 0 else True))
+            # 超预算的汉字串按词拆成单位，**不在这里定断点**：断点统一交给
+            # `_pack()` 的 DP 挑，否则这里选的边界会被当成死断点，外面再想
+            # 挪（比如躲开往左粘的「的」）就没有余地了。
+            words = _words(piece, lookup)
+            for k, w in enumerate(words):
+                units.append((w, len(w), first if k == 0 else False))
+        else:
+            units.append((piece, len(piece), first))
         first = False
     return units
 
