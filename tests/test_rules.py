@@ -166,13 +166,6 @@ class TestZhSpace(unittest.TestCase):
         for tok in tail.split(" "):
             self.assertLessEqual(len(tok), 12, tok)
 
-    def test_perchar_puts_one_space_between_han_chars(self):
-        """逐字模式：汉字之间一空格，标签/变量内不动，短引号标签不拆。"""
-        t = "你的目标<n>是从「关闭」按钮%@$Pos$开始。"
-        out = zh_space.perchar(t)
-        self.assertEqual(out, "你 的 目 标<n>是 从「关闭」按 钮%@$Pos$开 始。")
-        self.assertNotIn("  ", out)
-
 
 class TestSpecInterface(unittest.TestCase):
     """三段式接口：语言只声明 spec，engine_text 不认语言。"""

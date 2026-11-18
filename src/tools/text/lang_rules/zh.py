@@ -96,31 +96,6 @@ class ZhCompactSpacing(S.Spacing):
                   % len(missing))
 
 
-class ZhPerCharSpacing(S.Spacing):
-    """逐字断行（试验）：两个汉字之间插一个半角空格，其余不动。
-
-    动机是绕开「预算多少字」这个标定问题：每字后面都有断行点，引擎
-    总能填满一行，不会因为超宽 token 被裁、也不会把词从中间切开。
-    代价是空格本身有宽度，整段变成均匀疏排。
-
-    用 `PR2_ZH_SPACING=perchar` 打开，默认仍是 `compact`。
-    """
-
-    mode = "perchar"
-
-    def setup(self, doc):
-        return None
-
-    def before(self, text):
-        return text, {"conj": 0, "name": 0}
-
-    def prepare(self, texts, segmenter):
-        return None
-
-    def apply(self, text, ctx):
-        return zh_space.perchar(text)
-
-
 class ZhGroupSpacing(S.Spacing):
     """中文补空格：先连词/人名/数字标签，再按词成组（每组 ≤ max_chars 字）。"""
 
@@ -161,12 +136,9 @@ class ZhGroupSpacing(S.Spacing):
 
 def spec():
     """给 engine_text / apply_*_rules 用的语言声明。"""
-    import os
-    mode = os.environ.get("PR2_ZH_SPACING", "").strip().lower()
-    spacing = ZhPerCharSpacing() if mode == "perchar" else ZhCompactSpacing()
     return S.LangSpec(
         code=LANG,
         punct=S.Punctuation(normalize, {"lang": LANG, **PUNCT}),
         segmenter=ZhSegmenter(),
-        spacing=spacing,
+        spacing=ZhCompactSpacing(),
     )
