@@ -34,7 +34,7 @@ class TestConfigCheck(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertFalse(any("未识别字段" in w for w in warnings))
 
-    def test_pack_rejects_bad_ai_assisted_and_source_lang(self):
+    def test_pack_rejects_unknown_tag_and_bad_source_lang(self):
         tmp = tempfile.mkdtemp(prefix="pr2-config-pack-")
         src = os.path.join(tmp, "src")
         os.makedirs(os.path.join(src, "packs"))
@@ -45,12 +45,36 @@ class TestConfigCheck(unittest.TestCase):
         with open(os.path.join(src, "packs", "zh.toml"),
                   "w", encoding="utf-8") as fh:
             fh.write('alias = "简体中文"\n'
-                     "ai_assisted = \"yes\"\n"
+                     'tags = ["fan", "hand-made"]\n'
                      'source_lang = "../outside"\n')
         errors, _warnings = [], []
         config_check._check_packs(src, errors, _warnings)
-        self.assertTrue(any("ai_assisted" in e for e in errors))
+        self.assertTrue(any("未知标记" in e for e in errors))
         self.assertTrue(any("source_lang" in e for e in errors))
+
+    def test_pack_requires_tags(self):
+        tmp = tempfile.mkdtemp(prefix="pr2-config-pack-")
+        src = os.path.join(tmp, "src")
+        os.makedirs(os.path.join(src, "packs"))
+        with open(os.path.join(src, "packs", "zh.toml"),
+                  "w", encoding="utf-8") as fh:
+            fh.write('alias = "简体中文"\n')
+        errors, _warnings = [], []
+        config_check._check_packs(src, errors, _warnings)
+        self.assertTrue(any("缺 tags" in e for e in errors))
+
+    def test_pack_rejects_legacy_provenance_fields(self):
+        tmp = tempfile.mkdtemp(prefix="pr2-config-pack-")
+        src = os.path.join(tmp, "src")
+        os.makedirs(os.path.join(src, "packs"))
+        with open(os.path.join(src, "packs", "zh.toml"),
+                  "w", encoding="utf-8") as fh:
+            fh.write('alias = "简体中文"\n'
+                     'tags = ["fan"]\n'
+                     'origin = "community"\n')
+        errors, _warnings = [], []
+        config_check._check_packs(src, errors, _warnings)
+        self.assertTrue(any("已废弃" in e for e in errors))
 
 
 if __name__ == "__main__":

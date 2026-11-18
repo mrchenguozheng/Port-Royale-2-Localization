@@ -6,7 +6,7 @@
 
 - `src/locale.ini` 的语言代码与语法；
 - `src/packs/*.toml` 的 alias/min_runtime 和可选的
-  origin/ai_assisted/review_status/source_lang；
+  tags/review_status/source_lang；
 - `src/translations/<code>.toml` 是否存在；
 - `src/injector-rs/ui/ui.default.ini` 是否存在、是否有重复键；
 - `src/font-map.ini` 的逻辑名、坏行和禁用字体；
@@ -28,6 +28,11 @@ if INSTALL not in sys.path:
     sys.path.insert(0, INSTALL)
 from pr2ctl.detect import read_ini_language  # noqa: E402
 
+PACK_TOOLS = os.path.join(SRC, "tools", "pack")
+if PACK_TOOLS not in sys.path:
+    sys.path.insert(0, PACK_TOOLS)
+import pack_tags  # noqa: E402
+
 FONT_NAMES = (
     "ARIAL.TTF",
     "ELGRECO_.TTF",
@@ -37,8 +42,7 @@ FONT_NAMES = (
 PACK_KEYS = (
     "alias",
     "min_runtime",
-    "origin",
-    "ai_assisted",
+    "tags",
     "review_status",
     "source_lang",
 )
@@ -96,16 +100,28 @@ def _check_packs(src, errors, warnings):
             if isinstance(runtime, bool) or not isinstance(runtime, int) or runtime < 1:
                 errors.append("src/packs/%s：min_runtime 必须是 >=1 的整数"
                               % name)
-        origin = doc.get("origin")
-        if origin is not None and (not isinstance(origin, str) or not origin.strip()):
-            errors.append("src/packs/%s：origin 不能是空值" % name)
-        ai_assisted = doc.get("ai_assisted")
-        if ai_assisted is not None and not isinstance(ai_assisted, bool):
-            errors.append("src/packs/%s：ai_assisted 必须是 true/false" % name)
+        for legacy in ("origin", "ai_assisted"):
+            if legacy in doc:
+                errors.append("src/packs/%s：%s 已废弃，改用 tags = [...]"
+                              % (name, legacy))
+        tags = doc.get("tags")
+        if tags is None:
+            errors.append("src/packs/%s：缺 tags（译文来源与制作方式必须标出）"
+                          % name)
+        else:
+            try:
+                pack_tags.normalize_tags(tags)
+            except ValueError as exc:
+                errors.append("src/packs/%s：%s" % (name, exc))
         review_status = doc.get("review_status")
         if review_status is not None and (
                 not isinstance(review_status, str) or not review_status.strip()):
             errors.append("src/packs/%s：review_status 不能是空值" % name)
+        elif (isinstance(review_status, str)
+              and review_status.strip() not in pack_tags.REVIEW_LABELS):
+            warnings.append("src/packs/%s：未识别的 review_status %r（已知：%s）"
+                            % (name, review_status,
+                               ", ".join(sorted(pack_tags.REVIEW_LABELS))))
         source_lang = doc.get("source_lang")
         if source_lang is not None:
             if (not isinstance(source_lang, str)

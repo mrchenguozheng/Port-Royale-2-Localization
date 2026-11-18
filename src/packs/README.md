@@ -16,11 +16,24 @@ min_runtime = 1      # 最低运行时版本
 以下字段可选，只用于发行清单和审计，不会写进语言包 `# pack-meta`，运行时也不读取：
 
 ```toml
-origin = "community"             # community / retail / official / unspecified
-ai_assisted = true               # 是否使用 AI 辅助翻译
-review_status = "preview"        # preview / complete / ...
-source_lang = "en.gog_1.1.2.3"   # 参考原文，对应 src/orig/<source_lang>.toml
+tags = ["fan", "community", "ai-assist"]  # 必填：是谁做的、怎么做的（词表见 src/tools/pack/pack_tags.py）
+review_status = "preview"                 # 完成度：preview / complete
+source_lang = "en.gog_1.1.2.3"            # 参考原文，对应 src/orig/<source_lang>.toml
 ```
+
+`tags` 的可用值由 `pack_tags.py` 固定，`config_check.py` 拒绝表外标记：
+
+| 标记 | 含义 |
+|---|---|
+| `official` | 官方本地化 |
+| `retail` | 随零售版附带的官方本地化 |
+| `fan` | 同人制作，非官方 |
+| `community` | 社区协作，接受外部贡献 |
+| `ai-assist` | AI 辅助起草，有人工审校环节 |
+| `machine` | 纯机器翻译，未经人工校对 |
+
+我们自己的译文一律 `["fan", "community", "ai-assist"]`；早期写的
+`origin`/`ai_assisted` 已废弃，`config_check.py` 遇到会直接报错。
 
 `compile_pack.py` 只把 `alias`、`min_runtime` 写成语言包开头的注释：
 

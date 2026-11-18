@@ -1,6 +1,5 @@
 alias = "简体中文"
 min_runtime = 1
-origin = "community"
-ai_assisted = true
+tags = ["fan", "community", "ai-assist"]
 review_status = "preview"
 source_lang = "en.gog_1.1.2.3"

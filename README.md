@@ -6,6 +6,11 @@
 
 **Supported languages:** Simplified Chinese (`zh`), Japanese (`ja`); English (`en`) is the original game language and fallback. See [README.en.md](README.en.md#supported-languages).
 
+**译文标记：** 同人制作 · 社区协作 · AI 辅助（预览版）。这批译文不是官方本地化，
+由社区制作、AI 辅助起草并人工审校；旧语言包若改自原版零售文件会单独标 `retail`。
+标记写在 `src/packs/<语言>.toml` 的 `tags` 里，词表见
+[`pack_tags.py`](src/tools/pack/pack_tags.py)，出包时进 `README.txt` 与 `manifest.json`。
+
 ---
 
 ## 快速开始（玩家）

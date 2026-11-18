@@ -16,6 +16,13 @@ original `PR2.exe` is not modified.
 language and the fallback when a pack is missing. The launcher UI is available
 in `en`, `ja`, and `zh`.
 
+**Translation marks: fan-made · community · AI-assisted (preview).** These
+packs are unofficial: produced by the community, drafted with AI assistance and
+human review. Packs adapted from a retail localization are marked `retail`
+instead. Marks live in `src/packs/<lang>.toml` (`tags`), the vocabulary is in
+[`pack_tags.py`](src/tools/pack/pack_tags.py), and they are copied into the
+package `README.txt` and `manifest.json`.
+
 The GOG English `1.1.2.3` build is tested through `PR2LocalizationGUI.exe`. The
 Steam English `1.1.2.3` build is tested with the host-DLL proxy and a Chinese UI.
 GOG French and other builds are out of scope.

@@ -83,9 +83,10 @@ def _source(source_lang):
 
 def _translation(lang):
     doc = _pack_doc(lang)
+    import pack_tags
+    tags = pack_tags.normalize_tags(doc.get("tags"))
     return {
-        "origin": doc.get("origin") or "unspecified",
-        "ai_assisted": doc.get("ai_assisted"),
+        "tags": tags,
         "review_status": doc.get("review_status") or "unspecified",
         "source_lang": doc.get("source_lang") or DEFAULT_SOURCE_LANG,
     }

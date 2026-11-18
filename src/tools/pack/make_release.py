@@ -170,6 +170,16 @@ def write_runtime_version(stage, log):
     log("写入 RUNTIME-VERSION (%d)" % RUNTIME_VERSION)
 
 
+def pack_identity(lang):
+    """读 src/packs/<lang>.toml 的标记，返回给玩家看的一行。"""
+    import pack_tags
+    import tomllib
+    path = os.path.join(SRC, "packs", lang + ".toml")
+    with open(path, "rb") as fh:
+        doc = tomllib.load(fh)
+    return pack_tags.describe(doc.get("tags"), doc.get("review_status"))
+
+
 def write_readme(lang, stage, mode, edition, version=""):
     label = LABELS.get(lang, lang)
     edition_label = "GOG 版" if edition == "gog" else "Steam 版"
@@ -284,6 +294,7 @@ def write_readme(lang, stage, mode, edition, version=""):
   packs\\overrides\\ 是本机临时译文覆盖目录，安装/升级不会删除。"""
     text = """Port Royale 2 本地化 - %s（%s）
 版本：%s（运行时版本 %d）
+%s
 
 %s
 
@@ -292,7 +303,7 @@ def write_readme(lang, stage, mode, edition, version=""):
 %s
 
 发布清单：
-  manifest.json 记录目标 exe、参考原文、翻译来源/AI 标记和逐文件 SHA-256；
+  manifest.json 记录目标 exe、参考原文、译文标记（tags）、审阅状态和逐文件 SHA-256；
   只用于审计和校验，运行时不会读取它。
 
 确认是否生效：
@@ -313,7 +324,8 @@ def write_readme(lang, stage, mode, edition, version=""):
   - %s
 
 %s
-""" % (label, edition_label, version, RUNTIME_VERSION, support_line,
+""" % (label, edition_label, version, RUNTIME_VERSION, pack_identity(lang),
+       support_line,
        install_step, lang, font_help,
        locale_help, uninstall_line, font_line, license_help)
     with open(os.path.join(stage, "README.txt"), "w",

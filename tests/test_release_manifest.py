@@ -50,8 +50,8 @@ class TestReleaseManifest(unittest.TestCase):
             data["target"]["exe_sha256"],
             "394CE2A48BC6B21708B81A232C7C88459BE7F3C8082CC593AD83B0B8E4C168EC",
         )
-        self.assertEqual(data["translation"]["origin"], "community")
-        self.assertTrue(data["translation"]["ai_assisted"])
+        self.assertEqual(data["translation"]["tags"],
+                         ["fan", "community", "ai-assist"])
         self.assertEqual(data["translation"]["review_status"], "preview")
         self.assertEqual(data["translation"]["source_lang"], "en.gog_1.1.2.3")
         self.assertEqual(len(data["source"]["sha256"]), 64)
