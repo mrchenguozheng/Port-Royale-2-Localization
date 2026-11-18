@@ -67,33 +67,46 @@ class TestExpand(unittest.TestCase):
                          "哈瓦那与查尔斯顿")
 
     def test_ref_expands_target(self):
-        doc = {"0xa": "[town:Charleston]遭到围攻。", "0xb": "[ref:0xa]"}
-        self.assertEqual(M.expand("[ref:0xa]", TABLE, "zh", "0xb", doc=doc),
+        doc = {"0x0000000a": "[town:Charleston]遭到围攻。",
+               "0x0000000b": "[ref:0x0000000a]"}
+        self.assertEqual(M.expand("[ref:0x0000000a]", TABLE, "zh", "0x0000000b", doc=doc),
                          "查尔斯顿遭到围攻。")
 
     def test_ref_needs_doc(self):
         with self.assertRaises(M.MarkError):
-            M.expand("[ref:0xa]", TABLE, "zh", "0xb")
+            M.expand("[ref:0x0000000a]", TABLE, "zh", "0x0000000b")
 
     def test_ref_target_missing(self):
         with self.assertRaises(M.MarkError):
-            M.expand("[ref:0xb]", TABLE, "zh", "0xc", doc={"0xa": "一句。"})
+            M.expand("[ref:0x0000000b]", TABLE, "zh", "0x0000000c",
+                     doc={"0x0000000a": "一句。"})
 
     def test_ref_target_empty(self):
         with self.assertRaises(M.MarkError):
-            M.expand("[ref:0xa]", TABLE, "zh", "0xb", doc={"0xa": ""})
+            M.expand("[ref:0x0000000a]", TABLE, "zh", "0x0000000b",
+                     doc={"0x0000000a": ""})
 
     def test_ref_self(self):
         with self.assertRaises(M.MarkError):
-            M.expand("[ref:0xa]", TABLE, "zh", "0xa", doc={"0xa": "[ref:0xa]"})
+            M.expand("[ref:0x0000000a]", TABLE, "zh", "0x0000000a",
+                     doc={"0x0000000a": "[ref:0x0000000a]"})
 
     def test_ref_only_one_level(self):
-        doc = {"0xa": "[ref:0xb]", "0xb": "[ref:0xa]"}
+        doc = {"0x0000000a": "[ref:0x0000000b]",
+               "0x0000000b": "[ref:0x0000000a]"}
         with self.assertRaises(M.MarkError):
-            M.expand("[ref:0xa]", TABLE, "zh", "0xc", doc=doc)
+            M.expand("[ref:0x0000000a]", TABLE, "zh", "0x0000000c", doc=doc)
+
+    def test_ref_target_without_0x(self):
+        # 引用键的写法宽容：`0x` 可省，大小写照收，落到同一个键上
+        doc = {"0x35f48f6c": "一句普通文本。"}
+        self.assertEqual(
+            M.expand("[ref:35F48F6C]", TABLE, "zh", "0x0000000c", doc=doc),
+            "一句普通文本。")
 
     def test_ref_chain_caught_by_check_doc(self):
-        doc = {"0x1": "[ref:0x2]", "0x2": "[ref:0x1]"}
+        doc = {"0x00000001": "[ref:0x00000002]",
+               "0x00000002": "[ref:0x00000001]"}
         problems = M.check_doc("zh", doc)
         self.assertTrue(any("只许一层" in p for p in problems), problems)
 
@@ -755,13 +768,24 @@ class TestAnswerGroup(unittest.TestCase):
         with self.assertRaises(M.MarkError) as ctx:
             M.expand("[riddle:answer=Vera Cruz;group=%s+%s%s"
                      % (self._b(self.A), self._b(self.B), self.S), TABLE, "zh", self.A)
-        self.assertIn("8 位小写十六进制", str(ctx.exception))
+        self.assertIn("8 位十六进制键", str(ctx.exception))
 
-    def test_0x_prefix_is_error(self):
-        # 有 0x 就比 8 位多两个字符，且大小写会分叉
+    def test_0x_prefix_is_accepted(self):
+        # 引用键的写法宽容：`0x` 可省，写上也行，存进来的仍是去前缀的小写 8 位
         with self.assertRaises(M.MarkError):
-            M.expand("[riddle:answer=Vera Cruz;group=%s;clue=count:三座]X。"
-                     % self.B, TABLE, "zh", self.A)
+            # 只改写法不改成员：单写 0x 形式仍然报「漏了本条自己」
+            M.expand("[riddle:answer=Vera Cruz;group=0x%s;clue=三座]三座城镇。"
+                     % self._b(self.B), TABLE, "zh", self.A)
+        problems = M.check_doc(
+            "zh", {self.A: "[riddle:answer=Vera Cruz;group=0x%s;clue=三座]三座城镇。"
+                          % self._b(self.A)}, entities={"Vera Cruz": {}}, terms={})
+        self.assertEqual(problems, [])
+
+    def test_seven_digit_key_is_error(self):
+        # 只放宽 0x，不放宽位数：少一位就认不出是哪个键
+        with self.assertRaises(M.MarkError):
+            M.expand("[riddle:answer=Vera Cruz;group=%s;clue=三座]三座城镇。"
+                     % self._b(self.A)[:-1], TABLE, "zh", self.A)
 
     def test_bad_key_form_is_error(self):
         with self.assertRaises(M.MarkError):
@@ -1188,28 +1212,60 @@ class TestRiddleStricter(unittest.TestCase):
 
 
 class TestRefCoveredRiddle(unittest.TestCase):
-    """同组逐字相同的副本写成整行 `[ref:最小键]`：身份随目标键继承。
+    """同组逐字相同的诗谜副本写成整行 `[riddle:copy=最小键]`：身份随目标键继承。
 
-    副本没有自己的谜面，所以不该、也不需要再抄一遍 `[riddle:…]`；但「同组每条都要标」
-    与「同文副本必须同组」两条判据对它照样成立。
+    副本没有自己的谜面，所以不该、也不需要再抄一遍完整 `[riddle:…]`；但「同组每条都要标」
+    与「同文副本必须同组」两条判据对它照样成立。`ref` 与 `copy` 互斥：诗谜行只许 copy，不含谜的同文才用 ref（见 09 卷第一百一十六节）。
     """
 
     A = "0x00000001"
     B = "0x00000002"
 
-    def test_ref_copy_inherits_riddle(self):
+    def test_copy_inherits_riddle(self):
+        doc = {self.A: "[riddle:answer=Vera Cruz;group=00000001,00000002;clue=三座]"
+                       "三座城镇，X 在最西。",
+               self.B: "[riddle:copy=0x00000001]"}
+        self.assertEqual(M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={}), [])
+
+    def test_copy_without_0x_is_the_same_row(self):
+        doc = {self.A: "[riddle:answer=Vera Cruz;group=00000001,00000002;clue=三座]"
+                       "三座城镇，X 在最西。",
+               self.B: "[riddle:copy=00000001]"}
+        self.assertEqual(M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={}), [])
+
+    def test_copy_cannot_dodge_group_membership(self):
+        # group 只列自己、副本靠 copy 混过去：集合比对仍要把副本算进去
+        doc = {self.A: "[riddle:answer=Vera Cruz;group=00000001;clue=三座]"
+                       "三座城镇，X 在最西。",
+               self.B: "[riddle:copy=0x00000001]"}
+        problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
+        self.assertTrue(any("没列成同一组" in p for p in problems), problems)
+
+    def test_ref_on_riddle_row_is_refused(self):
+        # 诗谜副本写 ref：身份会隐式继承，语义与 copy 混在一起，直接指出来改写法
         doc = {self.A: "[riddle:answer=Vera Cruz;group=00000001,00000002;clue=三座]"
                        "三座城镇，X 在最西。",
                self.B: "[ref:0x00000001]"}
-        self.assertEqual(M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={}), [])
-
-    def test_ref_copy_cannot_dodge_group_membership(self):
-        # group 只列自己、副本靠 ref 混过去：集合比对仍要把副本算进去
-        doc = {self.A: "[riddle:answer=Vera Cruz;group=00000001;clue=三座]"
-                       "三座城镇，X 在最西。",
-               self.B: "[ref:0x00000001]"}
         problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
-        self.assertTrue(any("没列成同一组" in p for p in problems), problems)
+        self.assertTrue(any("riddle:copy=" in p for p in problems), problems)
+
+    def test_copy_must_be_alone(self):
+        doc = {self.A: "[riddle:answer=Vera Cruz;group=00000001;clue=三座]三座城镇，X 在最西。",
+               self.B: "[riddle:copy=0x00000001;clue=三座]"}
+        problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
+        self.assertTrue(any("要独占整条" in p for p in problems), problems)
+
+    def test_copy_with_text_is_refused(self):
+        doc = {self.A: "[riddle:answer=Vera Cruz;group=00000001,00000002;clue=三座]"
+                       "三座城镇，X 在最西。",
+               self.B: "[riddle:copy=0x00000001]多写的正文"}
+        problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
+        self.assertTrue(any("要独占整行" in p for p in problems), problems)
+
+    def test_copy_of_plain_text_is_refused(self):
+        doc = {"0x00000001": "一句普通文本。", "0x00000002": "[riddle:copy=0x00000001]"}
+        problems = M.check_doc("zh", doc, entities={}, terms={})
+        self.assertTrue(any("没有 riddle 标注" in p for p in problems), problems)
 
     def test_ref_to_plain_text_is_not_a_riddle(self):
         # 目标是普通文本：ref 只是同句引用，不该被当成谜面成员

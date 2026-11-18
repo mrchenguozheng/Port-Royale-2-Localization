@@ -128,8 +128,13 @@ _ANS_SPAN = re.compile(r"\[riddle:[^\[\]]*\]")
 _TAG_RX = re.compile(r"^[a-z_][a-z0-9_-]*$")
 #: 判断「目标键自己又挂了 ref」用：只看 ref，别的标注不算第二层。
 _REF_MARK = re.compile(r"\[ref:")
+#: 判断「目标键自己也是诗谜副本」用：`[riddle:copy=…]` 也不许再被引用（只许一层）。
+_COPY_MARK = re.compile(r"\[riddle:\s*copy\s*=")
 #: 整行就是一个 ref 的行：这条文本本身没有谜面，身份（谜底/组/分级）随目标键。
 _PURE_REF_RX = re.compile(r"\[ref:([^\[\]]*)\]")
+#: 文本键的宽容写法：8 位十六进制，`0x` 可写可不写，大小写照收，统一规范成 `0x` + 小写。
+#: 只放宽写法，不放宽位数——8 位是「去掉 0x 后仍全表唯一」的实测结论（见 ANS_KEY_RX）。
+_HEX8_RX = re.compile(r"^(?:0x)?([0-9a-fA-F]{8})$")
 
 
 class MarkError(Exception):
@@ -243,12 +248,25 @@ def _resolve(arg, table, hid, lang):
     return value
 
 
+def _norm_key(raw, hid="", what="键"):
+    """把引用到的文本键规范成 `0x` + 8 位小写十六进制。
+
+    `0x` 可写可不写（`0x35f48f6c` 与 `35f48f6c` 同一条），大小写照收；位数不宽：
+    8 位是「去掉 0x 后仍全表唯一」的实测结论，写短了会撞别的键，所以照旧报错。
+    """
+    m = _HEX8_RX.match((raw or "").strip())
+    if not m:
+        raise MarkError("%s：%s %r 不是 8 位十六进制键（写 0x35f48f6c 或 35f48f6c）"
+                        % (hid, what, (raw or "").strip()))
+    return "0x" + m.group(1).lower()
+
+
 def _ref_target(arg, doc, hid=""):
     """校验并取出 `[ref:键]` 的目标原文。只许一层：目标不得再含 ref。
 
     `doc` 是本语言整份译文（键 → 原文），ref 查的是它，不是名字表。
     """
-    key = (arg or "").strip()
+    key = _norm_key(arg, hid, "ref 的目标键")
     if not key:
         raise MarkError("%s：ref 参数为空（写成 [ref:目标键]）" % hid)
     if doc is None:
@@ -261,8 +279,52 @@ def _ref_target(arg, doc, hid=""):
     if not target.strip():
         raise MarkError("%s：ref 的目标键 %r 还是空占位（目标没译完就不许引用）"
                         % (hid, key))
-    if _REF_MARK.search(target):
-        raise MarkError("%s：ref 只许一层，目标键 %r 自己也含 ref（禁 A→B→C）"
+    if _REF_MARK.search(target) or _COPY_MARK.search(target):
+        raise MarkError("%s：ref 只许一层，目标键 %r 自己也含 ref/copy（禁 A→B→C）"
+                        % (hid, key))
+    return key, target
+
+
+def _ans_copy_target(arg, hid=""):
+    """`[riddle:copy=键]` → 目标键（`0x` 形式）；不是副本写法返回 None。
+
+    `copy=` 要独占：它说的是「本条没有自己的谜面，文本与身份都取目标键」，再带
+    `answer=`/`clue=`/`group=` 就成了两种说法并存。目标键的写法照样宽容（`0x` 可省）。
+    """
+    parts = [p.strip() for p in _join_source_parts(arg, hid)]
+    names = [p.partition("=")[0].strip() for p in parts]
+    if "copy" not in names:
+        return None
+    if len(parts) != 1:
+        raise MarkError("%s：copy= 要独占整条（写成 [riddle:copy=键]，不许再带 "
+                        "answer/clue/group 等字段）" % hid)
+    _, _, value = parts[0].partition("=")
+    return _norm_key(value, hid, "copy 的目标键")
+
+
+def _copy_target(arg, doc, hid=""):
+    """校验 `[riddle:copy=键]` 的目标并取出它的原文（只许一层，且目标必须真是谜面）。
+
+    不是副本写法时返回 (None, None)——调用方靠这个区分「普通 [riddle:]」。
+    """
+    key = _ans_copy_target(arg, hid)
+    if key is None:
+        return None, None
+    if doc is None:
+        raise MarkError("%s：copy 要查同语言的整份译文，调用方没提供 doc" % hid)
+    if key not in doc:
+        raise MarkError("%s：copy 的目标键 %r 不在本语言译文里" % (hid, key))
+    if key == hid:
+        raise MarkError("%s：copy 指向自己（%r）" % (hid, key))
+    target = doc.get(key) or ""
+    if not target.strip():
+        raise MarkError("%s：copy 的目标键 %r 还是空占位（目标没译完就不许引用）"
+                        % (hid, key))
+    if not _ANS_SPAN.search(target):
+        raise MarkError("%s：copy 的目标键 %r 没有 riddle 标注（副本要指向一条谜面）"
+                        % (hid, key))
+    if _REF_MARK.search(target) or _COPY_MARK.search(target):
+        raise MarkError("%s：copy 只许一层，目标键 %r 自己也是 ref/copy（禁 A→B→C）"
                         % (hid, key))
     return key, target
 
@@ -488,10 +550,14 @@ def _group_tokens(raw, hid):
     并列符与 `clue` 一致，只用 `,`：`group=00000001,00000002`。`+` 在这里退役，`source=`
     的并列项另有 `+` / `&`（那是「几个来源」，不是同一种并列）——理由与第一百零六、
     一百零八节同：同一个符号不在一个字段里表示两种并列。
+
+    键的写法宽容：`0x` 可写可不写（`group=0x35f48f6c` 与 `group=35f48f6c` 同一条），
+    大小写照收；存进来的仍是去前缀的小写 8 位，排序也按这个比（写 `0x` 不会改变顺序）。
     """
     toks = [t.strip() for t in raw.split(",")]
     if any(not t for t in toks):
         raise MarkError("%s：ans 的 group 里 `,` 两侧都要写键（收到 %r）" % (hid, raw))
+    toks = [_norm_key(t, hid, "group 的键")[2:] for t in toks]
     self_bare = hid[2:] if hid.startswith("0x") else hid
     for t in toks:
         if not ANS_KEY_RX.match(t):
@@ -776,10 +842,8 @@ def _check_source_item(item, hid):
         if any(not t for t in toks):
             raise MarkError("%s：riddle 的键列表里 `,` 两侧都要写键（收到 %r）"
                             % (hid, tail))
-        for t in toks:
-            if not ANS_KEY_RX.match(t):
-                raise MarkError("%s：riddle 指向的键要写 8 位小写十六进制（收到 %r）"
-                                % (hid, t))
+        # 键的写法同样宽容：`0x` 可写可不写，存进来的是去前缀的 8 位小写。
+        toks = [_norm_key(t, hid, "riddle 指向的键")[2:] for t in toks]
         if len(set(toks)) != len(toks):
             raise MarkError("%s：riddle 的键列表里有重复（%r）" % (hid, tail))
         if toks != sorted(toks):
@@ -1042,6 +1106,7 @@ def expand(text, table, lang, hid="", terms=None, doc=None):
         terms = load_terms(lang)
     out = []
     ans_args = []
+    copy_span = None
     i = 0
     n = len(text)
     while i < n:
@@ -1066,13 +1131,28 @@ def expand(text, table, lang, hid="", terms=None, doc=None):
         elif key == "term":
             out.append(_resolve_term(arg, terms, hid, lang))
         elif key == "riddle":
-            ans_args.append(arg)      # 谜底只给翻译人看，玩家文本里不出现
+            # `[riddle:copy=键]` 是诗谜副本：本条没有自己的谜面，文本与身份都取目标键。
+            # 它要独占整行，所以展开完正文后再整体确认没有别的东西。
+            copy_key, copy_text = _copy_target(arg, doc, hid)
+            if copy_key is None:
+                ans_args.append(arg)  # 谜底只给翻译人看，玩家文本里不出现
+            else:
+                if copy_span is not None:
+                    raise MarkError("%s：一行只能有一个 [riddle:copy=…]" % hid)
+                copy_span = (m.start(), m.end())
+                out.append(expand(copy_text, table, lang, copy_key,
+                                  terms=terms, doc=doc))
         else:
             out.append(arg)
         i = m.end()
     rest = "".join(out)
     if _ANY_BRACKET.search(rest):
         raise MarkError("%s：展开后仍残留方括号（正文里不许出现 `[` 或 `]`）" % hid)
+    if copy_span is not None:
+        outside = (text[:copy_span[0]] + text[copy_span[1]:]).strip()
+        if outside:
+            raise MarkError("%s：copy= 要独占整行（[riddle:copy=键] 之外不许有正文）"
+                            % hid)
     if len(ans_args) > 1:
         raise MarkError("%s：一条文本里只能写一个 [riddle:…]（收到 %d 个）"
                         % (hid, len(ans_args)))
@@ -1223,6 +1303,7 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
     ans_groups = {}
     riddle_bodies = {}
     ref_rows = {}
+    copy_rows = {}
     for hid in sorted(doc):
         text = doc[hid] or ""
         if not text or hid in EXEMPT_KEYS:
@@ -1252,6 +1333,19 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
                     # 组内比对与统计就看不见第一条了——一条文本只许一个谜底标注。
                     problems.append("%s：一条文本里只能写一个 [riddle:…]（第二条会覆盖"
                                     "第一条的组信息）" % hid)
+                    continue
+                try:
+                    copy_key, _copy_text = _copy_target(arg, doc, hid)
+                except MarkError as e:
+                    problems.append(str(e))
+                    continue
+                if copy_key is not None:
+                    # 诗谜副本：语法自己声明了组身份，下面照 ref 的办法继承目标键的
+                    # ans_groups。形状上要独占整行，否则「副本没有自己的谜面」不成立。
+                    copy_rows[hid] = copy_key
+                    if _ANS_SPAN.sub("", text).strip():
+                        problems.append(
+                            "%s：copy= 要独占整行（[riddle:copy=键] 之外不许有正文）" % hid)
                     continue
                 # 谜底必须登记过实体，线索必须真的在谜面里——否则「这条谜面指向
                 # 哪座城」无从核对，标注就退化成一条注释。答案本身不查译名：
@@ -1372,12 +1466,24 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
     # 整行 `[ref:键]` 的副本没有自己的谜面，身份（谜底、组、分级）随目标键继承。
     # 这样「同组的每一条都要标」与「同文副本必须同组」两条判据对 ref 副本同样成立：
     # 复制谜面时不必把整段 `[riddle:…]` 抄一遍（抄一遍反而会和目标键的写法分叉）。
+    # 诗谜副本用 `[riddle:copy=键]`：身份同样继承，但归属是语法声明的，不是从「整行 ref」
+    # 反推出来的——所以 ref 与 copy 互斥：诗谜行只许写 copy。
     for hid in sorted(ref_rows):
         target = ref_rows[hid]
+        if target in ans_groups:
+            problems.append(
+                "%s：这条是诗谜副本，写 [riddle:copy=%s]，不要用 [ref:]（ref 只管不含谜的同文）"
+                % (hid, target[2:] if target.startswith("0x") else target))
+            continue
+    for hid in sorted(copy_rows):
+        target = copy_rows[hid]
         if target in ans_groups:
             ans_groups[hid] = ans_groups[target]
             riddle_bodies.setdefault(
                 _fold(_ANS_SPAN.sub("", doc[target] or "")), []).append(hid)
+        else:
+            problems.append("%s：copy 的目标键 %s 没有 riddle 标注（副本要指向一条谜面）"
+                            % (hid, target[2:] if target.startswith("0x") else target))
     # 同组自证：`group` 列全组含本条自己，所以每个成员的键列表本身就应该是同一个集合。
     # 组是身份不是答案——Roatán 出现在 14/15 两组、Providence 出现在 20/26 两组，
     # 按 answer 自动归并会把两个不同的寻宝组合成一个。

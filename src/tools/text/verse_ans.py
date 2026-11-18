@@ -23,6 +23,8 @@
     「不是那边」）。这两类不登记实体、不查译名；
   · 六语线索都不能空，只收英文逗号，每条线索都要出现在该语言自己的谜面正文里；
   · 已经标成同值的组直接跳开（可重复跑），标成别的值则报错，不覆盖；
+  · 诗谜副本（整行 `[riddle:copy=键]`）与不含谜的同文引用（整行 `[ref:键]`）都没有自己的
+    谜面，一律跳过：标注只落在带文本的那条上，副本靠目标键继承（见 09 卷第一百一十六节）；
   · 队列只生成 answer/town/direction/group/clue 五个字段；`certainty` / `source`
     这类队列之外的字段由人工维护，重写标注时原样保留（`tail_fields`/`with_tail`）。
 """
@@ -60,6 +62,13 @@ TOWN_RANGES = (
 )
 ANS_MARK = re.compile(r"^\[riddle:[^\[\]]*\]")
 REF_ROW = re.compile(r"^\[ref:([^\[\]]*)\]$")
+#: 诗谜副本行：`[riddle:copy=键]`——没有自己的谜面，标注只写在带文本的那条上。
+COPY_ROW = re.compile(r"^\[riddle:copy\s*=[^\[\]]*\]$")
+
+
+def is_copy_row(text):
+    """这条是不是诗谜副本（`[riddle:copy=键]`）：副本没有谜面，--apply 不碰。"""
+    return bool(COPY_ROW.match((text or "").strip()))
 
 
 def load_queue():
@@ -369,10 +378,12 @@ def cmd_apply():
             answer_field = "town"
 
         wanted = {}
-        # 整行 `[ref:键]` 的副本没有自己的谜面：标注只写在带文本的那条上，副本靠
-        # `[ref:]` 继承（组里仍然列全组键，副本仍在 group 名单里）。--apply 不碰副本。
+        # 整行 `[ref:键]` 是普通同文引用；`[riddle:copy=键]` 是诗谜副本——两者都没有
+        # 自己的谜面：标注只写在带文本的那条上，副本靠目标键继承（组里仍然列全组键，
+        # 副本仍在 group 名单里）。--apply 只碰带文本的键。
         text_ids = {lang: [k for k in ids
-                           if not REF_ROW.match((rows[lang].get(k) or "").strip())]
+                           if not REF_ROW.match((rows[lang].get(k) or "").strip())
+                           and not is_copy_row(rows[lang].get(k))]
                     for lang in LANGS}
         for lang in LANGS:
             clues = split_clues((g.get("clues") or {}).get(lang, ""), lang)

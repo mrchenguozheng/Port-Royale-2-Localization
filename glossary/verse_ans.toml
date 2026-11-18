@@ -1,6 +1,6 @@
 # 诗谜谜底队列 —— 谜面在 09 卷第六十四节定义的 verse 区间里，共 41 个槽位，按同一首谜面归成 29 组。
-# 41 个槽位里有 12 个与同组另一条逐字同文，译文侧按 `[ref:组内最小键]` 收敛，只剩 29 条带文本
-# （见 09 卷第一百一十四节）；下面 ids 仍列全组成员，--apply 只往带文本那条写标注。
+# 41 个槽位里有 12 个与同组另一条逐字同文，译文侧按 `[riddle:copy=组内最小键]` 收敛，只剩 29 条带文本
+# （见 09 卷第一百一十六节；早前写成整行 `[ref:]`，已改）；下面 ids 仍列全组成员，--apply 只往带文本那条写标注。
 #
 # 每组建三样：
 #   ans    谜底。必须是 entities.toml 里登记的实体键（城镇用英文名，六语共用）；
@@ -32,8 +32,13 @@
 #          全体成员的键（`,` 连接、按 0x 串升序、含本条自己；`+` 已退役）；单条的组只写
 #          自己那一个键。ids 决定这组有几条，
 #          译文那边的 group 只做校验：两边对不上（缺一条、多一条、互指不对称）就失败。
-#          组内逐字同文的副本在译文侧写成整行 `[ref:组内最小键]`，不抄第二遍 `[riddle:…]`
-#          （抄了会和目标键的写法分叉）；--apply 跳过这类副本，标注只落在带文本的那条上。
+#          组内逐字同文的副本在译文侧写成整行 `[riddle:copy=组内最小键]`，不抄第二遍
+#          `[riddle:…]`（抄了会和目标键的写法分叉）：副本没有自己的谜面，文本与身份
+#          （谜底/组/分级/certainty/source）全随目标键继承。`copy=` 要独占整条整行，
+#          只许一层；不含谜的同文才用 `[ref:]`——两条互斥，诗谜行写 ref 会直接报错
+#          （见 09 卷第一百一十六节）。--apply 同时跳过 ref 行与 copy 行，标注只落在
+#          带文本的那条上。引用键时 `0x` 可省（`copy=35f48f6c` 与 `copy=0x35f48f6c` 等价），
+#          位数仍是 8 位。
 #
 # 谜面本身不要改：加 [riddle:] 只在行首加标注，正文一字不动。
 #
@@ -253,7 +258,7 @@ clues = {zh = "海角,孤零零", de = "Vorgebirges,einsame,Westen", es = "cabo,
 [[group]]
 # HT26* Here, you should go, if you would like to bake colorful, sweet corn fields
 #       with vegetables in the clay oven.（原帖 Hunt Text 26*，Solution 写 Eleuthera）
-#       四槽逐字同文，只留 hash 最小的 0x35f48fdf 带文本，其余写 [ref:]。
+#       四槽逐字同文，只留 hash 最小的 0x35f48fdf 带文本，其余写 [riddle:copy=0x35f48fdf]。
 ids = ["0x35f48fdf", "0x35f48fe0", "0x35f48fe1", "0x35f48fe2"]
 ans = "Eleuthera"
 clues = {zh = "黏土炉,甜玉米面包,水果", de = "Tonofen,Süßmaisbrot,Früchten", es = "horno de barro,pan de maíz dulce,fruta", fr = "four d'argile,pain de maïs,fruits", ja = "粘土窯,スイートコーンパン,果物", ru = "глиняной печи,сладкий хлеб,фруктами"}
