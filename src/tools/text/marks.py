@@ -128,6 +128,8 @@ _ANS_SPAN = re.compile(r"\[riddle:[^\[\]]*\]")
 _TAG_RX = re.compile(r"^[a-z_][a-z0-9_-]*$")
 #: 判断「目标键自己又挂了 ref」用：只看 ref，别的标注不算第二层。
 _REF_MARK = re.compile(r"\[ref:")
+#: 整行就是一个 ref 的行：这条文本本身没有谜面，身份（谜底/组/分级）随目标键。
+_PURE_REF_RX = re.compile(r"\[ref:([^\[\]]*)\]")
 
 
 class MarkError(Exception):
@@ -1220,10 +1222,16 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
     ans_used = set()
     ans_groups = {}
     riddle_bodies = {}
+    ref_rows = {}
     for hid in sorted(doc):
         text = doc[hid] or ""
         if not text or hid in EXEMPT_KEYS:
             continue
+        m_pure = _PURE_REF_RX.fullmatch(text.strip())
+        if m_pure:
+            # 整行 ref：本条没有自己的谜面，身份随目标键。ref 本身在下面的 ref
+            # 分支里照常校验（存在、非空、不是自己、只许一层）。
+            ref_rows[hid] = m_pure.group(1).strip()
         try:
             marks = scan(text)
         except MarkError as e:
@@ -1361,6 +1369,15 @@ def check_doc(lang, doc, entities=None, terms=None, warns=None, strict_warns=Fal
                     _resolve(arg, table, hid, lang)
                 except MarkError as e:
                     problems.append(str(e))
+    # 整行 `[ref:键]` 的副本没有自己的谜面，身份（谜底、组、分级）随目标键继承。
+    # 这样「同组的每一条都要标」与「同文副本必须同组」两条判据对 ref 副本同样成立：
+    # 复制谜面时不必把整段 `[riddle:…]` 抄一遍（抄一遍反而会和目标键的写法分叉）。
+    for hid in sorted(ref_rows):
+        target = ref_rows[hid]
+        if target in ans_groups:
+            ans_groups[hid] = ans_groups[target]
+            riddle_bodies.setdefault(
+                _fold(_ANS_SPAN.sub("", doc[target] or "")), []).append(hid)
     # 同组自证：`group` 列全组含本条自己，所以每个成员的键列表本身就应该是同一个集合。
     # 组是身份不是答案——Roatán 出现在 14/15 两组、Providence 出现在 20/26 两组，
     # 按 answer 自动归并会把两个不同的寻宝组合成一个。

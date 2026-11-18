@@ -1187,5 +1187,35 @@ class TestRiddleStricter(unittest.TestCase):
         self.assertIn("用半角 `,`", str(ctx.exception))
 
 
+class TestRefCoveredRiddle(unittest.TestCase):
+    """同组逐字相同的副本写成整行 `[ref:最小键]`：身份随目标键继承。
+
+    副本没有自己的谜面，所以不该、也不需要再抄一遍 `[riddle:…]`；但「同组每条都要标」
+    与「同文副本必须同组」两条判据对它照样成立。
+    """
+
+    A = "0x00000001"
+    B = "0x00000002"
+
+    def test_ref_copy_inherits_riddle(self):
+        doc = {self.A: "[riddle:answer=Vera Cruz;group=00000001,00000002;clue=三座]"
+                       "三座城镇，X 在最西。",
+               self.B: "[ref:0x00000001]"}
+        self.assertEqual(M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={}), [])
+
+    def test_ref_copy_cannot_dodge_group_membership(self):
+        # group 只列自己、副本靠 ref 混过去：集合比对仍要把副本算进去
+        doc = {self.A: "[riddle:answer=Vera Cruz;group=00000001;clue=三座]"
+                       "三座城镇，X 在最西。",
+               self.B: "[ref:0x00000001]"}
+        problems = M.check_doc("zh", doc, entities={"Vera Cruz": {}}, terms={})
+        self.assertTrue(any("没列成同一组" in p for p in problems), problems)
+
+    def test_ref_to_plain_text_is_not_a_riddle(self):
+        # 目标是普通文本：ref 只是同句引用，不该被当成谜面成员
+        doc = {"0x00000001": "一句普通文本。", "0x00000002": "[ref:0x00000001]"}
+        self.assertEqual(M.check_doc("zh", doc, entities={}, terms={}), [])
+
+
 if __name__ == "__main__":
     unittest.main()

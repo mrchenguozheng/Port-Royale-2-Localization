@@ -369,23 +369,28 @@ def cmd_apply():
             answer_field = "town"
 
         wanted = {}
+        # 整行 `[ref:键]` 的副本没有自己的谜面：标注只写在带文本的那条上，副本靠
+        # `[ref:]` 继承（组里仍然列全组键，副本仍在 group 名单里）。--apply 不碰副本。
+        text_ids = {lang: [k for k in ids
+                           if not REF_ROW.match((rows[lang].get(k) or "").strip())]
+                    for lang in LANGS}
         for lang in LANGS:
             clues = split_clues((g.get("clues") or {}).get(lang, ""), lang)
             kinds = (g.get("kinds") or {}).get(lang, [])
-            text = ANS_MARK.sub("", rows[lang].get(ids[0], ""))
+            text = ANS_MARK.sub("", rows[lang].get(text_ids[lang][0], ""))
             for c in clues:
                 if c.casefold() not in text.casefold():
                     raise SystemExit("%s 的线索「%s」没出现在谜面里（%s）"
                                      "——谜面推不出这个谜底，或者线索该换" % (lang, c, ids[0]))
             clue_part = clue_text(clues, kinds, lang)
-            for k in ids:
+            for k in text_ids[lang]:
                 # group 列全组含本条自己（8 位小写十六进制、不带 0x、升序、`,` 分隔）
                 members = ",".join(sorted(
                     x[2:] if x.startswith("0x") else x for x in ids))
                 wanted[(lang, k)] = "[riddle:%s=%s;group=%s;clue=%s]" % (
                     answer_field, ans, members, clue_part)
 
-        order = [(lang, k) for k in ids for lang in LANGS]
+        order = [(lang, k) for k in ids for lang in LANGS if (lang, k) in wanted]
         already = {lk: rows[lk[0]].get(lk[1], "") for lk in order}
         want_mark = {lk: ANS_MARK.match(wanted[lk]).group(0) for lk in order}
         # 尾字段（certainty / source）不在队列里，重写时原样接回去，不能抹掉。
@@ -406,7 +411,7 @@ def cmd_apply():
         for lang in LANGS:
             path = os.path.join(TRANS, "%s.toml" % lang)
             doc, order_t = toml_io.read_doc(path)
-            for k in ids:
+            for k in text_ids[lang]:
                 mark = new_mark[(lang, k)]
                 if "[riddle:" in doc[k]:
                     # 值相同、只是写法不规范（大小写/变音/方位缩写/group 带 0x 之类）：

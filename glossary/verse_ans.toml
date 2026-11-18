@@ -1,4 +1,6 @@
-# 诗谜谜底队列 —— 谜面在 09 卷第六十四节定义的 verse 区间里，共 41 条，按同一首谜面归成 29 组。
+# 诗谜谜底队列 —— 谜面在 09 卷第六十四节定义的 verse 区间里，共 41 个槽位，按同一首谜面归成 29 组。
+# 41 个槽位里有 12 个与同组另一条逐字同文，译文侧按 `[ref:组内最小键]` 收敛，只剩 29 条带文本
+# （见 09 卷第一百一十四节）；下面 ids 仍列全组成员，--apply 只往带文本那条写标注。
 #
 # 每组建三样：
 #   ans    谜底。必须是 entities.toml 里登记的实体键（城镇用英文名，六语共用）；
@@ -25,11 +27,13 @@
 #          不参与答案判定。
 #          俄语 90c5、法语 90c6 原先各只剩两条线索（俄语把「白沙」漏译、法语把「海峡」
 #          并进 l'abondance 那句）——2026-11-18 已补齐：ru 补 `Белый песок`（正文里就有），
-#          fr 把线索换成正文里的 `détroit`。六语 41 条的线索条数现已齐平（每语 74 项）。
+#          fr 把线索换成正文里的 `détroit`。六语各条的线索条数现已齐平（收敛成 29 条文本后，每语 54 项）。
 #   ids    同组的文本键。**组内多于一条时**，--apply 会给每条译文加 `group=`，列出本组
 #          全体成员的键（`,` 连接、按 0x 串升序、含本条自己；`+` 已退役）；单条的组只写
 #          自己那一个键。ids 决定这组有几条，
 #          译文那边的 group 只做校验：两边对不上（缺一条、多一条、互指不对称）就失败。
+#          组内逐字同文的副本在译文侧写成整行 `[ref:组内最小键]`，不抄第二遍 `[riddle:…]`
+#          （抄了会和目标键的写法分叉）；--apply 跳过这类副本，标注只落在带文本的那条上。
 #
 # 谜面本身不要改：加 [riddle:] 只在行首加标注，正文一字不动。
 #
@@ -186,13 +190,13 @@ clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = 
 # 21  White strand beside the jungle, a little river known to none
 ids = ["0x35f490c5"]
 ans = "Santa Marta"
-clues = {zh = "白沙,丛林,只有阳光", de = "Weißer Strand,Dschungel,nur die Sonne", es = "Blanca orilla,selva,solo ve el sol", fr = "Plage blanche,jungle,que le soleil", ja = "白い砂浜,ジャングル,太陽だけ", ru = "джунглей,солнце"}
+clues = {zh = "白沙,丛林,只有阳光", de = "Weißer Strand,Dschungel,nur die Sonne", es = "Blanca orilla,selva,solo ve el sol", fr = "Plage blanche,jungle,que le soleil", ja = "白い砂浜,ジャングル,太陽だけ", ru = "джунглей,солнце,Белый песок"}
 
 [[group]]
 # 22  Here lies the town, overlooking the sound. It guards the bay
 ids = ["0x35f490c6"]
 ans = "Maracaibo"
-clues = {zh = "海峡,海湾,船", de = "Sund,Bucht,Schiffen", es = "estrecho,bahía,barcos", fr = "baie,navires", ja = "海峡,湾,船", ru = "пролив,бухте,кораблей"}
+clues = {zh = "海峡,海湾,船", de = "Sund,Bucht,Schiffen", es = "estrecho,bahía,barcos", fr = "détroit,baie,navires", ja = "海峡,湾,船", ru = "пролив,бухте,кораблей"}
 
 [[group]]
 # 23  Not far from the town, at the bottom of a cliff, lie the bat
