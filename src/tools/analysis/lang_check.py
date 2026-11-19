@@ -109,7 +109,7 @@ def split_head(w, vocab, link=("s", "n", "en", "er", "es", "e")):
 #: 本地 hunspell 词典（src/data/qa/dict/<base>.aff + .dic）。有就用它，它带变形与复合词规则，
 #: 比纯频率表准得多；没有就退回 pyspellchecker（pyspellchecker 只收拉丁系与俄语、波兰语等，
 #: 中日韩没有词表，硬走会抛 ValueError，因此这里显式跳过）。
-HUNSPELL = {"de": "de_DE_frami", "fr": "fr_FR", "es": "es_ES", "ru": "ru_RU"}
+HUNSPELL = {"de": "de_DE_frami", "fr": "fr_FR", "es": "es_ES", "ru": "ru_RU", "pl": "pl_PL"}
 NO_HUNSPELL = {"zh", "ja", "ko"}
 
 
