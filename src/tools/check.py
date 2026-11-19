@@ -10,7 +10,9 @@
 5. 英文微调层自查（translate.py overrides：id 存在、token 一致、不许白改）
 6. 不译清单对账（analysis/keep_audit.py：登记的 id 存在、登记项没译过、
    结构性不可译的不许占着待译）
-7. 规则单元测试（tests/）
+7. 文档一致性（docs_check.py）
+8. 脚本地图（tools_check.py：每个脚本都有 docstring、都登记在 README、路径可落地）
+9. 规则单元测试（tests/）
 
     python src/tools/check.py
 """
@@ -42,6 +44,7 @@ def main():
         ("英文微调层", [PY, os.path.join("src", "tools", "translate.py"), "overrides"]),
         ("不译清单", [PY, os.path.join("src", "tools", "analysis", "keep_audit.py")]),
         ("文档一致性", [PY, os.path.join("src", "tools", "docs_check.py")]),
+        ("脚本地图", [PY, os.path.join("src", "tools", "tools_check.py")]),
         ("规则单测", [PY, "-m", "unittest", "discover", "-s", "tests", "-q"]),
     ]
     for title, cmd in steps:
