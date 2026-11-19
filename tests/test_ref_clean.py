@@ -81,6 +81,31 @@ class TestBaseAlignment(unittest.TestCase):
         self.assertIn("缺口超过 2 处", "、".join(notes))
 
 
+class TestAlignEmpty(unittest.TestCase):
+    def test_majority_blank_beats_one_prose(self):
+        docs = [{"h": "+++EMPTY+++"}, {"h": "+++EMPTY+++"}, {"h": "+++EMPTY+++"}]
+        out, act, why = RC.align_empty("h", docs, "Seit einiger Zeit schon werden ...")
+        self.assertEqual(out, "+++EMPTY+++")
+        self.assertEqual(act, "blank")
+
+    def test_majority_prose_keeps_a_placeholder(self):
+        docs = [{"h": "text"}, {"h": "text"}, {"h": "text"}]
+        out, act, why = RC.align_empty("h", docs, "+++EMPTY+++")
+        self.assertEqual(out, "+++EMPTY+++")
+        self.assertEqual(act, "warn")
+
+    def test_a_space_becomes_the_standard_placeholder(self):
+        docs = [{"h": "+++EMPTY+++"}] * 5
+        out, act, why = RC.align_empty("h", docs, " ")
+        self.assertEqual(out, "+++EMPTY+++")
+        self.assertEqual(act, "blank")
+
+    def test_missing_keys_do_not_vote(self):
+        docs = [{"c": "+++EMPTY+++"}, {"c": "+++EMPTY+++"}, {}]
+        out, act, why = RC.align_empty("c", docs, "+++EMPTY+++")
+        self.assertEqual(act, "")
+
+
 class TestAlignIdm(unittest.TestCase):
     def test_body_becomes_the_key_name(self):
         out, hit = RC.align_idm("IDM_CONTEST_01_2004_LOG_01_HDR", "Wachstum und Versorgung")

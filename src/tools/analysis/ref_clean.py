@@ -44,6 +44,8 @@ TOK_BARE_RX = re.compile(r"@\$([^$\n]{1,60})\$")
 #: 占位名的形态：`IDM_CONTEST_01_2004_LOG_01_HDR`。上市文本里没这句，mod 作者就拿键名
 #: 顶上，当占位用。
 IDM_RX = re.compile(r"IDM_[A-Z0-9_]+$")
+#: 上市版「这句没有」的占位值。零售版有时把它写成纯空白（pl 的 `0xd49a1310` 是一个空格）。
+PLACEHOLDER = "+++EMPTY+++"
 
 
 def _cand(name):
@@ -106,6 +108,39 @@ def align_idm(base_val, text):
     return text, False
 
 
+def is_placeholder(val):
+    """上市版「这句没有」：`+++EMPTY+++`，或整个值只有空白。"""
+    return isinstance(val, str) and (not val.strip() or val.strip() == PLACEHOLDER)
+
+
+def align_empty(hid, docs, text):
+    """按多数票定这一条该不该是占位。
+
+    返回 `(文本, 动作, 说明)`，动作是 `blank`（退成占位）、`warn`（该有正文但本参照是
+    空，只能报）或 `""`（不动）。
+
+    票只算「这条存在」的语言：fr 比 en 多 42 条、en 也有 fr 没有的，缺键不是「反对票」。
+    """
+    vals = [doc[hid] for doc in docs if hid in doc and isinstance(doc[hid], str)]
+    if not vals:
+        return text, "", ""
+    blank = sum(1 for v in vals if is_placeholder(v))
+    prose = len(vals) - blank
+    if not text.strip() and text != PLACEHOLDER:
+        # 纯空白是占位的走样写法（pl 的 `0xd49a1310` 是一个空格）：票也说过半是占位，
+        # 就写成标准占位，别让下游拿到一个看起来像漏字的空格。
+        if blank >= 3 and blank > prose:
+            return PLACEHOLDER, "blank", "空白规整成占位（%d 空 : %d 文）" % (blank, prose)
+        return text, "", ""
+    if is_placeholder(text):
+        if prose >= 3 and prose > blank:
+            return text, "warn", "本参照是占位，%d 个语言有正文（要重译，别退）" % prose
+        return text, "", ""
+    if blank >= 3 and blank > prose:
+        return PLACEHOLDER, "blank", "%d 空 : %d 文" % (blank, prose)
+    return text, "", ""
+
+
 def max_run(text, unit="<n>"):
     """一段里最长的那串连续 `unit`（`<n><n>` 记 2，单个记 1，没有记 0）。"""
     best = cur = 0
@@ -139,6 +174,10 @@ def main(argv=None):
                          "把一整段挤成一行")
     ap.add_argument("--align-idm", action="store_true",
                     help="基准是 `IDM_` 占位名、本参照却写成了正文的行：对齐成那个占位名")
+    ap.add_argument("--align-empty", action="store_true",
+                    help="`+++EMPTY+++` 按多数票定：过半语言都是占位，本参照也退成占位")
+    ap.add_argument("--empty-votes", default="en,fr,de,es,pl,ru",
+                    help="算占位票的来源（逗号分隔），自己那份自动排除")
     ap.add_argument("--write", action="store_true", help="真写盘；默认只出报告")
     ap.add_argument("--out", default="", help="输出路径，默认 build/ref/clean/<名字>-clean.toml")
     args = ap.parse_args(argv)
@@ -156,6 +195,13 @@ def main(argv=None):
     patch = {}
     if args.patch:
         patch = json.load(io.open(args.patch, encoding="utf-8"))
+    empty_docs = []
+    if args.align_empty:
+        for name in [v.strip() for v in args.empty_votes.split(",") if v.strip()]:
+            p, nm = resolve(name)
+            if nm == ref_name:
+                continue
+            empty_docs.append(load(p))
 
     out = {}
     changed, issues = [], []
@@ -166,6 +212,13 @@ def main(argv=None):
         text, notes = val, []
         # 占位对齐排在最前：基准只有键名、本参照却译了正文的行，先退回键名，
         # 否则后面拿一段德语去跟一个键名比结构，白忙。
+        if empty_docs:
+            text, act, why = align_empty(hid, empty_docs, text)
+            if act == "blank":
+                notes.append("按多数票退成占位（%s；原 %d 字：%s）"
+                              % (why, len(val), val[:26].replace("\n", " ")))
+            elif act == "warn":
+                issues.append((hid, why))
         b_pre = (base or {}).get(hid)
         if args.align_idm:
             text, hit = align_idm(b_pre, text)
