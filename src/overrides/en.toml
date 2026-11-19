@@ -1,0 +1,5 @@
+# 英文微调层：只收「原版确实写错」的条目，不做文风润色。
+# 原版提取 src/orig/en.gog_1.1.2.3.toml 永不改动（审计与 token 比对都以它为准）；
+# 这里改的是合并后的语义基准，出 english 包与各语言参照都走这一版。
+# 每条改动的依据写在 en.md，改完记得复核各语言同一 id 的译文。
+"0xf4b68a6b" = "Congratulations! You have successfully completed the scenario and have captured several English towns on behalf of Holland.<n><n>You can capture towns in the same way in free-play mode. But remember to ensure that the nation whose towns you want to capture must be militarily weak. In addition, the nation for which you want to capture towns must be militarily strong and the two nations in question must be at war.<n><n>Note: You are usually rewarded with a plot of land on which you can build your own towns when you capture towns for a viceroy. However, this feature is deactivated in this scenario."

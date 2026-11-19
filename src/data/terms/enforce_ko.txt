@@ -1,0 +1,19 @@
+# 术语落词强制的键清单：只在对齐过的语言上开。
+# 一行一个键（对应 src/data/terms/ko.toml 的键）。
+# 判据只看短标签（可见 ≤24 字），例外登记在 allow_ko.txt。
+en_business
+en_tools
+en_plague_of_rats
+en_quality_of_life
+en_accuracy
+en_pirate
+en_governor
+en_warehouse
+en_colony
+en_convoy
+en_buccaneer
+en_captain
+en_sailor
+en_hideout
+en_trade_route
+en_market

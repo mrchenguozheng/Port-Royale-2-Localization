@@ -219,5 +219,120 @@ class TestTokensAreTheSameImplementation(unittest.TestCase):
         self.assertEqual(sorted(tokens("A %1 <n> B")), sorted(tokens("%1 B <n> A")))
 
 
+class TestKeepAsIs(unittest.TestCase):
+    """有意不译：清单内的 id 不进待译，进度不再被按键名永久拖着。"""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.src = os.path.join(self.dir, "src")
+        os.makedirs(os.path.join(self.src, "data", "keep_as_is"))
+        self.old_src = T.SRC
+        T.set_src(self.src)
+        with open(os.path.join(self.src, "data", "keep_as_is", "ko.txt"),
+                  "w", encoding="utf-8") as f:
+            f.write("# 头\n0xb1\tkey\n0xb9\tcredit\n")
+
+    def tearDown(self):
+        T.set_src(self.old_src)
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_listed_entry_leaves_pending(self):
+        es = [{"id": "0xb1", "ko": "F1"}, {"id": "0xb2", "ko": "English"}]
+        self.assertEqual(T.pending_ids(es, "ko"), ["0xb2"])
+
+    def test_empty_when_no_file(self):
+        T.set_src(self.src)
+        os.remove(os.path.join(self.src, "data", "keep_as_is", "ko.txt"))
+        self.assertEqual(T.keep_as_is("ko"), {})
+
+
+class TestDumpGroups(unittest.TestCase):
+    """骨架分组：只差占位符/标签的条目归一组，导出时给一条代表句。"""
+
+    def _es(self):
+        return [
+            {"id": "0xc1", "ko": "Loot the goods from %1 of the Twelve."},
+            {"id": "0xc2", "ko": "Loot the goods from %2 of the Twelve."},
+            {"id": "0xc3", "ko": "Loot the goods from %3 of the Twelve."},
+            {"id": "0xc4", "ko": "Something completely different here."},
+        ]
+
+    def test_by_group_keeps_one_per_skeleton(self):
+        rows = [l for l in T.dump_lines(self._es(), "ko", T.BAND_KEYS["all"], 0,
+                                        True) if not l.startswith("#")]
+        self.assertEqual([r.split("\t")[0] for r in rows], ["0xc1", "0xc4"])
+
+    def test_group_marker_lists_mates(self):
+        rows = [l for l in T.dump_lines(self._es(), "ko", T.BAND_KEYS["all"], 0)
+                if not l.startswith("#")]
+        self.assertIn("grp:3", rows[0])
+        self.assertIn("0xc2", rows[0])
+
+    def test_skeleton_collapses_vars_and_tags(self):
+        self.assertEqual(T.skeleton("Take %1 <n> now"), T.skeleton("Take %2 <n> now"))
+
+
+class TestNearPairs(unittest.TestCase):
+    """近重复：只差一个词的成对条目要摆在一起，别各写一版。"""
+
+    def test_similar_long_sentences_pair_up(self):
+        es = [
+            {"id": "0xd1", "ko": "You must be sure that the nation whose towns "
+                                 "you want to capture is militarily weak here."},
+            {"id": "0xd2", "ko": "You must be sure that the nation whose towns "
+                                 "you want to capture is militarily strong here."},
+            {"id": "0xd3", "ko": "Something else entirely."},
+        ]
+        pairs = T.near_pairs(es, "ko", min_ratio=0.90)
+        self.assertEqual(len(pairs), 1)
+        self.assertEqual({pairs[0][1], pairs[0][2]}, {"0xd1", "0xd2"})
+
+    def test_short_sentences_are_skipped(self):
+        es = [{"id": "0xd4", "ko": "Tools"}, {"id": "0xd5", "ko": "Toolz"}]
+        self.assertEqual(T.near_pairs(es, "ko", min_ratio=0.90), [])
+
+
+class TestOverrides(unittest.TestCase):
+    """英文微调层：id 必须存在、token 必须与原版一致，白改要拦。"""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.src = os.path.join(self.dir, "src")
+        os.makedirs(os.path.join(self.src, "orig"))
+        os.makedirs(os.path.join(self.src, "overrides"))
+        self.old_src = T.SRC
+        T.set_src(self.src)
+        raw = {"0xe1": "Take %1 now", "0xe2": "Second", "0xe3": "Third"}
+        with open(os.path.join(self.src, "orig", "en.gog_1.1.2.3.toml"),
+                  "w", encoding="utf-8") as f:
+            for k, v in raw.items():
+                f.write('"%s" = "%s"\n' % (k, v))
+        with open(os.path.join(self.src, "overrides", "en.toml"),
+                  "w", encoding="utf-8") as f:
+            f.write('"0xe1" = "Take %2 now"\n')
+            f.write('"0xe2" = "Second!"\n')
+            f.write('"0xe4" = "Ghost"\n')
+            f.write('"0xe3" = "Third"\n')
+
+    def tearDown(self):
+        T.set_src(self.old_src)
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_load_overrides_reads_short_code(self):
+        self.assertEqual(set(T.load_overrides("en")), {"0xe1", "0xe2", "0xe3", "0xe4"})
+
+    def test_token_change_is_flagged(self):
+        missing, bad_tok, noop = T.check_overrides("en")
+        self.assertEqual(bad_tok, ["0xe1"])
+
+    def test_missing_id_is_flagged(self):
+        missing, bad_tok, noop = T.check_overrides("en")
+        self.assertEqual(missing, ["0xe4"])
+
+    def test_noop_is_flagged(self):
+        missing, bad_tok, noop = T.check_overrides("en")
+        self.assertEqual(noop, ["0xe3"])
+
+
 if __name__ == "__main__":
     unittest.main()

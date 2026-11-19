@@ -6,8 +6,9 @@
 1. 跨模块引用检查（lint_imports.py）
 2. 语言配置检查（config_check.py）
 3. 译文规范复核（analysis/text_lint.py，E 级非 0 即失败）
-4. 规则单元测试（tests/）
-5. （已移除：译文层只有一份，不再做「生成物 vs 手改文本」一致性检查）
+4. 断行长度复核（analysis/line_run.py）
+5. 英文微调层自查（translate.py overrides：id 存在、token 一致、不许白改）
+6. 规则单元测试（tests/）
 
     python src/tools/check.py
 """
@@ -36,6 +37,7 @@ def main():
         ("语言配置", [PY, os.path.join("src", "tools", "config_check.py")]),
         ("译文规范", [PY, os.path.join("src", "tools", "analysis", "text_lint.py")]),
         ("断行长度", [PY, os.path.join("src", "tools", "analysis", "line_run.py")]),
+        ("英文微调层", [PY, os.path.join("src", "tools", "translate.py"), "overrides"]),
         ("文档一致性", [PY, os.path.join("src", "tools", "docs_check.py")]),
         ("规则单测", [PY, "-m", "unittest", "discover", "-s", "tests", "-q"]),
     ]

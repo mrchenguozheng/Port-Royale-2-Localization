@@ -234,11 +234,74 @@ def load_toml():
         for rid, t in rows:
             merged[rid][lang] = t
 
+    #: 英文微调层：`src/overrides/en.toml` 只放「确认原版写错」的条目。
+    #: 原版提取（orig/en.gog…）永远保持原样，做审计与 token 比对都用它；
+    #: 这里改的是合并后的语义基准，出 english 包与翻译参照都走这一版。
+    overrides = load_overrides(OVERRIDES_CODE)
+    missing_ov = [i for i in overrides if i not in merged]
+    for rid, text in overrides.items():
+        if rid in merged:
+            merged[rid][BASE_LANG] = text
+    if missing_ov:
+        sys.stderr.write("提示：overrides 里有 %d 条 id 不在基准表里：%s\n"
+                         % (len(missing_ov), "、".join(missing_ov[:5])))
+
     return {"s": [merged[i] for i in order], "missing": missing}
 
 
 def entries(doc):
     return doc.get("s", [])
+
+
+def overrides_dir():
+    """英文微调层目录（现算，set_src 换根后跟着走）。"""
+    return os.path.join(SRC, "overrides")
+
+#: 微调层按语言代码存（`en.toml`），基准名 `en.gog_1.1.2.3` 取前缀。
+OVERRIDES_CODE = BASE_LANG.split(".")[0]
+
+
+def load_overrides(code):
+    """读 `src/overrides/<code>.toml`：{id: 修正后的原文}。
+
+    只用于「原版确实写错」的条目。不做文风润色 —— 每次改动都要在
+    `overrides/<code>.md` 里留一行依据，否则半年后没人知道为什么和原版不一样。
+    """
+    path = os.path.join(overrides_dir(), code + ".toml")
+    if not os.path.exists(path):
+        return {}
+    import tomllib
+    with open(path, "rb") as f:
+        doc = tomllib.load(f)
+    return {k: v for k, v in doc.items() if isinstance(v, str)}
+
+
+def check_overrides(code):
+    """防线：overrides 的 id 必须存在、token 必须与原版完全一致。
+
+    微调改的是词句，不该动 `%1` / `@n$…$` / `<n>` —— 改坏了会让所有语言的
+    占位符校验都失去基准。返回 (缺 id, token 不一致, 白改) 三张清单。
+    """
+    #: 原版提取，按当前基准名取（`set_src` 换根后也跟着走）。
+    raw_path = os.path.join(REFERENCES_DIR, BASE_LANG + ".toml")
+    if not os.path.exists(raw_path):
+        return [], [], []
+    import tomllib
+    with open(raw_path, "rb") as f:
+        raw = tomllib.load(f)
+    ov = load_overrides(code)
+    missing = [i for i in ov if i not in raw]
+    bad_tok = [i for i, t in ov.items()
+               if i in raw and sorted(tokens(t)) != sorted(tokens(raw[i]))]
+    noop = [i for i, t in ov.items() if i in raw and t.strip() == str(raw[i]).strip()]
+    for i in bad_tok:
+        print("  token  %s  原版 %s | 微调 %s"
+              % (i, tokens(raw[i]), tokens(ov[i])))
+    for i in missing:
+        print("  缺条目 %s" % i)
+    for i in noop:
+        print("  白改   %s  与原版无差别" % i)
+    return missing, bad_tok, noop
 
 
 # ── 进度 ────────────────────────────────────────────────────
@@ -303,12 +366,41 @@ def band_label(lo, hi):
     return ">%d" % (lo - 1) if hi is None else ("%d–%d" % (lo, hi) if lo else "≤%d" % hi)
 
 
+def keep_dir():
+    """有意不译清单目录（现算，set_src 换根后跟着走）。"""
+    return os.path.join(SRC, "data", "keep_as_is")
+
+
+def keep_as_is(lang):
+    """「有意不译」清单：{id: 理由}。文件不存在就是空清单。
+
+    这些条目（按键名 F1/ESC、表头 Looted<t>…、职员表、脚本 id）的正确译法
+    就是英文原样。不单列出来，它们会永久占着「待译」，进度永远到不了 100%，
+    也分不清剩下的是「没干」还是「不该干」。
+    """
+    path = os.path.join(keep_dir(), lang + ".txt")
+    out = {}
+    if not os.path.exists(path):
+        return out
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 2:
+                out[parts[0].strip()] = parts[1].strip()
+    return out
+
+
 def pending_ids(es, field):
-    """还待译的条目 id 列表（判据同 `is_translated`）。"""
+    """还待译的条目 id 列表（判据同 `is_translated`，扣掉有意不译的）。"""
     script = lang_rules.script_re(field)
+    keep = keep_as_is(field)
     return [e["id"] for e in es
-            if not is_translated(e.get(field, ""), field,
-                                 base=e.get(BASE_LANG, ""), script=script)]
+            if e["id"] not in keep
+            and not is_translated(e.get(field, ""), field,
+                                  base=e.get(BASE_LANG, ""), script=script)]
 
 
 def pending_of(es, field):
@@ -324,10 +416,12 @@ def pending_of(es, field):
 
 def report_status(field, es):
     pend = pending_of(es, field)
+    keep = keep_as_is(field)
     total = len(es)
-    done = total - len(pend)
-    print("[%s] 共 %d 条，已译 %d 条（%.1f%%），待译 %d 条"
-          % (field, total, done, 100.0 * done / max(1, total), len(pend)))
+    done = total - len(pend) - len(keep)
+    print("[%s] 共 %d 条，已译 %d 条（%.1f%%），待译 %d 条%s"
+          % (field, total, done, 100.0 * done / max(1, total), len(pend),
+             "（另 %d 条有意不译，不计）" % len(keep) if keep else ""))
     if not pend:
         return
     buckets = {}
@@ -549,7 +643,17 @@ BAND_KEYS = {
 }
 
 
-def dump_lines(es, field, band, limit):
+def skeleton(text):
+    """把占位符/标签抹成 § 后的句子骨架。
+
+    `%@1$` 之类只差变量的条目、只差一个国家名的公告，骨架相同 —— 这就是
+    「一条模板一次翻完、按变量回填」的信号。逐字相同的比对抓不到它们。
+    """
+    text = STRUCT_RX.sub("\u00a7", TAG_RX.sub("\u00a7", text or ""))
+    return re.sub(r"\u00a7+", "\u00a7", text).strip()
+
+
+def dump_lines(es, field, band, limit, by_group=False):
     """把待译条目渲染成批次清单的行（首行是注释头的第 1 行）。
 
     纯函数，不碰文件：`cmd_dump` 只负责读数据与写盘，单测直接喂合成条目。
@@ -560,27 +664,66 @@ def dump_lines(es, field, band, limit):
         return content_of(e.get(field, "")).strip()
 
     groups = {}
+    skels = {}
     for e in pend:
         groups.setdefault(key_of(e), []).append(e["id"])
+        skels.setdefault(skeleton(key_of(e)), []).append(e["id"])
 
     in_band = [e for e in pend
                if band is None or band_of(content_of(e.get(field, ""))) == band]
+    if by_group:
+        # 每个骨架只留第一条：先翻一版代表句，再按变量替换回填
+        seen = set()
+        keep = []
+        for e in in_band:
+            sk = skeleton(key_of(e))
+            if sk in seen:
+                continue
+            seen.add(sk)
+            keep.append(e)
+        in_band = keep
     rows = in_band[:limit] if limit > 0 else in_band
 
-    lines = ["# 待译批次：%s  共 %d 条（待译 %d 条，该档 %d 条）"
+    lines = ["# 待译批次：%s  共 %d 条（待译 %d 条，该档 %d 条）%s"
              % (band_label(*band) if band else "全部", len(rows), len(pend),
-                len(in_band)),
+                len(in_band), "  按骨架分组" if by_group else ""),
              "# 制表符分隔：id / 可见字数 / 英文原文（换行写作 \\n）",
              "# 行末 dup:N = 与另外几条共用同一句英文；需不同译法时用 id 作键"
-             "：{\"0x...\": \"译文\"}"]
+             "：{\"0x...\": \"译文\"}；grp:N = 与另外几条只差占位符/标签，"
+             "可照同一模板改词填空"]
     for e in rows:
         text = (e.get(field, "") or "").replace("\n", "\\n")
         line = "%s\t%d\t%s" % (e["id"], len(content_of(e.get(field, ""))), text)
         mates = [h for h in groups.get(key_of(e), []) if h != e["id"]]
         if mates:
             line += "\tdup:%d %s" % (len(mates) + 1, ",".join(mates))
+        same = [h for h in skels.get(skeleton(key_of(e)), []) if h != e["id"]]
+        if same:
+            line += "\tgrp:%d %s" % (len(same) + 1, ",".join(same))
         lines.append(line)
     return lines
+
+
+def near_pairs(es, field, base_lang=BASE_LANG, min_ratio=0.90, min_len=40):
+    """相似度 ≥ min_ratio 的条目对：(ratio, id_a, id_b, 英文a, 英文b)。
+
+    只比长度够长的句子，且只在待译集合里比 —— 已译完的批次里这种「只差一个
+    词」的成对条目（四国公告、七档城镇状态）在翻译时最容易各写一版、术语漂移，
+    导出时就摆出来比事后 audit 省事。
+    """
+    import difflib
+    pend = pending_of(es, field)
+    rows = [(e["id"], e.get(base_lang) or e.get(field, "") or "") for e in pend]
+    rows = [(i, t) for i, t in rows if len(t) >= min_len]
+    out = []
+    for i in range(len(rows)):
+        for j in range(i + 1, min(len(rows), i + 30)):
+            ra, rb = rows[i][1], rows[j][1]
+            ratio = difflib.SequenceMatcher(None, ra, rb).ratio()
+            if ratio >= min_ratio:
+                out.append((ratio, rows[i][0], rows[j][0], ra, rb))
+    out.sort(reverse=True)
+    return out
 
 
 def cmd_dump(args):
@@ -595,7 +738,7 @@ def cmd_dump(args):
         raise SystemExit("--band 只认 %s。" % "、".join(BAND_KEYS))
     field = args.lang or target_field()
     lines = dump_lines(entries(load_toml()), field,
-                       BAND_KEYS[args.band], args.limit)
+                       BAND_KEYS[args.band], args.limit, args.by_group)
     body = "\n".join(lines) + "\n"
     if args.out:
         parent = os.path.dirname(os.path.abspath(args.out))
@@ -610,6 +753,43 @@ def cmd_dump(args):
 
 
 # ── 源缺失自查 ────────────────────────────────────────────────
+
+
+def cmd_near(args):
+    """近重复自查：待译里相似度 ≥ 阈值的条目对，并排打印差异片段。
+
+    用途有两层：一是「只差一个词」的条目（四国公告、七档城镇状态）照着同一
+    模板去翻，别各写一版；二是原文自相矛盾时会自己浮出来 —— 批次十一那条
+    「替你夺城的国家也必须军力虚弱」对「必须军力强大」正是这一类。
+    """
+    import difflib
+    field = args.lang or target_field()
+    es = entries(load_toml())
+    pairs = near_pairs(es, field, min_ratio=args.min)
+    print("[%s] 待译 %d 条里相似度 ≥ %.2f 的成对条目：%d 对"
+          % (field, len(pending_of(es, field)), args.min, len(pairs)))
+    for ratio, a, b, ra, rb in pairs[:args.limit]:
+        print("%.2f  %s  %s" % (ratio, a, b))
+        sm = difflib.SequenceMatcher(None, ra, rb)
+        for tag, i1, i2, j1, j2 in sm.get_opcodes():
+            if tag == "equal":
+                continue
+            left = ra[max(0, i1 - 12):i2 + 12].replace("\n", "\\n")
+            right = rb[max(0, j1 - 12):j2 + 12].replace("\n", "\\n")
+            print("      %-7s %s" % (tag, left))
+            print("      %-7s %s" % ("", right))
+    if len(pairs) > args.limit:
+        print("  ……另有 %d 对。" % (len(pairs) - args.limit))
+    return 0
+
+
+def cmd_overrides(args):
+    """微调版原文自查。有问题返回 1，供 check 收口。"""
+    missing, bad_tok, noop = check_overrides(OVERRIDES_CODE)
+    print("[%s] 微调版 overrides：%d 条（缺 id %d、token 不一致 %d、白改 %d）"
+          % (BASE_LANG, len(load_overrides(OVERRIDES_CODE)), len(missing),
+             len(bad_tok), len(noop)))
+    return 1 if (missing or bad_tok or noop) else 0
 
 
 def cmd_gaps(args):
@@ -647,13 +827,24 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="只报告，不写盘")
     p.set_defaults(fn=cmd_apply)
 
-    p = sub.add_parser("dump", help="导出待译批次清单（id/字数/原文，标同源串撞车）")
+    p = sub.add_parser("dump", help="导出待译批次清单（id/字数/原文，标撞车与同骨架）")
     p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
     p.add_argument("--band", default="long",
                    help="长度档：short/24/40/80/long/all，默认 long（81+）")
     p.add_argument("--limit", type=int, default=40, help="最多导几条，0 = 不限")
+    p.add_argument("--by-group", action="store_true",
+                   help="按骨架去重：只留每组一条代表句")
     p.add_argument("--out", default="", help="写到这个文件；不给就打到 stdout")
     p.set_defaults(fn=cmd_dump)
+
+    p = sub.add_parser("near", help="近重复自查：相似度 ≥ 阈值的待译条目对")
+    p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
+    p.add_argument("--min", type=float, default=0.90, help="相似度阈值，默认 0.90")
+    p.add_argument("--limit", type=int, default=20, help="最多列几对")
+    p.set_defaults(fn=cmd_near)
+
+    p = sub.add_parser("overrides", help="微调版原文自查：id 存在、token 一致")
+    p.set_defaults(fn=cmd_overrides)
 
     p = sub.add_parser("gaps", help="源缺失自查：英文原值是令牌、译文有实文")
     p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")

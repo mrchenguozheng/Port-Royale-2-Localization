@@ -57,6 +57,78 @@ VAR_CODE_ORIG = {"0xca4930dc"}
 
 KEEP = {"0xfc512ea5"}
 
+#: 有意不译清单与术语表。两者都在 src/data 下，按语言分文件。
+KEEP_DIR = os.path.join(ROOT, "src", "data", "keep_as_is")
+TERMS_DIR = os.path.join(ROOT, "src", "data", "terms")
+
+
+def load_keep(lang):
+    """{id: 理由}；文件不存在返回空。"""
+    path = os.path.join(KEEP_DIR, lang + ".txt")
+    out = {}
+    if not os.path.exists(path):
+        return out
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 2:
+                out[parts[0].strip()] = parts[1].strip()
+    return out
+
+
+def _allow_ids(lang):
+    """术语检查的例外 id（专名、固定短语）。`src/data/terms/allow_<lang>.txt`。"""
+    path = os.path.join(TERMS_DIR, "allow_%s.txt" % lang)
+    if not os.path.exists(path):
+        return set()
+    out = set()
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                out.add(line.split()[0])
+    return out
+
+
+def _enforce_keys(lang):
+    """要强制落词的术语键。`src/data/terms/enforce_<lang>.txt`，一行一个键。
+
+    没这个文件就完全不查：术语表里很多键只是「参考用」，并未与译文约定统一
+    （es 的 Pirata、ja 的 バッカニア 就与正文用词不同）。强求会和现实打架，
+    报出来的几十条没人处理，检查就失去意义。只在对齐过的语言上开。
+    """
+    path = os.path.join(TERMS_DIR, "enforce_%s.txt" % lang)
+    if not os.path.exists(path):
+        return None
+    out = set()
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                out.add(line.split()[0])
+    return out
+
+
+def load_terms(lang):
+    """[(键, 英文词, 本语译词)]；值为空的不算。键形如 `en_governor`。"""
+    path = os.path.join(TERMS_DIR, lang + ".toml")
+    if not os.path.exists(path):
+        return []
+    with open(path, "rb") as f:
+        doc = tomllib.load(f)
+    out = []
+    for key, val in doc.items():
+        if not isinstance(val, str) or not val.strip():
+            continue
+        prefix, _, rest = key.partition("_")
+        if prefix != "en" or not rest:
+            continue
+        out.append((key, rest.replace("_", " "), val.strip()))
+    return out
+
 # 货物数量的量词：全库统一「桶」。判据不是约定，而是模板自带的两处硬证据——
 # 送货换钱的十条任务文本同时含 `@g$GoldPerBarrel$`（变量名直译「每桶金币价」）
 # 与 `<g:INTEXT_FASS_800x600.screen>`（FASS = 德语的桶，渲染成一张桶的图片），
@@ -347,6 +419,34 @@ def main(argv):
             if len(outs) > 1 and len(src) > 8:
                 W.append((sorted(keys)[0], "同原文异译 %d 种" % len(outs),
                           " / ".join(sorted(outs))[:120]))
+
+    # 有意不译名单：保持英文原样才对。反过来查——名单内的值一旦被译，就是错。
+    for k, why in load_keep(lang).items():
+        if k in tr and en.get(k) is not None and str(tr[k]).strip() != str(en[k]).strip():
+            W.append((k, "名单内但已改动（%s）" % why, str(tr[k])[:60]))
+
+    # 术语落词：术语表的英文词在原文出现时，译文里必须用指定译法。
+    # 只在**短标签**上判（可见 ≤24 字）：长句里的同一个词是行文的一部分，
+    # 「quality of life」在叙述句里写「生活水平」并不算错，全族强求会报 189 条
+    # 噪音；标签才是名词即全部语义、必须与界面统一的地方。
+    # 专名（Captain Bean 之类）登记在 src/data/terms/allow_<lang>.txt。
+    allow = _allow_ids(lang)
+    enforce = _enforce_keys(lang)
+    seen_term = set()
+    for key, word, val in load_terms(lang):
+        if enforce is None or key not in enforce:
+            continue
+        rx = re.compile(r"\b%s\b" % re.escape(word), re.I)
+        for k, v in tr.items():
+            if k in KEEP or k in seen_term or k in allow:
+                continue
+            if len(str(v)) > 24:
+                continue
+            src = en.get(k) or ""
+            if rx.search(src) and val not in str(v):
+                seen_term.add(k)
+                W.append((k, "术语未用「%s」" % val,
+                          "原文含 %s：%s" % (word, str(v)[:50])))
 
     # 语言层：只挂在对得上判据的语言上；缺分析器时各函数自己静默跳过
     if lang == "ko":

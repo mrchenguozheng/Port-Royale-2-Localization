@@ -1375,7 +1375,7 @@
 "0xf4558653" = "Marineros (total)"
 "0xf46a87ef" = "Volver"
 "0xf4b112c8" = "Salir del juego"
-"0xf4b68a6b" = "¡Enhorabuena! Has completado con éxito el escenario y has capturado varias ciudades inglesas en nombre de Holanda.<n><n>Puedes capturar ciudades del mismo modo en el modo de juego libre. Pero recuerda asegurarte de que la nación cuyas ciudades quieres capturar sea militarmente débil. Además, la nación para la que quieres capturar ciudades también debe ser militarmente débil, y las dos naciones en cuestión deben estar en guerra.<n><n>Nota: normalmente se te recompensa con un terreno en el que puedes construir tus propias ciudades cuando capturas ciudades para un virrey. Sin embargo, esta función está desactivada en este escenario."
+"0xf4b68a6b" = "¡Enhorabuena! Has completado con éxito el escenario y has capturado varias ciudades inglesas en nombre de Holanda.<n><n>Puedes capturar ciudades del mismo modo en el modo de juego libre. Pero recuerda asegurarte de que la nación cuyas ciudades quieres capturar sea militarmente débil. Además, la nación para la que quieres capturar ciudades debe ser militarmente fuerte, y las dos naciones en cuestión deben estar en guerra.<n><n>Nota: normalmente se te recompensa con un terreno en el que puedes construir tus propias ciudades cuando capturas ciudades para un virrey. Sin embargo, esta función está desactivada en este escenario."
 "0xf4c07868" = "Has encontrado un pecio"
 "0xf4d00e3f" = "Pulsa una nueva tecla para cambiarla."
 "0xf4d42ef6" = "%1 barcos"

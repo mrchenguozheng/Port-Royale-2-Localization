@@ -189,10 +189,13 @@ def report(lang, rows, limit, level, text_only, show_all, update=False):
             if not show_all and len(kept) > 40:
                 f.write("… 其余 %d 条见 --all\n" % (len(kept) - 40))
     worst = fresh[0] if fresh else (kept[0] if kept else None)
-    print("%-3s 上限 %-2d（%s） 新增 %-3d 基线 %-3d 最长 %-3d%s%s → %s"
+    # 「全文最长」与「命中最长」必须分开印：rows[0] 是全表最长的段，往往是
+    # 技术串/单词（31 字），拿它和上限比毫无意义，却容易被读成「超限里最长 31」。
+    all_max = rows[0][1] if rows else 0
+    print("%-3s 上限 %-2d（%s） 新增 %-3d 基线 %-3d 命中最长 %-3d  全文最长 %-3d%s%s → %s"
           % (lang, limit, level, len(fresh), len(kept),
-             rows[0][1] if rows else 0,
-             (" " + worst[0] + " " + str(worst[1])) if worst else "",
+             worst[1] if worst else 0, all_max,
+             (" " + worst[0] + " ") if worst else "",
              "（已更新基线）" if update else "",
              os.path.relpath(path, ROOT)))
     return len(fresh) if level == "E" else 0
