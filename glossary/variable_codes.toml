@@ -10,7 +10,7 @@
 [meta]
 title = "PR2 文本变量码表"
 references_en = 770
-references_all = 5388
+references_all = 5382
 names = 67
 codes = 19
 confidence_legend = "confirmed / inferred / unknown"
@@ -150,8 +150,8 @@ display = "数值，按货币格式排版（是否带千分位/货币符未实�
 conf = "inferred"
 evidence = "85 处，只配 Gold/Price/Reward/StartGold/TotalPrice 等金钱类变量"
 refs_en = 85
-refs_all = 601
-names = ["FullPrice", "Gold", "GoldGoal", "GoldPerBarrel", "GoldReward", "PirateGold", "Price", "PriceBuy", "PriceSell", "Reward", "StartGold", "TotalPrice", "Wealth"]
+refs_all = 595
+names = ["FullPrice", "Gold", "GoldGoal", "GoldPerBarrel", "GoldReward", "Price", "PriceBuy", "PriceSell", "Reward", "StartGold", "TotalPrice", "Wealth"]
 
 [code.l]
 meaning = "位置（可嵌句）"
@@ -504,10 +504,10 @@ in_original = true
 
 [var.PirateGold]
 meaning = "海盗那边的金币（战利品分成）"
-codes = ["g"]
+codes = []
 refs_en = 0
-refs_all = 6
-example = "让一名拥有 20艘以上船只的海盗听你调遣，并且他至少要交给你 @g$PirateGold$ 的战利品分成。<n>不过要完成这项任务，你得先把其它任务全部完成。"
+refs_all = 0
+example = ""
 in_original = false
 note = "英文原文里没有这个引用，译自标识符行的补译（2004 竞赛文本）"
 

@@ -664,8 +664,8 @@ def main(argv):
     lines.append("# %s 机械复核（判据见 09 卷已落卷定则）\n" % lang)
     lines.append("E 级 %d 条，W 级 %d 条。\n" % (len(E), len(W)))
     if shadow:
-        lines.append("以基准版为占位／标识的名单条目 %d 条（版本差，正文取自零售版，"
-                     "不参与「等于英文」比对）：%s\n"
+        lines.append("以基准版为占位／标识的名单条目 %d 条（版本差：英文／法文两版"
+                     "都只有标识或空占位，不参与「等于英文」比对）：%s\n"
                      % (len(shadow), "、".join(shadow)))
     for tag, items in (("E", E), ("W", W)):
         shown = items if show_all else items[:40]
