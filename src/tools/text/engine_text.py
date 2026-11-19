@@ -42,7 +42,7 @@ sys.path.insert(0, HERE)
 ROOT = os.path.dirname(os.path.dirname(TOOLS))
 OUT_DIR = os.path.join(ROOT, "build", "preview", "engine_text")
 
-from text import lang_rules, marks, toml_io  # noqa: E402
+from text import entries, lang_rules, marks, toml_io  # noqa: E402
 from text.lang_rules import spec as specs  # noqa: E402
 
 def header(lang):
@@ -70,6 +70,8 @@ def build_full(lang, doc, order=None):
     marks_n = sum(1 for h in order if plain.get(h) != doc.get(h))
     out, stats, seg = specs.build_texts(lang_rules.get_spec(lang), plain, order)
     stats["marks"] = marks_n
+    stats["kinds"] = entries.tally([(h, plain[h]) for h in order if plain.get(h)],
+                                   entries.verse_ids())
     return out, stats, seg
 
 
@@ -112,6 +114,9 @@ def main():
               "分词器 %s" % (
                   len(order), stats.get("marks", 0), stats["punct"], stats["conj"],
                   stats["name"], stats["space"], seg or "无（机械兜底）"))
+        kinds = stats.get("kinds") or {}
+        if kinds:
+            print("分类：" + "｜".join("%s %d" % (k, n) for k, n in kinds.items()))
 
     if a.check:
         old = toml_io.read_doc_loose(out_path(a.lang))

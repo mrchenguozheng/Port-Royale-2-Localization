@@ -27,7 +27,7 @@ sys.path.insert(0, TOOLS)
 sys.path.insert(0, HERE)
 ROOT = os.path.dirname(os.path.dirname(TOOLS))
 
-from text import lang_rules, marks, toml_io, zh_space  # noqa: E402
+from text import entries, lang_rules, marks, toml_io, zh_space  # noqa: E402
 from text.lang_rules import spec as specs  # noqa: E402
 from text.lang_rules import zh as zh_rules  # noqa: E402
 
@@ -245,6 +245,13 @@ def main():
         raise SystemExit("没有分词器（spaCy），扫描没有意义")
     texts = [out[h] for h in order if out.get(h)]
     print("译文 %d 条\n" % len(texts))
+    kinds = entries.tally([(h, out[h]) for h in order if out.get(h)],
+                          entries.verse_ids())
+    print("分类：" + "｜".join("%s %d" % (k, n) for k, n in kinds.items()))
+    # 扫描只跑会被排版的那一类：无汉字与模板条目原样输出，
+    # 把它们算进分母只会稀释读数（它们永远 0 刀、0 坏断）。
+    texts = [t for t in texts if entries.kind(t) not in entries.UNTOUCHED]
+    print("（无汉字与模板条目不进排版，参与扫描 %d 条）\n" % len(texts))
     rows = sweep(texts, lookup, a.budgets)
     table(rows)
     if a.hist:

@@ -5,7 +5,7 @@ import re
 
 from . import base
 from . import spec as S
-from text import zh_pipeline, zh_space
+from text import entries, zh_pipeline, zh_space
 
 LANG = "zh"
 
@@ -21,7 +21,7 @@ ASCII = {",": "，", ";": "；", ":": "：", "!": "！", "?": "？", "(": "（",
 
 FMT, PUNCT_CHARS = base.make_fmt(PUNCT)
 
-CJK_RX = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
+CJK_RX = base.CJK_RX
 
 
 def normalize(text, date_format=False):
@@ -85,11 +85,12 @@ class ZhCompactSpacing(S.Spacing):
         return self.lookup
 
     def apply(self, text, ctx):
-        # 整条没有汉字 → 不是中文正文，一个空格都别动。
-        # 这些条目是算式与模板（`%1 %2  +  %3 …`：双空格是作者的对齐）、
-        # 字体名（`Tiepolo_black14x14aaFHk.res`）、英文人名（`Dirk Niestadtkötter`）、
-        # 字符集自检串——中文排版给它们插空格，等于把内容改坏。
-        if not CJK_RX.search(text):
+        # 无汉字与模板条目不进排版：算式 `%1 %2  +  %3` 的双空格是作者的
+        # 对齐，字体名 `Tiepolo_black14x14aaFHk.res` 插空格就废，
+        # `Dirk Niestadtkötter` 会被拆成 `Niestadtk ötter`。一个空格都别动。
+        # 短标签与名词短语照旧进排版：它们短、通常一刀都不用，但带变量时
+        # （「你还需要%1才能升到下一级」）能在变量前留一个断点，窄框里有用。
+        if entries.kind(text) in entries.UNTOUCHED:
             return text.strip()
         if ctx is None:
             return zh_space.fallback_wrap(text, step=self.max_chars)

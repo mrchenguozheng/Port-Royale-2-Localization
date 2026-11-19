@@ -31,6 +31,9 @@ def make_fmt(sets):
     return fmt, punct
 
 
+#: 汉字口径（CJK 统一表意文字 + 扩展 A）。分类、标点、排版都问这个正则。
+CJK_RX = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
+
 _ASCII_CACHE = {}
 
 #: 半角记号内部允许出现的字符：字母数字与 `., : / \ - _ +`。
