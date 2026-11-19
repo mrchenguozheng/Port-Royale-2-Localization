@@ -11,3 +11,14 @@
 0xf725f230	零售这段与基准不是同一段教程，且 Cartagena 出现两次、无法交代现值那处标注，不导
 0x00bff5f3	零售只写一次 Cartagena（建两个织机那句没写），承载不了现值的三处标注，不导
 0x353cae5f	零售只写两处 Port Royale（其中一处是 Port Royale 2），承载不了现值的三处标注，不导
+
+# 第二类：零售的标点/引号不合西语规范，或漏了整句；现值已按 en/fr 精修。
+# 这几行不进 hold 会被下一次 --write 用零售版盖回去（实测盖掉过一轮）。
+0xd07dbe34	零售这行的引号是半角起、弯引号收（“auge”），现值已统一成对弯引号，不导
+0xd4cd0f44	零售这行的引号半角，且 “Trinidad” 后多一个空格；现值已修并补了葡语引语的 ¡，不导
+0xd4cd0fb6	零售这行两处 Bermuda 三角都用半角引号，现值统一弯引号，不导
+0x08e78a8c	零售这行 “Recesión” 是半角起、弯引号收，现值已统一，不导
+0xeb1ce06f	零售这行自加了一句 en 没有的话，creyó 写成 creó、educamente 写成 educadamente；现值已按 en/fr 整句重写，不导
+0xd9720472	零售末句 “Te pagaré @g$Reward$!” 缺 ¡，现值已补，不导
+0xddbd4de4	零售第二句 “La fiesta… empezará hoy mismo!” 缺 ¡，现值已补，不导
+0x03d3dcd8	零售漏了 “Estaba en la cocina en ese momento.” 整句，且引号半角、“¡Lo juro!” 大写；现值已按 en/fr 补句改写，不导
