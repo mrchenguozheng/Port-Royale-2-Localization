@@ -225,6 +225,17 @@ def jong(ch):
     return None
 
 
+def _kiwi():
+    """Kiwi 实例（缺包返回 None）。与 ko_checks 共用，避免重复加载模型。"""
+    if not _KIWI:
+        try:
+            from kiwipiepy import Kiwi
+        except Exception:
+            return None
+        _KIWI.append(Kiwi())
+    return _KIWI[0]
+
+
 def ko_checks(tr, W):
     """韩语：占位符后接助词（必改）+ 助词收音一致性（需 Kiwi，缺包自动跳过）。"""
     for k, v in tr.items():
@@ -237,13 +248,9 @@ def ko_checks(tr, W):
             W.append((k, "占位符后接助词",
                       "%s（替换值末音节未知；改写句式或写并列形）" % m.group(0)))
 
-    if not _KIWI:
-        try:
-            from kiwipiepy import Kiwi
-        except Exception:
-            return
-        _KIWI.append(Kiwi())
-    kiwi = _KIWI[0]
+    kiwi = _kiwi()
+    if kiwi is None:
+        return
     for k, v in tr.items():
         if k in KEEP or not v:
             continue
@@ -261,6 +268,80 @@ def ko_checks(tr, W):
             want = pair[0] if has else pair[1]
             if t.form != want:
                 W.append((k, "助词收音", "%s 应为 %s%s" % (prev.form + t.form, prev.form, want)))
+
+
+#: 韩语量词（只认由数词位引导、且是独立词元的那些；正则子串会把
+#: 「대출」「대륙」「대신」里的「대」算成量词，616 处命中里 520 处是这种）。
+KO_COUNTERS = {"개", "척", "통", "명", "대", "병", "자루", "상자", "채", "장", "권", "마리"}
+#: 量词检查只掩码**占位符**；标签 `<t>` 一律抹成空格。用 `PH_ANY` 连标签一起
+#: 掩成 ○，`<t>배` 会被当成「数词 + 배」（0x2ca2d7bd 就是这么误报的）。
+KO_UNIT_PH = re.compile(r"@[a-zA-Z]\$[^$]*\$|%[0-9]+")
+KO_UNIT_TAG = re.compile(r"<[^>]*>")
+#: 必须带量词的可数名词 → 该用的量词。**只列白名单里的名词**：
+#: 黑名单（「量词后面不是这些就报」）会把 `%1 대연회`（大宴会，不是「两台」）
+#: 、`럼주 한 병 시켜`（一瓶朗姆酒，병 是量词但后面接动词）全判成错。
+KO_REQUIRE = {"배": "척", "선박": "척", "함": "척", "배들": "척",
+              "선원": "명", "병사": "명", "정착민": "명", "주민": "명",
+              "사람": "명", "용병": "명",
+              "물자": "통", "화물": "통", "곡물": "통", "목재": "통",
+              "의류": "통", "상품": "통", "물품": "통",
+              "상자": "개", "포": "대", "대포": "대"}
+#: 白名单里**故意不收** `선장`：英文 `Captain %1 assembles…` 里的 %1 是船长名字，
+#: 韩语照「이름 + 직함」写 `%1 선장이` 是合规的（存量 2 条正是这种，曾被判成
+#: 「缺 명」）。只有确实表示人数时才该有量词，而那时 %1 也不跟在 선장 后面。
+
+
+def ko_unit_checks(tr):
+    """韩语：数量词位的量词缺失与搭配错（E 级）。
+
+    只做两件机械判据（数词、量词必须都是 Kiwi 的独立词元，子串不算）：
+
+      1. 缺量词：`%1 배` / `3 척` 里的数词位后直接是白名单名词，中间没量词 ——
+         `%1 배` 会渲成「10 배」。
+      2. 搭配错：数词 + 量词 + 名词，但名词要的不是这个量词 ——
+         `5척의 병사`（兵用 척）、`3개의 배`（船用 개）。
+
+    数词位只认**占位符与阿拉伯数字**。固有数词（한/두/여러）不进判据：
+    `두 배로 늘었`（翻倍）、`한 사람`（一个人）、`여러 배`（好几倍）在韩语里
+    本来就是词，不是「两艘船」；把衬词当数词会先在库存里刷出 5 条误报。
+    标签按段切开再分词，否则 `물자:<t>%2<n>대포:<t>%3` 会把 %2 与下一行的
+    대포 拼成「N 대포」（0xd23b7fdf 两条就是这么误报的）。
+    存量 3090 条实测 0 命中：数词位 1973 处里 112 处带量词，其余紧跟的都是
+    助词（의 66 / 이 57 / 을 42 / 에서 38 …）。这两条是给后续批次设的栅栏。
+    """
+    kiwi = _kiwi()
+    if kiwi is None:
+        return []
+    out = []
+    for k, v in tr.items():
+        if k in KEEP or not v:
+            continue
+        # 按标签切段：`물자:<t>%2<n>대포:<t>%3` 这种损失清单是「标签 + 数字」，
+        # 整段一起分词会让 %2 与下一行的「대포」相邻，误判成「N 대포」缺量词。
+        for seg in KO_UNIT_TAG.split(KO_UNIT_PH.sub(FILLER, v)):
+            toks = kiwi.tokenize(seg)
+            for i, t in enumerate(toks):
+                is_num = t.form == FILLER or t.tag == "SN"
+                if not is_num or i + 1 >= len(toks):
+                    continue
+                nxt = toks[i + 1]
+                want = KO_REQUIRE.get(nxt.form)
+                if want is not None:                      # 数词 + 裸名词
+                    out.append((k, "缺量词", "%s（应带 %s）" % (t.form + nxt.form, want)))
+                    continue
+                if nxt.form not in KO_COUNTERS:           # 数词 + 助词/动词，没有量词可比
+                    continue
+                j = i + 2
+                while j < len(toks) and toks[j].form == "의":   # `3척의 배`
+                    j += 1
+                if j >= len(toks):
+                    continue
+                noun = toks[j].form
+                need = KO_REQUIRE.get(noun)
+                if need is not None and need != nxt.form:
+                    out.append((k, "量词搭配错",
+                                "%s（%s 用 %s）" % (t.form + nxt.form + noun, noun, need)))
+    return out
 
 
 JA_POLITE = {"ます", "です", "ました", "でした", "ません", "ましょう", "ください",
@@ -497,6 +578,7 @@ def main(argv):
     # 语言层：只挂在对得上判据的语言上；缺分析器时各函数自己静默跳过
     if lang == "ko":
         ko_checks(tr, W)
+        E.extend(ko_unit_checks(tr))
     elif lang == "ja":
         ja_checks(tr, W)
         E.extend(ja_unit_checks(tr))

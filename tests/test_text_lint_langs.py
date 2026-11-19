@@ -110,5 +110,35 @@ class TestJaSpeechLevel(unittest.TestCase):
         self.assertEqual(W, [])
 
 
+class TestKoUnit(unittest.TestCase):
+    """韩语量词：缺量词 / 搭配错（都要 Kiwi 词元，子串不算）。"""
+
+    @unittest.skipUnless(HAS_KIWI, "需要 kiwipiepy")
+    def test_bare_noun_after_number_is_reported(self):
+        out = TL.ko_unit_checks({"0x00000011": "@a$Amount$ 배를 확보하십시오."})
+        self.assertEqual([o[1] for o in out], ["缺量词"])
+
+    @unittest.skipUnless(HAS_KIWI, "需要 kiwipiepy")
+    def test_counter_with_right_noun_is_silent(self):
+        out = TL.ko_unit_checks({"0x00000012": "@a$Amount$척의 배를 확보하십시오."})
+        self.assertEqual(out, [])
+
+    @unittest.skipUnless(HAS_KIWI, "需要 kiwipiepy")
+    def test_wrong_counter_for_noun_is_reported(self):
+        out = TL.ko_unit_checks({"0x00000013": "5척의 병사를 보내십시오."})
+        self.assertEqual([o[1] for o in out], ["量词搭配错"])
+
+    @unittest.skipUnless(HAS_KIWI, "需要 kiwipiepy")
+    def test_word_internal_char_is_not_a_counter(self):
+        # 「%1 병력」「%1 대연회」「럼주 한 병」里的字不是量词用法，不能报
+        for v in ("%1 병력 요청", "%1 대연회", "럼주 한 병 시켜 주십시오."):
+            self.assertEqual(TL.ko_unit_checks({"0x00000014": v}), [], v)
+
+    @unittest.skipUnless(HAS_KIWI, "需要 kiwipiepy")
+    def test_particle_after_counter_is_skipped(self):
+        # 「3척의 배」的量词后隔一个 의 再是名词，仍算搭配正确
+        self.assertEqual(TL.ko_unit_checks({"0x00000015": "배 두 척은 항구에 있습니다."}), [])
+
+
 if __name__ == "__main__":
     unittest.main()
