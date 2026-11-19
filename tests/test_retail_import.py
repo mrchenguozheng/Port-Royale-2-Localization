@@ -1,5 +1,6 @@
 """零售参照导入：承标注规则与落盘行为。"""
 
+import io
 import os
 import shutil
 import sys
@@ -155,12 +156,31 @@ class TestRepair(unittest.TestCase):
         fixed, _ = RI.repair_tags(base, out)
         self.assertEqual(fixed, base)
 
-    def test_unknown_font_tag_is_not_guessed(self):
-        base = "<n:25>Texto largo."
-        out = "Texto largo."
+    def test_parameterized_break_is_restored_from_base(self):
+        """`<n:25>` 也是换行标签：个数跟基准一样，参数照抄基准那一个，不自己编。"""
+        base = "<n:25>Texto largo y tendido."
+        out = "Texto largo y tendido."
         fixed, why = RI.repair_tags(base, out)
-        self.assertIsNone(fixed)
-        self.assertIn("<n:25>", why)
+        self.assertIsNotNone(fixed)
+        self.assertEqual(fixed.count("<n:25>"), 1)
+        self.assertIn("补 <n:25> 1", why)
+
+    def test_parameterized_break_is_removed_when_base_has_none(self):
+        """基准没有 `<n:25>`、零售有：按个数删掉，不留多出来的段标记。"""
+        base = "Texto largo y tendido."
+        out = "Texto largo<n:25>y tendido."
+        fixed, why = RI.repair_tags(base, out)
+        self.assertNotIn("<n:25>", fixed)
+        self.assertIn("删 <n:25> 1", why)
+
+    def test_pair_deficit_break_goes_to_a_clause_not_mid_word(self):
+        """一行一句、没有句末标点：退到逗号分句处，不能在词中间断。"""
+        base = ("Ahora, localiza la ciudad y envía tu convoy allí.<n>"
+                "La campaña termina al llegar.")
+        out = "Ahora, localiza la ciudad y envía tu convoy allí."
+        fixed, _ = RI.repair_tags(base, out)
+        self.assertEqual(fixed.count("<n>"), 1)
+        self.assertRegex(fixed, r",<n>")
 
     def test_percent_column_is_normalized(self):
         """零售把「`%2` 制表 `%3%`」写成「`%2` 空格 `(%3%)`」，按基准还原。"""
@@ -356,11 +376,12 @@ class TestCleanText(unittest.TestCase):
         self.assertEqual(out, "¡Hola!")
         self.assertIn("去多余句号 1", notes)
 
-    def test_big_paragraph_gap_is_left_for_the_list(self):
-        """一次差 8 个 `<n>` 说明段落分法本身不同，清洁版不动它。"""
+    def test_big_paragraph_gap_is_aligned_to_base_count(self):
+        """`<n>` 个数必须与基准一致：多 8 个也照删，接缝留空格（内容不动）。"""
         text = "Uno.<n><n>Dos.<n><n>Tres.<n><n>Cuatro.<n><n>Cinco."
-        out, _ = RI.clean_text("es", "One paragraph.", text)
-        self.assertEqual(out.count("<n>"), 8)
+        out, notes = RI.clean_text("es", "One paragraph.", text)
+        self.assertEqual(out.count("<n>"), 0)
+        self.assertIn("删 <n> 8", "、".join(notes))
 
     def test_small_paragraph_gap_is_filled(self):
         base = ("Selecciona el barco que quieres controlar.<n><n>"
@@ -413,6 +434,15 @@ class TestCleanRef(unittest.TestCase):
         self.assertTrue(path.replace("\\", "/").endswith("build/ref/retail_clean/es.retail-1.0.0.toml"))
         old, _ = TI.read_doc(os.path.join(self.src, "orig", "es.retail-1.0.0.toml"))
         self.assertEqual(old, self.ref)
+
+    def test_held_row_keeps_structure_aligned_but_is_not_cleaned(self):
+        """hold 行不导入，但清洁版里结构仍要对齐基准；标点空白不动。"""
+        os.makedirs(os.path.join(self.src, "data", "qa", "retail_hold"), exist_ok=True)
+        io.open(os.path.join(self.src, "data", "qa", "retail_hold", "es.txt"),
+                "w", encoding="utf-8").write("0xa3\t人工判定\n")
+        out, _, _, issues, _ = RI.clean_ref("es", "es.retail-1.0.0")
+        self.assertEqual(out["0xa3"], self.ref["0xa3"])       # 没补 `¡`
+        self.assertTrue([i for i in issues if i[0] == "0xa3" and "在 hold 名单" in i[1]])
 
     def test_build_accepts_the_cleaned_doc_in_memory(self):
         out, _, _, _, _ = RI.clean_ref("es", "es.retail-1.0.0")

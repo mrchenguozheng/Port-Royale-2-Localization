@@ -173,7 +173,9 @@ def carried(cur, ref, resolve):
 
 TAG_RX = re.compile(r"<[^<>]{1,60}>")
 TOK_RX = re.compile(r"%[0-9]+|@[A-Z]\$[A-Za-z0-9_$]+\$")
-RUN_RX = re.compile(r"(?:<n>)+")
+RUN_RX = re.compile(r"(?:<n(?::[^<>]*)?>)+")
+#: 换行标签的两个形态：`<n>` 与带参数的 `<n:25>`。两者都是结构，个数都要跟基准一样。
+NL_RX = re.compile(r"<n(?::[^<>]*)?>")
 SENT_END_RX = re.compile(r"[.!?:»”\"](?=\s|<|$)")
 
 
@@ -187,38 +189,61 @@ def _segments(text):
     return [(a, b, text[a:b]) for a, b in segs]
 
 
+def _pick_break(text):
+    """挑一个不拆句、不贴已有换行堆的切点；实在没有就退到行末。
+
+    顺序：最长的段里的句末（两侧都还有 6 个字）→ 任一段的句末（两侧都还有字）→
+    任一段的分句处（逗号／分号／冒号后）→ 行末。越往后位置越像「推定」，报告会写出来。
+    """
+    segs = sorted(_segments(text), key=lambda s: -len(s[2]))
+    for sloppy in (False, True):
+        for a, b, seg in segs:
+            ends = [a + m.end() for m in SENT_END_RX.finditer(seg)]
+            cands = [p for p in ends
+                     if p - a > (0 if sloppy else 6) and b - p > (0 if sloppy else 6)]
+            if cands:
+                mid = a + len(seg) / 2
+                return min(cands, key=lambda p: abs(p - mid))
+    for a, b, seg in segs:
+        clauses = [a + m.end() for m in re.finditer(r"[,;](?=\s)", seg)]
+        if clauses:
+            mid = a + len(seg) / 2
+            return min(clauses, key=lambda p: abs(p - mid))
+    return None
+
+
 def _insert_n(text, k, unit="<n>"):
-    """在最长的段里按句末插入 k 个换行单元——不拆句，也不贴着已有的换行堆。"""
+    """插入 k 个换行单元。个数必须与基准一致；切点按 `_pick_break` 挑，挑不到就挂到行末。
+
+    拆句中段最难看（`0x2efebfe6` 一行一句话），所以宁可多一个空段也不在词中间断。
+    """
     for _ in range(k):
-        segs = _segments(text)
-        a, b, seg = max(segs, key=lambda s: len(s[2]))
-        ends = [a + m.end() for m in SENT_END_RX.finditer(seg)]
-        mid = a + len(seg) / 2
-        cands = [p for p in ends if p - a > 6 and b - p > 6]
-        if not cands:
-            return text
-        pos = min(cands, key=lambda p: abs(p - mid))
-        text = text[:pos] + unit + text[pos:].lstrip(" ")
+        pos = _pick_break(text)
+        if pos is None:
+            text = text.rstrip(" ") + unit
+        else:
+            text = text[:pos] + unit + text[pos:].lstrip(" ")
     return text
 
 
-def _strip_n(text, k):
-    """删 k 个 `<n>`：从最长段前面那个换行串里删，接缝处留一个空格。"""
+def _strip_n(text, k, unit="<n>"):
+    """删 k 个指定换行标签：从它后面那段最长的地方删，接缝处留一个空格。"""
     for _ in range(k):
-        runs = list(RUN_RX.finditer(text))
-        if not runs:
+        hits = list(re.finditer(re.escape(unit), text))
+        if not hits:
             return text
-        segs = _segments(text)
-        starts = [m.start() for m in runs]
-        after = [(starts[i], len(segs[i + 1][2])) for i in range(len(starts))]
-        pos, _ = max(after, key=lambda x: x[1])
-        head = text[:pos].rstrip(" ")
-        tail = text[pos + 3:].lstrip(" ")
+        best, best_len = None, -1
+        for m in hits:
+            nxt = NL_RX.search(text, m.end())
+            seg = text[m.end():nxt.start() if nxt else len(text)]
+            if len(seg) > best_len:
+                best, best_len = m, len(seg)
+        head = text[:best.start()].rstrip(" ")
+        tail = text[best.end():].lstrip(" ")
         sep = "" if (not head or not tail
                      or tail.startswith(("<", ",", ".", ";", ":", "!", "?"))) else " "
         text = head + sep + tail
     return text
-
 
 def _nth_occurrence(text, tag, n):
     """`tag` 在 `text` 里的第 n 个（从 1 起）起点；不够就 -1。"""
@@ -284,14 +309,15 @@ def _pct_columns(base, out):
     return PCT_PAREN_RX.sub(repl, out), fixed[0]
 
 
-def structural_fix(base, text, n_slack=None):
-    """按基准对齐结构：百分列、`<t>` 项目符号、`<n>` 段落数。只排队，不判对错。
+def structural_fix(base, text):
+    """按基准对齐结构：百分列、`<t>` 项目符号、换行标签个数。只排队，不判对错。
 
     拆出来给两个出口共用：`repair_tags`（导入前就地修，修不动就整行放弃）与
     `clean_text`（生产「小修小补的参考」，修不动的部分照抄，把剩下的推进清单）。
 
-    `n_slack` 给了就限制 `<n>` 的差额：清洁版只做小修小补，一次要删/补超过这么多
-    `<n>` 说明段落分法本身就不是小差，留给清单（`0xd4cd0f43` 一次多 8 个）。
+    换行标签**个数必须与基准一致**，`<n>` 与带参数的 `<n:25>` 各自按类算：少就补
+    （切点按段内句末推定，推不动退到段中点的词边界），多就删（删后面最长的那段）。
+    参数值照抄基准里那一个，不自己编。
     """
     out, notes = text, []
     out, cols = _pct_columns(base, out)
@@ -309,17 +335,25 @@ def structural_fix(base, text, n_slack=None):
             fixed += more
         if fixed:
             notes.append("补 <t> %d" % fixed)
-    delta = base.count("<n>") - out.count("<n>")
-    if n_slack is not None and abs(delta) > n_slack:
-        return out, notes
-    if delta > 0:
-        out = _insert_n(out, delta // 2, "<n><n>")   # 差额成对时补一整个段落
-        if delta % 2:
-            out = _insert_n(out, 1)
-        notes.append("补 <n> %d" % delta)
-    elif delta < 0:
-        out = _strip_n(out, -delta)
-        notes.append("删 <n> %d" % -delta)
+    for unit in sorted(set(NL_RX.findall(base)) | set(NL_RX.findall(out))):
+        want, got = base.count(unit), out.count(unit)
+        if want > got:
+            if unit == "<n>":
+                # 差额成对时补一整个段落 `<n><n>`，零头再补单个。
+                out = _insert_n(out, (want - got) // 2, "<n><n>")
+                if (want - got) % 2:
+                    out = _insert_n(out, 1)
+            else:
+                out = _insert_n(out, want - got, unit)
+            left = want - out.count(unit)
+            notes.append("补 %s %d%s" % (unit, want - got,
+                                         "" if not left else "（%d 个没找到切点）" % left))
+        elif want < got:
+            out = _strip_n(out, got - want, unit)
+            left = out.count(unit) - want
+            notes.append("删 %s %d%s" % (unit, got - want,
+                                         "" if not left else "（还剩 %d 个）" % left))
+    return out, notes
     return out, notes
 
 
@@ -348,8 +382,6 @@ def repair_tags(base, text):
 INVERTED_LANGS = ("es",)
 #: 想吃掉的空白只有这一种：两个以上普通空格。制表位是 `<t>`，不是空格。
 SQUEEZE_RX = re.compile(r"  +")
-#: 清洁版里 `<n>` 一次只调这么多个：超过就是段落分法本身不同，不是「小差」。
-N_SLACK = 2
 
 
 def _fill_inverted(text, lang):
@@ -421,7 +453,7 @@ def clean_text(lang, base, text):
         squeezed = SQUEEZE_RX.sub(" ", out)
         if squeezed != out:
             out, notes = squeezed, notes + ["压连续空格"]
-    out, seg = structural_fix(base, out, n_slack=N_SLACK)
+    out, seg = structural_fix(base, out)
     notes.extend(seg)
     # `!.`／`?.`：问号感叹号后面多跟一个句号，零售里写成「.!」的地方不少。
     deduped, dup = re.subn(r"([!?])\.(?=\s|$|<)", r"\1", out)
@@ -482,12 +514,27 @@ def clean_ref(lang, ref_name):
     en = load(T.lang_path(T.BASE_LANG))
     doc, order = TI.read_doc(resolve_path(ref_name))
     known = lexicon(lang)
+    keep = set(T.keep_as_is(lang))
+    hold = load_hold(lang)
     out, changed, issues = {}, [], []
     for hid, val in doc.items():
         if not isinstance(val, str):
             out[hid] = val
             continue
         base = str(en.get(hid, "") or "")
+        # 不译名单里的行（版权声明之类）本来就该与英文一字不差，别拿词典去判它。
+        if hid in keep:
+            out[hid] = val
+            continue
+        if hid.lower() in hold:
+            # hold 行不会被导入，但结构仍要对齐基准：个数不一致的参照本身就不该留在盘上。
+            fixed, seg = structural_fix(base, val) if base else (val, [])
+            out[hid] = fixed
+            if fixed != val:
+                changed.append((hid, "、".join(seg), _diff_snip(val, fixed)))
+            issues.append((hid, "在 hold 名单（%s），只对齐结构、未清洁标点空白"
+                           % hold[hid.lower()]))
+            continue
         # 混进别的语言的行不清洁：给它补本语言的标点只会更乱（es 的 `0xd3481944` 是德语原文）。
         foreign = foreign_words(val, known)
         if foreign:
