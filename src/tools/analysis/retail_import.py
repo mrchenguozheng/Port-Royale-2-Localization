@@ -800,6 +800,15 @@ def render(lang, ref_name, mapping, why, stats, repairs=(), cover=None):
     return "\n".join(lines) + "\n"
 
 
+def is_clean_ref(ref):
+    """参照是不是「清洁版」（`--clean-ref` 的产物，落在 build/ref/retail_clean/）。
+
+    工具链的顺序是原始零售 → 清洁版 → 拿清洁版当参照落盘；直接写原始零售会把它的
+    原始标点一起落盘，所以 `--write` 时对这一点给一句提醒。
+    """
+    return "retail_clean" in str(ref).replace("\\", "/")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="把零售版参照导入译文（含承标注）")
     ap.add_argument("--lang", required=True)
@@ -815,6 +824,12 @@ def main(argv=None):
     ap.add_argument("--dump", default="", help="同时把映射写成 json")
     ap.add_argument("--out", default="", help="报告路径，默认 build\\qa\\retail_import_<lang>.txt")
     args = ap.parse_args(argv)
+
+    if args.write and not args.clean_ref and not is_clean_ref(args.ref):
+        print("！--write 用的参照未经清洁（%s）。" % args.ref)
+        print("  正确顺序：原始零售 → --clean-ref 生成清洁版 → 用 "
+              "build/ref/retail_clean/<同名>.toml 做 --ref 再 --write。")
+        print("  直接写原始零售会把它的原始标点、空白一并落盘。")
 
     ref_doc = None
     if args.clean_ref:

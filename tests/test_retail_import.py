@@ -6,6 +6,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -486,6 +487,21 @@ class TestCleanRef(unittest.TestCase):
         self.assertEqual(mapping["0xa3"], "¡Adiós!")
         # 清洁版不补令牌：缺 `%1` 的那条照样被 `apply` 拦下。
         self.assertEqual(len(T.apply_map("es", mapping, dry_run=True)["tokens"]), 1)
+
+    def test_clean_ref_is_recognised_by_path(self):
+        """落盘只该认清洁版；原始零售路径必须被识别成「未清洁」。"""
+        self.assertTrue(RI.is_clean_ref("build\\ref\\retail_clean\\es.retail-1.0.0.toml"))
+        self.assertTrue(RI.is_clean_ref("build/ref/retail_clean/es.retail-1.0.0.toml"))
+        self.assertFalse(RI.is_clean_ref("es.retail-1.0.0"))
+        self.assertFalse(RI.is_clean_ref("src\\orig\\es.retail-1.0.0.toml"))
+
+    def test_write_on_raw_retail_warns_about_the_order(self):
+        """拿原始零售直接 --write 要提醒先过清洁版，否则原始标点会一起落盘。"""
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            RI.main(["--lang", "es", "--ref", "es.retail-1.0.0", "--write",
+                     "--out", os.path.join(self.src, "qa", "r.txt")])
+        self.assertIn("未经清洁", buf.getvalue())
 
 
 if __name__ == "__main__":
