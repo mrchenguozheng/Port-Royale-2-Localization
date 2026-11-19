@@ -59,7 +59,8 @@ src/tools/
 | `pack/pack_tags.py` | 语言包身份标记的唯一词表 |
 | `pack/check_breaks.py` | 编译后核对译文与原文的换行（`<n>`）数量 |
 | `pack/apply_patch.py` | 开发流程：校验 → 编译 → 部署到游戏目录一条命令（`apply_patch.ps1` 调它） |
-| `pack/new_lang.py` | 命令行新建语言 |
+| `pack/new_lang.py` | 命令行新建语言（只复制译文文件） |
+| `pack/lang_add.py` | 加一门语言的骨架：译文/语言包/占位符/不译清单/语言规则/字体映射/断行跳过/两处 README，并实测原版字形覆盖 |
 
 ## 文本与规则
 
@@ -127,6 +128,7 @@ src/tools/
 |---|---|
 | `font/make_noto_fonts.py` | 生成 Noto 替换字体（字体只做映射，不做裁剪） |
 | `font/build_cyr_fonts.py` | 俄语四个自建字体（正文 + 标题三档） |
+| `font/build_lat_fonts.py` | 拉丁扩展 A 语言（pl）的三个标题字体：正文原版够用，只换标题槽位 |
 | `font/squeeze_fonts.py` | TrueType（glyf）水平压缩，按原版度量调，供日文等宽字符用 |
 | `font/extract_fonts.py` | 从 `pr2_loca.cpr` 导出原版拉丁字体（只用于测度量） |
 

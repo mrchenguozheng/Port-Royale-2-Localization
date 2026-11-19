@@ -10,11 +10,13 @@
 * 半角→全角：没有 CJK 语境，不需要；
 * 目标文字判据：拉丁字母语言，`SCRIPT` 不声明，进度按「与英文原文不同」计。
 
-**未定项（字形）**：波兰语用九个拉丁扩展 A 字母（ą ć ę ł ń ó ś ź ż，另有大写）。
-原版拉丁字体只证明覆盖了西语、德语、法语的重音（Latin-1），这些字母多半不在里面。
-在实机确认之前 `font-map.ini` 的 `[pl]` 先回落根目录原版字体；如实测缺字形，
-按俄语那条路自建（`src/tools/font/build_cyr_fonts.py` 的同类做法），
-不要在这里做任何「按字符替换成近似拉丁字母」的妥协 —— 那是改译文迁就字体。
+**字形（已实测，不是推断）**：fontTools 读 `assets\fonts\original\` 的 cmap，
+正文 ARIAL 1186 个码位、波兰语 18 个字母全覆盖；三个标题体
+（ELGRECO_ / Tiepolo_black / Tiepolo_bold）只收 223 个字形，缺 ą ć ę ł ń ś ź ż
+及大写（ó 在 Latin-1 里反而有）。所以 `font-map.ini` 的 `[pl]` 正文回落原版、
+三个标题槽位指向 `build_lat_fonts.py` 生成的 `PR2PlDisplay-*.ttf`
+（Noto Serif 按原版 cap height / 平均 advance 缩放）。不要在任何地方做
+「按字符替换成近似拉丁字母」的妥协 —— 那是改译文迁就字体。
 """
 
 from . import spec as S

@@ -70,11 +70,19 @@ def build_fonts(langs, out_dir=None, mode="noto", log=None, cache=True):
 
     import make_noto_fonts
     import build_cyr_fonts
+    import build_lat_fonts
     for lang in langs:
         dst = os.path.join(out_dir or FONT_DIR, lang)
         if lang == "ru":
             log("生成俄语字体 %s …（正文 Liberation Sans，标题 Noto Serif 压缩）" % lang)
             ok, msg = build_cyr_fonts.build(dst, log=log)
+            if not ok:
+                return False, msg
+            continue
+        if lang in build_lat_fonts.LANGS:
+            # 正文原版 ARIAL 就够（拉丁扩展 A 全覆盖），只换三个标题槽位。
+            log("生成 %s 标题字体（Noto Serif 按原版 cap/avg 缩放）…" % lang)
+            ok, msg = build_lat_fonts.build(lang, dst, log=log)
             if not ok:
                 return False, msg
             continue
