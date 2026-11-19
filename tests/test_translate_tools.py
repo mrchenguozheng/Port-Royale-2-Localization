@@ -40,10 +40,20 @@ class TestIsTranslated(unittest.TestCase):
         rx = T.lang_rules.script_re("ko")
         self.assertFalse(T.is_translated("你好，世界", "ko", script=rx))
 
-    def test_japanese_needs_kana_not_kanji(self):
+    def test_japanese_accepts_kanji_labels(self):
+        # 日文界面标签常只写汉字不带假名（`資産`、`倉庫`、`不明`），只认假名会
+        # 把整批标签判成未译；换算时 ja 待译 560 条里 530 条就是这么来的。
         rx = T.lang_rules.script_re("ja")
         self.assertTrue(T.is_translated("こちらは港です", "ja", script=rx))
-        self.assertFalse(T.is_translated("这里是港口", "ja", script=rx))
+        self.assertTrue(T.is_translated("倉庫", "ja", base="Warehouse", script=rx))
+        # 但与英文原串一样、或整句照抄中文，仍然算未译。
+        self.assertFalse(T.is_translated("Warehouse", "ja", base="Warehouse", script=rx))
+        self.assertFalse(T.is_translated(
+            "这里是港口，船只可以停靠补给。", "ja", base="Here is the harbor.",
+            script=rx, avoid="这里是港口，船只可以停靠补给。"))
+        # 短标签中日同形是正常的（`人口`、`武器`），不该因此判待译。
+        self.assertTrue(T.is_translated(
+            "人口", "ja", base="Population", script=rx, avoid="人口"))
 
     def test_symbol_only_entry_counts_as_done(self):
         rx = T.lang_rules.script_re("ko")

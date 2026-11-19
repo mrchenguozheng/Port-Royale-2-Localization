@@ -316,6 +316,9 @@ STRUCT_RX = re.compile(r"\[[^\[\]]*\]|%[0-9A-Za-z]+|@[A-Za-z]\$[^$]*\$")
 #: 「有没有文字」按 Unicode 字母算，不只 ASCII —— 中文译文里全是汉字、
 #: 韩语里混进中文，都是「有文字但不是目标文字」，不能当成纯符号条目放过。
 LETTER_RX = re.compile(r"[^\W\d_]", re.UNICODE)
+#: 汉字块。日文里「資産」「倉庫」「不明」这类界面标签本来就只写汉字不带假名，
+#: 光看假名会把它们全判成未译（实测 ja 560 条待译里 530 条是这种）。
+CJK_RX = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]", re.UNICODE)
 
 #: 英文原值像个令牌：全大写、无空格、没有小写字母。`IDM_CONTEST_01_2004_*`
 #: 这一类在英文表里就是键名本身，中文表却是实文 —— `gaps` 专门抓这个。
@@ -330,7 +333,7 @@ def content_of(value):
     return STRUCT_RX.sub("", TAG_RX.sub("", value or ""))
 
 
-def is_translated(value, lang, base=None, script=None):
+def is_translated(value, lang, base=None, script=None, avoid=None):
     """这条值算不算「已译」。
 
     三个判定，按顺序：
@@ -344,12 +347,27 @@ def is_translated(value, lang, base=None, script=None):
        纯符号条目同样天然已译。
 
     `lang_rules.script_re()` 取第 1 条的正则，`base` 是英文原值（第 2 条用）。
+    `avoid` 是「不该跟它一样」的参照值（日文传中文值）：日文的界面标签常只写
+    汉字不带假名（`資産`、`倉庫`、`不明`），只认假名会把这些判成未译；所以汉字
+    也算日文，但要求既不等于英文原文、也不等于中文译文 —— 整句照抄中文仍然
+    判待译。
     """
     vis = content_of(value)
     if script is not None:
         if script.search(vis):
             return True
-        return not LETTER_RX.search(vis)
+        if not LETTER_RX.search(vis):
+            return True
+        if lang == "ja" and CJK_RX.search(vis):
+            if vis.strip() == content_of(base).strip():
+                return False
+            # 短标签（`人口`、`武器`、`注意`）中日同形本来就正常；
+            # 只有整句（>12 字）与中文一模一样才判成照抄。
+            if (avoid is not None and len(vis.strip()) > 12
+                    and vis.strip() == content_of(avoid).strip()):
+                return False
+            return True
+        return False
     if not LETTER_RX.search(vis):
         return True
     return vis.strip() != content_of(base).strip()
@@ -402,10 +420,12 @@ def pending_ids(es, field):
     """还待译的条目 id 列表（判据同 `is_translated`，扣掉有意不译的）。"""
     script = lang_rules.script_re(field)
     keep = keep_as_is(field)
+    avoid = "zh" if field == "ja" else None
     return [e["id"] for e in es
             if e["id"] not in keep
             and not is_translated(e.get(field, ""), field,
-                                  base=e.get(BASE_LANG, ""), script=script)]
+                                  base=e.get(BASE_LANG, ""), script=script,
+                                  avoid=e.get(avoid, "") if avoid else None)]
 
 
 def pending_of(es, field):
@@ -645,9 +665,11 @@ def apply_map(lang, mapping, dry_run=False):
             continue
         # 映射值必须是目标文字：韩语映射里写回英文，多半是抄错了行。
         # 例外是名单内条目 —— 它们的正确值本来就是英文，用来把译错的名字改回去。
+        # 日文的汉字标签（`資産`、`名前`）本身不带假名，走 `is_translated` 同一判据。
         vis = content_of(val)
         if (script is not None and hid not in keep_ids
-                and LETTER_RX.search(vis) and not script.search(vis)):
+                and LETTER_RX.search(vis)
+                and not (script.search(vis) or (lang == "ja" and CJK_RX.search(vis)))):
             bad_lang.append((hid, val))
             continue
         doc[hid] = val
