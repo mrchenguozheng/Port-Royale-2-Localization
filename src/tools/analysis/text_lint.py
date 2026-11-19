@@ -30,6 +30,7 @@ import os
 import re
 import sys
 import tomllib
+import unicodedata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
@@ -69,6 +70,32 @@ KEEP = set()
 #: 有意不译清单与术语表。两者都在 src/data 下，按语言分文件。
 KEEP_DIR = os.path.join(ROOT, "src", "data", "keep_as_is")
 TERMS_DIR = os.path.join(ROOT, "src", "data", "terms")
+
+#: 有格变化的语言：术语表里写原形，正文里是 `Konwój / Konwoje / Konwoju`、
+#: `Pirat / Piraci / Piratów` 这类同词异形。只按整串比对会把**译对了**的条目
+#: 全报成漂移（pl 实测 633 条），所以这几门语言改按词干比对：取值里每个词
+#: 的前 4 个折叠字母，各自要在译文里作为一个词的开头出现。
+STEM_LANGS = {"pl", "ru"}
+
+
+def _fold_word(w):
+    s = unicodedata.normalize("NFKD", w or "")
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return s.casefold()
+
+
+def term_hit(value, text, lang):
+    """术语是否落在译文里。整串命中直接算；屈折语再按词干比对一次。"""
+    if value in text:
+        return True
+    if lang not in STEM_LANGS:
+        return False
+    stems = [_fold_word(w)[:4] for w in re.findall(r"[^\W\d_]+", value)]
+    stems = [s for s in stems if s]
+    if not stems:
+        return False
+    words = [_fold_word(w) for w in re.findall(r"[^\W\d_]+", text or "")]
+    return all(any(w.startswith(s) for w in words) for s in stems)
 
 
 def load_keep(lang):
@@ -546,6 +573,10 @@ def load_lint_ok(lang):
 def main(argv):
     lang = "zh"
     show_all = "--all" in argv
+    # `--strict`：W 级也按失败处理，给 check.py 用。默认只按 E 级退出，
+    # 因为 W 里有「判据不该管的那类」，跑给人看时不该红；但**发行前**放过
+    # 一条 W 就等于放过了「诗谜缺谜底」「术语未落词」这类已经证实的欠账。
+    strict = "--strict" in argv
     if "--lang" in argv:
         lang = argv[argv.index("--lang") + 1]
     en = tomllib.load(open(EN, "rb"))
@@ -665,7 +696,7 @@ def main(argv):
             if len(str(v)) > 24:
                 continue
             src = en.get(k) or ""
-            if rx.search(src) and val not in str(v):
+            if rx.search(src) and not term_hit(val, str(v), lang):
                 seen_term.add(k)
                 W.append((k, "术语未用「%s」" % val,
                           "原文含 %s：%s" % (word, str(v)[:50])))
@@ -735,7 +766,9 @@ def main(argv):
     os.makedirs(os.path.dirname(out), exist_ok=True)
     io.open(out, "w", encoding="utf-8", newline="").write(text)
     print("报告：%s" % os.path.relpath(out, ROOT))
-    return 1 if E else 0
+    if E:
+        return 1
+    return 1 if (strict and W) else 0
 
 
 if __name__ == "__main__":

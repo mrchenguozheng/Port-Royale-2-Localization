@@ -56,7 +56,7 @@ class TestRiddleMarks(unittest.TestCase):
         shutil.rmtree(self.dir, ignore_errors=True)
 
     def test_metadata_is_copied_and_clue_checked(self):
-        out, problems, reps, total = RM.build(
+        out, problems, reps, total, _bd = RM.build(
             "pl", "ko", {"0x35f48f6c": "Daleko, porzucone"})
         self.assertEqual(problems, [])
         self.assertEqual((reps, total), (1, 2))
@@ -66,32 +66,32 @@ class TestRiddleMarks(unittest.TestCase):
         self.assertEqual(out["0x35f48f6d"], "[riddle:copy=0x35f48f6c]")
 
     def test_clue_word_must_appear_in_verse(self):
-        _out, problems, _r, _t = RM.build(
+        _out, problems, _r, _t, _bd = RM.build(
             "pl", "ko", {"0x35f48f6c": "Daleko, wyspa"})
         self.assertEqual(len(problems), 1)
         self.assertIn("wyspa", problems[0])
 
     def test_clue_is_case_sensitive(self):
         """谜面写的是 `Daleko`；给小写就找不到——大小写算不同的事。"""
-        _out, problems, _r, _t = RM.build(
+        _out, problems, _r, _t, _bd = RM.build(
             "pl", "ko", {"0x35f48f6c": "daleko"})
         self.assertEqual(len(problems), 1)
         self.assertIn("不在本语言谜面里", problems[0])
 
     def test_missing_clue_is_reported(self):
-        out, problems, _r, _t = RM.build("pl", "ko", {})
+        out, problems, _r, _t, _bd = RM.build("pl", "ko", {})
         self.assertIn("缺 clue", problems[0])
         self.assertNotIn("0x35f48f6c", out)
 
     def test_copy_must_point_at_a_representative(self):
         _write(self.ko, [("0x35f48f6c", REP_MARK + " 먼 곳에."),
                          ("0x35f48f6d", "[riddle:copy=0x35f48f6d]")])
-        _out, problems, _r, _t = RM.build("pl", "ko", {"0x35f48f6c": "Daleko"})
+        _out, problems, _r, _t, _bd = RM.build("pl", "ko", {"0x35f48f6c": "Daleko"})
         self.assertTrue(any("copy 指向自己" in p for p in problems))
 
     def test_unannotated_entry_is_reported(self):
         _write(self.ko, [("0x35f48f6c", REP_MARK + " 먼 곳에.")])
-        _out, problems, _r, _t = RM.build("pl", "ko", {"0x35f48f6c": "Daleko"})
+        _out, problems, _r, _t, _bd = RM.build("pl", "ko", {"0x35f48f6c": "Daleko"})
         self.assertTrue(any("无从搬" in p for p in problems))
 
 

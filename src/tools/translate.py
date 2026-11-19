@@ -1102,7 +1102,7 @@ def cmd_terms(args):
                 continue
             en = (e.get(BASE_LANG) or "")
             val = e.get(field) or ""
-            if not rx.search(en) or want in val:
+            if not rx.search(en) or L.term_hit(want, val, field):
                 continue
             if len(content_of(val)) < min_len:
                 continue

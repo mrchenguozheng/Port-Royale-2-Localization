@@ -74,6 +74,12 @@ def _clue_items(raw):
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 
+def body_conflict(target, vid, ref):
+    """本条正文与代表那条是否不同（不同就意味着写 copy 会覆盖掉一份已有译法）。"""
+    return (_body(str(target.get(vid, ""))).strip()
+            != _body(str(target.get(ref, ""))).strip())
+
+
 def build(lang, from_lang, clues):
     en = _load(EN)
     target = _load(TR % lang)
@@ -82,6 +88,7 @@ def build(lang, from_lang, clues):
     vids = sorted(TC.verse_ids(verse, en), key=lambda x: int(x, 16))
 
     problems, out, answer_ids, covered = [], {}, [], set()
+    body_diff = []          # 组内成员正文与代表不一致：写 copy 会把本条正文顶掉
     for vid in vids:
         marks = MARK.findall(str(donor.get(vid, "") or ""))
         if not marks:
@@ -126,6 +133,11 @@ def build(lang, from_lang, clues):
             problems.append("%s：copy 指向自己" % vid)
         elif ref not in answer_ids:
             problems.append("%s：copy 指向的 %s 不是带谜底的代表条目" % (vid, ref))
+        # `copy=` 说的是「本条没有自己的谜面，正文取代表那条」。本语言这条的正文
+        # 若与代表不同，落盘后就会被顶掉——那不是搬运，是覆盖一份已有的译法，
+        # 所以默认报错，逼人选：要么把这条算成代表（自己带谜底），要么统一正文。
+        elif body_conflict(target, vid, ref):
+            body_diff.append("%s → %s" % (vid, ref))
     by_id = {vid: out[vid] for vid in answer_ids if vid in out}
     for vid, mark in by_id.items():
         kv = _kv(_fields(mark))
@@ -140,7 +152,7 @@ def build(lang, from_lang, clues):
     for vid in vids:
         if vid not in covered:
             problems.append("%s：%s 里没有 [riddle:…]，无从搬" % (vid, from_lang))
-    return out, problems, len(answer_ids), len(vids)
+    return out, problems, len(answer_ids), len(vids), body_diff
 
 
 def main(argv=None):
@@ -151,6 +163,8 @@ def main(argv=None):
     ap.add_argument("--out", help="输出映射表（喂 translate.py apply --map）")
     ap.add_argument("--dump", action="store_true",
                     help="只把待写 clue 的条目列出来（含本语言谜面），不校验")
+    ap.add_argument("--strict", action="store_true",
+                    help="副本正文与代表不同就拒绝出表（默认只逐条列出并继续）")
     args = ap.parse_args(argv)
 
     en = _load(EN)
@@ -171,7 +185,16 @@ def main(argv=None):
     with open(args.clues, encoding="utf-8") as f:
         clues = json.load(f)
 
-    out, problems, reps, total = build(args.lang, args.from_lang, clues)
+    out, problems, reps, total, body_diff = build(args.lang, args.from_lang, clues)
+    if body_diff:
+        print("诗谜 %d 条副本的正文与代表不同（照写 copy 会用代表的正文覆盖本条）："
+              % len(body_diff))
+        for item in body_diff:
+            print("  " + item)
+        print("  —— 要保留本条自己的写法，就把该条升为代表（自己带谜底）；"
+              "要统一，就照出表。")
+        if args.strict:
+            return 1
     if problems:
         print("诗谜标注 %d 条没能生成：\n" % len(problems))
         for p in problems:

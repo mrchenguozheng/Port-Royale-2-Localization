@@ -103,7 +103,8 @@ src/tools/
 | `analysis/text_lint.py` | 译文定则的可重跑检查（E/W 分级；占位符-助词、并列助词次序、版本差豁免等） |
 | `analysis/keep_audit.py` | 「有意不译」清单对账：登记 id 存在、登记项没译过、结构性不可译的没占着待译 |
 | `analysis/ref_check.py` | 参照版健康检查：照抄前先报「这批参照哪几条自身是坏的」（令牌/标签个数不齐、疑似截断） |
-| `analysis/riddle_marks.py` | 诗谜标注搬运：从已核语言搬 `answer`／`group`／`level`／`certainty`／`source`，逐条核对本语言 `clue` 真的在谜面里 |
+| `analysis/riddle_marks.py` | 诗谜标注搬运：从已核语言搬 `answer`／`group`／`level`／`certainty`／`source`，逐条核对本语言 `clue` 真的在谜面里；副本正文与代表不同会逐条点名 |
+| `analysis/terms_seed.py` | 术语表取证起草：整行标签档直接成值，全库共现档按词干簇＋位置吻合＋密度比，不足只列候选（`--write` 落 `src/data/terms/<语言>.toml`） |
 | `analysis/line_run.py` | 断行复核：断完最长一段有没有超上限（逐语言报告 `build/qa/line_run_*.txt`） |
 | `analysis/lang_check.py` | 外语形态层：语法、拼写、复合词拆分（与 `text_lint` 分工：一个查形态，一个查定则） |
 | `analysis/progress.py` | 翻译进度：已译 / 原样保留 / 还没动 |
