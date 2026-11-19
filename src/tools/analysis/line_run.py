@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # coding: utf-8
-"""line_run.py —— 断行长度复核：断完之后，最长的一段有没有超过上限。
+r"""line_run.py —— 断行长度复核：断完之后，最长的一段有没有超过上限。
 
 引擎只在 U+0020 与 `<n>` 处断行；一段里没有这两样，就永远排在同一行。
 所以「最长段」是唯一能机械度量的断行指标——不是像素宽度（控件宽度没实测过）。
@@ -24,11 +24,21 @@
 
 改上限是一个数字，改级别是一个字母；两处都在 LIMITS 里。
 
+基线
+----
+不打算再动的命中（人名带括号这类，补空格也解决不了）记进
+`src\data\baselines\line_run_<语言>.txt`，一行一条 `id<TAB>实测字数`。
+报告与退出码只数**新增**命中：基线内的只列出。否则这 9 条旧账会天天报
+「超限」，看的人很快就会当它不存在，检查等于没有。
+基线只能显式更新：
+
+    python src/tools/analysis/line_run.py --lang ko --update-baseline
+
     python src/tools/analysis/line_run.py            # 摘要
     python src/tools/analysis/line_run.py --all      # 列出每条命中
     python src/tools/analysis/line_run.py --lang ja  # 只跑一门
 
-退出码：有 E 级命中时返回 1。
+退出码：有 E 级**新增**命中时返回 1。
 """
 
 import argparse
@@ -44,6 +54,40 @@ sys.path.insert(0, os.path.join(ROOT, "src", "tools", "text"))
 import engine_text  # noqa: E402
 
 QA_DIR = os.path.join(ROOT, "build", "qa")
+BASELINE_DIR = os.path.join(ROOT, "src", "data", "baselines")
+
+
+def baseline_path(lang):
+    return os.path.join(BASELINE_DIR, "line_run_%s.txt" % lang)
+
+
+def load_baseline(lang):
+    """读基线：{id: 实测字数}。文件不存在就是空基线，不是错误。"""
+    path = baseline_path(lang)
+    out = {}
+    if not os.path.exists(path):
+        return out
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) >= 2 and parts[1].isdigit():
+                out[parts[0]] = int(parts[1])
+    return out
+
+
+def save_baseline(lang, hits, limit):
+    """把当前全部命中写成基线。只有 --update-baseline 会调到这里。"""
+    os.makedirs(BASELINE_DIR, exist_ok=True)
+    with open(baseline_path(lang), "w", encoding="utf-8", newline="\n") as f:
+        f.write("# line_run 基线：%s，上限 %d 字\n" % (lang, limit))
+        f.write("# 一行一条：id<TAB>实测最长字数\n")
+        f.write("# 只收「已接受、不再处理」的条目。新增命中不计入，\n")
+        f.write("# 要收进来必须改译文，或者显式 --update-baseline。\n")
+        for h, w, _seg, _k in hits:
+            f.write("%s\t%d\n" % (h, w))
 
 #: 上限（含）与级别。E 级命中即让流水线失败，W 级只报告。
 LIMITS = {
@@ -111,33 +155,55 @@ def scan_lang(lang):
     return rows
 
 
-def report(lang, rows, limit, level, text_only, show_all):
-    """写报告文件并返回 E 级命中条数。"""
+def report(lang, rows, limit, level, text_only, show_all, update=False):
+    """写报告文件，返回 E 级**新增**命中条数。
+
+    命中分成两段：基线内（旧账，只列出）与新增（要处理）。退出码只看新增，
+    否则基线迟早会被当成不存在——一切都不报错的检查等于没有检查。
+    """
     hits = [(h, w, seg, k) for h, w, seg, k in rows
             if w > limit and (k == "text" or not text_only)]
+    base = load_baseline(lang)
+    if update:
+        save_baseline(lang, hits, limit)
+        base = {h: w for h, w, _s, _k in hits}
+    fresh = [x for x in hits if x[0] not in base]
+    kept = [x for x in hits if x[0] in base]
     os.makedirs(QA_DIR, exist_ok=True)
     path = os.path.join(QA_DIR, "line_run_%s.txt" % lang)
     with open(path, "w", encoding="utf-8") as f:
         f.write("# %s：上限 %d 字（%s 级）%s\n" % (
             lang, limit, level, "，只判正文段" if text_only else ""))
         f.write("# 测量口径：只在空格与 <n> 处断行；标签不计字，变量记 1 字\n")
-        f.write("命中 %d 条\n" % len(hits))
-        for h, w, seg, k in (hits if show_all else hits[:40]):
+        f.write("# 基线 %s 内 %d 条，基线外新增 %d 条\n"
+                % (os.path.relpath(baseline_path(lang), ROOT), len(kept), len(fresh)))
+        f.write("新增 %d 条\n" % len(fresh))
+        for h, w, seg, k in (fresh if show_all else fresh[:40]):
             f.write("%s  最长 %d 字（%s）  %s\n" % (h, w, k, seg[:120]))
-        if not show_all and len(hits) > 40:
-            f.write("… 其余 %d 条见 --all\n" % (len(hits) - 40))
-    worst = hits[0] if hits else None
-    print("%-3s 上限 %-2d（%s） 命中 %-4d 最长 %-3d%s  → %s"
-          % (lang, limit, level, len(hits), rows[0][1] if rows else 0,
+        if not show_all and len(fresh) > 40:
+            f.write("… 其余 %d 条见 --all\n" % (len(fresh) - 40))
+        if kept:
+            f.write("基线内 %d 条（不判、只列出）\n" % len(kept))
+            for h, w, seg, k in (kept if show_all else kept[:40]):
+                f.write("%s  最长 %d 字（%s）  %s\n" % (h, w, k, seg[:120]))
+            if not show_all and len(kept) > 40:
+                f.write("… 其余 %d 条见 --all\n" % (len(kept) - 40))
+    worst = fresh[0] if fresh else (kept[0] if kept else None)
+    print("%-3s 上限 %-2d（%s） 新增 %-3d 基线 %-3d 最长 %-3d%s%s → %s"
+          % (lang, limit, level, len(fresh), len(kept),
+             rows[0][1] if rows else 0,
              (" " + worst[0] + " " + str(worst[1])) if worst else "",
+             "（已更新基线）" if update else "",
              os.path.relpath(path, ROOT)))
-    return len(hits) if level == "E" else 0
+    return len(fresh) if level == "E" else 0
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--lang", default="")
     ap.add_argument("--all", action="store_true", help="列出全部命中")
+    ap.add_argument("--update-baseline", action="store_true",
+                    help="把当前全部命中写成基线（会把旧账一并收进来，慎用）")
     a = ap.parse_args(argv)
 
     langs = [a.lang] if a.lang else list(LIMITS) + list(SKIP)
@@ -151,9 +217,10 @@ def main(argv=None):
             continue
         limit, level = LIMITS[lang]
         rows = scan_lang(lang)
-        bad += report(lang, rows, limit, level, TEXT_ONLY.get(lang, False), a.all)
+        bad += report(lang, rows, limit, level, TEXT_ONLY.get(lang, False),
+                      a.all, update=a.update_baseline)
     if bad:
-        print("\nE 级命中 %d 条，流水线失败。" % bad)
+        print("\nE 级新增命中 %d 条，流水线失败。" % bad)
         return 1
     return 0
 

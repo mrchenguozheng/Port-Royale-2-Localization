@@ -1,0 +1,13 @@
+# line_run 基线：ko，上限 13 字
+# 一行一条：id<TAB>实测最长字数
+# 只收「已接受、不再处理」的条目。新增命中不计入，
+# 要收进来必须改译文，或者显式 --update-baseline。
+0xd4cd0f43	18
+0xd4cd0faf	18
+0xd4cd1028	17
+0xd4cd0fb7	16
+0xd4cd101f	16
+0xd4cd1090	16
+0xd4cd0f44	15
+0xd4cd1026	15
+0xd4cd0fb3	14

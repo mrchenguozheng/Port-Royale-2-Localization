@@ -303,23 +303,31 @@ def band_label(lo, hi):
     return ">%d" % (lo - 1) if hi is None else ("%d–%d" % (lo, hi) if lo else "≤%d" % hi)
 
 
-def pending_of(es, field):
-    """待译条目（含字母、无目标文字），以及「与英文逐字相同」的条数。"""
+def pending_ids(es, field):
+    """还待译的条目 id 列表（判据同 `is_translated`）。"""
     script = lang_rules.script_re(field)
-    pend = [e for e in es
+    return [e["id"] for e in es
             if not is_translated(e.get(field, ""), field,
                                  base=e.get(BASE_LANG, ""), script=script)]
-    same = sum(1 for e in es if e.get(field, "") == e.get(BASE_LANG, ""))
-    return pend, same
+
+
+def pending_of(es, field):
+    """待译条目。
+
+    这里以前还会顺带数一个「与英文逐字相同」的条数，后来发现它必然
+    等于待译条数（没译的条目，值就是英文原串），全表和待译集合两种口径
+    算出来的数还互相打脸（773 vs 657）。没有信息量的统计不如不要。
+    """
+    ids = set(pending_ids(es, field))
+    return [e for e in es if e["id"] in ids]
 
 
 def report_status(field, es):
-    pend, same = pending_of(es, field)
+    pend = pending_of(es, field)
     total = len(es)
     done = total - len(pend)
-    print("[%s] 共 %d 条，已译 %d 条（%.1f%%），待译 %d 条%s"
-          % (field, total, done, 100.0 * done / max(1, total), len(pend),
-             "（与英文逐字相同 %d 条）" % same if same else ""))
+    print("[%s] 共 %d 条，已译 %d 条（%.1f%%），待译 %d 条"
+          % (field, total, done, 100.0 * done / max(1, total), len(pend)))
     if not pend:
         return
     buckets = {}
@@ -459,7 +467,7 @@ def apply_map(lang, mapping, dry_run=False):
                   if k not in used and v.strip() in landed)
     stats = {"hit": len(hit_ids), "unused": unused, "josa": bad_josa,
              "tokens": bad_tok, "lang": bad_lang, "same": same,
-             "rewrite": rewritten, "applied": applied}
+             "rewrite": rewritten, "applied": applied, "ids": hit_ids}
 
     if bad_tok or bad_josa or bad_lang:
         print("拒绝落盘：%d 条 token 与原文不齐、%d 条占位符后接助词、"
@@ -482,6 +490,7 @@ def apply_map(lang, mapping, dry_run=False):
 def cmd_apply(args):
     field = args.lang or target_field()
     mapping = load_map(args.map)
+    was = set(pending_ids(entries(load_toml()), field))
     stats = apply_map(field, mapping, dry_run=args.dry_run)
     if stats["tokens"] or stats["josa"] or stats["lang"]:
         return 1
@@ -497,6 +506,106 @@ def cmd_apply(args):
         print("  未对上：%s" % key[:80])
     if len(stats["unused"]) > 10:
         print("  ……另有 %d 条，完整清单见映射文件。" % (len(stats["unused"]) - 10))
+    if not args.dry_run and stats["hit"]:
+        bad = reconcile(field, was, stats)
+        if bad:
+            return 1
+    return 0
+
+
+def reconcile(field, was, stats):
+    """写完之后对账：待译条数应当正好减少「本次写进去的、原本待译的」那些。
+
+    防的是两类静默失败：写盘只落了一半、或同源串撞车导致另一条 id 没写上
+    （映射按源串作键时，撞车的两条只能写进一条）。
+    """
+    now = set(pending_ids(entries(load_toml()), field))
+    expect_ids = [h for h in stats["ids"] if h in was]
+    lost = was - now
+    if len(lost) == len(expect_ids):
+        print("     对账：待译 %d → %d（-%d）。" % (len(was), len(now), len(lost)))
+        return 0
+    print("     对账不符：应减少 %d 条待译，实际减少 %d 条。"
+          % (len(expect_ids), len(lost)))
+    stuck = [h for h in expect_ids if h in now]
+    for hid in stuck[:10]:
+        print("  仍待译 %s" % hid)
+    if len(stuck) > 10:
+        print("  ……另有 %d 条。" % (len(stuck) - 10))
+    print("     多半是映射里同源串撞车：两条 id 共用一句英文，只能写进一条。"
+          "改用 id 作键 {\"0x...\": \"译文\"} 再跑一次。")
+    return 1
+
+
+# ── 导出批次清单 ────────────────────────────────────────────
+
+#: `--band` 的可取值 → BANDS 的下标区间。名字取代 `len(...) > 80` 这类内联式。
+BAND_KEYS = {
+    "short": (0, 12), "12": (0, 12),
+    "24": (13, 24),
+    "40": (25, 40),
+    "80": (41, 80),
+    "long": (81, None), "all": None,
+}
+
+
+def dump_lines(es, field, band, limit):
+    """把待译条目渲染成批次清单的行（首行是注释头的第 1 行）。
+
+    纯函数，不碰文件：`cmd_dump` 只负责读数据与写盘，单测直接喂合成条目。
+    """
+    pend = pending_of(es, field)
+
+    def key_of(e):
+        return content_of(e.get(field, "")).strip()
+
+    groups = {}
+    for e in pend:
+        groups.setdefault(key_of(e), []).append(e["id"])
+
+    in_band = [e for e in pend
+               if band is None or band_of(content_of(e.get(field, ""))) == band]
+    rows = in_band[:limit] if limit > 0 else in_band
+
+    lines = ["# 待译批次：%s  共 %d 条（待译 %d 条，该档 %d 条）"
+             % (band_label(*band) if band else "全部", len(rows), len(pend),
+                len(in_band)),
+             "# 制表符分隔：id / 可见字数 / 英文原文（换行写作 \\n）",
+             "# 行末 dup:N = 与另外几条共用同一句英文；需不同译法时用 id 作键"
+             "：{\"0x...\": \"译文\"}"]
+    for e in rows:
+        text = (e.get(field, "") or "").replace("\n", "\\n")
+        line = "%s\t%d\t%s" % (e["id"], len(content_of(e.get(field, ""))), text)
+        mates = [h for h in groups.get(key_of(e), []) if h != e["id"]]
+        if mates:
+            line += "\tdup:%d %s" % (len(mates) + 1, ",".join(mates))
+        lines.append(line)
+    return lines
+
+
+def cmd_dump(args):
+    """导出待译批次：id / 可见字数 / 英文原文，并把同源串撞车标出来。
+
+    以前每批都是手写一段 here-string：改 sys.path、`pending_of`、`len>80`、
+    写制表符、`\\n` 转义。八批下来这段重复了八次，条件还漂过（>80 与 ≥81），
+    所以收成一条命令。撞车列是为了让「按源串作键只能写一条」这件事在导出时
+    就看得见，而不是等 apply 对账才发现。
+    """
+    if args.band not in BAND_KEYS:
+        raise SystemExit("--band 只认 %s。" % "、".join(BAND_KEYS))
+    field = args.lang or target_field()
+    lines = dump_lines(entries(load_toml()), field,
+                       BAND_KEYS[args.band], args.limit)
+    body = "\n".join(lines) + "\n"
+    if args.out:
+        parent = os.path.dirname(os.path.abspath(args.out))
+        if parent and not os.path.isdir(parent):
+            os.makedirs(parent, exist_ok=True)
+        with open(args.out, "w", encoding="utf-8", newline="\n") as f:
+            f.write(body)
+        print("[%s] 导出 %d 条 → %s" % (field, len(lines) - 3, args.out))
+    else:
+        sys.stdout.write(body)
     return 0
 
 
@@ -537,6 +646,14 @@ def main():
     p.add_argument("--map", required=True, help="映射 JSON 文件")
     p.add_argument("--dry-run", action="store_true", help="只报告，不写盘")
     p.set_defaults(fn=cmd_apply)
+
+    p = sub.add_parser("dump", help="导出待译批次清单（id/字数/原文，标同源串撞车）")
+    p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
+    p.add_argument("--band", default="long",
+                   help="长度档：short/24/40/80/long/all，默认 long（81+）")
+    p.add_argument("--limit", type=int, default=40, help="最多导几条，0 = 不限")
+    p.add_argument("--out", default="", help="写到这个文件；不给就打到 stdout")
+    p.set_defaults(fn=cmd_dump)
 
     p = sub.add_parser("gaps", help="源缺失自查：英文原值是令牌、译文有实文")
     p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")

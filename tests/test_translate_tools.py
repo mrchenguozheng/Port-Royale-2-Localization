@@ -167,6 +167,53 @@ class TestApplyMap(unittest.TestCase):
             T.apply_map("en.gog_1.1.2.3", {"Hello": "안녕"})
 
 
+class TestDumpLines(unittest.TestCase):
+    """导出批次清单：分档、限条数、同源串撞车标记。"""
+
+    def _es(self):
+        return [
+            {"id": "0xb1", "ko": "Short"},
+            {"id": "0xb2", "ko": "A" * 90},
+            {"id": "0xb3", "ko": "A" * 85},
+            {"id": "0xb4", "ko": "이미 번역됨"},
+        ]
+
+    def test_long_band_selects_only_81_plus(self):
+        lines = T.dump_lines(self._es(), "ko", (81, None), 0)
+        rows = [l for l in lines if not l.startswith("#")]
+        self.assertEqual([r.split("\t")[0] for r in rows], ["0xb2", "0xb3"])
+
+    def test_limit_truncates_rows(self):
+        lines = T.dump_lines(self._es(), "ko", (81, None), 1)
+        rows = [l for l in lines if not l.startswith("#")]
+        self.assertEqual(len(rows), 1)
+
+    def test_header_states_counts(self):
+        lines = T.dump_lines(self._es(), "ko", (81, None), 0)
+        self.assertIn("该档 2 条", lines[0])
+        self.assertTrue(lines[2].startswith("#"))
+
+    def test_identical_sources_are_flagged(self):
+        es = [{"id": "0xb2", "ko": "Same " + "A" * 85},
+              {"id": "0xb3", "ko": "Same " + "A" * 85}]
+        rows = [l for l in T.dump_lines(es, "ko", (81, None), 0)
+                if not l.startswith("#")]
+        self.assertIn("dup:2", rows[0])
+        self.assertIn("0xb3", rows[0])
+
+    def test_translated_entries_are_not_exported(self):
+        rows = [l for l in T.dump_lines(self._es(), "ko", T.BAND_KEYS["all"], 0)
+                if not l.startswith("#")]
+        self.assertNotIn("0xb4", [r.split("\t")[0] for r in rows])
+
+    def test_newlines_are_escaped(self):
+        es = [{"id": "0xb5", "ko": "Line one\nLine two"}]
+        rows = [l for l in T.dump_lines(es, "ko", T.BAND_KEYS["all"], 0)
+                if not l.startswith("#")]
+        self.assertEqual(len(rows), 1)
+        self.assertIn("Line one\\nLine two", rows[0])
+
+
 class TestTokensAreTheSameImplementation(unittest.TestCase):
     def test_token_set_order_free(self):
         self.assertEqual(sorted(tokens("A %1 <n> B")), sorted(tokens("%1 B <n> A")))
