@@ -326,6 +326,28 @@ def repair_tags(base, text):
     return out, "、".join(notes) or "无改动"
 
 
+def coverage(lang, ref_name):
+    """零售参照对基准表的覆盖：基准多少条、零售给了多少条、缺哪些、多哪些。
+
+    换语言之前先看这个数：**缺口**是「基准有、零售没有」的行——这些行零售里根本没有
+    译文，不是「没翻」，导入工具对它们无能为力，只能走正常翻译流程；**多出的行**是
+    零售版本差异（fr 1.1.2.42 比基准多 42 条），参照时直接忽略。
+    """
+    en = load(T.lang_path(T.BASE_LANG))
+    ref = load(resolve_path(ref_name))
+    base = [k for k, v in en.items() if isinstance(v, str)]
+    got = [k for k, v in ref.items() if isinstance(v, str)]
+    hit = [k for k in base if k in ref]
+    return {
+        "base": len(base),
+        "ref": len(got),
+        "hit": len(hit),
+        "missing": [k for k in base if k not in ref],
+        "extra": [k for k in got if k not in en],
+        "empty": [k for k in hit if not str(ref[k]).strip()],
+    }
+
+
 def build(lang, ref_name, only_empty=False):
     en = load(T.lang_path(T.BASE_LANG))
     cur = load(T.lang_path(lang))
@@ -414,8 +436,26 @@ def repair_map(lang, mapping):
     return out, notes
 
 
-def render(lang, ref_name, mapping, why, stats, repairs=()):
+def render(lang, ref_name, mapping, why, stats, repairs=(), cover=None):
     lines = ["# 零售参照导入：%s ← %s" % (lang, ref_name), ""]
+    if cover:
+        lines.append("## 基准覆盖")
+        lines.append("  基准 %d 条；零售 %d 条 → 对上 %d 条（其中空 %d 条）、"
+                     "缺 %d 条、多 %d 条"
+                     % (cover["base"], cover["ref"], cover["hit"],
+                        len(cover["empty"]), len(cover["missing"]),
+                        len(cover["extra"])))
+        if cover["missing"]:
+            lines.append("  零售没给的行（导入无从下手，得走正常翻译）：%s"
+                         % " ".join(cover["missing"][:8])
+                         + (" … 共 %d 条" % len(cover["missing"])
+                            if len(cover["missing"]) > 8 else ""))
+        if cover["extra"]:
+            lines.append("  零售多出的行（版本差异，已忽略）：%s"
+                         % " ".join(cover["extra"][:8])
+                         + (" … 共 %d 条" % len(cover["extra"])
+                            if len(cover["extra"]) > 8 else ""))
+        lines.append("")
     lines.append("候选 %d 条；apply 可落 %d 条、拦住 %d 条（令牌 %d、标签 %d、助词 %d、"
                  "非本语言 %d、并列次序 %d）"
                  % (len(mapping), stats.get("hit", 0), stats.get("skipped", 0),
@@ -457,12 +497,13 @@ def main(argv=None):
     ap.add_argument("--out", default="", help="报告路径，默认 build\\qa\\retail_import_<lang>.txt")
     args = ap.parse_args(argv)
 
+    cover = coverage(args.lang, args.ref)
     mapping, why = build(args.lang, args.ref, args.only_empty)
     repairs = ()
     if args.repair:
         mapping, repairs = repair_map(args.lang, mapping)
     stats = T.apply_map(args.lang, mapping, dry_run=not args.write)
-    text = render(args.lang, args.ref, mapping, why, stats, repairs)
+    text = render(args.lang, args.ref, mapping, why, stats, repairs, cover)
     out = args.out or os.path.join(OUT_DIR, "retail_import_%s.txt" % args.lang)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     io.open(out, "w", encoding="utf-8").write(text)

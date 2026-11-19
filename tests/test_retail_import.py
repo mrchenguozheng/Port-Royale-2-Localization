@@ -249,6 +249,21 @@ class TestBuildAndWrite(unittest.TestCase):
         self.assertTrue([r for r in why if "不是目标语言" in r],
                         why.keys())
 
+    def test_coverage_counts_missing_and_extra_rows(self):
+        """换语言前先看覆盖：零售没给的行，导入无从下手。"""
+        ref = dict(self.ref)
+        ref.pop("0xa4")
+        ref["0xb1"] = "Solo en la versión de tienda"
+        TI.write_doc_atomic(os.path.join(self.src, "orig", "es.retail-1.0.1.toml"),
+                            ref, list(ref), ["# 头"])
+        cover = RI.coverage(
+            "es", os.path.join(self.src, "orig", "es.retail-1.0.1.toml"))
+        self.assertEqual(cover["base"], 6)
+        self.assertEqual(cover["ref"], 6)
+        self.assertEqual(cover["hit"], 5)
+        self.assertEqual(cover["missing"], ["0xa4"])
+        self.assertEqual(cover["extra"], ["0xb1"])
+
     def test_held_row_keeps_current_translation(self):
         """人工判定不导的行不能因为「结构修得齐」就被写进去。"""
         mapping, why = RI.build("es", "es.retail-1.0.0")
