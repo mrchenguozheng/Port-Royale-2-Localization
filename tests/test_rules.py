@@ -264,14 +264,15 @@ class TestSpecInterface(unittest.TestCase):
         self.assertEqual(out, doc)
 
     def test_fr_spec_parts(self):
-        """法语：构建期不加工——排版（NBSP）已经写在译文里。"""
+        """法语：构建期不加工——空格保持作者写的普通空格，不引入 NBSP。"""
         sp = lang_rules.get_spec("fr")
         self.assertEqual((sp.code, sp.spacing.mode), ("fr", "none"))
         self.assertIsNone(sp.punct)
         self.assertIsNone(sp.segmenter.tag("x"))
-        doc = {"0x1": "Vraiment\u00a0? Or\u00a0: 100", "0x2": "%1:%2:%3"}
+        doc = {"0x1": "Vraiment ? Or : 100", "0x2": "%1:%2:%3"}
         out, _stats, _seg = specs.build_texts(sp, doc, ["0x1", "0x2"])
         self.assertEqual(out, doc)
+        self.assertFalse(any("\u00a0" in v for v in out.values()))
 
     def test_skip_languages_are_declared(self):
         """de/es/ru/ko/fr 不加工，但必须是「显式声明」：模块在、理由在、行为确定。"""
