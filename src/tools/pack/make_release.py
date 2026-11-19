@@ -88,11 +88,14 @@ def check_runtime_version(log=print):
 
 
 def build_pack(lang, stage, log):
+    """发行包里的语言包恒为**并集**：GOG 用 PR2LocalizationGUI.exe 注入、Steam 用
+    PR2HostMount 改 VERSION.dll，两条注入路径读的是同一份 packs\\<lang>.txt，
+    所以两个 zip 里放同一个文件，装哪种版本都行。逐版对照在 build\\variants 里。"""
     out = os.path.join(stage, DATA_DIR, "packs")
     os.makedirs(out, exist_ok=True)
-    log("编译语言包 %s …" % lang)
+    log("编译语言包 %s（并集）…" % lang)
     from build_artifacts import compile_pack
-    if compile_pack(lang, out, no_fonts=True, on_line=log) != 0:
+    if compile_pack(lang, out, no_fonts=True, on_line=log, union=True) != 0:
         raise RuntimeError("语言包编译失败：%s" % lang)
     with open(os.path.join(out, "locale.default.ini"), "w",
               encoding="utf-8", newline="\n") as fh:

@@ -119,5 +119,22 @@ class TestVersionOwnValueWins(unittest.TestCase):
         self.assertEqual(errors, [])
 
 
+class TestUnionBaseline(unittest.TestCase):
+    """并集基线：键集取并，重复键只留一份，顺序先主基线再其余独有。"""
+
+    def test_union_merges_keys_without_duplicates(self):
+        b1 = {"id": "en.test", "keys": ["0x1", "0x2"],
+              "table": {"0x1": "A", "0x2": "B"}, "primary": True}
+        b2 = {"id": "fr.test", "keys": ["0x2", "0x3"],
+              "table": {"0x2": "B 的另一版", "0x3": "+++EMPTY+++"}, "primary": False}
+        u = C.union_baseline([b1, b2])
+        self.assertEqual(u["keys"], ["0x1", "0x2", "0x3"])
+        # 重复键取先出现那份的原文（主基线），不制造第二份正文
+        self.assertEqual(u["table"]["0x2"], "B")
+        self.assertEqual(u["table"]["0x3"], "+++EMPTY+++")
+        self.assertTrue(u["primary"])
+        self.assertIn("union", u["id"])
+
+
 if __name__ == "__main__":
     unittest.main()

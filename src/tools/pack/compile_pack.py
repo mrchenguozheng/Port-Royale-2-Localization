@@ -296,7 +296,26 @@ def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal):
     return lines, n, n_ph, n_empty, n_ident, meta
 
 
-def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None):
+def union_baseline(bases):
+    """把多份基线合成一份「并集」基线：键集是各行键集的并集，取值按**各自版本**的原文。
+
+    同一键在多份基线里都出现时只留一份（取先出现的那份的原文）—— 实测
+    en 1.1.2.3 与 fr 1.1.2.42 共有的 3529 条在两份原文表里正文一致，版本差只
+    体现在键集。顺序：先主基线的顺序，再把其余基线独有的键按各自的表顺序接在后面。
+    """
+    keys, table = [], {}
+    for b in bases:
+        for k in b["keys"]:
+            if k in table:
+                continue
+            keys.append(k)
+            table[k] = b["table"][k]
+    return {"id": "union(%s)" % "+".join(b["id"] for b in bases),
+            "keys": keys, "table": table, "primary": True}
+
+
+def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None,
+          union=False):
     # 参考原文**不参与编译**：生成 en.txt / fr.txt 交给引擎等于用「原始英文」
     # 覆盖游戏，等于没汉化。所以直接拒绝，而不是打个警告继续跑。
     # 名单问 translate —— 那里是唯一一份（src\orig\en.gog_1.1.2.3 之类）。
@@ -332,6 +351,8 @@ def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None):
             by_hash[s["id"].lower()] = s
 
     bases = _version_bases(baseline)
+    if union:
+        bases = [union_baseline(bases)]
     variant_out = variant_out or DEFAULT_VARIANT_OUT
     mk = mark_map(list(by_hash)) if marks else {}
 
@@ -426,11 +447,14 @@ def main():
                          " build\\variants\\<id>\\")
     ap.add_argument("--variant-out", default=DEFAULT_VARIANT_OUT,
                     help="非 primary 基线的输出根目录（默认 build\\variants）")
+    ap.add_argument("--union", action="store_true",
+                    help="只出一份并集包（所有基线的键集合并，写在 --out 的 <语言>.txt）。"
+                         "GOG 与 Steam 两个发行包共用这一份；逐版对照仍用默认模式。")
     a = ap.parse_args()
     lang = a.lang
     if not lang:
         lang = _default_lang()
-    code = build(lang, a.out, a.strict, a.marks, a.baseline, a.variant_out)
+    code = build(lang, a.out, a.strict, a.marks, a.baseline, a.variant_out, a.union)
 
     # 编完语言包顺手检查字体：字体只做映射，按 Noto 替换字体生成。
     # 字体出错不算构建失败 —— 语言包本身没问题。
