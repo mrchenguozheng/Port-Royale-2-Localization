@@ -423,9 +423,11 @@ def report_status(field, es):
     pend = pending_of(es, field)
     keep = keep_as_is(field)
     total = len(es)
-    done = total - len(pend) - len(keep)
-    print("[%s] 共 %d 条，已译 %d 条（%.1f%%），待译 %d 条%s"
-          % (field, total, done, 100.0 * done / max(1, total), len(pend),
+    translatable = total - len(keep)
+    done = translatable - len(pend)
+    print("[%s] 共 %d 条：已译 %d / 可译 %d（%.1f%%），待译 %d 条%s"
+          % (field, total, done, translatable,
+             100.0 * done / max(1, translatable), len(pend),
              "（另 %d 条有意不译，不计）" % len(keep) if keep else ""))
     if not pend:
         return
