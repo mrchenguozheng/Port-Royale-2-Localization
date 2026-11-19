@@ -139,6 +139,23 @@ class TestEsInvertedMarks(unittest.TestCase):
         TL.es_checks({"0x00000007": "¿Quieres devolver tu permiso? ¡Recuerda que no!"}, W)
         self.assertEqual(W, [])
 
+    def test_birth_year_uncertainty_is_not_a_question(self):
+        # `1682?-1722` 是生卒年不确定，不是疑问句，不能被要成对。
+        W = []
+        TL.es_checks({"0x0000000a": "El galés Bartholomew Roberts (1682?-1722) fue pirata."}, W)
+        self.assertEqual(W, [])
+
+    def test_sentence_final_question_after_year_is_still_reported(self):
+        # 同一条里句末的 ? 不能被上面的年份规则吃掉。
+        W = []
+        TL.es_checks({"0x0000000b": "Nació en 1682? ¡No lo sé!"}, W)
+        self.assertEqual([w[1] for w in W], ["倒置符号不配对"])
+
+    def test_punctuation_only_entry_is_silent(self):
+        W = []
+        TL.es_checks({"0x0000000c": "?"}, W)
+        self.assertEqual(W, [])
+
 
 class TestJaSpeechLevel(unittest.TestCase):
     @unittest.skipUnless(HAS_JANOME, "需要 janome")
@@ -151,6 +168,13 @@ class TestJaSpeechLevel(unittest.TestCase):
     def test_uniform_level_is_silent(self):
         W = []
         TL.ja_checks({"0x00000009": "私は5点を宣言します。この勝負は私のものです。"}, W)
+        self.assertEqual(W, [])
+
+    @unittest.skipUnless(HAS_JANOME, "需要 janome")
+    def test_quoted_plain_speech_does_not_count_as_mixing(self):
+        # 引号里是别人原话，海盗就该说常体；叙述本身只有一个语体。
+        W = []
+        TL.ja_checks({"0x0000000d": "彼女の言葉が残っています。「この勝負は私のものだ」"}, W)
         self.assertEqual(W, [])
 
 

@@ -44,6 +44,13 @@ FONT = re.compile(r"<f:([^>]*)>")
 HAN = re.compile(r"[\u4e00-\u9fff]")
 LATIN = re.compile(r"[A-Za-z]")
 MARK_ANY = re.compile(r"\[(?:town|lit|term):?")
+#: 日语引号（「」『』）。判语体前先把引文抹掉，引文里的常体不算叙述混用。
+JA_QUOTE = re.compile(r"「[^「」]*」|『[^『』]*』")
+#: 西语里「年份后紧跟破折号」的 `?` 是生卒年不确定标记（`1682?-1722`），
+#: 不是疑问句。只认这种形状，句末真正的 `?` 不能被它吃掉。
+ES_YEAR_RX = re.compile(r"\d{3,4}\?(?=[-–—])")
+#: 一个条目里连一个字母都没有（纯标点、纯数字）就没有句子可配倒置符号。
+ES_WORD_RX = re.compile(r"[^\W\d_]")
 ANS_MARK = re.compile(r"\[riddle:")
 # 站内变量 @x$Name$：x 是格式码。同一个变量在整份语料里几乎只有一种码，出现孤例多半是
 # 原文笔误被逐语照抄（0xca4930dc 的 @A$Amount$ 就是：同文件 55 处 @a$Amount$）。
@@ -393,18 +400,29 @@ def ja_checks(tr, W):
     for k, v in tr.items():
         if k in KEEP or not v:
             continue
-        kinds = [kind(x) for x in re.split(r"[。！？]", MARK_ANY.sub(" ", v)) if x.strip()]
+        # 引号里是引用别人说的话，语体由说话人决定（海盗的原话就该是常体），
+        # 不参与叙述语体的统计。不剥掉的话，「…残っています。「…残念だよ」」这种
+        # 句子会被算成「polite / plain」混用，实际叙述只有一个语体。
+        plain = JA_QUOTE.sub(" ", v)
+        kinds = [kind(x) for x in re.split(r"[。！？]", MARK_ANY.sub(" ", plain)) if x.strip()]
         kinds = [x for x in kinds if x]
         if len(set(kinds)) > 1:
             W.append((k, "语体混用", " / ".join(kinds)))
 
 
 def es_checks(tr, W):
-    """西语：¿¡ 与 ?! 必须成对，感叹句/疑问句缺倒置符号。"""
+    """西语：¿¡ 与 ?! 必须成对，感叹句/疑问句缺倒置符号。
+
+    两种不算疑问的 `?` 先抹掉：生卒年里的不确定标记（`1682?-1722`）、
+    以及整个条目就是单个标点的情况（`?` 是界面图标，不是句子）。
+    """
     for k, v in tr.items():
         if k in KEEP or not v:
             continue
         s = MARK_ANY.sub(" ", v)
+        s = ES_YEAR_RX.sub(" ", s)
+        if not ES_WORD_RX.search(s):
+            continue
         if s.count("¿") != s.count("?") or s.count("¡") != s.count("!"):
             W.append((k, "倒置符号不配对", "¿%d ?%d ¡%d !%d"
                       % (s.count("¿"), s.count("?"), s.count("¡"), s.count("!"))))
