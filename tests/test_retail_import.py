@@ -313,5 +313,115 @@ class TestBuildAndWrite(unittest.TestCase):
         self.assertEqual(T.apply_map("es", again)["hit"], 0)
 
 
+class TestCleanText(unittest.TestCase):
+    """小修小补只动写法：空白、结构、标点；不改字，也不猜内容。"""
+
+    def test_trims_and_squeezes_spaces(self):
+        out, notes = RI.clean_text("es", "Hello", "  Hola.  Que  tal  ")
+        self.assertEqual(out, "Hola. Que tal")
+        self.assertIn("去首尾空白", notes)
+        self.assertIn("压连续空格", notes)
+
+    def test_column_row_keeps_its_spaces(self):
+        """含 `<t>` 的行按列排版，空白是数据，不能压。"""
+        out, _ = RI.clean_text("es", "a<t>b", "Uno<t>Dos   tres")
+        self.assertIn("Dos   tres", out)
+
+    def test_spanish_inverted_marks_added(self):
+        out, _ = RI.clean_text("es", "Hello. How are you? I'll pay!",
+                              "Hola. ¿Cómo estás? Te pagaré @g$Reward$!")
+        self.assertTrue(out.endswith("¡Te pagaré @g$Reward$!"))
+
+    def test_question_inside_parentheses_is_not_a_sentence(self):
+        """年份缩写 `(1682? – 1722)` 里的问号不是句尾，不许在句首补 `¿`。"""
+        text = ("El galés Bartholomew Roberts (1682? – 1722) fue uno de los piratas "
+                "más importantes y también más peculiares que han existido.")
+        out, notes = RI.clean_text("es", text, text)
+        self.assertEqual(out, text)
+        self.assertEqual(notes, [])
+
+    def test_inverted_mark_not_duplicated_across_paragraph_break(self):
+        """起头符号可以跨 `<n>`：`¡%1,<n>me alegro…!` 已经带了 `¡`，不许再补。"""
+        text = "¡%1,<n>me alegro tanto de que hayas vuelto!"
+        out, _ = RI.clean_text("es", "%1,<n>I am glad you are back!", text)
+        self.assertEqual(out.count("¡"), 1)
+
+    def test_other_languages_are_not_touched_by_inverted_rule(self):
+        out, notes = RI.clean_text("de", "Frage", "Frage?")
+        self.assertEqual(out, "Frage?")
+        self.assertEqual(notes, [])
+
+    def test_dangling_period_after_exclamation_removed(self):
+        out, notes = RI.clean_text("es", "Hello!", "¡Hola!.")
+        self.assertEqual(out, "¡Hola!")
+        self.assertIn("去多余句号 1", notes)
+
+    def test_big_paragraph_gap_is_left_for_the_list(self):
+        """一次差 8 个 `<n>` 说明段落分法本身不同，清洁版不动它。"""
+        text = "Uno.<n><n>Dos.<n><n>Tres.<n><n>Cuatro.<n><n>Cinco."
+        out, _ = RI.clean_text("es", "One paragraph.", text)
+        self.assertEqual(out.count("<n>"), 8)
+
+    def test_small_paragraph_gap_is_filled(self):
+        base = ("Selecciona el barco que quieres controlar.<n><n>"
+                "En cualquier momento puedes seleccionar otro de la lista.")
+        text = ("Selecciona el barco que quieres controlar. "
+                "En cualquier momento puedes seleccionar otro de la lista.")
+        out, notes = RI.clean_text("es", base, text)
+        self.assertEqual(out.count("<n>"), 2)
+        self.assertIn("补 <n> 2", notes)
+
+    def test_issues_report_what_cannot_be_fixed(self):
+        base = "Take @A$Amount$ now"
+        self.assertIn("令牌 @A$Amount$ 1→0", RI.clean_issues(base, "Toma ahora"))
+        self.assertIn("直引号 `\"` 奇数个", RI.clean_issues("Say \"hi\"", "Di \"hola"))
+        self.assertIn("行内有裸制表符（应为 `<t>`）", RI.clean_issues("a<t>b", "a\tb"))
+
+
+class TestCleanRef(unittest.TestCase):
+    """清洁版落盘：派生文件进 `build/`，原始零售文件一字不动。"""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.src = os.path.join(self.dir, "src")
+        for sub in ("translations", "orig"):
+            os.makedirs(os.path.join(self.src, sub))
+        self.old_src = T.SRC
+        T.set_src(self.src)
+        self.en = {"0xa1": "Hello", "0xa2": "Take %1 now.", "0xa3": "Bye"}
+        self.ref = {"0xa1": "  Hola.  ", "0xa2": "Toma ahora.", "0xa3": "Adiós!"}
+        TI.write_doc_atomic(os.path.join(self.src, "orig", "en.gog_1.1.2.3.toml"),
+                            self.en, list(self.en), ["# 头"])
+        self.cur = {"0xa1": "Hello", "0xa2": "Take %1 now.", "0xa3": "Bye"}
+        TI.write_doc_atomic(os.path.join(self.src, "translations", "es.toml"),
+                            self.cur, list(self.cur), ["# 头"])
+        TI.write_doc_atomic(os.path.join(self.src, "orig", "es.retail-1.0.0.toml"),
+                            self.ref, list(self.ref), ["# 头"])
+
+    def tearDown(self):
+        T.set_src(self.old_src)
+        shutil.rmtree(self.dir, ignore_errors=True)
+
+    def test_cleaned_file_and_original_both_kept(self):
+        out, _, changed, issues, path = RI.clean_ref("es", "es.retail-1.0.0")
+        self.assertEqual(out["0xa1"], "Hola.")
+        self.assertEqual(out["0xa3"], "¡Adiós!")
+        self.assertEqual([c[0] for c in changed], ["0xa1", "0xa3"])
+        # `%1` 被零售吃掉了，只能报：不在清洁版里补。
+        self.assertIn(("0xa2", "令牌 %1 1→0"), issues)
+        self.assertTrue(os.path.isfile(path))
+        self.assertTrue(path.replace("\\", "/").endswith("build/ref/retail_clean/es.retail-1.0.0.toml"))
+        old, _ = TI.read_doc(os.path.join(self.src, "orig", "es.retail-1.0.0.toml"))
+        self.assertEqual(old, self.ref)
+
+    def test_build_accepts_the_cleaned_doc_in_memory(self):
+        out, _, _, _, _ = RI.clean_ref("es", "es.retail-1.0.0")
+        mapping, _ = RI.build("es", "es.retail-1.0.0", ref_doc=out)
+        self.assertEqual(mapping["0xa1"], "Hola.")
+        self.assertEqual(mapping["0xa3"], "¡Adiós!")
+        # 清洁版不补令牌：缺 `%1` 的那条照样被 `apply` 拦下。
+        self.assertEqual(len(T.apply_map("es", mapping, dry_run=True)["tokens"]), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

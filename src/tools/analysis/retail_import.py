@@ -41,6 +41,7 @@ if TOOLS not in sys.path:
 
 import translate as T  # noqa: E402
 from text import marks as MK  # noqa: E402
+from text import toml_io as TI  # noqa: E402
 
 #: 一条标注的完整写法：`[key:arg]`。arg 里允许再出现冒号（`ref:键`）与斜杠（形态）。
 MARK_RX = re.compile(r"\[(ref|town|lit|term|riddle):([^\[\]]{1,200})\]")
@@ -283,14 +284,14 @@ def _pct_columns(base, out):
     return PCT_PAREN_RX.sub(repl, out), fixed[0]
 
 
-def repair_tags(base, text):
-    """只调 `<n>` 与 `<t>`：段落数按基准对齐、项目符号补回、百分列还原；一个字不动。
+def structural_fix(base, text, n_slack=None):
+    """按基准对齐结构：百分列、`<t>` 项目符号、`<n>` 段落数。只排队，不判对错。
 
-    能用机械规则修的只有这两样：零售 1.0.0 常把两段并成一段（`<n><n>` 写成一个
-    `<n>`），或把列表前的 `-<t>` 去掉（连破折号一起）。字体标签、`<c>`、`<n:25>` 与
-    令牌不对就不动——那些要么是内容缺了，要么得人给成分，猜不得。
+    拆出来给两个出口共用：`repair_tags`（导入前就地修，修不动就整行放弃）与
+    `clean_text`（生产「小修小补的参考」，修不动的部分照抄，把剩下的推进清单）。
 
-    返回 (修好的文本, 说明) 或 (None, 放弃原因)。
+    `n_slack` 给了就限制 `<n>` 的差额：清洁版只做小修小补，一次要删/补超过这么多
+    `<n>` 说明段落分法本身就不是小差，留给清单（`0xd4cd0f43` 一次多 8 个）。
     """
     out, notes = text, []
     out, cols = _pct_columns(base, out)
@@ -309,6 +310,8 @@ def repair_tags(base, text):
         if fixed:
             notes.append("补 <t> %d" % fixed)
     delta = base.count("<n>") - out.count("<n>")
+    if n_slack is not None and abs(delta) > n_slack:
+        return out, notes
     if delta > 0:
         out = _insert_n(out, delta // 2, "<n><n>")   # 差额成对时补一整个段落
         if delta % 2:
@@ -317,6 +320,19 @@ def repair_tags(base, text):
     elif delta < 0:
         out = _strip_n(out, -delta)
         notes.append("删 <n> %d" % -delta)
+    return out, notes
+
+
+def repair_tags(base, text):
+    """只调 `<n>` 与 `<t>`：段落数按基准对齐、项目符号补回、百分列还原；一个字不动。
+
+    能用机械规则修的只有这两样：零售 1.0.0 常把两段并成一段（`<n><n>` 写成一个
+    `<n>`），或把列表前的 `-<t>` 去掉（连破折号一起）。字体标签、`<c>`、`<n:25>` 与
+    令牌不对就不动——那些要么是内容缺了，要么得人给成分，猜不得。
+
+    返回 (修好的文本, 说明) 或 (None, 放弃原因)。
+    """
+    out, notes = structural_fix(base, text)
     for name in set(TAG_RX.findall(base)) | set(TAG_RX.findall(out)):
         if out.count(name) != base.count(name):
             return None, "标签 %s 个数仍不齐" % name
@@ -326,7 +342,197 @@ def repair_tags(base, text):
     return out, "、".join(notes) or "无改动"
 
 
-def coverage(lang, ref_name):
+# ---------------------------------------------------------------- 小修小补的参考
+
+#: 说得清归属的标点只在部分语言有意义：西语问句要 `¿` 起头、感叹要 `¡` 起头。
+INVERTED_LANGS = ("es",)
+#: 想吃掉的空白只有这一种：两个以上普通空格。制表位是 `<t>`，不是空格。
+SQUEEZE_RX = re.compile(r"  +")
+#: 清洁版里 `<n>` 一次只调这么多个：超过就是段落分法本身不同，不是「小差」。
+N_SLACK = 2
+
+
+def _fill_inverted(text, lang):
+    """按西语定则补 `¿`／`¡`：句子里有 `?`／`!` 收尾却没有对应的起头符号，就在句首补一个。
+
+    只补、不删：多出来的 `¿` 可能是引文的一部分，删了会改断句。判「句尾」也判得紧：
+    `?` 后面跟的是破折号、括号注之类，就不是句尾（年份缩写 `(1682? – 1722)` 是常客）。
+    """
+    if lang not in INVERTED_LANGS:
+        return text, 0
+    inserts, seg_start, n, i = {}, 0, len(text), 0
+    # 不按 `<n>` 断句：起头符号可以跨段（`¡%1,<n>me alegro…!` 已经带了 `¡`）。
+    while i < n:
+        ch = text[i]
+        if ch in ".!?":
+            j = i + 1
+            while j < n and text[j] in " \t":
+                j += 1
+            if j < n and text[j] == "<":
+                close = text.find(">", j)
+                j = (close + 1) if close >= 0 else n
+                while j < n and text[j] in " \t":
+                    j += 1
+            # 句尾之后要么到行末、要么换到新句（`<n>` 之类标签、大写字母）。
+            # 紧跟引号/括号的不算句尾：`…”` 里的 `!` 是引文内部的，给整句补 `¡` 会补错位置。
+            ends = j >= n or text[j] == "<" or text[j].isupper()
+            if ends:
+                body = text[seg_start:i + 1]
+                letters = sum(1 for c in body if c.isalpha())
+                # 没有词的行（字形覆盖测试串 `°§$%&()=?…`）不补：那里的 `?` 是被测的符号本身。
+                if letters >= 2:
+                    if ch == "?" and "¿" not in body:
+                        inserts[seg_start] = inserts.get(seg_start, "") + "¿"
+                    elif ch == "!" and "¡" not in body:
+                        inserts[seg_start] = inserts.get(seg_start, "") + "¡"
+                seg_start = i + 1
+        i += 1
+    if not inserts:
+        return text, 0
+    out = text
+    for pos in sorted(inserts, reverse=True):
+        at = pos
+        # 插在分句第一个字母之前：跳过开头的空白与标签，`"¿…?"` 也就在引号内侧。
+        while at < len(out):
+            if out[at] in " \t":
+                at += 1
+            elif out[at] == "<":
+                close = out.find(">", at)
+                if close < 0:
+                    break
+                at = close + 1
+            else:
+                break
+        out = out[:at] + inserts[pos] + out[at:]
+    return out, len(inserts)
+
+
+def clean_text(lang, base, text):
+    """小修小补：首尾空白、连续空格、结构对齐、西语 `¿¡`。不改字，也不猜内容。
+
+    改的是「写法」不是「说法」：这里每一条都能事后核对（个数、成对、空白），
+    所以可以放心当成后续流程的输入；缺句、改句、令牌缺成分不在此列。
+    """
+    notes = []
+    out = text.strip()
+    if out != text:
+        notes.append("去首尾空白")
+    if "<t>" not in out:
+        squeezed = SQUEEZE_RX.sub(" ", out)
+        if squeezed != out:
+            out, notes = squeezed, notes + ["压连续空格"]
+    out, seg = structural_fix(base, out, n_slack=N_SLACK)
+    notes.extend(seg)
+    # `!.`／`?.`：问号感叹号后面多跟一个句号，零售里写成「.!」的地方不少。
+    deduped, dup = re.subn(r"([!?])\.(?=\s|$|<)", r"\1", out)
+    if dup:
+        out, notes = deduped, notes + ["去多余句号 %d" % dup]
+    out, inv = _fill_inverted(out, lang)
+    if inv:
+        notes.append("补 ¿¡ %d" % inv)
+    return out, notes
+
+
+def clean_issues(base, text):
+    """清洁之后还剩什么对不上——这些只能报，不能修。"""
+    bad = []
+    for name in sorted(set(TAG_RX.findall(base)) | set(TAG_RX.findall(text))):
+        if text.count(name) != base.count(name):
+            bad.append("标签 %s %d→%d" % (name, base.count(name), text.count(name)))
+    for name in sorted(set(TOK_RX.findall(base)) | set(TOK_RX.findall(text))):
+        if text.count(name) != base.count(name):
+            bad.append("令牌 %s %d→%d" % (name, base.count(name), text.count(name)))
+    if text.count('"') % 2:
+        bad.append("直引号 `\"` 奇数个")
+    if text.count("“") != text.count("”"):
+        bad.append("弯引号 `“”` 不成对")
+    if text.count("«") != text.count("»"):
+        bad.append("法式引号 `«»` 不成对")
+    if "\t" in text:
+        bad.append("行内有裸制表符（应为 `<t>`）")
+    # 只抓「两个句末标点黏在一起」：`!.`、`?.`、`.!`、`??`、`!?`；三个点省略号 `...` 不算，
+    # 字体尺寸写法 `<…>1..0` 也不算（两边是数字或尖括号）。
+    if re.search(r"(?<![\d.<])\.\.(?![\d.>])|[!?]\.|\.!|[!?]!|[!?]\?", text):
+        bad.append("句末标点黏连（如 `!.`／`..`）")
+    return bad
+
+
+def _diff_snip(old, new, width=24):
+    """改动落在哪：取第一处差异前后各 width 个字的对照，供报告看。"""
+    i = 0
+    while i < min(len(old), len(new)) and old[i] == new[i]:
+        i += 1
+    j = 0
+    while (j < min(len(old), len(new)) - i
+           and old[len(old) - 1 - j] == new[len(new) - 1 - j]):
+        j += 1
+    a = old[max(0, i - 4):len(old) - j][:width]
+    b = new[max(0, i - 4):len(new) - j][:width]
+    return "「%s」→「%s」" % (a, b)
+
+
+def clean_ref(lang, ref_name):
+    """零售参照 → 一版「小修小补的参考」：结构对齐基准、标点按本语言定则。
+
+    产出两份东西：清洁后的参照文件（`build/ref/retail_clean/`，与 `build/` 一起
+    gitignore，原始零售文件一字不动、仍是对照基准），以及逐条改动清单。清洁版只
+    动写法，所以拿它当导入输入时 `--repair` 无事可做；令牌缺成分与内容差异仍由
+    导入环节拦下。
+    """
+    en = load(T.lang_path(T.BASE_LANG))
+    doc, order = TI.read_doc(resolve_path(ref_name))
+    known = lexicon(lang)
+    out, changed, issues = {}, [], []
+    for hid, val in doc.items():
+        if not isinstance(val, str):
+            out[hid] = val
+            continue
+        base = str(en.get(hid, "") or "")
+        # 混进别的语言的行不清洁：给它补本语言的标点只会更乱（es 的 `0xd3481944` 是德语原文）。
+        foreign = foreign_words(val, known)
+        if foreign:
+            out[hid] = val
+            issues.append((hid, "不是目标语言（词典只认得 %d/%d 个词），未清洁" % foreign))
+            continue
+        fixed, notes = clean_text(lang, base, val) if base else (val, [])
+        out[hid] = fixed
+        if fixed != val:
+            changed.append((hid, "、".join(notes), _diff_snip(val, fixed)))
+        if base:
+            for issue in clean_issues(base, fixed):
+                issues.append((hid, issue))
+    # 路径按 `T.ROOT` 现算：测试会 `set_src()` 到临时仓库，模块级常量会指回真实仓库。
+    path = os.path.join(T.ROOT, "build", "ref", "retail_clean", os.path.basename(ref_name))
+    if not path.endswith(".toml"):
+        path += ".toml"
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    TI.write_doc_atomic(
+        path, out, order,
+        ["# 零售参照的清洁版：%s ← %s" % (lang, ref_name),
+         "# 只修写法（结构对齐基准、标点按本语言定则），不改字；原始零售文件仍是基准对照。",
+         "# 由 analysis/retail_import.py --clean-ref 生成，可随时重建。"])
+    return out, order, changed, issues, path
+
+
+def render_clean(lang, ref_name, changed, issues, path):
+    lines = ["# 零售参照清洁：%s ← %s" % (lang, ref_name), "",
+             "改动 %d 条；剩 %d 处对不上（只报不修）" % (len(changed), len(issues)),
+             "清洁版：%s" % path, ""]
+    if changed:
+        lines.append("## 改动明细（只动写法）")
+        for hid, note, snip in changed:
+            lines.append("  %s  %s  %s" % (hid, note, snip))
+    if issues:
+        lines.append("")
+        lines.append("## 留着没修的（要靠人／靠 hold 名单，别在这里补）")
+        for hid, issue in issues:
+            lines.append("  %s  %s" % (hid, issue))
+    return "\n".join(lines) + "\n"
+
+
+# ---------------------------------------------------------------- 覆盖与导入
+
+def coverage(lang, ref_name, ref_doc=None):
     """零售参照对基准表的覆盖：基准多少条、零售给了多少条、缺哪些、多哪些。
 
     换语言之前先看这个数。**缺口**是「基准有、零售没有」的行——零售里根本没有这条，
@@ -339,7 +545,7 @@ def coverage(lang, ref_name):
     `extra` 是零售版本差异（fr 1.1.2.42 比基准多 42 条），参照时直接忽略。
     """
     en = load(T.lang_path(T.BASE_LANG))
-    ref = load(resolve_path(ref_name))
+    ref = ref_doc if ref_doc is not None else load(resolve_path(ref_name))
     cur = load(T.lang_path(lang))
     keep = set(T.keep_as_is(lang))
     base = [k for k, v in en.items() if isinstance(v, str)]
@@ -368,10 +574,10 @@ def coverage(lang, ref_name):
     }
 
 
-def build(lang, ref_name, only_empty=False):
+def build(lang, ref_name, only_empty=False, ref_doc=None):
     en = load(T.lang_path(T.BASE_LANG))
     cur = load(T.lang_path(lang))
-    ref = load(resolve_path(ref_name))
+    ref = ref_doc if ref_doc is not None else load(resolve_path(ref_name))
     keep = set(T.keep_as_is(lang))
     hold = load_hold(lang)
     table = MK.load_names(lang)
@@ -522,12 +728,24 @@ def main(argv=None):
     ap.add_argument("--write", action="store_true", help="真落盘；默认只出报告")
     ap.add_argument("--repair", action="store_true",
                     help="先按基准修参照的结构（只调 <n>／<t>，不改字）再校验")
+    ap.add_argument("--clean-ref", action="store_true",
+                    help="先生成一版「小修小补的参考」（结构对齐 + 标点/空白/符号），"
+                         "再用它做导入")
     ap.add_argument("--dump", default="", help="同时把映射写成 json")
     ap.add_argument("--out", default="", help="报告路径，默认 build\\qa\\retail_import_<lang>.txt")
     args = ap.parse_args(argv)
 
-    cover = coverage(args.lang, args.ref)
-    mapping, why = build(args.lang, args.ref, args.only_empty)
+    ref_doc = None
+    if args.clean_ref:
+        ref_doc, _, changed, issues, path = clean_ref(args.lang, args.ref)
+        clean_text_report = render_clean(args.lang, args.ref, changed, issues, path)
+        clean_out = os.path.join(OUT_DIR, "retail_clean_%s.txt" % args.lang)
+        os.makedirs(os.path.dirname(clean_out), exist_ok=True)
+        io.open(clean_out, "w", encoding="utf-8").write(clean_text_report)
+        print(clean_text_report)
+
+    cover = coverage(args.lang, args.ref, ref_doc)
+    mapping, why = build(args.lang, args.ref, args.only_empty, ref_doc)
     repairs = ()
     if args.repair:
         mapping, repairs = repair_map(args.lang, mapping)
