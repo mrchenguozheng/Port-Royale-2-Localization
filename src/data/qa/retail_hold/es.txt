@@ -2,3 +2,12 @@
 # 一行 `id<TAB>理由`；`#` 开头是注释。改动这里要有对应的说明（见 docs/译文与语言包.md）。
 
 0x010faa75	零售这段是另一套内容（96x64 BMP、Ascaron 默认安装路径），不是基准这段说明；现值已按 en/fr 重译，不导
+0xc77f4d5e	零售把地名写成 Charles Town（少一个 e），en/fr 都是 Charles Towne；现值整行就是 [town:Charles Towne]，不导
+0xd607db6d	零售把 Charles Towne 写成 Charles Town；现值的地名用译名表展开，不导
+0xe6490f96	零售把 Turk Islands 留成英文原名、只提到一次，现值三处都用 [town:Turk Islands]（显示 Islas Turcas），不导
+0xd3ac64cd	零售这行是另一段牙买加摘要（不含 Port Royale），现值忠实基准那句，不导
+0xdaeb0489	零售这行没写 Port Royale（只写「海战视图」），现值忠实基准，不导
+0x2ee8bb91	零售这行是另一套教程文字（没有 Cartagena），现值忠实基准，不导
+0xf725f230	零售这段与基准不是同一段教程，且 Cartagena 出现两次、无法交代现值那处标注，不导
+0x00bff5f3	零售只写一次 Cartagena（建两个织机那句没写），承载不了现值的三处标注，不导
+0x353cae5f	零售只写两处 Port Royale（其中一处是 Port Royale 2），承载不了现值的三处标注，不导

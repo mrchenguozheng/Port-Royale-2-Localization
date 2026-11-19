@@ -148,6 +148,11 @@ def carried(cur, ref, resolve):
 
     `resolve` 是 `(标注原文, id) -> 该标注的显示文本`，由调用方按语言注入；
     测试里换成字面表即可，不需要真的读译名表。
+
+    同一条显示文本可能在一行里出现多次（零售写「Port Royal … Port Royal」、
+    es 现值两处都用标注），这时按标注在 `cur` 里的先后，依次替换第 1、2、3 个
+    出现——标注与显示文本是同一个词，换哪一处显示效果一样，只有「第几处」是确定的。
+    出现次数少于标注个数才是真对不上（零售少写了一处地名），照旧放弃。
     """
     if "[" in ref or "]" in ref:
         return None, "参照自带方括号，不敢动"
@@ -155,18 +160,47 @@ def carried(cur, ref, resolve):
     if deferred:
         return None, "含 [%s:…]，要另一道工序" % deferred.group(1)
     out = ref
-    for key, arg in MARK_RX.findall(cur):
-        span = "[%s:%s]" % (key, arg)
+    marks = MARK_RX.findall(cur)
+    spans = ["[%s:%s]" % (k, a) for k, a in marks]
+    keys = {s: a for s, (k, a) in zip(spans, marks)}
+    totals = {}
+    for s in spans:
+        totals[s] = totals.get(s, 0) + 1
+    used = {}
+    for span in spans:
         shown = resolve(span, "")
         if not shown:
             return None, "标注 %s 展开为空" % span
         n = out.count(shown)
         if n == 0:
+            # 零售的写法可能不一样：少写冠词（es 写「Habana」，译名表是「La Habana」），
+            # 或者地名根本没译（零售整行留「Turk Islands」）。依次退一步再认：
+            # 去掉冠词的写法 → 标注参数原文（仅当地名键，不含下划线的术语键不算）。
+            for cand in (_drop_article(shown), keys[span]):
+                if cand and cand != shown and "_" not in cand and out.count(cand) >= 1:
+                    shown = cand
+                    n = out.count(shown)
+                    break
+        if n == 0:
             return None, "标注 %s 的显示文本不在参照里" % span
-        if n > 1:
-            return None, "标注 %s 的显示文本在参照里出现 %d 次" % (span, n)
-        out = out.replace(shown, span, 1)
+        if n != totals[span]:
+            return None, "标注 %s 的显示文本在参照里出现 %d 次（标注 %d 处）" % (
+                span, n, totals[span])
+        k = used.get(span, 0) + 1
+        pos = _nth_occurrence(out, shown, k)
+        out = out[:pos] + span + out[pos + len(shown):]
+        used[span] = k
     return out, None
+
+
+ARTICLES = ("El ", "La ", "Los ", "Las ")
+
+
+def _drop_article(shown):
+    for a in ARTICLES:
+        if shown.startswith(a):
+            return shown[len(a):]
+    return shown
 
 
 # ---------------------------------------------------------------- 结构修复

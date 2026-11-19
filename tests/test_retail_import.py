@@ -56,6 +56,41 @@ class TestCarried(unittest.TestCase):
         self.assertIsNone(body)
         self.assertIn("出现 2 次", why)
 
+    def test_repeated_name_is_filled_by_ordinal(self):
+        """一行里两处都写地名、两处都带标注：按先后交代，一个换一处。"""
+        body, why = RI.carried(
+            "Ve a [town:Cartagena].<n>Luego vuelve a [town:Cartagena] y vende.",
+            "Ve a Cartagena.<n>Luego vuelve a Cartagena y vende.", self._resolve)
+        self.assertIsNone(why)
+        self.assertEqual(
+            body, "Ve a [town:Cartagena].<n>Luego vuelve a [town:Cartagena] y vende.")
+
+    def test_three_repeats_are_filled_in_order(self):
+        body, why = RI.carried(
+            "[town:Cartagena] es grande. En [town:Cartagena] hay un almacén. "
+            "Sal de [town:Cartagena] pronto.",
+            "Cartagena es grande. En Cartagena hay un almacén. Sal de Cartagena pronto.",
+            self._resolve)
+        self.assertIsNone(why)
+        self.assertIn("[town:Cartagena] es grande", body)
+        self.assertIn("Sal de [town:Cartagena] pronto", body)
+
+    def test_fewer_places_than_marks_refuses(self):
+        """标注两处、参照只写一处地名：没地方交代第二处，放弃。"""
+        body, why = RI.carried(
+            "Ve a [town:Cartagena].<n>Luego vuelve a [town:Cartagena] y vende.",
+            "Ve a la ciudad.<n>Luego vuelve a Cartagena y vende.", self._resolve)
+        self.assertIsNone(body)
+        self.assertIn("标注 2 处", why)
+
+    def test_missing_article_still_matches(self):
+        """零售少写冠词（Habana），译名表是 La Habana：去掉冠词再认一次。"""
+        self.show["[town:Havana]"] = "La Habana"
+        body, why = RI.carried("Llegó a [town:Havana] de noche.",
+                               "Llegó a Habana de noche.", self._resolve)
+        self.assertIsNone(why)
+        self.assertIn("[town:Havana] de noche", body)
+
     def test_riddle_and_ref_defer_to_other_stages(self):
         for mark in ("[riddle:答案]", "[ref:0xabc]"):
             body, why = RI.carried("x %s y" % mark, "x y", self._resolve)
