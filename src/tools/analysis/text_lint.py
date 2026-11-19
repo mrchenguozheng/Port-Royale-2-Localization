@@ -481,7 +481,8 @@ def keep_violations(keep, tr, en):
       （de `Autospeichern`、fr `Sauvegarde automatique` 都合法）。
     - 基准侧没有正文（`IDM_…` 标识符、`+++EMPTY+++`）：版本差的产物，
       「等于英文」无从谈起，判据跳过（见 `base_without_text`）。
-    - 其余（key / label / id / credit）：正确译法就是英文原样，值一变就是错。
+    - 其余（key / label / id / credit / name）：正确译法就是英文原样，值一变就是错
+      （`name` 指原文即本语言写法的专名：Tampa、Nombre de Dios、Edward Teach）。
     """
     W = []
     for k, why in keep.items():
