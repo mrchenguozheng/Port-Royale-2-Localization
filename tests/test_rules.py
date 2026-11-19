@@ -54,6 +54,16 @@ class TestZhText(unittest.TestCase):
         lo, hi = base.ascii_token(t, t.index("Royale"))
         self.assertEqual(t[lo:hi], "Royale")
 
+    def test_non_cjk_entry_untouched(self):
+        """整条没有汉字就不是中文正文：算式、字体名、英文人名一个空格都别动。"""
+        spec = lang_rules.get_spec("zh").spacing
+        for src in (
+            "%1 %2  +  %3 %4  +  %5 %6  =  %7",
+            "Tiepolo_black14x14aaFHk.res",
+            "Dirk Niestadtkötter",
+        ):
+            self.assertEqual(spec.apply(src, {}), src)
+
     def test_placeholder_kept(self):
         zh = lang_rules.get("zh")
         out = zh.normalize("支付 @g$TotalPrice$ 元")

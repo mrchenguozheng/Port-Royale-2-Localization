@@ -85,6 +85,12 @@ class ZhCompactSpacing(S.Spacing):
         return self.lookup
 
     def apply(self, text, ctx):
+        # 整条没有汉字 → 不是中文正文，一个空格都别动。
+        # 这些条目是算式与模板（`%1 %2  +  %3 …`：双空格是作者的对齐）、
+        # 字体名（`Tiepolo_black14x14aaFHk.res`）、英文人名（`Dirk Niestadtkötter`）、
+        # 字符集自检串——中文排版给它们插空格，等于把内容改坏。
+        if not CJK_RX.search(text):
+            return text.strip()
         if ctx is None:
             return zh_space.fallback_wrap(text, step=self.max_chars)
         return zh_space.compact(text, ctx, max_chars=self.max_chars)
