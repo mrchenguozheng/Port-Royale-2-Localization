@@ -201,44 +201,6 @@ def sweep(texts, lookup, budgets):
     return rows
 
 
-def two_pass(texts, lookup, pairs):
-    """粗档先断一次，再拿细档断第二次。两种做法都跑一遍。
-
-    `local`：把粗档的 token 单独拎出来，对超细档的那个再 `compact()` 一次。
-             简单，但 token 离开句子上下文，分词器会改主意（实测切出
-             「某 些」「可 以」）。
-    `pin`  ：把粗档的断点写成切断标签，再拿细档跑一遍 `compact()`。上下文
-             还在，第二遍只是在既有断点之间补刀。
-
-    另外别写 `compact(compact(t, X), Y)`：`compact()` 每次都会先抹掉汉字/
-    全角标点旁的空白（`_TIGHT_SPACE`），第二遍等于从零重排，数字和单遍 `Y`
-    一模一样，看不出任何分层。
-    """
-    import re
-    rows = []
-    for coarse, fine in pairs:
-        local, pinned = [], []
-        for t in texts:
-            if not t:
-                local.append("")
-                pinned.append("")
-                continue
-            first = zh_space.compact(t, lookup, coarse)
-            pieces = []
-            for tok in tokens_of(first):
-                if HAN(tok) > fine:
-                    pieces.extend(tokens_of(zh_space.compact(tok, lookup, fine)))
-                else:
-                    pieces.append(tok)
-            local.append(" ".join(pieces))
-            glued = re.sub("(?<=[\u4e00-\u9fff])\\s(?=[\u4e00-\u9fff])",
-                           zh_space.CUT_TAG, first)
-            pinned.append(zh_space.compact(glued, lookup, fine))
-        rows.append(collect("%d:%d-local" % (coarse, fine), texts, local, lookup))
-        rows.append(collect("%d:%d-pin" % (coarse, fine), texts, pinned, lookup))
-    return rows
-
-
 #: 「窄控件风险」参考宽度：token 超过这么多汉字，就塞不进一行十来字的提示框。
 #: 这只是给对比用的整数门槛，不是游戏里量出来的控件宽度。
 NARROW = 12
@@ -274,8 +236,6 @@ def main():
     ap.add_argument("--lang", default="zh")
     ap.add_argument("--budgets", type=int, nargs="*",
                     default=list(range(6, 21)))
-    ap.add_argument("--two", nargs="*", default=[], metavar="粗:细",
-                    help="二次切断：先按粗档断一次，再按细档在成品上断第二次")
     ap.add_argument("--hist", nargs="*", default=[],
                     help="额外打印这些档位的 token 长度分布")
     a = ap.parse_args()
@@ -286,11 +246,6 @@ def main():
     texts = [out[h] for h in order if out.get(h)]
     print("译文 %d 条\n" % len(texts))
     rows = sweep(texts, lookup, a.budgets)
-    pairs = []
-    for item in a.two:
-        coarse, fine = item.split(":")
-        pairs.append((int(coarse), int(fine)))
-    rows += two_pass(texts, lookup, pairs)
     table(rows)
     if a.hist:
         hist(rows, set(a.hist))

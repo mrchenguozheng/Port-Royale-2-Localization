@@ -87,13 +87,7 @@ class ZhCompactSpacing(S.Spacing):
     def apply(self, text, ctx):
         if ctx is None:
             return zh_space.fallback_wrap(text, step=self.max_chars)
-        out = zh_space.compact(text, ctx, max_chars=self.max_chars)
-        # `<cut>`（译文层写 `[cut]`）是构建期标记：到这一步必须已经被换成空格，
-        # 落进包里就是引擎会原样画出来的乱码（它不认识这个标签）。
-        if zh_space.CUT_TAG in out or "[cut]" in out:
-            raise ValueError("切断标记 %s 没有被吃掉：%r"
-                             % (zh_space.CUT_TAG, text[:60]))
-        return out
+        return zh_space.compact(text, ctx, max_chars=self.max_chars)
 
     def report(self):
         missing = getattr(self.lookup, "missing", None) or []

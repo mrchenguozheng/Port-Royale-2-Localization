@@ -168,26 +168,6 @@ class TestZhSpace(unittest.TestCase):
         for tok in tail.split(" "):
             self.assertLessEqual(len(tok), 12, tok)
 
-
-    def test_compact_cut_tag_becomes_space(self):
-        """`[cut]` 是人工钉的断点：标记不落地，只换成一个普通空格。"""
-        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
-        t = "港口里停着三艘船，[cut]船坞旁还有两艘正在修理。"
-        out = zh_space.compact(t, lookup, 15)
-        self.assertNotIn("[cut]", out)
-        self.assertIn("船 ", out.split("，")[0] + " ")   # 断在 [cut] 那一刀上
-        self.assertNotIn("  ", out)
-
-    def test_compact_cut_tag_keeps_budget_short(self):
-        """`[cut]` 处预算清零：它后面的片段不会和前面的字合并成超长 token。"""
-        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
-        t = "这是一段没有标点的长句子用来验证切断标记的作用[cut]后面的内容重新开始算预算"
-        out = zh_space.compact(t, lookup, 15)
-        self.assertNotIn("[cut]", out)
-        for tok in out.split(" "):
-            han = sum(1 for c in tok if "\u4e00" <= c <= "\u9fff")
-            self.assertLessEqual(han, 15, tok)
-
     def test_compact_no_run_longer_than_budget(self):
         """连续 15 个字之内必须有一个断点：没有任何标点的长句也得被切开。"""
         lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]

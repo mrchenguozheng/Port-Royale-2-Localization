@@ -85,7 +85,6 @@ BIND_RIGHT = set("一二三四五六七八九十每各半几这那些不没未�
 #:
 #: 现在定成 13：每个没有空格的片段不超过 13 字，也就是连续 13 个字之内必有一刀。
 #: 位置交给 `_dp_pack()` 按 `_cut_cost()` 挑（标点后 > 词界）。
-#: 窄控件里需要更早断的地方，用显式切断标记 `CUT_TAG` 钉住，不再靠调小预算。
 MAX_CHARS = 13
 #: 只处理这么长以上的汉字串。
 #:
@@ -274,17 +273,6 @@ _RUN_RX = re.compile(r"[\u4e00-\u9fff]+(?:·[\u4e00-\u9fff]+)*")
 #: 硬换行：`<n>` 与 `<n:25>` 这类带参数的换行都要清零；`<c>`、`<f:…>` 是行内标签。
 _HARD = re.compile(r"(<n[^>]*>|\r?\n)", re.I)
 _HARD_TAG = re.compile(r"<n[^>]*>|\r?\n", re.I)
-#: 显式切断标记：放在两个汉字之间表示「这里必须能断」。构建期由 `compact()`
-#: 吃掉并换成一个普通空格；它和 `<n>` 的区别是**不换行**，只提供一个断点。
-#: 用途是「预算 15 字」之外的人工干预：窄控件里必须更早断、或者自动挑出来的
-#: 位置读着别扭时，在源文的词界钉一刀，不用整体把预算调小。
-#:
-#: 译文层写的是 `[cut]`（`marks.CUT_MARK`），展开时换成本标签；下面这个 `<cut>`
-#: 是内部表示，只在补空格这一步存在，不进语言包。
-CUT_TAG = "<cut>"
-_CUT = re.compile(r"<cut>", re.I)
-#: 作者层写法：译文里写 `[cut]`，`marks.expand()` 换成 `CUT_TAG`。
-_CUT_MARK_RX = re.compile(r"\[cut\]", re.I)
 #: 行内原子：名字占位符、标签、变量（`%1`、`@P$PirateName$`）。
 _ATOM = re.compile(r"\x00\d+\x00|<[^>]*>|" + base.VAR.pattern)
 
@@ -325,9 +313,6 @@ def compact(text, lookup, max_chars=MAX_CHARS):
     段内放得下就不再动；放不下时用 `_dp_pack()` 在词界里挑断点。标点本身不留
     空格，空格只落在「已经放不下了」的位置上，比逢词插空格干净得多。
     """
-    # 译文层写 `[cut]`，`marks.expand()` 会先换成 `CUT_TAG`；这里再收一次，
-    # 让直接调用 `compact()` 的脚本和测试也能用作者层那套写法。
-    text = _CUT_MARK_RX.sub(CUT_TAG, text)
     parts = _HARD.split(text)
     out = []
     for p in parts:
@@ -339,11 +324,7 @@ def compact(text, lookup, max_chars=MAX_CHARS):
 
 
 def _compact_seg(seg, lookup, max_chars, names):
-    """给一段（行内）文本排空格：预算穿过占位符累加，只有 `<n>` 才清零。
-
-    `CUT_TAG`（`<cut>`，作者层写 `[cut]`）是人工钉下的断点：预算在这里清零、
-    标记本身不落地，只留一个普通空格；<n> 才是换行。
-    """
+    """给一段（行内）文本排空格：预算穿过占位符累加，只有 `<n>` 才清零。"""
     if not seg:
         return seg
     units = []          # [(文本, 权重, 是否强制断行), …]
@@ -352,10 +333,6 @@ def _compact_seg(seg, lookup, max_chars, names):
     for m in _ATOM.finditer(seg):
         hard = _chunk_units(seg[last:m.start()], lookup, max_chars, names, hard, units)
         atom = m.group(0)
-        if _CUT.fullmatch(atom):
-            hard = True
-            last = m.end()
-            continue
         units.append((atom, _atom_weight(atom, names), hard))
         hard = False
         last = m.end()
@@ -400,8 +377,8 @@ def _pack(units, max_chars):
     """把单位按预算拼回去：预算内不插空格，超了才挑一个最像停顿的位置断。
 
     断点由 DP 挑，不再「填满就断」：贪心会在「…「X」/的按钮」这种地方落刀，
-    前半截成了残句。代价函数见 `_cut_cost()`；`hard`（来自 `[cut]` 或原文空格）
-    是死断点，先把 units 切块，块内再各自挑。
+    前半截成了残句。代价函数见 `_cut_cost()`；`hard`（来自原文空格）是死断点，
+    先把 units 切块，块内再各自挑。
     """
     blocks, cur = [], []
     for u in units:

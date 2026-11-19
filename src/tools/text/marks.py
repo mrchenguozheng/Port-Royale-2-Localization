@@ -122,11 +122,6 @@ ANS_KEYS = ANS_DIRECTIONS | ANS_NEGATIVE
 
 _MARK = re.compile(r"\[([A-Za-z]+):([^\[\]]*)\]")
 _ANY_BRACKET = re.compile(r"[\[\]]")
-#: 切断标记的作者层写法：`[cut]`，没有参数，所以不套 `[key:arg]` 那套语法。
-#: 展开时换成内部标签 `CUT_TAG`（治理层只在 zh_space 里认它），玩家永远看不到。
-CUT_MARK = "[cut]"
-CUT_TAG = "<cut>"
-_CUT_MARK_RX = re.compile(r"\[cut\]", re.I)
 _ANS_SPAN = re.compile(r"\[riddle:[^\[\]]*\]")
 #: clue 项的标签形态：只允许小写字母或 `_` 开头，后面小写字母/数字/_/-。
 #: 大写、数字开头都报错（大写还会让人误以为类型名不区分大小写）。
@@ -1109,9 +1104,6 @@ def expand(text, table, lang, hid="", terms=None, doc=None):
     """
     if terms is None:
         terms = load_terms(lang)
-    # `[cut]` 先换掉：它没有参数，进不了 `_MARK`，但必须赶在方括号检查之前处理，
-    # 否则会被当成「不成标记的 `[`」。
-    text = _CUT_MARK_RX.sub(CUT_TAG, text)
     out = []
     ans_args = []
     copy_span = None
@@ -1170,12 +1162,7 @@ def expand(text, table, lang, hid="", terms=None, doc=None):
 
 
 def scan(text):
-    """只解析不展开：返回 [(key, arg)]，给校验和统计用。写错抛 MarkError。
-
-    `[cut]` 不算标注（它没有参数），扫之前先换成内部标签，免得被当成
-    「不成标记的 `[`」。
-    """
-    text = _CUT_MARK_RX.sub(CUT_TAG, text)
+    """只解析不展开：返回 [(key, arg)]，给校验和统计用。写错抛 MarkError。"""
     out = []
     i = 0
     while i < len(text):

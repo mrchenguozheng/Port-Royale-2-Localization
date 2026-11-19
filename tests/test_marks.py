@@ -46,13 +46,6 @@ class TestExpand(unittest.TestCase):
     def test_lit(self):
         self.assertEqual(M.expand("[lit:%2 %1日]", TABLE, "zh"), "%2 %1日")
 
-    def test_cut_mark(self):
-        """`[cut]` 没有参数，展开成内部标签，不是「不成标记的 `[`」。"""
-        self.assertEqual(M.expand("港口[cut]船坞", TABLE, "zh"),
-                         "港口%s船坞" % M.CUT_TAG)
-        self.assertEqual(M.expand("港口[CUT]船坞", TABLE, "zh"),
-                         "港口%s船坞" % M.CUT_TAG)
-
     def test_keyword_unknown(self):
         with self.assertRaises(M.MarkError):
             M.expand("[keep:sample]", TABLE, "zh")
