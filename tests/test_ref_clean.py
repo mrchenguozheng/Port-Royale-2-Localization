@@ -52,6 +52,35 @@ class TestTokenPrefix(unittest.TestCase):
         self.assertEqual(n, 0)
 
 
+class TestBaseAlignment(unittest.TestCase):
+    """参照层的两档收紧：只补不删、只补在句末。"""
+
+    def test_add_only_keeps_the_reference_own_paragraphs(self):
+        base = "one.<n>two.<n>three."
+        text = "eins.<n><n>zwei.<n><n>drei."
+        out, notes = RC.RI.structural_fix(base, text, strip=False)
+        self.assertEqual(out, text)
+        self.assertIn("多 <n> 2（保留）", "、".join(notes))
+
+    def test_strict_break_refuses_a_comma(self):
+        base = "a.<n>b.<n>c."
+        text = "x, y and z."
+        out, notes = RC.RI.structural_fix(base, text, strip=False, strict_break=True)
+        self.assertEqual(out.count("<n>"), 0)
+
+    def test_strict_break_treats_a_quote_as_part_of_the_phrase(self):
+        """`"Страны" хроники` 里引号后面不是句末，在这儿插换行会把标题劈开。"""
+        self.assertIsNone(RC.RI._pick_break('в разделе "Страны" хроники.', strict=True))
+        self.assertIsNotNone(RC.RI._pick_break('в разделе "Страны" хроники.', strict=False))
+
+    def test_big_gap_is_left_to_a_human(self):
+        base = "a.<n>b.<n>c.<n>d.<n>e."
+        text = "x. y. z."
+        out, notes = RC.RI.structural_fix(base, text, strip=False, strict_break=True)
+        self.assertEqual(out, text)
+        self.assertIn("缺口超过 2 处", "、".join(notes))
+
+
 class TestPatch(unittest.TestCase):
     def _run(self, patch, ref="en"):
         buf = io.StringIO()

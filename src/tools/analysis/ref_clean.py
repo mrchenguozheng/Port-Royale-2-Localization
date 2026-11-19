@@ -90,6 +90,19 @@ def fix_token_prefix(base, text):
     return TOK_BARE_RX.sub(repl, text), fixed[0]
 
 
+def max_run(text, unit="<n>"):
+    """一段里最长的那串连续 `unit`（`<n><n>` 记 2，单个记 1，没有记 0）。"""
+    best = cur = 0
+    i = 0
+    while True:
+        i = text.find(unit, i)
+        if i < 0:
+            return best
+        cur = cur + 1 if i and text[i - len(unit):i] == unit else 1
+        best = max(best, cur)
+        i += len(unit)
+
+
 def diff_snip(old, new):
     """报告里用的小片段：找出第一处不同的前后各 12 字。"""
     i = 0
@@ -105,6 +118,9 @@ def main(argv=None):
     ap.add_argument("--votes", default="fr,de,es,pl,ru",
                     help="多数票来源（逗号分隔），只在没有 --base 时用")
     ap.add_argument("--patch", default="", help="手工补丁 json：{id: [[old, new], ...]}")
+    ap.add_argument("--add-only", action="store_true",
+                    help="只补不删：给零售版用。零售的段落划分是它自己的排版，按基准删会"
+                         "把一整段挤成一行")
     ap.add_argument("--write", action="store_true", help="真写盘；默认只出报告")
     ap.add_argument("--out", default="", help="输出路径，默认 build/ref/clean/<名字>-clean.toml")
     args = ap.parse_args(argv)
@@ -141,10 +157,20 @@ def main(argv=None):
             notes.append("按补丁补结构")
         b = (base or {}).get(hid)
         if isinstance(b, str):
-            fixed, how = RI.structural_fix(b, text)
+            fixed, how = RI.structural_fix(b, text, strip=not args.add_only,
+                                            strict_break=args.add_only)
             if fixed != text:
-                notes.append("、".join(how) or "结构对齐")
-                text = fixed
+                # 补 `<n>` 找不到足够句末时 `_insert_n` 会把剩下的挂在行末，挂成
+                # `<n><n><n>` 一长串是一段被生生截断的信号（ru `0xe1cdc367`）。原参照
+                # 本来就有这么长的连续换行才算正常，否则整条退回。
+                if max_run(fixed) > max_run(text):
+                    fixed = text
+                    gap = len(RI.NL_RX.findall(b)) - len(RI.NL_RX.findall(text))
+                    issues.append((hid, "补换行找不到合语句末（差 %d 处），切点得人定（用 --patch）"
+                                   % gap))
+                else:
+                    notes.append("、".join(how) or "结构对齐")
+                    text = fixed
             text, npfx = fix_token_prefix(b, text)
             if npfx:
                 notes.append("令牌前缀 %d" % npfx)

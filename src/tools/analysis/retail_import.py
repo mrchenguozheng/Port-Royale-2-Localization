@@ -211,6 +211,9 @@ RUN_RX = re.compile(r"(?:<n(?::[^<>]*)?>)+")
 #: 换行标签的两个形态：`<n>` 与带参数的 `<n:25>`。两者都是结构，个数都要跟基准一样。
 NL_RX = re.compile(r"<n(?::[^<>]*)?>")
 SENT_END_RX = re.compile(r"[.!?:»”\"](?=\s|<|$)")
+#: 严档句末：冒号、引号、书名号收尾都不算句子结束。参照层用这一档——`"Страны"` 后面
+#: 是 `хроники`（同一个状语），在那儿插换行会把标题和正文劈成两段。
+STRICT_END_RX = re.compile(r"[.!?…](?=\s|<|$)")
 
 
 def _segments(text):
@@ -223,21 +226,28 @@ def _segments(text):
     return [(a, b, text[a:b]) for a, b in segs]
 
 
-def _pick_break(text):
+def _pick_break(text, strict=False):
     """挑一个不拆句、不贴已有换行堆的切点；实在没有就退到行末。
 
     顺序：最长的段里的句末（两侧都还有 6 个字）→ 任一段的句末（两侧都还有字）→
     任一段的分句处（逗号／分号／冒号后）→ 行末。越往后位置越像「推定」，报告会写出来。
+
+    `strict=True` 只要句末标点后那一档：参照层用。句子中间插换行改的是排版事实，
+    猜错了比不补更糟（ru `0x1a444b3e` 会被插在 `"Страны"` 与 `хроники` 之间，
+    把标题和正文劈开）。
     """
     segs = sorted(_segments(text), key=lambda s: -len(s[2]))
+    rx = STRICT_END_RX if strict else SENT_END_RX
     for sloppy in (False, True):
         for a, b, seg in segs:
-            ends = [a + m.end() for m in SENT_END_RX.finditer(seg)]
+            ends = [a + m.end() for m in rx.finditer(seg)]
             cands = [p for p in ends
                      if p - a > (0 if sloppy else 6) and b - p > (0 if sloppy else 6)]
             if cands:
                 mid = a + len(seg) / 2
                 return min(cands, key=lambda p: abs(p - mid))
+    if strict:
+        return None
     for a, b, seg in segs:
         clauses = [a + m.end() for m in re.finditer(r"[,;](?=\s)", seg)]
         if clauses:
@@ -246,14 +256,18 @@ def _pick_break(text):
     return None
 
 
-def _insert_n(text, k, unit="<n>"):
+def _insert_n(text, k, unit="<n>", strict=False):
     """插入 k 个换行单元。个数必须与基准一致；切点按 `_pick_break` 挑，挑不到就挂到行末。
 
     拆句中段最难看（`0x2efebfe6` 一行一句话），所以宁可多一个空段也不在词中间断。
+
+    `strict=True` 挑不到句末就不补（返回的文本少几个，调用方照差额报出来）。
     """
     for _ in range(k):
-        pos = _pick_break(text)
+        pos = _pick_break(text, strict=strict)
         if pos is None:
+            if strict:
+                break
             text = text.rstrip(" ") + unit
         else:
             text = text[:pos] + unit + text[pos:].lstrip(" ")
@@ -343,7 +357,7 @@ def _pct_columns(base, out):
     return PCT_PAREN_RX.sub(repl, out), fixed[0]
 
 
-def structural_fix(base, text):
+def structural_fix(base, text, strip=True, strict_break=False):
     """按基准对齐结构：百分列、`<t>` 项目符号、换行标签个数。只排队，不判对错。
 
     拆出来给两个出口共用：`repair_tags`（导入前就地修，修不动就整行放弃）与
@@ -352,6 +366,13 @@ def structural_fix(base, text):
     换行标签**个数必须与基准一致**，`<n>` 与带参数的 `<n:25>` 各自按类算：少就补
     （切点按段内句末推定，推不动退到段中点的词边界），多就删（删后面最长的那段）。
     参数值照抄基准里那一个，不自己编。
+
+    `strip=False` 时只补不删。参照层要用这个：零售的段落划分是它自己的排版（德语文
+    本更长、段落更多，或把两段并作一段），按基准删会把一整段挤成一行，比不修更糟。
+    译文层保留默认 `strip=True`——译文本来就该服从基准的分段。
+
+    `strict_break=True` 时换行只补在句末、带参换行（`<n:25>`）一律不自动补。零售层
+    还要这个：它的句子与基准不是逐句对应，句中切点只能人给。
     """
     out, notes = text, []
     out, cols = _pct_columns(base, out)
@@ -372,17 +393,28 @@ def structural_fix(base, text):
     for unit in sorted(set(NL_RX.findall(base)) | set(NL_RX.findall(out))):
         want, got = base.count(unit), out.count(unit)
         if want > got:
+            if strict_break and unit.startswith("<n:"):
+                notes.append("缺 %s %d（带参换行不自动补，位置要人定）" % (unit, want - got))
+                continue
+            if strict_break and want - got > 2:
+                # 一处两处还能说是段落边界丢了；差三处以上说明这条的段落划分本来就
+                # 和基准不一样（零售把整条压成一段、或换了断法），自动补是瞎猜。
+                notes.append("缺 %s %d（缺口超过 2 处，切点要人定）" % (unit, want - got))
+                continue
             if unit == "<n>":
                 # 差额成对时补一整个段落 `<n><n>`，零头再补单个。
-                out = _insert_n(out, (want - got) // 2, "<n><n>")
+                out = _insert_n(out, (want - got) // 2, "<n><n>", strict_break)
                 if (want - got) % 2:
-                    out = _insert_n(out, 1)
+                    out = _insert_n(out, 1, strict=strict_break)
             else:
-                out = _insert_n(out, want - got, unit)
+                out = _insert_n(out, want - got, unit, strict_break)
             left = want - out.count(unit)
             notes.append("补 %s %d%s" % (unit, want - got,
                                          "" if not left else "（%d 个没找到切点）" % left))
         elif want < got:
+            if not strip:
+                notes.append("多 %s %d（保留）" % (unit, got - want))
+                continue
             out = _strip_n(out, got - want, unit)
             left = out.count(unit) - want
             notes.append("删 %s %d%s" % (unit, got - want,
