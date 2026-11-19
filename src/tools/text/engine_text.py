@@ -16,7 +16,7 @@ r"""engine_text.py —— 译文层 → 引擎层（构建期的唯一入口）�
     spec = lang_rules.get_spec(lang)   # 标点 / 分词器 / 补空格，见 lang_rules/spec.py
     zh     标点全角化 + 连词/人名 + 按词补空格（Spacing mode=group）
     ja     助词后空格 + 标点规范化（Spacing mode=particle）
-    fr     标点前置不换行空格（NBSP），不补词间空格（Spacing mode=none）
+    fr     显式透传：法语排版（? ! ; : % 前的 NBSP）已写在译文里，构建期不改字面
     de/es/ru/ko  显式透传：模块存在、`SKIP` 里写明理由，`spec()` 不加工
     en/其他 未登记语言同样原样返回
 

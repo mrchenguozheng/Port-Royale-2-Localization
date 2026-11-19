@@ -250,6 +250,53 @@ def fr_unit_checks(tr):
     return out
 
 
+def fr_typo_checks(tr, W):
+    """法语：`? ! ; :` 前、百分号前那一格必须是不换行空格（NBSP）。
+
+    这一格是**译文层**的字面约定（fr.toml 里直接写 U+00A0），构建期不再改一遍，
+    所以复核放在内容层：写成一格普通空格的会被引擎当断行点、问号可能单独掉行；
+    写成紧贴的则不符合法语排版。判据只认「字形/断行机制」，属 W 级。
+
+    豁免与写盘脚本一致：标签 `<…>`、标注 `[…]` 内部不查；时间 `12:30`、网址
+    `http://`、比例、以及 `%1:%2:%3` 这类时间模板的冒号不算句子冒号；
+    `%1` 这类占位符不是百分号；符号表（字符集自检串）整条跳过。
+    """
+    nbsp = "\u00a0"
+    mask_rx = re.compile(r"<[^<>]*>|\[[^\[\]]*\]")
+    odd_rx = re.compile(r"[`\\^|~\[\]{}]")
+    wordlike = "\"'\u2019\u201d)]}\u2026"
+    for k, v in tr.items():
+        if k in KEEP or not v:
+            continue
+        body = mask_rx.sub(lambda m: "\x00" * len(m.group(0)), v)
+        if len(odd_rx.findall(body.replace("\x00", " "))) >= 2:
+            continue
+        for i, ch in enumerate(body):
+            if ch not in "?!;:%":
+                continue
+            j = i - 1
+            while j >= 0 and body[j] in (" ", nbsp):
+                j -= 1
+            prev = body[j] if j >= 0 else ""
+            if not (prev.isalnum() or prev in wordlike or prev == "\x00"):
+                continue
+            nxt = body[i + 1] if i + 1 < len(body) else ""
+            if ch == ":" and ((prev.isdigit() and nxt.isdigit()) or nxt == "/"):
+                continue
+            if ch == ":" and prev.isdigit() and nxt == "%":
+                continue        # `%1:%2:%3` 是时:分:秒模板
+            if ch == "%" and nxt.isalnum():
+                continue
+            at = body[i - 1] if i else ""
+            if at == nbsp:
+                continue
+            if at == " ":
+                W.append((k, "标点前是普通空格（会断行）",
+                          v[max(0, i - 10):i + 2]))
+            else:
+                W.append((k, "标点前缺一格 NBSP", v[max(0, i - 10):i + 2]))
+
+
 def main(argv):
     lang = "zh"
     show_all = "--all" in argv
@@ -340,6 +387,7 @@ def main(argv):
         es_checks(tr, W)
     elif lang == "fr":
         E.extend(fr_unit_checks(tr))
+        fr_typo_checks(tr_raw, W)
 
     # 内联标注（[town:…] / [lit:…] / [term:…]）：未定义引用、缺形态、方括号写错、死条目
     # 自造 clue 标签（非 `_` 开头、也不是已知类型）只做关键词扫描、没有任何校验，

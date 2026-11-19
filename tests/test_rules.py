@@ -264,33 +264,18 @@ class TestSpecInterface(unittest.TestCase):
         self.assertEqual(out, doc)
 
     def test_fr_spec_parts(self):
-        """法语：只把已有一格改成 NBSP；不补空格、分词与补空格显式不做。"""
+        """法语：构建期不加工——排版（NBSP）已经写在译文里。"""
         sp = lang_rules.get_spec("fr")
         self.assertEqual((sp.code, sp.spacing.mode), ("fr", "none"))
+        self.assertIsNone(sp.punct)
         self.assertIsNone(sp.segmenter.tag("x"))
-        norm = sp.punct.normalize
-        self.assertEqual(norm("Vraiment ?"), "Vraiment\u00a0?")
-        self.assertEqual(norm("Vraiment  ?"), "Vraiment\u00a0?")   # 多格并成一格
-        self.assertEqual(norm("Or : 100"), "Or\u00a0: 100")
-        self.assertEqual(norm("50 %"), "50\u00a0%")
-        self.assertEqual(norm("le pirate %1 ?"), "le pirate %1\u00a0?")
-        # 没写格子的一律不补（补空格是译文作者的事）
-        self.assertEqual(norm("Vraiment?"), "Vraiment?")
-        self.assertEqual(norm("50%"), "50%")
-        self.assertEqual(norm("%1:"), "%1:")
-        self.assertEqual(norm("@T$DestTown$?"), "@T$DestTown$?")
-        self.assertEqual(norm("<gs:TEXT:X>? oui"), "<gs:TEXT:X>? oui")
-        # 时间、网址、标签里的冒号不是句子标点
-        self.assertEqual(norm("12:30"), "12:30")
-        self.assertEqual(norm("http://a.b"), "http://a.b")
-        self.assertEqual(norm("<gs:TEXT:X> oui"), "<gs:TEXT:X> oui")
-        # 字符集自检串（0x11f0398f）整条不动
-        sym = "``°§$%&()=?\\^';,:<|>@/*~[]²³€"
-        self.assertEqual(norm(sym), sym)
+        doc = {"0x1": "Vraiment\u00a0? Or\u00a0: 100", "0x2": "%1:%2:%3"}
+        out, _stats, _seg = specs.build_texts(sp, doc, ["0x1", "0x2"])
+        self.assertEqual(out, doc)
 
     def test_skip_languages_are_declared(self):
-        """de/es/ru/ko 不加工，但必须是「显式声明」：模块在、理由在、行为确定。"""
-        for lang in ("de", "es", "ru", "ko"):
+        """de/es/ru/ko/fr 不加工，但必须是「显式声明」：模块在、理由在、行为确定。"""
+        for lang in ("de", "es", "ru", "ko", "fr"):
             mod = lang_rules.get(lang)
             self.assertIsNotNone(mod, lang)
             self.assertTrue(getattr(mod, "SKIP", "").strip(), lang)
