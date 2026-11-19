@@ -128,6 +128,17 @@ class TestApplyMap(unittest.TestCase):
         self.assertEqual(len(stats["lang"]), 1)
         self.assertEqual(self._read()["0xa4"], "안녕")
 
+    def test_keep_entry_may_be_written_back_to_english(self):
+        """名单内的职员表：写回英文原名是修正，不是抄错行。"""
+        os.makedirs(os.path.join(self.src, "data", "keep_as_is"))
+        with open(os.path.join(self.src, "data", "keep_as_is", "ko.txt"),
+                  "w", encoding="utf-8") as f:
+            f.write("0xa4\tcredit\n")
+        stats = T.apply_map("ko", {"0xa4": "Hello"})
+        self.assertEqual(stats["hit"], 1)
+        self.assertEqual(stats["lang"], [])
+        self.assertEqual(self._read()["0xa4"], "Hello")
+
     def test_translated_entry_can_be_corrected(self):
         stats = T.apply_map("ko", {"안녕": "안녕하십니까"})
         self.assertEqual(stats["hit"], 1)
@@ -244,6 +255,20 @@ class TestKeepAsIs(unittest.TestCase):
         T.set_src(self.src)
         os.remove(os.path.join(self.src, "data", "keep_as_is", "ko.txt"))
         self.assertEqual(T.keep_as_is("ko"), {})
+
+    def test_common_baseline_is_shared_by_all_langs(self):
+        """七语共用的职员表只在 _common.txt 写一遍，各语言文件不必抄。"""
+        with open(os.path.join(self.src, "data", "keep_as_is", "_common.txt"),
+                  "w", encoding="utf-8") as f:
+            f.write("0xc1\tcredit\n0xc2\tsave-name\n")
+        for lang in ("ko", "ja", "zh"):
+            self.assertEqual(T.keep_as_is(lang).get("0xc1"), "credit")
+        # 语言文件里的同名条目覆盖基线
+        with open(os.path.join(self.src, "data", "keep_as_is", "ko.txt"),
+                  "a", encoding="utf-8") as f:
+            f.write("0xc2\tkey\n")
+        self.assertEqual(T.keep_as_is("ko")["0xc2"], "key")
+        self.assertEqual(T.keep_as_is("ja")["0xc2"], "save-name")
 
 
 class TestDumpGroups(unittest.TestCase):

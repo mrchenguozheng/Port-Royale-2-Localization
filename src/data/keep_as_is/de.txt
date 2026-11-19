@@ -4,5 +4,4 @@
 #
 # save-name 的判据与其余不同：值不必等于英文，但不许出现非 ASCII 字符 ——
 # PR2.exe 只导入 ANSI 版文件 API，非 ASCII 文件名写出去就是乱码，读回来弹「存档无效」。
-0x33c2c533	save-name
-0xd0d692a5	save-name
+# 七语共用的条目（职员表、场景存档名、存档名模板）在 _common.txt，本文件只写本语言独有的。

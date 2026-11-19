@@ -377,19 +377,23 @@ def keep_as_is(lang):
     这些条目（按键名 F1/ESC、表头 Looted<t>…、职员表、脚本 id）的正确译法
     就是英文原样。不单列出来，它们会永久占着「待译」，进度永远到不了 100%，
     也分不清剩下的是「没干」还是「不该干」。
+
+    读两份：`_common.txt`（七种语言共用，职员表、存档名模板都在这里）+ `<lang>.txt`
+    （语言自己的按键名/表头）。同一个 id 两边都写了，以语言文件为准。
     """
-    path = os.path.join(keep_dir(), lang + ".txt")
     out = {}
-    if not os.path.exists(path):
-        return out
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            parts = line.split("\t")
-            if len(parts) >= 2:
-                out[parts[0].strip()] = parts[1].strip()
+    for name in ("_common.txt", lang + ".txt"):
+        path = os.path.join(keep_dir(), name)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split("\t")
+                if len(parts) >= 2:
+                    out[parts[0].strip()] = parts[1].strip()
     return out
 
 
@@ -511,6 +515,8 @@ def apply_map(lang, mapping, dry_run=False):
     bad_josa, bad_tok, bad_lang = [], [], []
     script = lang_rules.script_re(lang)
     ph_bare, ph_pair = josa_rules()
+    #: 有意不译的条目：它们**正确**的值就是英文原串，写回去不算「抄错行」。
+    keep_ids = set(keep_as_is(lang))
 
     #: 已经落过盘的译文：映射里没按源串命中的键，可能只是「已经应用过」。
     landed = set()
@@ -547,8 +553,10 @@ def apply_map(lang, mapping, dry_run=False):
             bad_josa.append((hid, val))
             continue
         # 映射值必须是目标文字：韩语映射里写回英文，多半是抄错了行。
+        # 例外是名单内条目 —— 它们的正确值本来就是英文，用来把译错的名字改回去。
         vis = content_of(val)
-        if script is not None and LETTER_RX.search(vis) and not script.search(vis):
+        if (script is not None and hid not in keep_ids
+                and LETTER_RX.search(vis) and not script.search(vis)):
             bad_lang.append((hid, val))
             continue
         doc[hid] = val

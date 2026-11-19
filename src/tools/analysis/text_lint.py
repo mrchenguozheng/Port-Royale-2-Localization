@@ -55,7 +55,7 @@ VAR_CODE_MULTI = {"Pos", "USER"}
 # 等实机对照后再决定，豁免只收这一个键。
 VAR_CODE_ORIG = {"0xca4930dc"}
 
-KEEP = {"0xfc512ea5"}
+KEEP = set()
 
 #: 有意不译清单与术语表。两者都在 src/data 下，按语言分文件。
 KEEP_DIR = os.path.join(ROOT, "src", "data", "keep_as_is")
@@ -63,19 +63,20 @@ TERMS_DIR = os.path.join(ROOT, "src", "data", "terms")
 
 
 def load_keep(lang):
-    """{id: 理由}；文件不存在返回空。"""
-    path = os.path.join(KEEP_DIR, lang + ".txt")
+    """{id: 理由}；读 `_common.txt`（七语共用）再读 `<lang>.txt`，后者覆盖前者。"""
     out = {}
-    if not os.path.exists(path):
-        return out
-    with open(path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            parts = line.split("\t")
-            if len(parts) >= 2:
-                out[parts[0].strip()] = parts[1].strip()
+    for name in ("_common.txt", lang + ".txt"):
+        path = os.path.join(KEEP_DIR, name)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split("\t")
+                if len(parts) >= 2:
+                    out[parts[0].strip()] = parts[1].strip()
     return out
 
 
@@ -391,6 +392,9 @@ def main(argv):
     # 会被当成同原文异译。标注本身的检查另走 check_doc（用带标注原文）。
     tr = MK.expand_doc(lang, tr_raw)
     zh_mode = lang == "zh"
+    # 有意不译的条目（七语共用基线 + 本语言）：语言层检查一律跳过它们
+    KEEP.clear()
+    KEEP.update(load_keep(lang))
 
     # 变量名 → 各格式码在本文里的出现次数，供逐行查孤例
     codes = {}
