@@ -68,7 +68,7 @@ if HERE not in sys.path:
 # 占位符与标签规则只有一份，在 shared\core\validate.py。
 # 这里转出来，是为了让 `import translate as T` 的老调用点（编辑器、
 # 审计脚本）继续能用 T.tokens / T.tag_profile。
-from shared.core.validate import PH_RE, tag_profile, tokens  # noqa: E402
+from shared.core.validate import PH_RE, tag_profile, token_counts, tokens  # noqa: E402
 from text import lang_rules, toml_io  # noqa: E402
 
 STRINGS_DIR = os.path.join(SRC, "translations")
@@ -292,11 +292,11 @@ def check_overrides(code):
     ov = load_overrides(code)
     missing = [i for i in ov if i not in raw]
     bad_tok = [i for i, t in ov.items()
-               if i in raw and sorted(tokens(t)) != sorted(tokens(raw[i]))]
+               if i in raw and token_counts(t) != token_counts(raw[i])]
     noop = [i for i, t in ov.items() if i in raw and t.strip() == str(raw[i]).strip()]
     for i in bad_tok:
         print("  token  %s  原版 %s | 微调 %s"
-              % (i, tokens(raw[i]), tokens(ov[i])))
+              % (i, dict(token_counts(raw[i])), dict(token_counts(ov[i]))))
     for i in missing:
         print("  缺条目 %s" % i)
     for i in noop:
@@ -487,8 +487,11 @@ def load_map(path):
 
 
 def token_diff(old, new):
-    """占位符/token 与原文比，缺了或多了都算不合格（顺序允许调）。"""
-    return sorted(tokens(old)) != sorted(tokens(new))
+    """占位符与原文比，缺了或多了都算不合格（顺序允许调）。
+
+    比的是**个数**：原文两处 `@G$Goods$`、译文只留一处，也必须报出来。
+    """
+    return token_counts(old) != token_counts(new)
 
 
 def apply_map(lang, mapping, dry_run=False):
@@ -517,6 +520,12 @@ def apply_map(lang, mapping, dry_run=False):
     ph_bare, ph_pair = josa_rules()
     #: 有意不译的条目：它们**正确**的值就是英文原串，写回去不算「抄错行」。
     keep_ids = set(keep_as_is(lang))
+    #: 英文基准：占位符个数以它为准。拿现值比是没用的 —— 现值本身可能就是
+    #: 少了一个 @G$Goods$ 的旧译文，那样只会「错得一致」。
+    try:
+        en_by_id = {e["id"]: e.get(BASE_LANG, "") for e in entries(load_toml())}
+    except (OSError, SystemExit):
+        en_by_id = {}                      # 单测的临时 src 里没有 orig/，按现值比
 
     #: 已经落过盘的译文：映射里没按源串命中的键，可能只是「已经应用过」。
     landed = set()
@@ -541,12 +550,26 @@ def apply_map(lang, mapping, dry_run=False):
             same += 1                      # 映射与现值一模一样
             used.add(key)
             continue
+        # 按 id 重放同一份映射：值没变就是「已是当前值」，不是「修正」。
+        # 以前一律算 hit + rewrite，重放会报「修正 40 条 / 已是当前值 0 条」，
+        # 幂等核对时看着像全都改过。
+        if by_id and key == new.strip():
+            same += 1
+            used.add(hid)
+            continue
         if script is not None and script.search(content_of(cur)):
             rewritten += 1                 # 现值是目标文字：这次是修正
         lead = cur[:len(cur) - len(cur.lstrip())]
         trail = cur[len(cur.rstrip()):]
         val = lead + new.strip() + trail
-        if token_diff(cur, val):
+        # 占位符按**个数**比英文（语序不管）：原文两处 @G$Goods$、译文只留一处
+        # 也必须拦下，否则界面上会少印一个货物名。
+        base = en_by_id.get(hid)
+        if base is not None:
+            bad = token_counts(base) != token_counts(val)
+        else:
+            bad = token_diff(cur, val)
+        if bad:
             bad_tok.append(hid)
             continue
         if ph_bare is not None and not ph_pair.search(val) and ph_bare.search(val):
@@ -575,11 +598,13 @@ def apply_map(lang, mapping, dry_run=False):
         print("拒绝落盘：%d 条 token 与原文不齐、%d 条占位符后接助词、"
               "%d 条映射值不是目标文字。" % (len(bad_tok), len(bad_josa),
                                           len(bad_lang)))
-        for hid in bad_tok[:5]:
+        # 全列，不再只印前 5 条：一批 40 条里往往一次就有七八条同类问题，
+        # 只印 5 条就得改—重跑—再改，白跑两三轮。
+        for hid in bad_tok:
             print("  token  %s  %s" % (hid, doc.get(hid, "")[:60]))
-        for hid, val in bad_josa[:5]:
+        for hid, val in bad_josa:
             print("  助词   %s  %s" % (hid, val[:60]))
-        for hid, val in bad_lang[:5]:
+        for hid, val in bad_lang:
             print("  非目标文字 %s  %s" % (hid, val[:60]))
         print("改完映射后重跑；本次一个字节都没写。")
         return stats
@@ -661,10 +686,14 @@ def skeleton(text):
     return re.sub(r"\u00a7+", "\u00a7", text).strip()
 
 
-def dump_lines(es, field, band, limit, by_group=False):
+def dump_lines(es, field, band, limit, by_group=False, order=None):
     """把待译条目渲染成批次清单的行（首行是注释头的第 1 行）。
 
     纯函数，不碰文件：`cmd_dump` 只负责读数据与写盘，单测直接喂合成条目。
+
+    `order="short"` 按可见字数从短到长取，短档先清。默认（None）保持表序，
+    也就是 `--band long` 一直是 >80 那一档 —— 41–80 的 42 条因此会被 8 批
+    `>80` 压在后面，而它们更短、在界面和任务板上出现得更频繁。
     """
     pend = pending_of(es, field)
 
@@ -690,11 +719,23 @@ def dump_lines(es, field, band, limit, by_group=False):
             seen.add(sk)
             keep.append(e)
         in_band = keep
+    if order == "short":
+        in_band = sorted(in_band, key=lambda e: len(content_of(e.get(field, ""))))
+    elif order == "long":
+        in_band = sorted(in_band, key=lambda e: -len(content_of(e.get(field, ""))))
     rows = in_band[:limit] if limit > 0 else in_band
 
+    # 队列全貌：只报当前档的话，「还剩多少、别的档排在哪」看不见
+    queue = {}
+    for e in pend:
+        lab = band_label(*band_of(content_of(e.get(field, ""))))
+        queue[lab] = queue.get(lab, 0) + 1
+    qsum = "  ".join("%s:%d" % (band_label(*b), queue[band_label(*b)])
+                     for b in BANDS if band_label(*b) in queue)
     lines = ["# 待译批次：%s  共 %d 条（待译 %d 条，该档 %d 条）%s"
              % (band_label(*band) if band else "全部", len(rows), len(pend),
                 len(in_band), "  按骨架分组" if by_group else ""),
+             "# 全队列 %s" % qsum,
              "# 制表符分隔：id / 可见字数 / 英文原文（换行写作 \\n）",
              "# 行末 dup:N = 与另外几条共用同一句英文；需不同译法时用 id 作键"
              "：{\"0x...\": \"译文\"}；grp:N = 与另外几条只差占位符/标签，"
@@ -745,16 +786,18 @@ def cmd_dump(args):
     if args.band not in BAND_KEYS:
         raise SystemExit("--band 只认 %s。" % "、".join(BAND_KEYS))
     field = args.lang or target_field()
+    order = getattr(args, "order", None)
     lines = dump_lines(entries(load_toml()), field,
-                       BAND_KEYS[args.band], args.limit, args.by_group)
+                       BAND_KEYS[args.band], args.limit, args.by_group, order)
     body = "\n".join(lines) + "\n"
+    n_rows = sum(1 for ln in lines if not ln.startswith("#"))
     if args.out:
         parent = os.path.dirname(os.path.abspath(args.out))
         if parent and not os.path.isdir(parent):
             os.makedirs(parent, exist_ok=True)
         with open(args.out, "w", encoding="utf-8", newline="\n") as f:
             f.write(body)
-        print("[%s] 导出 %d 条 → %s" % (field, len(lines) - 3, args.out))
+        print("[%s] 导出 %d 条 → %s" % (field, n_rows, args.out))
     else:
         sys.stdout.write(body)
     return 0
@@ -842,6 +885,8 @@ def main():
     p.add_argument("--limit", type=int, default=40, help="最多导几条，0 = 不限")
     p.add_argument("--by-group", action="store_true",
                    help="按骨架去重：只留每组一条代表句")
+    p.add_argument("--order", choices=("short", "long"), default=None,
+                   help="short=可见字数从短到长取，先把短档清掉；默认按表序")
     p.add_argument("--out", default="", help="写到这个文件；不给就打到 stdout")
     p.set_defaults(fn=cmd_dump)
 

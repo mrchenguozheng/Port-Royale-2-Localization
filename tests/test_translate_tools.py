@@ -168,6 +168,19 @@ class TestApplyMap(unittest.TestCase):
         self.assertEqual(stats["tokens"], ["0xa3"])
         self.assertEqual(self._read()["0xa3"], "Take %1 now")
 
+    def test_duplicate_placeholder_counts(self):
+        """原文同一个占位符出现两处、译文只留一处 → 拦下（集合比会漏）。"""
+        self.assertTrue(T.token_diff("buy @G$Goods$ then @G$Goods$", "사고 @G$Goods$"))
+        self.assertFalse(T.token_diff("@G$Goods$ @G$Goods$", "@G$Goods$ @G$Goods$"))
+
+    def test_id_replay_is_counted_as_same_not_rewrite(self):
+        """按 id 重放同一份映射：值没变就是「已是当前值」，不是「修正」。"""
+        T.apply_map("ko", {"0xa1": "안녕하세요"})
+        again = T.apply_map("ko", {"0xa1": "안녕하세요"})
+        self.assertEqual(again["hit"], 0)
+        self.assertEqual(again["rewrite"], 0)
+        self.assertGreaterEqual(again["same"], 1)
+
     def test_dry_run_does_not_write(self):
         stats = T.apply_map("ko", {"Hello": "안녕하세요"}, dry_run=True)
         self.assertEqual(stats["hit"], 1)
@@ -202,7 +215,21 @@ class TestDumpLines(unittest.TestCase):
     def test_header_states_counts(self):
         lines = T.dump_lines(self._es(), "ko", (81, None), 0)
         self.assertIn("该档 2 条", lines[0])
-        self.assertTrue(lines[2].startswith("#"))
+        self.assertTrue(lines[3].startswith("#"))
+
+    def test_header_lists_whole_queue(self):
+        """只报当前档看不见别档还剩多少；新表头把全队列各档一起列出来。"""
+        lines = T.dump_lines(self._es(), "ko", (81, None), 0)
+        self.assertIn("全队列", lines[1])
+        self.assertIn(">80:2", lines[1])
+
+    def test_order_short_takes_shortest_first(self):
+        es = [{"id": "0xb2", "ko": "A" * 90},
+              {"id": "0xb6", "ko": "C" * 120},
+              {"id": "0xb7", "ko": "D" * 100}]
+        rows = [l for l in T.dump_lines(es, "ko", (81, None), 2, order="short")
+                if not l.startswith("#")]
+        self.assertEqual([r.split("\t")[0] for r in rows], ["0xb2", "0xb7"])
 
     def test_identical_sources_are_flagged(self):
         es = [{"id": "0xb2", "ko": "Same " + "A" * 85},

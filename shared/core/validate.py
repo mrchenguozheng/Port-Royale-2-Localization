@@ -55,13 +55,29 @@ PH_RE = re.compile(r"^\s*0x[0-9a-fA-F]{6,8}\s*\|")
 
 
 def tokens(text):
-    """占位符集合，**按字面**取（%02 与 %2 不同）。顺序不管，各语言语序不同。"""
+    """占位符集合，**按字面**取（%02 与 %2 不同）。顺序不管，各语言语序不同。
+
+    只看「有没有」：同一占位符写两遍与写一遍在这里等价。要抓「漏掉重复的
+    那一处」用 `token_counts()`。
+    """
     if text is None:
         return set()
     t = RE_TAG_ALL.sub(" ", str(text))
     out = set(RE_SCRIPT.findall(t))
     out |= set(RE_POS.findall(t))
     return out
+
+
+def token_counts(text):
+    """占位符**计数**：同一占位符出现两次就是 2。
+
+    `tokens()` 用集合比，`@G$Goods$` 在原文出现两处、译文只留一处也会判成一致
+    —— 界面上就是少印一个货物名。语序仍不管，只比各占位符的个数。
+    """
+    if text is None:
+        return Counter()
+    t = RE_TAG_ALL.sub(" ", str(text))
+    return Counter(RE_SCRIPT.findall(t) + RE_POS.findall(t))
 
 
 def tag_counts(text):
