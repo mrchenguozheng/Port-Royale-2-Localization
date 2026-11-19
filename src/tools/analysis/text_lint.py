@@ -36,6 +36,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 
 EN = os.path.join(ROOT, "src", "orig", "en.gog_1.1.2.3.toml")
 TR = os.path.join(ROOT, "src", "translations", "%s.toml")
+#: 已判定为误报的 W 级条目清单（一行 `id<TAB>理由`）。
+LINT_OK = os.path.join(ROOT, "src", "data", "lint_ok")
 
 # 模板只比「会被引擎解释的东西」：%N、@x$Name$、<n>/<c>/<t>/<ts:N>/<gs:…> 一类。
 # 字体资源 <f:…> 不进模板（允许按字形替换，见 09 卷定则），另按资源名单独检查。
@@ -517,6 +519,30 @@ def keep_violations(keep, tr, en):
     return W
 
 
+def load_lint_ok(lang):
+    """已判定为误报的 W 级条目：`src/data/lint_ok/<语言>.txt`，一行 `id<TAB>理由`。
+
+    W 级里有一类永远不会靠改译文消失 —— 判据本身不该管的那种（生卒年不确定的
+    `?`、纯标点的图标条目、引文里的常体、字形覆盖测试串）。以前每次重跑都要
+    重新判断一遍，判断结果只留在口头和提交信息里。落到文件里才有积累：
+    被豁免的条目不会静默消失，报告头会点名列出理由。
+    """
+    out = {}
+    for name in ("_common.txt", "%s.txt" % lang):
+        path = os.path.join(LINT_OK, name)
+        if not os.path.exists(path):
+            continue
+        for line in io.open(path, encoding="utf-8").read().splitlines():
+            line = line.rstrip("\n")
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            parts = line.split("\t")
+            hid = parts[0].strip()
+            if hid:
+                out[hid] = parts[1].strip() if len(parts) > 1 else ""
+    return out
+
+
 def main(argv):
     lang = "zh"
     show_all = "--all" in argv
@@ -681,7 +707,17 @@ def main(argv):
 
     lines = []
     lines.append("# %s 机械复核（判据见 09 卷已落卷定则）\n" % lang)
+    # 豁免只对 W 级：E 级一律不许免（模板不一致、空值、标注错误这些改得动，也不该留）。
+    waived = load_lint_ok(lang)
+    dropped = [(k, why, ctx) for k, why, ctx in W if k in waived]
+    W = [(k, why, ctx) for k, why, ctx in W if k not in waived]
     lines.append("E 级 %d 条，W 级 %d 条。\n" % (len(E), len(W)))
+    if dropped:
+        lines.append("已豁免 W 级 %d 条（判据不该管的那类，理由见 "
+                     "src/data/lint_ok/%s.txt）：\n" % (len(dropped), lang))
+        for k, why, ctx in dropped:
+            lines.append("  %s  %s  —— %s" % (k, why, waived[k] or "未写理由"))
+        lines.append("")
     if shadow:
         lines.append("以基准版为占位／标识的名单条目 %d 条（版本差：英文／法文两版"
                      "都只有标识或空占位，不参与「等于英文」比对）：%s\n"

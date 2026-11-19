@@ -5,6 +5,8 @@
 指过去，测完再指回来。
 """
 
+import contextlib
+import io
 import os
 import shutil
 import sys
@@ -281,6 +283,22 @@ class TestApplyMap(unittest.TestCase):
         self.assertEqual(stats["hit"], 1)
         self.assertEqual(self._read()["0xa1"], " Hello ")
 
+    def test_bad_entry_does_not_block_the_good_ones(self):
+        """一批里夹着坏值：坏条目跳过、好条目照常写（以前是整批一个字节都不写）。"""
+        stats = T.apply_map("ko", {"Take %1 now": "지금 %1를 가지세요",
+                                   "Hello": "안녕하세요",
+                                   "World": "세계"})
+        self.assertEqual(stats["hit"], 2)
+        self.assertEqual(stats["skipped"], 1)
+        doc = self._read()
+        self.assertEqual(doc["0xa1"], " 안녕하세요 ")
+        self.assertEqual(doc["0xa2"], "세계")
+        self.assertEqual(doc["0xa3"], "Take %1 now")   # 坏的没写
+
+    def test_skipped_count_is_zero_when_everything_passes(self):
+        stats = T.apply_map("ko", {"Hello": "안녕하세요"})
+        self.assertEqual(stats["skipped"], 0)
+
     def test_reference_language_is_refused(self):
         with self.assertRaises(SystemExit):
             T.apply_map("en.gog_1.1.2.3", {"Hello": "안녕"})
@@ -510,6 +528,39 @@ class TestOverrides(unittest.TestCase):
     def test_noop_is_flagged(self):
         missing, bad_tok, noop = T.check_overrides("en")
         self.assertEqual(noop, ["0xe3"])
+
+
+class TestReportStatus(unittest.TestCase):
+    """status 要能把「判据把已有译文判错了」与「真的没译」分开报。"""
+
+    def _run(self, es, lang="ko"):
+        buf = io.StringIO()
+        old = T.keep_as_is
+        T.keep_as_is = lambda _lang: []
+        try:
+            with contextlib.redirect_stdout(buf):
+                T.report_status(lang, es)
+        finally:
+            T.keep_as_is = old
+        return buf.getvalue()
+
+    def test_non_target_script_values_are_flagged_as_suspicious(self):
+        # 汉字无谚文：韩语判据会把它算成待译，但值明显不是英文原串。
+        out = self._run([{"id": "0x1", "en.gog_1.1.2.3": "Assets", "ko": "資産"},
+                         {"id": "0x2", "en.gog_1.1.2.3": "Goods", "ko": "화물"}])
+        self.assertIn("待译 1 条", out)
+        self.assertIn("有文字但不是目标文字", out)
+        self.assertIn("0x1", out)
+
+    def test_english_leftover_is_not_called_suspicious(self):
+        # 值就是英文原串 —— 那是没译，不该栽赃给判据。
+        out = self._run([{"id": "0x3", "en.gog_1.1.2.3": "Assets", "ko": "Assets"}])
+        self.assertNotIn("有文字但不是目标文字", out)
+
+    def test_latin_languages_have_no_suspicious_line(self):
+        out = self._run([{"id": "0x4", "en.gog_1.1.2.3": "Assets",
+                          "de": "Anlagen"}], lang="de")
+        self.assertNotIn("有文字但不是目标文字", out)
 
 
 if __name__ == "__main__":

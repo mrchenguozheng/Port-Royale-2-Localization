@@ -225,9 +225,23 @@ def load_toml():
         ids = [r for r, _ in rows]
         if ids != order:
             if len(ids) != len(order):
+                # 删一行最常见的原因是「想让它变成不译」，但正确的做法是把值退回
+                # 英文原串、再去 <lang>.txt 登记理由 —— 删行会让这里所有条目错位。
+                lack = [rid for rid in order if rid not in set(ids)]
+                extra = [rid for rid in ids if rid not in set(order)]
+                hint = []
+                if lack:
+                    hint.append("缺 %d 条（%s）" % (len(lack), ", ".join(lack[:4]))
+                                + (" …" if len(lack) > 4 else ""))
+                if extra:
+                    hint.append("多 %d 条（%s）" % (len(extra), ", ".join(extra[:4]))
+                                + (" …" if len(extra) > 4 else ""))
                 raise SystemExit(
-                    "%s.toml 有 %d 条，%s.toml 有 %d 条——条目数不一致，无法合并。"
-                    % (lang, len(ids), BASE_LANG, len(order)))
+                    "%s.toml 有 %d 条，%s.toml 有 %d 条——条目数不一致，无法合并：%s。\n"
+                    "改法：条目必须留在文件里、值退回英文原串，再去 "
+                    "src/data/keep_as_is/%s.txt 登记 id 与理由；不要删行。"
+                    % (lang, len(ids), BASE_LANG, len(order), "；".join(hint) or "无法定位",
+                       lang))
             n = next(i for i, (a, b) in enumerate(zip(ids, order)) if a != b)
             raise SystemExit(
                 "%s.toml 第 %d 条是 %s，%s.toml 同位置是 %s——条目顺序不一致。"
@@ -457,6 +471,21 @@ def report_status(field, es):
     parts = ["%s:%d" % (band_label(lo, hi), len(buckets[(lo, hi)]))
              for lo, hi in BANDS if (lo, hi) in buckets]
     print("     待译长度分布：%s" % "  ".join(parts))
+    # 判据假阴性是一类反复出现的坑：值明明有文字、只是不是目标文字，
+    # 就会被算成「待译」，看着像几百条没译（ja 那次 560 条里 530 条是汉字标签）。
+    # 这里单独把这一堆挑出来，让人先怀疑判据、而不是先补译。
+    script = lang_rules.script_re(field)
+    if script is None:
+        return
+    suspect = [e["id"] for e in pend
+               if LETTER_RX.search(content_of(e.get(field, "")))
+               and not script.search(content_of(e.get(field, "")))
+               # 值就是英文原串 —— 那是没译，不是判据判错，不能栽赃给判据。
+               and content_of(e.get(field, "")) != content_of(e.get(BASE_LANG, ""))]
+    if suspect:
+        print("     其中 %d 条「有文字但不是目标文字」——先确认是没译，"
+              "还是判据把已有译文判错了（例：%s）"
+              % (len(suspect), ", ".join(suspect[:3])))
 
 
 def cmd_status(args):
@@ -568,9 +597,12 @@ def apply_map(lang, mapping, dry_run=False):
     #: 英文基准：占位符个数以它为准。拿现值比是没用的 —— 现值本身可能就是
     #: 少了一个 @G$Goods$ 的旧译文，那样只会「错得一致」。
     try:
-        en_by_id = {e["id"]: e.get(BASE_LANG, "") for e in entries(load_toml())}
+        rows_now = entries(load_toml())
+        en_by_id = {e["id"]: e.get(BASE_LANG, "") for e in rows_now}
+        zh_by_id = {e["id"]: e.get("zh", "") for e in rows_now}
     except (OSError, SystemExit):
         en_by_id = {}                      # 单测的临时 src 里没有 orig/，按现值比
+        zh_by_id = {}
 
     #: 已经落过盘的译文：映射里没按源串命中的键，可能只是「已经应用过」。
     landed = set()
@@ -665,11 +697,12 @@ def apply_map(lang, mapping, dry_run=False):
             continue
         # 映射值必须是目标文字：韩语映射里写回英文，多半是抄错了行。
         # 例外是名单内条目 —— 它们的正确值本来就是英文，用来把译错的名字改回去。
-        # 日文的汉字标签（`資産`、`名前`）本身不带假名，走 `is_translated` 同一判据。
-        vis = content_of(val)
+        # 判据直接复用 `is_translated`（含日文汉字、避让中文值），不再另写一份：
+        # 早先两套判据各写一遍，改了一处没改另一处，就会出现「status 说 0 条待译、
+        # apply 却说值不是目标文字」这种自相矛盾的报错。
         if (script is not None and hid not in keep_ids
-                and LETTER_RX.search(vis)
-                and not (script.search(vis) or (lang == "ja" and CJK_RX.search(vis)))):
+                and not is_translated(val, lang, base=base, script=script,
+                                      avoid=zh_by_id.get(hid) if lang == "ja" else None)):
             bad_lang.append((hid, val))
             continue
         doc[hid] = val
@@ -686,11 +719,17 @@ def apply_map(lang, mapping, dry_run=False):
              "rewrite": rewritten, "applied": applied, "ids": hit_ids}
 
     if bad_tok or bad_josa or bad_lang or bad_unit or bad_tag or bad_pair:
-        print("拒绝落盘：%d 条 token 与原文不齐、%d 条占位符／标签后接助词、"
-              "%d 条量词不对、%d 条标签与原文不一致、%d 条并列助词次序反了、"
-              "%d 条映射值不是目标文字。"
-              % (len(bad_tok), len(bad_josa), len(bad_unit), len(bad_tag),
-                 len(bad_pair), len(bad_lang)))
+        # 以前这里是「整批不写」：530 条映射里夹着 2 条值不合格的，就一个字节都不落盘，
+        # 于是好条目得陪着坏条目一起重来。现在只把不合格的挑出去，其余照常写 ——
+        # 单条坏值不该阻断整批，但也不许悄悄吞掉：逐条列出来，写盘条数如实报。
+        skip_n = (len(bad_tok) + len(bad_josa) + len(bad_lang)
+                  + len(bad_unit) + len(bad_tag) + len(bad_pair))
+        print("跳过 %d 条不合格的映射值（%d 条 token 与原文不齐、"
+              "%d 条占位符／标签后接助词、%d 条量词不对、%d 条标签不一致、"
+              "%d 条并列助词次序反了、%d 条不是目标文字），"
+              "其余 %d 条照常落盘："
+              % (skip_n, len(bad_tok), len(bad_josa), len(bad_unit),
+                 len(bad_tag), len(bad_pair), len(bad_lang), len(hit_ids)))
         # 全列，不再只印前 5 条：一批 40 条里往往一次就有七八条同类问题，
         # 只印 5 条就得改—重跑—再改，白跑两三轮。
         for hid in bad_tok:
@@ -711,11 +750,12 @@ def apply_map(lang, mapping, dry_run=False):
             print("     助词改法：① 量词后置（`@g$Reward$` → `@g$Reward$만큼을`）"
                   " ② 换句式（`…에 이르렀습니다` / `…, 그 값을`）"
                   " ③ 写并列形（`은(는)`／`을(를)`／`이(가)`／`와(과)`／`으로(로)`，只此一套次序）")
-        print("改完映射后重跑；本次一个字节都没写。")
-        return stats
+        print("     被跳过的条目改好后重跑同一份映射即可（已落盘的不会重写）。")
 
     if hit_ids and not dry_run:
         toml_io.write_doc_atomic(path, doc, order, header)
+    stats["skipped"] = skip_n if (bad_tok or bad_josa or bad_lang or bad_unit
+                                  or bad_tag or bad_pair) else 0
     return stats
 
 
@@ -744,13 +784,13 @@ def cmd_apply(args):
         mapping = picked
     was = set(pending_ids(entries(load_toml()), field))
     stats = apply_map(field, mapping, dry_run=args.dry_run)
-    if (stats["tokens"] or stats["josa"] or stats["lang"]
-            or stats["unit"] or stats["tag"] or stats["pair"]):
-        return 1
     tail = "（--dry-run，未写盘）" if args.dry_run else ""
     print("[%s] 映射 %d 条，写入 %d 条%s，其中修正旧译文 %d 条，已是当前值 %d 条。"
           % (field, len(mapping), stats["hit"], tail, stats["rewrite"],
              stats["same"]))
+    if stats.get("skipped"):
+        print("     另有 %d 条因不合格被跳过（见上），改好后重跑同一份映射。"
+              % stats["skipped"])
     if stats["applied"]:
         print("     另有 %d 条已落过盘（值已存在，未重复计）。" % stats["applied"])
     if not stats["hit"] and not stats["same"] and not args.dry_run:
@@ -763,7 +803,7 @@ def cmd_apply(args):
         bad = reconcile(field, was, stats)
         if bad:
             return 1
-    return 0
+    return 1 if stats.get("skipped") else 0
 
 
 def reconcile(field, was, stats):

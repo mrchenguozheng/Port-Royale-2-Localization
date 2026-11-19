@@ -208,5 +208,43 @@ class TestKoUnit(unittest.TestCase):
         self.assertEqual(TL.ko_unit_checks({"0x00000015": "배 두 척은 항구에 있습니다."}), [])
 
 
+class TestLintOk(unittest.TestCase):
+    """W 级豁免清单：一行 `id<TAB>理由`，只免 W，理由要能被报告点名。"""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        self.dir = tempfile.mkdtemp()
+        self.old = TL.LINT_OK
+        TL.LINT_OK = self.dir
+        self.cleanup = lambda: shutil.rmtree(self.dir, ignore_errors=True)
+
+    def tearDown(self):
+        TL.LINT_OK = self.old
+        self.cleanup()
+
+    def _write(self, name, text):
+        with open(os.path.join(self.dir, name), "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def test_common_and_lang_files_both_load(self):
+        self._write("_common.txt", "# 注释\n0xc1\t字面就是原文\n")
+        self._write("fr.txt", "0xf1\t字形覆盖测试串\n\n")
+        got = TL.load_lint_ok("fr")
+        self.assertEqual(got, {"0xc1": "字面就是原文", "0xf1": "字形覆盖测试串"})
+
+    def test_comment_and_blank_lines_are_skipped(self):
+        self._write("fr.txt", "# 头\n\n0xf1\t理由\n")
+        self.assertEqual(list(TL.load_lint_ok("fr")), ["0xf1"])
+
+    def test_other_language_file_is_not_loaded(self):
+        self._write("de.txt", "0xd1\t德语专用\n")
+        self.assertEqual(TL.load_lint_ok("fr"), {})
+
+    def test_reason_may_be_omitted_but_id_still_counts(self):
+        self._write("fr.txt", "0xf1\n")
+        self.assertEqual(TL.load_lint_ok("fr"), {"0xf1": ""})
+
+
 if __name__ == "__main__":
     unittest.main()
