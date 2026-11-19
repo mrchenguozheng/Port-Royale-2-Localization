@@ -253,6 +253,17 @@ class TestApplyMap(unittest.TestCase):
         self.assertTrue(bad["tag"])
         self.assertIn("AAk.res", bad["tag"][0][1])
 
+    def test_tag_count_mismatch_is_reported_by_counts(self):
+        """同一张标签只在重复次数上不同时，报错要点出个数（只报「缺—多—」等于没说）。"""
+        with open(self.path, "w", encoding="utf-8", newline="\n") as f:
+            f.write('"0xa7" = "<n>Hello<n>there<n>friend"\n')
+        bad = T.apply_map("ko", {"0xa7": "<n>안녕<n>거기<n>친구<n>여기"},
+                          dry_run=True)
+        self.assertEqual(bad["hit"], 0)
+        self.assertTrue(bad["tag"])
+        self.assertIn("缺 — 多 —", bad["tag"][0][1])
+        self.assertIn("<n> 基准 3 译文 4", bad["tag"][0][1])
+
     def test_ids_filter_keeps_only_listed(self):
         """一个映射混两批时用 --ids 只落一批（源串键与 id 键都认）。"""
         args = T.build_parser().parse_args(

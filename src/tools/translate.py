@@ -667,9 +667,23 @@ def apply_map(lang, mapping, dry_run=False):
             if base_tags != tag_literals(val):
                 want = set(base_tags) - set(tag_literals(val))
                 got = set(tag_literals(val)) - set(base_tags)
-                bad_tag.append((hid, "缺 %s 多 %s" % (
+                # 差集只看得见「少了哪种标签」。同一张标签写多/写少（`<n><n>`
+                # 比基准多一个）时两侧集合一模一样，只报「缺 — 多 —」等于什么
+                # 也没说，所以个数不一致的标签再按计数点出来。
+                base_counts, got_counts = {}, {}
+                for t in base_tags:
+                    base_counts[t] = base_counts.get(t, 0) + 1
+                for t in tag_literals(val):
+                    got_counts[t] = got_counts.get(t, 0) + 1
+                counts = "、".join(
+                    "%s 基准 %d 译文 %d" % (t, base_counts.get(t, 0), got_counts.get(t, 0))
+                    for t in sorted(set(base_counts) | set(got_counts))
+                    if base_counts.get(t, 0) != got_counts.get(t, 0)
+                    and t not in want and t not in got)
+                bad_tag.append((hid, "缺 %s 多 %s%s" % (
                     "、".join(sorted(want)) or "—",
-                    "、".join(sorted(got)) or "—")))
+                    "、".join(sorted(got)) or "—",
+                    "（个数不同：%s）" % counts if counts else "")))
                 continue
         # 逐处判，不再「整条里只要有一处并列形就放过整条」：同一句里
         # `@T$TOWN$이(가)` 与 `@T$Town$으로` 并存时，后者仍是错的。
