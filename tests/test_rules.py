@@ -263,6 +263,41 @@ class TestSpecInterface(unittest.TestCase):
         out, _stats, _seg = specs.build_texts(sp, doc, ["0x1"])
         self.assertEqual(out, doc)
 
+    def test_fr_spec_parts(self):
+        """法语：标点前置不换行空格；分词与补空格显式不做。"""
+        sp = lang_rules.get_spec("fr")
+        self.assertEqual((sp.code, sp.spacing.mode), ("fr", "none"))
+        self.assertIsNone(sp.segmenter.tag("x"))
+        norm = sp.punct.normalize
+        self.assertEqual(norm("Vraiment?"), "Vraiment\u00a0?")
+        self.assertEqual(norm("Vraiment  ?"), "Vraiment\u00a0?")   # 多格并成一格
+        self.assertEqual(norm("Or: 100"), "Or\u00a0: 100")
+        self.assertEqual(norm("50%"), "50\u00a0%")
+        # 时间、网址、标签内的冒号不是句子标点
+        self.assertEqual(norm("12:30"), "12:30")
+        self.assertEqual(norm("http://a.b"), "http://a.b")
+        self.assertEqual(norm("<gs:TEXT:X>? oui"), "<gs:TEXT:X>\u00a0? oui")
+        # 变量紧贴标点也要补，且标签/变量本身一字不动
+        self.assertEqual(norm("@T$DestTown$?"), "@T$DestTown$\u00a0?")
+        self.assertEqual(norm("le pirate %1?"), "le pirate %1\u00a0?")
+        # 字符集自检串（0x11f0398f）整条不动
+        sym = "``°§$%&()=?\\^';,:<|>@/*~[]²³€"
+        self.assertEqual(norm(sym), sym)
+
+    def test_skip_languages_are_declared(self):
+        """de/es/ru/ko 不加工，但必须是「显式声明」：模块在、理由在、行为确定。"""
+        for lang in ("de", "es", "ru", "ko"):
+            mod = lang_rules.get(lang)
+            self.assertIsNotNone(mod, lang)
+            self.assertTrue(getattr(mod, "SKIP", "").strip(), lang)
+            sp = lang_rules.get_spec(lang)
+            self.assertEqual(sp.code, lang)
+            self.assertIsNone(sp.punct)
+            self.assertEqual(sp.spacing.mode, "none")
+            doc = {"0x1": "Fass 10? x: 1"}
+            out, _stats, _seg = specs.build_texts(sp, doc, ["0x1"])
+            self.assertEqual(out, doc)
+
     def test_build_texts_matches_engine_text(self):
         doc = {"0x1": "你好,世界。"}
         out, _stats, _seg = specs.build_texts(lang_rules.get_spec("zh"), doc, ["0x1"])
