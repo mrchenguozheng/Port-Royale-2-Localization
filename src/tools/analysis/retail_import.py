@@ -329,20 +329,40 @@ def repair_tags(base, text):
 def coverage(lang, ref_name):
     """零售参照对基准表的覆盖：基准多少条、零售给了多少条、缺哪些、多哪些。
 
-    换语言之前先看这个数：**缺口**是「基准有、零售没有」的行——这些行零售里根本没有
-    译文，不是「没翻」，导入工具对它们无能为力，只能走正常翻译流程；**多出的行**是
-    零售版本差异（fr 1.1.2.42 比基准多 42 条），参照时直接忽略。
+    换语言之前先看这个数。**缺口**是「基准有、零售没有」的行——零售里根本没有这条，
+    导入工具对它们无能为力；但缺口不等于欠译，所以按现值再分三类：
+
+    - `keep`：在不译名单里（按键名、表头、脚本 id、存档名）——正确做法就是英文原样；
+    - `done`：现值不是英文了，译文本来就有，缺的只是「零售」这个来源；
+    - `todo`：现值仍等于英文，也不在不译名单——**只有这些才真的要去译**。
+
+    `extra` 是零售版本差异（fr 1.1.2.42 比基准多 42 条），参照时直接忽略。
     """
     en = load(T.lang_path(T.BASE_LANG))
     ref = load(resolve_path(ref_name))
+    cur = load(T.lang_path(lang))
+    keep = set(T.keep_as_is(lang))
     base = [k for k, v in en.items() if isinstance(v, str)]
     got = [k for k, v in ref.items() if isinstance(v, str)]
     hit = [k for k in base if k in ref]
+    missing = [k for k in base if k not in ref]
+    keep_ids, done, todo = [], [], []
+    for k in missing:
+        now = str(cur.get(k, "") or "")
+        if k in keep:
+            keep_ids.append(k)
+        elif now.strip() and now.strip() != str(en[k]).strip():
+            done.append(k)
+        else:
+            todo.append(k)
     return {
         "base": len(base),
         "ref": len(got),
         "hit": len(hit),
-        "missing": [k for k in base if k not in ref],
+        "missing": missing,
+        "keep": keep_ids,
+        "done": done,
+        "todo": todo,
         "extra": [k for k in got if k not in en],
         "empty": [k for k in hit if not str(ref[k]).strip()],
     }
@@ -446,10 +466,14 @@ def render(lang, ref_name, mapping, why, stats, repairs=(), cover=None):
                         len(cover["empty"]), len(cover["missing"]),
                         len(cover["extra"])))
         if cover["missing"]:
-            lines.append("  零售没给的行（导入无从下手，得走正常翻译）：%s"
-                         % " ".join(cover["missing"][:8])
-                         + (" … 共 %d 条" % len(cover["missing"])
-                            if len(cover["missing"]) > 8 else ""))
+            lines.append("  零售没给的行 %d 条：不译名单 %d、已有译文 %d、真待译 %d"
+                         % (len(cover["missing"]), len(cover["keep"]),
+                            len(cover["done"]), len(cover["todo"])))
+            if cover["todo"]:
+                lines.append("      真待译（现值仍等于英文，要按基准自己译）：%s"
+                             % " ".join(cover["todo"][:8])
+                             + (" … 共 %d 条" % len(cover["todo"])
+                                if len(cover["todo"]) > 8 else ""))
         if cover["extra"]:
             lines.append("  零售多出的行（版本差异，已忽略）：%s"
                          % " ".join(cover["extra"][:8])

@@ -263,6 +263,9 @@ class TestBuildAndWrite(unittest.TestCase):
         self.assertEqual(cover["hit"], 5)
         self.assertEqual(cover["missing"], ["0xa4"])
         self.assertEqual(cover["extra"], ["0xb1"])
+        self.assertEqual(cover["todo"], ["0xa4"])       # 现值仍是英文，真要去译
+        self.assertEqual(cover["done"], [])
+        self.assertEqual(cover["keep"], [])
 
     def test_held_row_keeps_current_translation(self):
         """人工判定不导的行不能因为「结构修得齐」就被写进去。"""
