@@ -123,7 +123,9 @@ pr2-localization/
 │     ├─ install/            pr2ctl 构建/部署/启动实现
 │     └─ data/               人名、地名、分词词典
 ├─ assets/fonts/original/    游戏原版拉丁字体（gitignore，需自己导出）
-├─ build/                    产物：runtime/（部署根）、variants/（逐版包）、qa/（报告）、cache/（字体缓存）
+├─ build/                    本地产物（gitignore）：runtime/（部署根）、variants/（逐版包）、
+│                            qa/（报告与一次性脚本）、cache/（字体缓存）、
+│                            notes/（提交草稿、批次映射、改前快照、试验数据）、tools/（清理脚本）
 ├─ docs/                     说明文档
 ├─ glossary/                 术语对照表
 └─ tests/                    规则与 API 单测
