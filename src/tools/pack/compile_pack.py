@@ -12,7 +12,7 @@ r"""src/tools/pack/compile_pack.py — 把 src\translations\<语言>.toml 编译
 写到 build\preview\engine_text\<语言>.toml 供人查看。译文层（src\translations\）是
 唯一手改层，引擎文本是构建产物，不进仓库。
 
-src\orig\ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
+src/orig/ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
 合并层（translate.load_toml）本身就是从这两个文件读出 en / fr 的，
 拿它们校验自己永远相等，报不出任何东西。
 
