@@ -25,7 +25,9 @@
 "en_warehouse" = "Magazyn"        # en: warehouse，整行标签 1 种写法
 "en_colony" = "kolonia"        # en: colony，9/9 条、位置吻合 100%、密度比 61.8
 "en_convoy" = "Konwój"        # en: convoy，整行标签 1 种写法
-"en_buccaneer" = ""        # en: buccaneer，64 条；候选：pirat(56)、konwój(18)、Dzisiaj(20)；首选 pirat 56/64 条、位置吻合 91%、密度比 12.9（未达标）
+"en_buccaneer" = "pirat"        # en: buccaneer，64 条；pirat 56/64 条、位置吻合 91%、密度比 12.9。
+                                # 统计没到 0.95，是人工定的：58 条实体行里 50 条本来就是 pirat；
+                                # korsarz / bukanier 只在源文并列列举处保留（0xd4cd0fb4 百科的词源列举、0xf52fee2f 宣传语）
 "en_captain" = "Kapitan"        # en: captain，整行标签 1 种写法
 "en_sailor" = "Żeglarz"        # en: sailor，整行标签 1 种写法
 "en_hideout" = "Kryjówka"        # en: hideout，整行标签 1 种写法
