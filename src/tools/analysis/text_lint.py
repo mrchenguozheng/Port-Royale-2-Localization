@@ -164,7 +164,7 @@ BARREL_HINT = re.compile(r"@g\$GoldPerBarrel\$|INTEXT_FASS")
 sys.path.insert(0, os.path.dirname(HERE))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
-from shared.core.validate import is_identifier  # noqa: E402
+from shared.core.validate import is_identifier, tag_literals  # noqa: E402
 from text import marks as MK  # noqa: E402
 import terms_check as TC  # noqa: E402
 
@@ -551,6 +551,17 @@ def main(argv):
     # 有意不译名单：按键名/表头/专名保持英文原样；存档名另有一条 —— 必须是
     # ASCII，因为引擎只用 ANSI 文件 API，非 ASCII 的文件名写出去就是乱码。
     W.extend(keep_violations(load_keep(lang), tr, en))
+
+    # 标签字面保留：`<n>` 少一个就是丢分段，`<f:fonts/…FHk.res>` 多一个字母
+    # 就是换字体。`tag_profile` 只比名字，抓不到字体路径的错；这里整段比。
+    for k, v in tr.items():
+        if k in KEEP or not v:
+            continue
+        want, got = tag_literals(en.get(k)), tag_literals(v)
+        if want != got:
+            W.append((k, "标签与原文不一致", "缺 %s 多 %s" % (
+                "、".join(sorted(set(want) - set(got))) or "—",
+                "、".join(sorted(set(got) - set(want))) or "—")))
 
     # 术语落词：术语表的英文词在原文出现时，译文里必须用指定译法。
     # 只在**短标签**上判（可见 ≤24 字）：长句里的同一个词是行文的一部分，

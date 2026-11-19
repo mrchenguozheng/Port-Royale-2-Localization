@@ -68,7 +68,8 @@ if HERE not in sys.path:
 # 占位符与标签规则只有一份，在 shared\core\validate.py。
 # 这里转出来，是为了让 `import translate as T` 的老调用点（编辑器、
 # 审计脚本）继续能用 T.tokens / T.tag_profile。
-from shared.core.validate import PH_RE, tag_profile, token_counts, tokens  # noqa: E402
+from shared.core.validate import (PH_RE, tag_literals, tag_profile,  # noqa: E402
+                                 token_counts, tokens)
 from text import lang_rules, toml_io  # noqa: E402
 
 STRINGS_DIR = os.path.join(SRC, "translations")
@@ -533,7 +534,7 @@ def apply_map(lang, mapping, dry_run=False):
     header = toml_io.head_lines(path)
 
     hit_ids, used, same, rewritten = [], set(), 0, 0
-    bad_josa, bad_tok, bad_lang, bad_unit = [], [], [], []
+    bad_josa, bad_tok, bad_lang, bad_unit, bad_tag = [], [], [], [], []
     script = lang_rules.script_re(lang)
     ph_bare, _ph_pair = josa_rules()
     #: 有意不译的条目：它们**正确**的值就是英文原串，写回去不算「抄错行」。
@@ -590,6 +591,15 @@ def apply_map(lang, mapping, dry_run=False):
         if bad:
             bad_tok.append(hid)
             continue
+        # 标签按字面比：`<n>` 少一个、`<f:fonts/…FHk.res>` 的字体名多一个字母，
+        # 屏幕上就是丢分段、换字体。占位符另由 token_counts 管，这里只管 `<...>`。
+        base_tags = tag_literals(base if base is not None else cur)
+        if base_tags != tag_literals(val):
+            want = set(base_tags) - set(tag_literals(val))
+            got = set(tag_literals(val)) - set(base_tags)
+            bad_tag.append((hid, "缺 %s 多 %s" % (
+                "、".join(sorted(want)) or "—", "、".join(sorted(got)) or "—")))
+            continue
         # 逐处判，不再「整条里只要有一处并列形就放过整条」：同一句里
         # `@T$TOWN$이(가)` 与 `@T$Town$으로` 并存时，后者仍是错的。
         if ph_bare is not None:
@@ -620,13 +630,14 @@ def apply_map(lang, mapping, dry_run=False):
                   if k not in used and v.strip() in landed)
     stats = {"hit": len(hit_ids), "unused": unused, "josa": bad_josa,
              "tokens": bad_tok, "lang": bad_lang, "same": same,
-             "unit": bad_unit,
+             "unit": bad_unit, "tag": bad_tag,
              "rewrite": rewritten, "applied": applied, "ids": hit_ids}
 
-    if bad_tok or bad_josa or bad_lang or bad_unit:
+    if bad_tok or bad_josa or bad_lang or bad_unit or bad_tag:
         print("拒绝落盘：%d 条 token 与原文不齐、%d 条占位符后接助词、"
-              "%d 条量词不对、%d 条映射值不是目标文字。"
-              % (len(bad_tok), len(bad_josa), len(bad_unit), len(bad_lang)))
+              "%d 条量词不对、%d 条标签与原文不一致、%d 条映射值不是目标文字。"
+              % (len(bad_tok), len(bad_josa), len(bad_unit), len(bad_tag),
+                 len(bad_lang)))
         # 全列，不再只印前 5 条：一批 40 条里往往一次就有七八条同类问题，
         # 只印 5 条就得改—重跑—再改，白跑两三轮。
         for hid in bad_tok:
@@ -635,6 +646,8 @@ def apply_map(lang, mapping, dry_run=False):
             print("  助词   %s  %s" % (hid, tok))
         for hid, detail in bad_unit:
             print("  量词   %s  %s" % (hid, detail))
+        for hid, detail in bad_tag:
+            print("  标签   %s  %s" % (hid, detail))
         for hid, val in bad_lang:
             print("  非目标文字 %s  %s" % (hid, val[:60]))
         print("改完映射后重跑；本次一个字节都没写。")
@@ -648,9 +661,30 @@ def apply_map(lang, mapping, dry_run=False):
 def cmd_apply(args):
     field = args.lang or target_field()
     mapping = load_map(args.map)
+    only = [h.strip() for h in getattr(args, "ids", "").split(",") if h.strip()]
+    if only:
+        # 一个映射里混了两批时，靠 --ids 只落第一批：否则两份改动落在同一次
+        # 写盘里，git 那边就是一个 hunk，提交信息也只能并成一条。
+        want = {h.lower() for h in only}
+        rows = entries(load_toml())
+        by_en = {(e.get(BASE_LANG) or "").strip(): e["id"] for e in rows}
+        by_id = {e["id"].lower(): e["id"] for e in rows}
+        picked = {}
+        skipped = []
+        for k, v in mapping.items():
+            hid = (by_id.get(k.lower()) if k.lower().startswith("0x")
+                   else by_en.get(k.strip()))
+            if hid and hid.lower() in want:
+                picked[hid] = v                  # 统一改按 id 键送下去
+            else:
+                skipped.append(k)
+        print("[%s] --ids 命中 %d 条，跳过 %d 条（不在清单里）。"
+              % (field, len(picked), len(skipped)))
+        mapping = picked
     was = set(pending_ids(entries(load_toml()), field))
     stats = apply_map(field, mapping, dry_run=args.dry_run)
-    if stats["tokens"] or stats["josa"] or stats["lang"] or stats["unit"]:
+    if (stats["tokens"] or stats["josa"] or stats["lang"]
+            or stats["unit"] or stats["tag"]):
         return 1
     tail = "（--dry-run，未写盘）" if args.dry_run else ""
     print("[%s] 映射 %d 条，写入 %d 条%s，其中修正旧译文 %d 条，已是当前值 %d 条。"
@@ -717,18 +751,25 @@ def skeleton(text):
     return re.sub(r"\u00a7+", "\u00a7", text).strip()
 
 
-def dump_lines(es, field, band, limit, by_group=False, order=None, ids=None):
+def dump_lines(es, field, band, limit, by_group=False, order=None, ids=None,
+               ref_langs=()):
     """把待译条目渲染成批次清单的行（首行是注释头的第 1 行）。
 
     纯函数，不碰文件：`cmd_dump` 只负责读数据与写盘，单测直接喂合成条目。
 
-    `order="short"` 按可见字数从短到长取，短档先清。默认（None）保持表序，
-    也就是 `--band long` 一直是 >80 那一档 —— 41–80 的 42 条因此会被 8 批
-    `>80` 压在后面，而它们更短、在界面和任务板上出现得更频繁。
+    `order="risk"`（默认）先按结构风险分层：无占位符无标签 → 有占位符 →
+    带标签，同层按字数。剩下的活全是长文时，纯字数排序已经没有区分度，
+    而「纯文字」那批抄不错的概率最高、「带标签」那批最容易抄错。
+
+    `order="short"` 按可见字数从短到长取，短档先清。
+    `order="long"` 从长到短。`order="table"`（或 None）保持表序。
 
     `ids` 给了就只取这几条（无视 band / limit）：同模板换词的那一族（桶模板
     五条、四国公告六条）按字数散在整个长文队列里，一次只碰上一两条，靠手抄
     id 单独成批才收拾得干净。
+
+    `ref_langs` 在英文原文后面追加参考列（`zh=…`、`ja=…`）：韩语剩下的长文
+    在其余六语里都有现成译文，术语与句式照着最省事，也最不容易漂。
     """
     pend = pending_of(es, field)
 
@@ -757,7 +798,16 @@ def dump_lines(es, field, band, limit, by_group=False, order=None, ids=None):
             seen.add(sk)
             keep.append(e)
         in_band = keep
-    if order == "short":
+    if order == "risk":
+        # 风险分层：无占位符无标签 → 只有占位符 → 带标签；同层再按字数。
+        def risk_key(e):
+            t = e.get(BASE_LANG) or e.get(field) or ""   # 单测里没有英文基准列
+            has_ph = bool(PH_RE.search(t))
+            has_tag = "<" in t
+            return (2 if has_tag else (1 if has_ph else 0),
+                    len(content_of(e.get(field, ""))))
+        in_band = sorted(in_band, key=risk_key)
+    elif order == "short":
         in_band = sorted(in_band, key=lambda e: len(content_of(e.get(field, ""))))
     elif order == "long":
         in_band = sorted(in_band, key=lambda e: -len(content_of(e.get(field, ""))))
@@ -776,13 +826,16 @@ def dump_lines(es, field, band, limit, by_group=False, order=None, ids=None):
                     len(in_band), "  按骨架分组" if by_group else ""))
     lines = [head,
              "# 全队列 %s" % qsum,
-             "# 制表符分隔：id / 可见字数 / 英文原文（换行写作 \\n）",
+             "# 制表符分隔：id / 可见字数 / 英文原文（换行写作 \\n）%s"
+             % ("".join(" / %s=%s" % (r, r) for r in ref_langs)),
              "# 行末 dup:N = 与另外几条共用同一句英文；需不同译法时用 id 作键"
              "：{\"0x...\": \"译文\"}；grp:N = 与另外几条只差占位符/标签，"
              "可照同一模板改词填空"]
     for e in rows:
         text = (e.get(field, "") or "").replace("\n", "\\n")
         line = "%s\t%d\t%s" % (e["id"], len(content_of(e.get(field, ""))), text)
+        for r in ref_langs:
+            line += "\t%s=%s" % (r, (e.get(r, "") or "").replace("\n", "\\n"))
         mates = [h for h in groups.get(key_of(e), []) if h != e["id"]]
         if mates:
             line += "\tdup:%d %s" % (len(mates) + 1, ",".join(mates))
@@ -828,9 +881,10 @@ def cmd_dump(args):
     field = args.lang or target_field()
     order = getattr(args, "order", None)
     ids = [h.strip() for h in getattr(args, "ids", "").split(",") if h.strip()]
+    refs = [r.strip() for r in getattr(args, "ref", "").split(",") if r.strip()]
     lines = dump_lines(entries(load_toml()), field,
                        BAND_KEYS[args.band], args.limit, args.by_group, order,
-                       ids or None)
+                       ids or None, refs)
     body = "\n".join(lines) + "\n"
     n_rows = sum(1 for ln in lines if not ln.startswith("#"))
     if args.out:
@@ -906,6 +960,54 @@ def cmd_gaps(args):
     return 0
 
 
+def cmd_terms(args):
+    """术语落词检查的全量版：长文也算，只报告不判定。
+
+    `text_lint` 那边只在 ≤24 字的短标签上判（长句里同一个词是行文的一部分，
+    强求会报一堆没人处理的 W）。但长文里术语漂掉也确实发生过 —— 用这个命令
+    按词列出全量命中，人工挑要改的那些。
+    """
+    field = args.lang or target_field()
+    sys.path.insert(0, os.path.join(HERE, "analysis"))
+    import text_lint as L                      # noqa: E402  惰性：避免循环依赖
+
+    enforce = None if args.all_keys else L._enforce_keys(field)
+    keep = keep_as_is(field)
+    script = lang_rules.script_re(field)
+    rows = entries(load_toml())
+    min_len = args.min_len
+    hits = []
+    for key, word, want in L.load_terms(field):
+        if enforce is not None and key not in enforce:
+            continue
+        rx = re.compile(r"\b%s\b" % re.escape(word), re.I)
+        ids = []
+        for e in rows:
+            if e["id"] in keep:
+                continue
+            en = (e.get(BASE_LANG) or "")
+            val = e.get(field) or ""
+            if not rx.search(en) or want in val:
+                continue
+            if len(content_of(val)) < min_len:
+                continue
+            if not is_translated(val, field, base=en, script=script):
+                continue                      # 待译条目还是英文，不算漂
+            ids.append(e["id"])
+        if ids:
+            hits.append((key, word, want, ids))
+    total = sum(len(h[3]) for h in hits)
+    print("[%s] 术语未落词 %d 条（%d 个词，可见 ≥%d 字）"
+          % (field, total, len(hits), min_len))
+    for key, word, want, ids in sorted(hits, key=lambda h: -len(h[3])):
+        print("  %-22s %-26s → 「%s」  %d 条" % (key, word, want, len(ids)))
+        for hid in ids[:6]:
+            print("      %s" % hid)
+        if len(ids) > 6:
+            print("      ……另有 %d 条。" % (len(ids) - 6))
+    return 0
+
+
 def build_parser():
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -917,6 +1019,8 @@ def build_parser():
     p = sub.add_parser("apply", help="把 {英文原串: 译文} 映射落进译文文件")
     p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
     p.add_argument("--map", required=True, help="映射 JSON 文件")
+    p.add_argument("--ids", default="",
+                   help="只落这几条（逗号分隔 id）：一个映射里混了两批时按批提交")
     p.add_argument("--dry-run", action="store_true", help="只报告，不写盘")
     p.set_defaults(fn=cmd_apply)
 
@@ -927,12 +1031,16 @@ def build_parser():
     p.add_argument("--limit", type=int, default=40, help="最多导几条，0 = 不限")
     p.add_argument("--by-group", action="store_true",
                    help="按骨架去重：只留每组一条代表句")
-    p.add_argument("--order", choices=("short", "long", "table"), default="short",
-                   help="short=可见字数从短到长取（默认，先把短档清掉）；"
-                        "long=从长到短；table=按表序")
+    p.add_argument("--order", choices=("risk", "short", "long", "table"),
+                   default="risk",
+                   help="risk=先清纯文字（无占位符无标签）再清带标签（默认）；"
+                        "short=可见字数从短到长；long=从长到短；table=按表序")
     p.add_argument("--ids", default="",
                    help="只导这几条（逗号分隔 id），无视 --band/--limit；"
                         "同模板换词的一族用这个单独成批")
+    p.add_argument("--ref", default="",
+                   help="追加参考列，逗号分隔语言代码（如 zh,ja）："
+                        "在英文原文后面每语多一列现成译文")
     p.add_argument("--out", default="", help="写到这个文件；不给就打到 stdout")
     p.set_defaults(fn=cmd_dump)
 
@@ -948,6 +1056,14 @@ def build_parser():
     p = sub.add_parser("gaps", help="源缺失自查：英文原值是令牌、译文有实文")
     p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
     p.set_defaults(fn=cmd_gaps)
+
+    p = sub.add_parser("terms", help="术语落词全量自查（长文也算，只报告）")
+    p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
+    p.add_argument("--min-len", type=int, default=0,
+                   help="只算可见字数 ≥N 的条目（默认 0 = 长短都算）")
+    p.add_argument("--all-keys", action="store_true",
+                   help="不看 enforce_<lang>.txt，术语表里的键全查")
+    p.set_defaults(fn=cmd_terms)
     return ap
 
 

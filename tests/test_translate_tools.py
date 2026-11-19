@@ -186,6 +186,25 @@ class TestApplyMap(unittest.TestCase):
         self.assertTrue(stats["unit"], "缺量词应当在 apply 阶段被拦")
         self.assertEqual(self._read()["0xa3"], "Take %1 now")
 
+    def test_tag_loss_blocks_the_write(self):
+        """`<n>` 少一个、字体名写错一个字母，落盘前就拦（占位符检查管不到标签）。"""
+        os.makedirs(os.path.join(self.src, "data", "keep_as_is"), exist_ok=True)
+        stats = T.apply_map("ko", {"0xa1": "안녕"}, dry_run=True)
+        self.assertEqual(stats["hit"], 1)          # 基线试探：无标签两侧都空
+        # 造一条带标签的条目再试
+        with open(self.path, "w", encoding="utf-8", newline="\n") as f:
+            f.write('"0xa6" = "<n>Hello <f:fonts/AA.res> there"\n')
+        bad = T.apply_map("ko", {"0xa6": "<n>안녕 <f:fonts/AAk.res>"}, dry_run=True)
+        self.assertEqual(bad["hit"], 0)
+        self.assertTrue(bad["tag"])
+        self.assertIn("AAk.res", bad["tag"][0][1])
+
+    def test_ids_filter_keeps_only_listed(self):
+        """一个映射混两批时用 --ids 只落一批（源串键与 id 键都认）。"""
+        args = T.build_parser().parse_args(
+            ["apply", "--lang", "ko", "--map", "x.json", "--ids", "0xa2"])
+        self.assertEqual(args.ids, "0xa2")
+
     def test_token_loss_blocks_the_write(self):
         stats = T.apply_map("ko", {"Take %1 now": "지금 가지세요"})
         self.assertEqual(stats["hit"], 0)
@@ -267,9 +286,24 @@ class TestDumpLines(unittest.TestCase):
         self.assertIn("手选批次：1 条", lines[0])
 
     def test_dump_defaults_to_shortest_first(self):
-        """不写 `--order` 也按字数从短到长，不再回表序把短档压在后面。"""
+        """不写 `--order` 也按结构风险分层，纯文字先清、带标签最后。"""
         args = T.build_parser().parse_args(["dump", "--lang", "ko"])
-        self.assertEqual(args.order, "short")
+        self.assertEqual(args.order, "risk")
+
+    def test_risk_order_puts_plain_text_first_tags_last(self):
+        es = [{"id": "0xb8", "ko": "<n>" + "A" * 90},
+              {"id": "0xb9", "ko": "B" * 90},
+              {"id": "0xba", "ko": "@A$USER$ " + "C" * 90}]
+        rows = [l for l in T.dump_lines(es, "ko", (81, None), 0, order="risk")
+                if not l.startswith("#")]
+        self.assertEqual([r.split("\t")[0] for r in rows], ["0xb9", "0xba", "0xb8"])
+
+    def test_ref_columns_are_appended(self):
+        es = [{"id": "0xb9", "ko": "B" * 90, "zh": "中" * 40}]
+        lines = T.dump_lines(es, "ko", (81, None), 0, ref_langs=("zh",))
+        row = [l for l in lines if not l.startswith("#")][0]
+        self.assertIn("\tzh=", row)
+        self.assertIn("zh=zh", lines[2])
 
     def test_identical_sources_are_flagged(self):
         es = [{"id": "0xb2", "ko": "Same " + "A" * 85},
