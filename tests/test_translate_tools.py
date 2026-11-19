@@ -204,6 +204,19 @@ class TestApplyMap(unittest.TestCase):
         self.assertEqual(ok["hit"], 1)
         self.assertEqual(ok["josa"], [])
 
+    def test_placeholder_base_allows_real_text(self):
+        """英文基准是 `IDM_…_TEXT` 时没有可比模板：补正文不拦 token／标签门。"""
+        en = os.path.join(self.src, "orig", "en.gog_1.1.2.3.toml")
+        TI.write_doc_atomic(
+            en, {"0xa1": "Hello", "0xa2": "World",
+                 "0xa3": "IDM_CONTEST_01_2004_LOG_00_TEXT",
+                 "0xa4": "Hi", "0xa5": "Get %1 and %2 now"},
+            ["0xa1", "0xa2", "0xa3", "0xa4", "0xa5"], ["# 头"])
+        stats = T.apply_map("ko", {"0xa3": "<n>지금 %1(을)를 가지세요"}, dry_run=True)
+        self.assertEqual(stats["hit"], 1)
+        self.assertEqual(stats["tokens"], [])
+        self.assertEqual(stats["tag"], [])
+
     def test_wrong_counter_blocks_the_write(self):
         """`%1 물자`（缺量词）在落盘前就拦下，不再等 text_lint 那一步。"""
         try:

@@ -52,6 +52,25 @@ class TestKeepViolations(unittest.TestCase):
     def test_missing_entry_is_ignored(self):
         self.assertEqual(TL.keep_violations({"0x4": "key"}, {}, {}), [])
 
+    def test_identifier_base_allows_translation(self):
+        """版本差：英文侧是 `IDM_…_TEXT` 资源标识，正文只在零售版里，补译不算错。"""
+        W = TL.keep_violations(
+            {"0x5": "id"},
+            {"0x5": "在以下城镇取得建筑许可：<n>哈瓦那、玛格丽塔。"},
+            {"0x5": "IDM_CONTEST_01_2004_LOG_00_TEXT"})
+        self.assertEqual(W, [])
+
+    def test_empty_base_allows_translation(self):
+        W = TL.keep_violations({"0x6": "id"}, {"0x6": "正文"},
+                               {"0x6": "+++EMPTY+++"})
+        self.assertEqual(W, [])
+
+    def test_real_text_base_still_reports_change(self):
+        """基准有正文时判据照旧：credit 名单里改了名就是错。"""
+        W = TL.keep_violations({"0x7": "credit"}, {"0x7": "Johann Meier"},
+                               {"0x7": "John Meier"})
+        self.assertEqual([w[1] for w in W], ["名单内但已改动（credit）"])
+
 
 class TestKoParticle(unittest.TestCase):
     def test_placeholder_followed_by_bare_josa_is_reported(self):

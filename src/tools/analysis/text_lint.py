@@ -459,14 +459,28 @@ def fr_space_checks(tr):
     return out
 
 
+def base_without_text(text):
+    """英文基准这一侧有没有正文。
+
+    两种「没有正文」：开发残留标识符（`IDM_CONTEST_01_2004_LOG_00_TEXT`），
+    与构建基准里的空占位 `+++EMPTY+++`。这类键在基准表里从来不是句子，
+    「译文必须等于英文」这条判据没有意义 —— 正文只存在于别的版本
+    （德语零售版），中文/西语等把它补上是对的，不该报 W。
+    """
+    s = str(text or "").strip()
+    return bool(s) and (is_identifier(s) or s == "+++EMPTY+++")
+
+
 def keep_violations(keep, tr, en):
     """有意不译名单的反向检查，返回 W 级条目。
 
-    两种理由的判据不同：
+    三种理由的判据不同：
     - `save-name`：这条会变成**存档文件名**。PR2.exe 只导入 ANSI 版文件 API，
       名字里的非 ASCII 字节会被按 Latin-1 映射，存档写出去就是乱码文件、
       再读回来弹「存档无效」。所以它不必等于英文，但必须是纯 ASCII
       （de `Autospeichern`、fr `Sauvegarde automatique` 都合法）。
+    - 基准侧没有正文（`IDM_…` 标识符、`+++EMPTY+++`）：版本差的产物，
+      「等于英文」无从谈起，判据跳过（见 `base_without_text`）。
     - 其余（key / label / id / credit）：正确译法就是英文原样，值一变就是错。
     """
     W = []
@@ -477,6 +491,8 @@ def keep_violations(keep, tr, en):
         if why == "save-name":
             if not str(v).isascii():
                 W.append((k, "存档名非 ASCII", str(v)[:60]))
+        elif base_without_text(en.get(k)):
+            continue
         elif en.get(k) is not None and str(v).strip() != str(en[k]).strip():
             W.append((k, "名单内但已改动（%s）" % why, str(v)[:60]))
     return W
@@ -571,6 +587,9 @@ def main(argv):
     # 有意不译名单：按键名/表头/专名保持英文原样；存档名另有一条 —— 必须是
     # ASCII，因为引擎只用 ANSI 文件 API，非 ASCII 的文件名写出去就是乱码。
     W.extend(keep_violations(load_keep(lang), tr, en))
+    # 被跳过的是哪一类，单独印一行 —— 静默放过 15 条判据，比报错更难查。
+    shadow = sorted(k for k, why in load_keep(lang).items()
+                    if why != "save-name" and base_without_text(en.get(k)))
 
     # 标签字面保留：`<n>` 少一个就是丢分段，`<f:fonts/…FHk.res>` 多一个字母
     # 就是换字体。`tag_profile` 只比名字，抓不到字体路径的错；这里整段比。
@@ -644,6 +663,10 @@ def main(argv):
     lines = []
     lines.append("# %s 机械复核（判据见 09 卷已落卷定则）\n" % lang)
     lines.append("E 级 %d 条，W 级 %d 条。\n" % (len(E), len(W)))
+    if shadow:
+        lines.append("以基准版为占位／标识的名单条目 %d 条（版本差，正文取自零售版，"
+                     "不参与「等于英文」比对）：%s\n"
+                     % (len(shadow), "、".join(shadow)))
     for tag, items in (("E", E), ("W", W)):
         shown = items if show_all else items[:40]
         for k, why, ctx in shown:

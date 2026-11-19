@@ -68,8 +68,8 @@ if HERE not in sys.path:
 # 占位符与标签规则只有一份，在 shared\core\validate.py。
 # 这里转出来，是为了让 `import translate as T` 的老调用点（编辑器、
 # 审计脚本）继续能用 T.tokens / T.tag_profile。
-from shared.core.validate import (PH_RE, tag_literals, tag_profile,  # noqa: E402
-                                 token_counts, tokens)
+from shared.core.validate import (PH_RE, is_identifier, tag_literals,  # noqa: E402
+                                 tag_profile, token_counts, tokens)
 from text import lang_rules, toml_io  # noqa: E402
 
 STRINGS_DIR = os.path.join(SRC, "translations")
@@ -588,8 +588,18 @@ def apply_map(lang, mapping, dry_run=False):
         # 占位符按**个数**比英文（语序不管）：原文两处 @G$Goods$、译文只留一处
         # 也必须拦下，否则界面上会少印一个货物名。
         base = en_by_id.get(hid)
+        # 版本差：英文基准里是 `IDM_…_TEXT` 这样的资源标识或 `+++EMPTY+++`，
+        # 从来没有正文。这类条目拿英文当模板比必然全错（正文来自零售版），
+        # 跳过 token 与标签两道门，余下的助词/量词/文字检查照旧。
+        if base is not None and (is_identifier(base) or base.strip() == "+++EMPTY+++"):
+            base = None
+            no_text_base = True
+        else:
+            no_text_base = False
         if base is not None:
             bad = token_counts(base) != token_counts(val)
+        elif no_text_base:
+            bad = False
         else:
             bad = token_diff(cur, val)
         if bad:
@@ -597,13 +607,16 @@ def apply_map(lang, mapping, dry_run=False):
             continue
         # 标签按字面比：`<n>` 少一个、`<f:fonts/…FHk.res>` 的字体名多一个字母，
         # 屏幕上就是丢分段、换字体。占位符另由 token_counts 管，这里只管 `<...>`。
-        base_tags = tag_literals(base if base is not None else cur)
-        if base_tags != tag_literals(val):
-            want = set(base_tags) - set(tag_literals(val))
-            got = set(tag_literals(val)) - set(base_tags)
-            bad_tag.append((hid, "缺 %s 多 %s" % (
-                "、".join(sorted(want)) or "—", "、".join(sorted(got)) or "—")))
-            continue
+        # 基准侧无正文时不比 —— 那边只有一个标识串，一个标签都没有。
+        if not no_text_base:
+            base_tags = tag_literals(base if base is not None else cur)
+            if base_tags != tag_literals(val):
+                want = set(base_tags) - set(tag_literals(val))
+                got = set(tag_literals(val)) - set(base_tags)
+                bad_tag.append((hid, "缺 %s 多 %s" % (
+                    "、".join(sorted(want)) or "—",
+                    "、".join(sorted(got)) or "—")))
+                continue
         # 逐处判，不再「整条里只要有一处并列形就放过整条」：同一句里
         # `@T$TOWN$이(가)` 与 `@T$Town$으로` 并存时，后者仍是错的。
         if ph_bare is not None:
