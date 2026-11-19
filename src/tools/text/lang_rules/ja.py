@@ -22,6 +22,10 @@ FMT, PUNCT_CHARS = base.make_fmt(PUNCT)
 
 CJK_RX = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff\uff66-\uff9f]")
 
+#: 目标文字：假名（平假名/片假名/半角片假名）。判「译没译」时不收汉字 ——
+#: 中文译文里也全是汉字，只有假名能证明这条真的改成了日语。
+SCRIPT = re.compile(r"[\u3040-\u309f\u30a0-\u30ff\uff66-\uff9f]")
+
 #: 助词。长的写在前面（正则会先匹配到长的）。
 JA_PARTICLES = [
     "から", "まで", "より", "など", "ほど", "ばかり", "だけ", "しか", "こそ",

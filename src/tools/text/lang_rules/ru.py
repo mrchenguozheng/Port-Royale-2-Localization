@@ -11,9 +11,14 @@
   `[ru]` 已映射，不需要额外处理。
 """
 
+import re
+
 from . import spec as S
 
 LANG = "ru"
+
+#: 目标文字：西里尔字母。供 `translate.py status` 判「译没译」用。
+SCRIPT = re.compile(r"[\u0400-\u045f\u0460-\u04ff]")
 
 SKIP = "空格分词、标点无前置空格、«» 已自带空格"
 

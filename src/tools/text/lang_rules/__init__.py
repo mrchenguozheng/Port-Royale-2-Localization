@@ -5,9 +5,12 @@
 
     LANG, PUNCT, ASCII, CJK_RX, normalize(text, date_format=False)
     spec() -> LangSpec            # 标点 / 分词器 / 补空格 三件套
+    SCRIPT                        # 目标文字正则（非拉丁字母语言才需要）
 
 `spec()` 返回的对象见 spec.py；`engine_text.build()` 只认 spec，不认语言。
 `normalize_text.py` 仍然只调 `normalize()`（它只改标点，不补排版空格）。
+`SCRIPT` 不参与排版，只给 `translate.py status` 判「这条译文译没译」：
+fr/de/es 用拉丁字母，没有这份声明，进度按「与英文原文不同」计。
 
 加一种语言：在本目录放 <代码>.py，实现上面的契约，然后在 REGISTRY 登记。
 新语言如果词间本来就有空格，`spec()` 里写 `spacing=spec.NoSpacing()` 即可。
@@ -44,3 +47,14 @@ def get_spec(lang):
         return S.LangSpec(code=lang or "*", punct=None,
                           segmenter=S.NullSegmenter(), spacing=S.NoSpacing())
     return maker()
+
+
+def script_re(lang):
+    """目标文字正则；拉丁字母语言（fr/de/es）没有，返回 None。
+
+    「这条译文到底译没译」不能用「值不是纯占位符」判 —— 未翻译的条目
+    值就是英文原串，那样会整篇判成已译。判据只能是**目标文字是否出现**，
+    而且这份判据要和语言放同一个模块里，加一门语言只改一个地方。
+    """
+    mod = get(lang)
+    return getattr(mod, "SCRIPT", None) if mod else None

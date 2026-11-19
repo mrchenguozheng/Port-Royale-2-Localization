@@ -11,9 +11,15 @@
   原样透传，不能替作者写韩文。
 """
 
+import re
+
 from . import spec as S
 
 LANG = "ko"
+
+#: 目标文字：谚文（含古谚文字母与相容字母）。`translate.py status` 用这一份
+#: 判「这条到底译没译」，不再靠「值不是纯占位符」那种会把整篇判成已译的口径。
+SCRIPT = re.compile(r"[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]")
 
 SKIP = "语节空格分词、标点无前置空格；大面积未翻译属内容层"
 

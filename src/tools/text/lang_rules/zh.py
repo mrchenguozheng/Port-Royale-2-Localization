@@ -23,6 +23,9 @@ FMT, PUNCT_CHARS = base.make_fmt(PUNCT)
 
 CJK_RX = base.CJK_RX
 
+#: 目标文字：汉字。供 `translate.py status` 判「译没译」用（与 CJK_RX 同范围）。
+SCRIPT = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
+
 
 def normalize(text, date_format=False):
     """标点 → 占位符 → <n>，中文的完整规范化（不含任何补空格）。

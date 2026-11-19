@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
-r"""src/tools/translate.py — 译文数据层：合并、进度
+r"""src/tools/translate.py — 译文数据层：合并、进度、落盘
 
-    python src/tools/translate.py status                    # 看翻译进度
+    python src/tools/translate.py status                    # 看翻译进度（全语言）
+    python src/tools/translate.py status --lang ko          # 只看一门
+    python src/tools/translate.py apply --lang ko --map build/x.json
+    python src/tools/translate.py gaps --lang ko            # 源缺失自查
 
 为什么要有这个脚本
 ------------------
@@ -15,6 +18,18 @@ r"""src/tools/translate.py — 译文数据层：合并、进度
   * load_toml —— 合并层，编译、编辑器、审计都走它，形态只有一份；
   * status —— 看进度。编辑器只显示「第 N 页 / 共 X 条」，
     不显示「已译多少」，这个命令补上那一块；
+  * apply —— 把一份 `{英文原串: 译文}` 的映射落进译文文件。
+    以前每批翻译都要手写一遍「读 → 查表 → 贴回首尾空白 → 写」，
+    六批下来攒了八个一次性脚本，其中两次踩到同一个坑（带尾空格的键
+    对不上、自检逻辑写反）。这里把这件事收成一条命令：
+      - 按 strip 后的值查表，首尾空白原样贴回；
+      - 同一条译文只写一次，重复条目自动一致；
+      - 报「命中几条、映射里哪几条根本没对上」（后者是真缺口，必须报）；
+      - 写盘前跑占位符-助词检查与 token 齐备检查，不合格直接拒绝落盘；
+      - 再跑一次命中 0 条，幂等性自证。
+  * gaps —— 源缺失自查：英文原值本身就是个令牌（如
+    `IDM_CONTEST_01_2004_LOG_00_HDR`），而译文里有实文。这类条目
+    靠长度分档抽查碰不到，只能机械扫。
   * 占位符与标签规则**不在本文件**，在 shared\core\validate.py ——
     那里是唯一一份实现，编译脚本与两个编辑器后端都调它，
     本文件只是把 tokens / tag_profile 原样借出来给旧调用点用。
@@ -37,7 +52,9 @@ r"""src/tools/translate.py — 译文数据层：合并、进度
 """
 
 import argparse
+import json
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -45,11 +62,14 @@ SRC = os.path.dirname(HERE)                     # 仓库的 src\
 ROOT = os.path.dirname(SRC)                     # 仓库根
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)                    # 让 `text` 包可导入
 
 # 占位符与标签规则只有一份，在 shared\core\validate.py。
 # 这里转出来，是为了让 `import translate as T` 的老调用点（编辑器、
 # 审计脚本）继续能用 T.tokens / T.tag_profile。
 from shared.core.validate import PH_RE, tag_profile, tokens  # noqa: E402
+from text import lang_rules, toml_io  # noqa: E402
 
 STRINGS_DIR = os.path.join(SRC, "translations")
 REFERENCES_DIR = os.path.join(SRC, "orig")
@@ -223,20 +243,250 @@ def entries(doc):
 
 # ── 进度 ────────────────────────────────────────────────────
 
+#: 判「有没有字」时先抹掉引擎标签：`<n>`、`<ts:0>` 之类不算内容。
+#: 判「有没有字」时先抹掉结构成分：`<n>`/`<ts:0>` 这类引擎标签、
+#: `[town:Havana]`/`[term:en_business]` 这类键、`%1`/`@A$Amount$` 占位符。
+#: 它们本来就不该译，留在里面会把「保持原样是对的」误报成待译。
+TAG_RX = re.compile(r"<[^<>]*>")
+STRUCT_RX = re.compile(r"\[[^\[\]]*\]|%[0-9A-Za-z]+|@[A-Za-z]\$[^$]*\$")
+#: 「有没有文字」按 Unicode 字母算，不只 ASCII —— 中文译文里全是汉字、
+#: 韩语里混进中文，都是「有文字但不是目标文字」，不能当成纯符号条目放过。
+LETTER_RX = re.compile(r"[^\W\d_]", re.UNICODE)
+
+#: 英文原值像个令牌：全大写、无空格、没有小写字母。`IDM_CONTEST_01_2004_*`
+#: 这一类在英文表里就是键名本身，中文表却是实文 —— `gaps` 专门抓这个。
+TOKEN_SRC_RX = re.compile(r"^[A-Z][A-Z0-9_]{8,}$")
+
+#: 待译条目的长度分档，与批次划分口径一致。
+BANDS = ((0, 12), (13, 24), (25, 40), (41, 80), (81, None))
+
+
+def content_of(value):
+    """抹掉标签、方括号键与占位符后剩下的人话。"""
+    return STRUCT_RX.sub("", TAG_RX.sub("", value or ""))
+
+
+def is_translated(value, lang, base=None, script=None):
+    """这条值算不算「已译」。
+
+    三个判定，按顺序：
+
+    1. 目标语言有 `SCRIPT`（zh/ja/ko/ru）：出现目标文字才算译。
+       未翻译的条目值就是英文原串，所以「不是纯占位符」那种判据在这里
+       会把整篇判成已译 —— 这正是上一版 `status` 的毛病；
+       反过来，韩语文件里出现中文也要判待译，所以「有没有文字」按 Unicode
+       字母算，只有纯数字/纯符号/纯标签条目才当成天然已译；
+    2. 拉丁字母语言（fr/de/es）没有目标文字可认，只能按「与英文原文不同」判。
+       纯符号条目同样天然已译。
+
+    `lang_rules.script_re()` 取第 1 条的正则，`base` 是英文原值（第 2 条用）。
+    """
+    vis = content_of(value)
+    if script is not None:
+        if script.search(vis):
+            return True
+        return not LETTER_RX.search(vis)
+    if not LETTER_RX.search(vis):
+        return True
+    return vis.strip() != content_of(base).strip()
+
+
+def band_of(text):
+    n = len(text.strip())
+    for lo, hi in BANDS:
+        if hi is None or n <= hi:
+            return lo, hi
+    return 81, None
+
+
+def band_label(lo, hi):
+    return ">%d" % (lo - 1) if hi is None else ("%d–%d" % (lo, hi) if lo else "≤%d" % hi)
+
+
+def pending_of(es, field):
+    """待译条目（含字母、无目标文字），以及「与英文逐字相同」的条数。"""
+    script = lang_rules.script_re(field)
+    pend = [e for e in es
+            if not is_translated(e.get(field, ""), field,
+                                 base=e.get(BASE_LANG, ""), script=script)]
+    same = sum(1 for e in es if e.get(field, "") == e.get(BASE_LANG, ""))
+    return pend, same
+
+
+def report_status(field, es):
+    pend, same = pending_of(es, field)
+    total = len(es)
+    done = total - len(pend)
+    print("[%s] 共 %d 条，已译 %d 条（%.1f%%），待译 %d 条%s"
+          % (field, total, done, 100.0 * done / max(1, total), len(pend),
+             "（与英文逐字相同 %d 条）" % same if same else ""))
+    if not pend:
+        return
+    buckets = {}
+    for e in pend:
+        buckets.setdefault(band_of(content_of(e.get(field, ""))), []).append(e)
+    parts = ["%s:%d" % (band_label(lo, hi), len(buckets[(lo, hi)]))
+             for lo, hi in BANDS if (lo, hi) in buckets]
+    print("     待译长度分布：%s" % "  ".join(parts))
+
 
 def cmd_status(args):
+    doc = load_toml()
+    es = entries(doc)
+    langs = [args.lang] if args.lang else target_langs()
+    for field in langs:
+        report_status(field, es)
+
+
+# ── 落盘：把映射应用进译文 ──────────────────────────────────
+
+
+def josa_rules():
+    """占位符-助词检查的两条正则，取 `text_lint` 的唯一一份实现。
+
+    取不到就返回 (None, None)：检查缺失不该让落盘失败，但会打印提示 ——
+    宁可少一道门，也不要偷偷改成另一份规则。
+    """
+    path = os.path.join(HERE, "analysis")
+    if path not in sys.path:
+        sys.path.insert(0, path)
+    try:
+        import text_lint
+        return text_lint.PH_BARE, text_lint.PH_PAIR
+    except Exception as exc:                    # noqa: BLE001
+        print("提示：取不到 text_lint 的占位符-助词规则（%s），跳过这道检查。" % exc)
+        return None, None
+
+
+def load_map(path):
+    """读 `{英文原串: 译文}`；值不是字符串、或源串重复归一化后撞车就报错。"""
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    if isinstance(data, dict) and isinstance(data.get("map"), dict):
+        data = data["map"]                    # 允许 {"map": {...}} 包一层
+    if not isinstance(data, dict):
+        raise SystemExit("映射文件必须是 {\"英文原串\": \"译文\"} 的 JSON 对象。")
+    out, clash = {}, []
+    for k, v in data.items():
+        if not isinstance(v, str):
+            raise SystemExit("映射 %r 的值不是字符串。" % k)
+        kk = k.strip()
+        if kk in out and out[kk] != v:
+            clash.append(kk)
+        out[kk] = v
+    if clash:
+        raise SystemExit("映射里有 %d 个源串去掉首尾空白后撞车：%s"
+                         % (len(clash), "、".join(clash[:5])))
+    return out
+
+
+def token_diff(old, new):
+    """占位符/token 与原文比，缺了或多了都算不合格（顺序允许调）。"""
+    return sorted(tokens(old)) != sorted(tokens(new))
+
+
+def apply_map(lang, mapping, dry_run=False):
+    """把映射落进 `translations/<lang>.toml`。返回统计字典。
+
+    查表用 strip 后的值，命中后把原值的首尾空白贴回 —— 六批脚本里只有
+    最后两批写对了这一点，所以这里把它写进代码，而不是写进注释。
+    """
+    if lang in REFERENCE_LANGS:
+        raise SystemExit("%s 是只读参考语言，不能落盘。" % lang)
+    path = lang_path(lang)
+    if not os.path.exists(path):
+        raise SystemExit("没有 %s" % path)
+    doc, order = toml_io.read_doc(path)
+    header = toml_io.head_lines(path)
+
+    hit_ids, used, bad_josa, bad_tok, skipped = [], set(), [], [], 0
+    script = lang_rules.script_re(lang)
+    ph_bare, ph_pair = josa_rules()
+
+    for hid in order:
+        cur = doc.get(hid, "")
+        key = cur.strip()
+        if key not in mapping:
+            continue
+        # 已经有目标文字的条目不再覆盖：映射写错一次不该把译好的句子换回英文。
+        if script is not None and script.search(content_of(cur)):
+            skipped += 1
+            continue
+        new = mapping[key]
+        lead = cur[:len(cur) - len(cur.lstrip())]
+        trail = cur[len(cur.rstrip()):]
+        val = lead + new.strip() + trail
+        if token_diff(cur, val):
+            bad_tok.append(hid)
+            continue
+        if ph_bare is not None and not ph_pair.search(val) and ph_bare.search(val):
+            bad_josa.append((hid, val))
+            continue
+        doc[hid] = val
+        hit_ids.append(hid)
+        used.add(key)
+
+    unused = sorted(set(mapping) - used)
+    stats = {"hit": len(hit_ids), "unused": unused, "josa": bad_josa,
+             "tokens": bad_tok, "skipped": skipped}
+
+    if bad_tok or bad_josa:
+        print("拒绝落盘：%d 条 token 与原文不齐、%d 条占位符后接助词。"
+              % (len(bad_tok), len(bad_josa)))
+        for hid in bad_tok[:5]:
+            print("  token  %s  %s" % (hid, doc.get(hid, "")[:60]))
+        for hid, val in bad_josa[:5]:
+            print("  助词   %s  %s" % (hid, val[:60]))
+        print("改完映射后重跑；本次一个字节都没写。")
+        return stats
+
+    if hit_ids and not dry_run:
+        toml_io.write_doc_atomic(path, doc, order, header)
+    return stats
+
+
+def cmd_apply(args):
+    field = args.lang or target_field()
+    mapping = load_map(args.map)
+    stats = apply_map(field, mapping, dry_run=args.dry_run)
+    if stats["tokens"] or stats["josa"]:
+        return 1
+    tail = "（--dry-run，未写盘）" if args.dry_run else ""
+    print("[%s] 映射 %d 条，命中并写入 %d 条%s，映射里 %d 条没有对上。"
+          % (field, len(mapping), stats["hit"], tail, len(stats["unused"])))
+    if stats["skipped"]:
+        print("     跳过 %d 条：该条已有目标文字，不覆盖。" % stats["skipped"])
+    if stats["hit"] == 0 and not args.dry_run:
+        print("     命中 0 条：映射要么已应用过（幂等），要么源串对不上。")
+    for key in stats["unused"][:10]:
+        print("  未对上：%s" % key[:80])
+    if len(stats["unused"]) > 10:
+        print("  ……另有 %d 条，完整清单见映射文件。" % (len(stats["unused"]) - 10))
+    return 0
+
+
+# ── 源缺失自查 ────────────────────────────────────────────────
+
+
+def cmd_gaps(args):
+    """英文原值是令牌、译文却是实文的条目。只报告，不改，不进 check 的判定。"""
     field = args.lang or target_field()
     doc = load_toml()
     es = entries(doc)
-    total = len(es)
-    done = sum(1 for e in es if not PH_RE.match(e.get(field, "")))
-    same = sum(1 for e in es if e.get(field, "") == e.get(BASE_LANG, ""))
-    extra = ""
-    if field != BASE_LANG:
-        extra = "，其中与英文原文相同 %d 条（尚未改写）" % same
-    print("[%s] 共 %d 条，已译 %d 条（%.1f%%），待译 %d 条%s"
-          % (field, total, done, 100.0 * done / max(1, total), total - done,
-             extra))
+    rows = []
+    for e in es:
+        en = e.get(BASE_LANG, "")
+        if not TOKEN_SRC_RX.match(en.strip()):
+            continue
+        val = content_of(e.get(field, "")).strip()
+        if val and val != en.strip():
+            rows.append((e["id"], en.strip(), val))
+    print("[%s] 源缺失 %d 条（英文原值即令牌，译文有实文）" % (field, len(rows)))
+    for hid, en, val in rows[:20]:
+        print("  %s  %-36s  %s" % (hid, en[:36], val[:48]))
+    if len(rows) > 20:
+        print("  ……另有 %d 条。" % (len(rows) - 20))
+    return 0
 
 
 def main():
@@ -244,8 +494,18 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("status", help="看进度")
-    p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
+    p.add_argument("--lang", default="", help="译文语言代码，默认列出全部可编辑语言")
     p.set_defaults(fn=cmd_status)
+
+    p = sub.add_parser("apply", help="把 {英文原串: 译文} 映射落进译文文件")
+    p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
+    p.add_argument("--map", required=True, help="映射 JSON 文件")
+    p.add_argument("--dry-run", action="store_true", help="只报告，不写盘")
+    p.set_defaults(fn=cmd_apply)
+
+    p = sub.add_parser("gaps", help="源缺失自查：英文原值是令牌、译文有实文")
+    p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
+    p.set_defaults(fn=cmd_gaps)
 
     args = ap.parse_args()
     sys.exit(args.fn(args) or 0)
