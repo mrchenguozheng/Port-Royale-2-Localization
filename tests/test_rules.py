@@ -199,6 +199,35 @@ class TestZhSpace(unittest.TestCase):
         for tok in tail.split(" "):
             self.assertLessEqual(len(tok), 12, tok)
 
+    def test_compact_breaks_after_var_not_before(self):
+        """断点紧邻变量时优先落在变量**之后**：数字后面起行是自然断法。
+
+        实测背景：`你还需要%1才能升到下一级`（重量 4+3+7=14）只差一点就得断一刀，
+        旧 DP 把这一刀切在 `%1` 之前，剩下 `%1才能升到下一级` 连成 9 字，窄提示条
+        放不下、整行被引擎丢掉。切在 `%1` 之后是 7 / 7，两行都放得下。
+        """
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        out = zh_space.compact("你还需要%1才能升到下一级", lookup, 13)
+        self.assertIn("%1 ", out)
+        self.assertNotIn(" %1", out)
+
+    def test_cut_cost_around_var(self):
+        """变量之后的断点免单，但变量之前不免费；下一件是粘连字/连词时也不免单。
+
+        直接钉在 `_cut_cost()` 上，避免靠一句人造文本间接验证（人造文本里
+        两侧代价可能打平，断点落在哪里取决于 DP 的扫描顺序）。
+        """
+        block = [("你还需要", 4, False), ("%1", 3, False), ("才能升到下一级", 7, False)]
+        n = len(block)
+        self.assertEqual(zh_space._cut_cost(block, 1, 2, n), 0)   # 变量之后：免单
+        self.assertEqual(zh_space._cut_cost(block, 0, 1, n), 2)   # 变量之前：原价
+
+        blocked = [("他提到了", 4, False), ("%1", 3, False), ("和奥格斯堡", 5, False)]
+        self.assertEqual(zh_space._cut_cost(blocked, 1, 2, len(blocked)), 10)
+
+        particle = [("这艘船", 3, False), ("%1", 3, False), ("的船队", 4, False)]
+        self.assertEqual(zh_space._cut_cost(particle, 1, 2, len(particle)), 10)
+
     def test_compact_no_run_longer_than_budget(self):
         """连续 15 个字之内必须有一个断点：没有任何标点的长句也得被切开。"""
         lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]

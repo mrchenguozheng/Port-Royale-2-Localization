@@ -268,6 +268,7 @@ LINE_HEAD_OK = set("—…")
 #: 拆件：名字占位符整体一件、汉字串一件、其余单字一件。
 _PIECE = re.compile(r"[\u4e00-\u9fff]+(?:·[\u4e00-\u9fff]+)*|.")
 _PLACEHOLDER = re.compile(r"\x00(\d+)\x00")
+_VAR_UNIT = re.compile(r"\x00\d+\x00|%\d+|@[A-Za-z]\$[^$]*\$")
 _RUN_RX = re.compile(r"[\u4e00-\u9fff]+(?:·[\u4e00-\u9fff]+)*")
 
 #: 硬换行：`<n>` 与 `<n:25>` 这类带参数的换行都要清零；`<c>`、`<f:…>` 是行内标签。
@@ -501,11 +502,19 @@ def _cut_cost(block, i, j, n):
     """
     if j >= n:
         return 0
+    tail = block[j - 1][0]
+    if _is_var(tail):
+        # 断在变量之后：变量换成数字/名字后，在它后面起行是自然的断法
+        # （「还需 1234 / 才能升到下一级」），所以不收那 2，也不吃 LEAD 罚分。
+        # 但下一件以「的/了/着」或「与/和/或」起头时不享受免单，按常规价算——
+        # 否则会断出「@T$TOWN$ / 和奥格斯堡」这种更碎的切口。
+        head = block[j][0]
+        if not head or head[0] not in STICKY and head[0] not in CONJ:
+            return 0
     cost = 0
     head = block[j][0]
     if head and (head[0] in STICKY or head[0] in CONJ):
         cost += 8
-    tail = block[j - 1][0]
     if tail and tail[-1] in LEAD:
         cost += 8
     if tail and tail[-1] in PUNCT_CHARS:
@@ -545,6 +554,12 @@ def _clause_units(clause, lookup, max_chars, names, hard):
             units.append((piece, len(piece), first))
         first = False
     return units
+
+
+def _is_var(unit_text):
+    """这一件是不是变量：`%1` 直写、`\\x00N\\x00`（`compact()` 内部记法）、
+    `@X$Name$` 这类名字。三者都算，否则规则只在名字上生效、`%1` 全漏。"""
+    return bool(_VAR_UNIT.fullmatch(unit_text))
 
 
 def _is_han(ch):
