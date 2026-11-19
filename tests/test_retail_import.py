@@ -219,6 +219,10 @@ class TestBuildAndWrite(unittest.TestCase):
                             self.cur, list(self.cur), ["# 头"])
         TI.write_doc_atomic(os.path.join(self.src, "orig", "es.retail-1.0.0.toml"),
                             self.ref, list(self.ref), ["# 头"])
+        hold = os.path.join(self.src, "data", "qa", "retail_hold")
+        os.makedirs(hold, exist_ok=True)
+        with open(os.path.join(hold, "es.txt"), "w", encoding="utf-8") as f:
+            f.write("# 测试用\n0xa3\t零售内容对不上，保留现译\n")
 
     def tearDown(self):
         T.set_src(self.old_src)
@@ -244,6 +248,13 @@ class TestBuildAndWrite(unittest.TestCase):
         self.assertNotIn("0xa6", mapping)
         self.assertTrue([r for r in why if "不是目标语言" in r],
                         why.keys())
+
+    def test_held_row_keeps_current_translation(self):
+        """人工判定不导的行不能因为「结构修得齐」就被写进去。"""
+        mapping, why = RI.build("es", "es.retail-1.0.0")
+        self.assertNotIn("0xa3", mapping)
+        self.assertTrue([r for r in why if "人工判定不导" in r], why.keys())
+        self.assertEqual(self._cur()["0xa3"], "La ciudad de Cartagena")
 
     def test_repair_map_leaves_fitting_rows_alone(self):
         fixed, notes = RI.repair_map("es", {"0xa1": "Hola", "0xa3": "La ciudad es rica"})

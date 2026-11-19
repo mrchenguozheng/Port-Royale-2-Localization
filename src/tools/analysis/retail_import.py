@@ -58,6 +58,28 @@ def load(path):
         return tomllib.load(f)
 
 
+def load_hold(lang):
+    """人工判定「这一条别导」的名单：`src/data/qa/retail_hold/<lang>.txt`，一行 `id<TAB>理由`。
+
+    为什么要有它：结构缺陷能机械修，内容对不上不能。零售偶尔少一整句、或把「见手册」
+    换成硬编码安装路径，这类行只能人看过再定，定了之后就得留痕——否则下一次
+    `--repair --write` 会把它当成「结构现在齐了」直接盖掉现译。
+    """
+    path = os.path.join(T.ROOT, "src", "data", "qa", "retail_hold", lang + ".txt")
+    hold = {}
+    if not os.path.isfile(path):
+        return hold
+    with io.open(path, encoding="utf-8") as f:
+        lines = f.read().splitlines()
+    for line in lines:
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        hid, _, why = s.partition("\t")
+        hold[hid.strip().lower()] = (why.strip() or "无理由")
+    return hold
+
+
 def resolve_path(ref):
     """`--ref` 既收短名（es.retail-1.0.0）也收路径。"""
     if os.path.isfile(ref):
@@ -309,6 +331,7 @@ def build(lang, ref_name, only_empty=False):
     cur = load(T.lang_path(lang))
     ref = load(resolve_path(ref_name))
     keep = set(T.keep_as_is(lang))
+    hold = load_hold(lang)
     table = MK.load_names(lang)
     terms = MK.load_terms(lang)
     known = lexicon(lang)
@@ -323,6 +346,9 @@ def build(lang, ref_name, only_empty=False):
         rv = ref.get(hid)
         if hid in keep:
             note(hid, "不译名单")
+            continue
+        if hid.lower() in hold:
+            note(hid, "人工判定不导（%s）" % hold[hid.lower()])
             continue
         if rv is None:
             note(hid, "参照里没有这条")
