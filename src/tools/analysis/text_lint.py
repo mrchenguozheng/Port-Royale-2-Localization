@@ -57,6 +57,16 @@ VAR_CODE_ORIG = {"0xca4930dc"}
 
 KEEP = {"0xfc512ea5"}
 
+# 货物数量的量词：全库统一「桶」。判据不是约定，而是模板自带的两处硬证据——
+# 送货换钱的十条任务文本同时含 `@g$GoldPerBarrel$`（变量名直译「每桶金币价」）
+# 与 `<g:INTEXT_FASS_800x600.screen>`（FASS = 德语的桶，渲染成一张桶的图片），
+# 插在「每交付一__就能拿到每桶价」的位置；德/英原文写的是 Fass / barrel。
+# 所以数量变量后面的量词只能是桶：写「单位」「份」这类泛称、或干脆不写（`@a$Amount$的
+# 朗姆酒` 会被渲成「10 的朗姆酒」），都算偏离。检查是全域的：全库 56 处 @a$Amount$
+# 全是货物数量，没有一处例外。
+AMT_VAR = re.compile(r"@[aA]\$Amount\$")
+BAD_AMT_UNIT = re.compile(r"@[aA]\$Amount\$(?:单位|份|件|担|公斤|箱)")
+
 sys.path.insert(0, os.path.dirname(HERE))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
@@ -267,6 +277,12 @@ def main(argv):
             W.append((k, "连续空格", v[:60]))
         if "\u3000" in v:
             W.append((k, "全角空格", v[:60]))
+        m_bad = BAD_AMT_UNIT.search(v)
+        if m_bad:
+            E.append((k, "量词不统一", "%s → 桶" % m_bad.group(0)))
+        for m in AMT_VAR.finditer(v):
+            if not v[m.end():].lstrip().startswith("桶"):
+                E.append((k, "缺桶量词", v[max(0, m.start() - 8):m.end() + 12]))
 
     if zh_mode:
         byen = {}
