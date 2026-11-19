@@ -41,6 +41,9 @@ OUT_DIR = os.path.join(ROOT, "build", "qa")
 
 #: 参照里写成 `@$Name$`（漏了类型字母）的令牌：基准同名的是 `@X$Name$` 就照基准补。
 TOK_BARE_RX = re.compile(r"@\$([^$\n]{1,60})\$")
+#: 占位名的形态：`IDM_CONTEST_01_2004_LOG_01_HDR`。上市文本里没这句，mod 作者就拿键名
+#: 顶上，当占位用。
+IDM_RX = re.compile(r"IDM_[A-Z0-9_]+$")
 
 
 def _cand(name):
@@ -90,6 +93,19 @@ def fix_token_prefix(base, text):
     return TOK_BARE_RX.sub(repl, text), fixed[0]
 
 
+def align_idm(base_val, text):
+    """基准只有 `IDM_` 键名、本参照却译了正文：退回键名。
+
+    `IDM_CONTEST_01_2004_LOG_01_HDR` 这类值是 mod 作者给「上市版没有这句」留的占位，
+    不是给人看的文本。德语零售把这批 2004 竞赛日志自己译了，别家只有键名——留着正文，
+    下游抄参照就会把德语搬进别的语言。
+    """
+    if (isinstance(base_val, str) and IDM_RX.match(base_val.strip())
+            and text.strip() != base_val.strip()):
+        return base_val, True
+    return text, False
+
+
 def max_run(text, unit="<n>"):
     """一段里最长的那串连续 `unit`（`<n><n>` 记 2，单个记 1，没有记 0）。"""
     best = cur = 0
@@ -121,6 +137,8 @@ def main(argv=None):
     ap.add_argument("--add-only", action="store_true",
                     help="只补不删：给零售版用。零售的段落划分是它自己的排版，按基准删会"
                          "把一整段挤成一行")
+    ap.add_argument("--align-idm", action="store_true",
+                    help="基准是 `IDM_` 占位名、本参照却写成了正文的行：对齐成那个占位名")
     ap.add_argument("--write", action="store_true", help="真写盘；默认只出报告")
     ap.add_argument("--out", default="", help="输出路径，默认 build/ref/clean/<名字>-clean.toml")
     args = ap.parse_args(argv)
@@ -146,6 +164,14 @@ def main(argv=None):
             out[hid] = val
             continue
         text, notes = val, []
+        # 占位对齐排在最前：基准只有键名、本参照却译了正文的行，先退回键名，
+        # 否则后面拿一段德语去跟一个键名比结构，白忙。
+        b_pre = (base or {}).get(hid)
+        if args.align_idm:
+            text, hit = align_idm(b_pre, text)
+            if hit:
+                notes.append("对齐 IDM 占位（原 %d 字正文：%s）"
+                              % (len(val), val[:28].replace("\n", " ")))
         # 补丁先上：它给的是「基准里那处标签到底落在哪句末」，先定好切点，
         # 后面的自动对齐就无事可做（否则自动挑的切点会先占位，patch 的 old 串就找不到了）。
         for old, new in patch.get(hid, []):

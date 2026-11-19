@@ -81,6 +81,23 @@ class TestBaseAlignment(unittest.TestCase):
         self.assertIn("缺口超过 2 处", "、".join(notes))
 
 
+class TestAlignIdm(unittest.TestCase):
+    def test_body_becomes_the_key_name(self):
+        out, hit = RC.align_idm("IDM_CONTEST_01_2004_LOG_01_HDR", "Wachstum und Versorgung")
+        self.assertTrue(hit)
+        self.assertEqual(out, "IDM_CONTEST_01_2004_LOG_01_HDR")
+
+    def test_an_empty_placeholder_is_not_a_key_name(self):
+        """`+++EMPTY+++` 不是 IDM 键名：别家是空，本参照有正文时不按这套退。"""
+        out, hit = RC.align_idm("+++EMPTY+++", "Seit einiger Zeit schon ...")
+        self.assertFalse(hit)
+        self.assertEqual(out, "Seit einiger Zeit schon ...")
+
+    def test_already_aligned_is_no_change(self):
+        out, hit = RC.align_idm("IDM_X", "IDM_X")
+        self.assertFalse(hit)
+
+
 class TestPatch(unittest.TestCase):
     def _run(self, patch, ref="en"):
         buf = io.StringIO()
