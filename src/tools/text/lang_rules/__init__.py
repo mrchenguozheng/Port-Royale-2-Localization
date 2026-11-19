@@ -22,9 +22,9 @@ fr/de/es 用拉丁字母，没有这份声明，进度按「与英文原文不�
 
 import importlib
 
-#: 已登记的语言。fr 有真规则（标点前置不换行空格）；de / es / ru / ko 是显式
+#: 已登记的语言。fr 有真规则（标点前置不换行空格）；de / es / pl / ru / ko 是显式
 #: 透传（各自模块里写了理由）。en 是原文语，不在这里。
-REGISTRY = ("zh", "ja", "fr", "de", "es", "ru", "ko")
+REGISTRY = ("zh", "ja", "fr", "de", "es", "pl", "ru", "ko")
 
 
 def get(lang):
