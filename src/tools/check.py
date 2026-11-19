@@ -35,6 +35,7 @@ def main():
         ("跨模块引用", [PY, os.path.join("src", "tools", "lint_imports.py")]),
         ("语言配置", [PY, os.path.join("src", "tools", "config_check.py")]),
         ("译文规范", [PY, os.path.join("src", "tools", "analysis", "text_lint.py")]),
+        ("断行长度", [PY, os.path.join("src", "tools", "analysis", "line_run.py")]),
         ("文档一致性", [PY, os.path.join("src", "tools", "docs_check.py")]),
         ("规则单测", [PY, "-m", "unittest", "discover", "-s", "tests", "-q"]),
     ]
