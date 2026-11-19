@@ -412,6 +412,11 @@ def build(lang, ref_name, only_empty=False):
         if now == rv:
             note(hid, "与参照已一致")
             continue
+        if now.strip() == rv.strip():
+            # 只差首尾空白：零售版的行首偶尔带一个缩进空格，现译没有（或反过来）。
+            # 这种差异没有语义，整行覆盖只会把已落盘的值改一遍空白——判「已一致」，不动。
+            note(hid, "与参照只差首尾空白（保留现值）")
+            continue
         if "[" in now:
             try:
                 body, reason = carried(now, rv, lambda s, h: MK.expand(

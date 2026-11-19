@@ -249,6 +249,17 @@ class TestBuildAndWrite(unittest.TestCase):
         self.assertTrue([r for r in why if "不是目标语言" in r],
                         why.keys())
 
+    def test_outer_whitespace_only_is_not_a_change(self):
+        """只差首尾空白不当改动：零售的行首缩进不该把已落盘的值改一遍。"""
+        ref = dict(self.ref)
+        ref["0xa1"] = "  Buenos días"      # 与现值同一句，只多一个行首缩进
+        TI.write_doc_atomic(os.path.join(self.src, "orig", "es.retail-1.0.2.toml"),
+                            ref, list(ref), ["# 头"])
+        mapping, why = RI.build(
+            "es", os.path.join(self.src, "orig", "es.retail-1.0.2.toml"))
+        self.assertNotIn("0xa1", mapping)
+        self.assertIn("0xa1", why["与参照只差首尾空白（保留现值）"])
+
     def test_coverage_counts_missing_and_extra_rows(self):
         """换语言前先看覆盖：零售没给的行，导入无从下手。"""
         ref = dict(self.ref)
