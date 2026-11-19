@@ -1,0 +1,9 @@
+# 「同原文异译」例外：同一句英文对应两条用途不同、必须不同译法的条目。
+# 一行一条 id。
+#
+# 0x391f78da / 0xd0d692a5 英文都是 "Quick Save"：
+#   391f78da 只用于 ESC 菜单木牌显示 → 可本地化成「快速存档」；
+#   d0d692a5 是快速存档的文件名模板 → 必须 ASCII（保持 "Quick Save"）。
+# 证据与实机记录见 docs/待定.md §6；两条都写进 src/data/keep_as_is/zh.txt 的 save-name。
+0x391f78da
+0xd0d692a5

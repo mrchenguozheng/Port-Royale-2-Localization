@@ -93,6 +93,23 @@ def _allow_ids(lang):
     return out
 
 
+def load_allow_same_src(lang):
+    """「同原文异译」的例外：同一句英文对应两条用途不同的条目。
+
+    `src/data/allow_same_src_<lang>.txt`，一行一条 id，注释写为什么。
+    """
+    path = os.path.join(ROOT, "src", "data", "allow_same_src_%s.txt" % lang)
+    if not os.path.exists(path):
+        return set()
+    out = set()
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                out.add(line.split()[0])
+    return out
+
+
 def _enforce_keys(lang):
     """要强制落词的术语键。`src/data/terms/enforce_<lang>.txt`，一行一个键。
 
@@ -340,6 +357,29 @@ def fr_space_checks(tr):
     return out
 
 
+def keep_violations(keep, tr, en):
+    """有意不译名单的反向检查，返回 W 级条目。
+
+    两种理由的判据不同：
+    - `save-name`：这条会变成**存档文件名**。PR2.exe 只导入 ANSI 版文件 API，
+      名字里的非 ASCII 字节会被按 Latin-1 映射，存档写出去就是乱码文件、
+      再读回来弹「存档无效」。所以它不必等于英文，但必须是纯 ASCII
+      （de `Autospeichern`、fr `Sauvegarde automatique` 都合法）。
+    - 其余（key / label / id / credit）：正确译法就是英文原样，值一变就是错。
+    """
+    W = []
+    for k, why in keep.items():
+        v = tr.get(k)
+        if v is None:
+            continue
+        if why == "save-name":
+            if not str(v).isascii():
+                W.append((k, "存档名非 ASCII", str(v)[:60]))
+        elif en.get(k) is not None and str(v).strip() != str(en[k]).strip():
+            W.append((k, "名单内但已改动（%s）" % why, str(v)[:60]))
+    return W
+
+
 def main(argv):
     lang = "zh"
     show_all = "--all" in argv
@@ -410,20 +450,22 @@ def main(argv):
                 E.append((k, "缺桶量词", v[max(0, m.start() - 8):m.end() + 12]))
 
     if zh_mode:
+        allow_same = load_allow_same_src(lang)
         byen = {}
         for k, v in en.items():
             if k in tr:
                 byen.setdefault(v, []).append(k)
         for src, keys in byen.items():
             outs = {tr[k]: k for k in keys}
-            if len(outs) > 1 and len(src) > 8:
+            # 同一句英文对应「同名两用」时允许不同译法：Quick Save 的两条
+            # 一条是 ESC 菜单木牌（可本地化），一条是存档文件名（必须 ASCII）。
+            if len(outs) > 1 and len(src) > 8 and not set(keys) <= allow_same:
                 W.append((sorted(keys)[0], "同原文异译 %d 种" % len(outs),
                           " / ".join(sorted(outs))[:120]))
 
-    # 有意不译名单：保持英文原样才对。反过来查——名单内的值一旦被译，就是错。
-    for k, why in load_keep(lang).items():
-        if k in tr and en.get(k) is not None and str(tr[k]).strip() != str(en[k]).strip():
-            W.append((k, "名单内但已改动（%s）" % why, str(tr[k])[:60]))
+    # 有意不译名单：按键名/表头/专名保持英文原样；存档名另有一条 —— 必须是
+    # ASCII，因为引擎只用 ANSI 文件 API，非 ASCII 的文件名写出去就是乱码。
+    W.extend(keep_violations(load_keep(lang), tr, en))
 
     # 术语落词：术语表的英文词在原文出现时，译文里必须用指定译法。
     # 只在**短标签**上判（可见 ≤24 字）：长句里的同一个词是行文的一部分，

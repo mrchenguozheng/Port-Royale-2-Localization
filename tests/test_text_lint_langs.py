@@ -32,6 +32,27 @@ except Exception:
     HAS_JANOME = False
 
 
+class TestKeepViolations(unittest.TestCase):
+    """有意不译名单的反向检查：save-name 只认 ASCII，其余要等于英文。"""
+
+    def test_key_must_equal_english(self):
+        W = TL.keep_violations({"0x1": "key"}, {"0x1": "이스케이프"}, {"0x1": "ESC"})
+        self.assertEqual([w[1] for w in W], ["名单内但已改动（key）"])
+
+    def test_ascii_save_name_is_fine_even_if_localized(self):
+        W = TL.keep_violations({"0x2": "save-name"},
+                               {"0x2": "Autospeichern %02u"}, {"0x2": "Autosave %02u"})
+        self.assertEqual(W, [])
+
+    def test_non_ascii_save_name_is_reported(self):
+        W = TL.keep_violations({"0x3": "save-name"},
+                               {"0x3": "オートセーブ %02u"}, {"0x3": "Autosave %02u"})
+        self.assertEqual([w[1] for w in W], ["存档名非 ASCII"])
+
+    def test_missing_entry_is_ignored(self):
+        self.assertEqual(TL.keep_violations({"0x4": "key"}, {}, {}), [])
+
+
 class TestKoParticle(unittest.TestCase):
     def test_placeholder_followed_by_bare_josa_is_reported(self):
         W = []

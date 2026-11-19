@@ -1,0 +1,8 @@
+# 有意不译：正确译法就是保持英文原样（或至少纯 ASCII），算进度时不计入待译。
+# 一行一条：id<TAB>理由。理由取值：key=按键名、label=界面键名、
+# id=脚本/资源标识、credit=职员表、save-name=存档文件名（必须纯 ASCII）。
+#
+# save-name 的判据与其余不同：值不必等于英文，但不许出现非 ASCII 字符 ——
+# PR2.exe 只导入 ANSI 版文件 API，非 ASCII 文件名写出去就是乱码，读回来弹「存档无效」。
+0x33c2c533	save-name
+0xd0d692a5	save-name
