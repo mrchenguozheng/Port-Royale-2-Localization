@@ -107,11 +107,15 @@ def audit(lang, es, base_field):
 
 
 def main():
+    langs = []
+    if "--lang" in sys.argv:
+        i = sys.argv.index("--lang")
+        langs = [a for a in sys.argv[i + 1:] if not a.startswith("-")]
     doc = T.load_toml()
     es = T.entries(doc)
     base_field = T.BASE_LANG if any(e.get(T.BASE_LANG) for e in es) else "en"
     failed = 0
-    for lang in T.target_langs():
+    for lang in (langs or T.target_langs()):
         problems, n_pend, n_same, n_must, path = audit(lang, es, base_field)
         mark = "×" if problems else "√"
         print("%s %-3s 待译 %-4d 同英文 %-4d 结构性不可译未登记 %-3d %s"
