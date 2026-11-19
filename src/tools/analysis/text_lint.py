@@ -235,6 +235,21 @@ def ja_unit_checks(tr):
     return out
 
 
+def fr_unit_checks(tr):
+    """法语：桶模板族里数量变量必须带 `tonneaux`（E 级）。
+
+    「Livrez 10 d'outils」不成立，法语必须给量词；全库已用 tonneaux 18 条，口径一致。
+    """
+    out = []
+    for k, v in tr.items():
+        if k in KEEP or not v or not BARREL_HINT.search(v):
+            continue
+        for m in AMT_VAR.finditer(v):
+            if not v[m.end():].lstrip().startswith("tonneau"):
+                out.append((k, "缺 tonneaux 量词", v[max(0, m.start() - 8):m.end() + 12]))
+    return out
+
+
 def main(argv):
     lang = "zh"
     show_all = "--all" in argv
@@ -323,6 +338,8 @@ def main(argv):
         E.extend(ja_unit_checks(tr))
     elif lang == "es":
         es_checks(tr, W)
+    elif lang == "fr":
+        E.extend(fr_unit_checks(tr))
 
     # 内联标注（[town:…] / [lit:…] / [term:…]）：未定义引用、缺形态、方括号写错、死条目
     # 自造 clue 标签（非 `_` 开头、也不是已知类型）只做关键词扫描、没有任何校验，
