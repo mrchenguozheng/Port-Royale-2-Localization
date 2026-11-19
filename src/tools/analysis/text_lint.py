@@ -35,7 +35,12 @@ import unicodedata
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 
-EN = os.path.join(ROOT, "src", "orig", "en.gog_1.1.2.3.toml")
+#: 基准读清洁版（`ref_clean.py` 产出）：en 原件有两处漏掉的 `<n>`（`0x0cf7abf0`、
+#: `0xdb0108dd`），照着原件判就会把已补齐的译文判成「模板不一致」。clean 不在时
+#: （干净 clone、临时 src）退回原件，行为与从前一致。
+EN = os.path.join(ROOT, "build", "ref", "clean", "en-clean.toml")
+if not os.path.isfile(EN):
+    EN = os.path.join(ROOT, "src", "orig", "en.gog_1.1.2.3.toml")
 TR = os.path.join(ROOT, "src", "translations", "%s.toml")
 #: 已判定为误报的 W 级条目清单（一行 `id<TAB>理由`）。
 LINT_OK = os.path.join(ROOT, "src", "data", "lint_ok")
