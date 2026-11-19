@@ -74,6 +74,7 @@ from text import lang_rules, toml_io  # noqa: E402
 
 STRINGS_DIR = os.path.join(SRC, "translations")
 REFERENCES_DIR = os.path.join(SRC, "orig")
+CLEAN_DIR = os.path.join(ROOT, "build", "ref", "clean")
 
 #: 译文**唯一手改层**：translations\<语言>.toml，**每条一行**：
 #:     "0xd2d0a572" = "萧条"
@@ -111,17 +112,32 @@ def set_src(src):
     只改路径，不改语言清单与规则：`target_langs()`、`all_langs()` 都是
     现算的，所以换根之后自然跟着走。
     """
-    global SRC, ROOT, STRINGS_DIR, REFERENCES_DIR
+    global SRC, ROOT, STRINGS_DIR, REFERENCES_DIR, CLEAN_DIR
     SRC = os.path.abspath(src)
     ROOT = os.path.dirname(SRC)
     STRINGS_DIR = os.path.join(SRC, "translations")
     REFERENCES_DIR = os.path.join(SRC, "orig")
+    CLEAN_DIR = os.path.join(ROOT, "build", "ref", "clean")
+
+
+def clean_path(code):
+    """参照语言的清洁版路径（`analysis/ref_clean.py` 产出）。"""
+    return os.path.join(CLEAN_DIR, code.split(".")[0] + "-clean.toml")
 
 
 def lang_path(code):
-    """语言代码 -> 文件路径。只读参考在 orig\\ 目录下。"""
-    base = REFERENCES_DIR if code in REFERENCE_LANGS else STRINGS_DIR
-    return os.path.join(base, code + ".toml")
+    """语言代码 -> 文件路径。只读参考在 orig\\ 目录下。
+
+    参考语言优先读清洁版（`build/ref/clean/<短名>-clean.toml`）：原版 en/fr 与四家
+    零售自身有结构缺陷（缺换行、混着只该留在零售里的德语正文），照着抄就把缺陷抄进
+    译文。清洁版不存在时（干净 clone、临时 src）退回 orig 原件，行为与从前一致。
+    """
+    if code in REFERENCE_LANGS:
+        cand = clean_path(code)
+        if os.path.isfile(cand):
+            return cand
+        return os.path.join(REFERENCES_DIR, code + ".toml")
+    return os.path.join(STRINGS_DIR, code + ".toml")
 
 
 def target_langs():
