@@ -1960,7 +1960,7 @@
 "0x01066fc2" = "Bienes iniciales"
 "0x010930ef" = "Productos vendidos"
 "0x010c5059" = "Emblema del jugador"
-"0x010faa75" = "En cuanto cambias un logotipo, el logotipo cambiado se usa automáticamente en el juego.<n>También puedes crear tus propios logotipos. Debes crearlos en el formato correcto en un directorio específico (consulta el manual)."
+"0x010faa75" = "En cuanto cambias un emblema, el nuevo se utiliza automáticamente en la partida.<n>También puedes crear tus propios emblemas. Debes crearlos con el formato correcto en un directorio determinado (consulta el manual)."
 "0x01118328" = "¡No se encontró DirectX 8!"
 "0x01177579" = "Cambiar tamaño de la unidad"
 "0x012b8481" = "Volver al juego"
