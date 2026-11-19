@@ -390,6 +390,12 @@ def apply_map(lang, mapping, dry_run=False):
 
     查表用 strip 后的值，命中后把原值的首尾空白贴回 —— 六批脚本里只有
     最后两批写对了这一点，所以这里把它写进代码，而不是写进注释。
+
+    三种命中状态分开报：
+      * `hit`   写进去的条数（改过的）；
+      * `same`  值已经等于映射译文的条数 —— 重跑时就是这些，幂等的证据；
+      * `rewrite` 命中里有几条本来已经是目标文字（即这次是**修正**旧译文）。
+    映射里既没按源串命中、也没按译文对上的键才进 `unused`，那才是真缺口。
     """
     if lang in REFERENCE_LANGS:
         raise SystemExit("%s 是只读参考语言，不能落盘。" % lang)
@@ -399,20 +405,36 @@ def apply_map(lang, mapping, dry_run=False):
     doc, order = toml_io.read_doc(path)
     header = toml_io.head_lines(path)
 
-    hit_ids, used, bad_josa, bad_tok, skipped = [], set(), [], [], 0
+    hit_ids, used, same, rewritten = [], set(), 0, 0
+    bad_josa, bad_tok, bad_lang = [], [], []
     script = lang_rules.script_re(lang)
     ph_bare, ph_pair = josa_rules()
+
+    #: 已经落过盘的译文：映射里没按源串命中的键，可能只是「已经应用过」。
+    landed = set()
+    for hid in order:
+        val = (doc.get(hid, "") or "").strip()
+        if val:
+            landed.add(val)
 
     for hid in order:
         cur = doc.get(hid, "")
         key = cur.strip()
-        if key not in mapping:
+        # 键有两种：英文原串（正常落盘）、hash（修正已经译过的条目 ——
+        # 那时原串已经不在文件里了，只能按 id 找）。
+        by_id = hid in mapping
+        if by_id:
+            new = mapping[hid]
+        elif key in mapping:
+            new = mapping[key]
+        else:
             continue
-        # 已经有目标文字的条目不再覆盖：映射写错一次不该把译好的句子换回英文。
+        if not by_id and key == new.strip():
+            same += 1                      # 映射与现值一模一样
+            used.add(key)
+            continue
         if script is not None and script.search(content_of(cur)):
-            skipped += 1
-            continue
-        new = mapping[key]
+            rewritten += 1                 # 现值是目标文字：这次是修正
         lead = cur[:len(cur) - len(cur.lstrip())]
         trail = cur[len(cur.rstrip()):]
         val = lead + new.strip() + trail
@@ -422,21 +444,33 @@ def apply_map(lang, mapping, dry_run=False):
         if ph_bare is not None and not ph_pair.search(val) and ph_bare.search(val):
             bad_josa.append((hid, val))
             continue
+        # 映射值必须是目标文字：韩语映射里写回英文，多半是抄错了行。
+        vis = content_of(val)
+        if script is not None and LETTER_RX.search(vis) and not script.search(vis):
+            bad_lang.append((hid, val))
+            continue
         doc[hid] = val
         hit_ids.append(hid)
-        used.add(key)
+        used.add(hid if by_id else key)
 
-    unused = sorted(set(mapping) - used)
+    unused = sorted(k for k, v in mapping.items()
+                    if k not in used and v.strip() not in landed)
+    applied = sum(1 for k, v in mapping.items()
+                  if k not in used and v.strip() in landed)
     stats = {"hit": len(hit_ids), "unused": unused, "josa": bad_josa,
-             "tokens": bad_tok, "skipped": skipped}
+             "tokens": bad_tok, "lang": bad_lang, "same": same,
+             "rewrite": rewritten, "applied": applied}
 
-    if bad_tok or bad_josa:
-        print("拒绝落盘：%d 条 token 与原文不齐、%d 条占位符后接助词。"
-              % (len(bad_tok), len(bad_josa)))
+    if bad_tok or bad_josa or bad_lang:
+        print("拒绝落盘：%d 条 token 与原文不齐、%d 条占位符后接助词、"
+              "%d 条映射值不是目标文字。" % (len(bad_tok), len(bad_josa),
+                                          len(bad_lang)))
         for hid in bad_tok[:5]:
             print("  token  %s  %s" % (hid, doc.get(hid, "")[:60]))
         for hid, val in bad_josa[:5]:
             print("  助词   %s  %s" % (hid, val[:60]))
+        for hid, val in bad_lang[:5]:
+            print("  非目标文字 %s  %s" % (hid, val[:60]))
         print("改完映射后重跑；本次一个字节都没写。")
         return stats
 
@@ -449,14 +483,15 @@ def cmd_apply(args):
     field = args.lang or target_field()
     mapping = load_map(args.map)
     stats = apply_map(field, mapping, dry_run=args.dry_run)
-    if stats["tokens"] or stats["josa"]:
+    if stats["tokens"] or stats["josa"] or stats["lang"]:
         return 1
     tail = "（--dry-run，未写盘）" if args.dry_run else ""
-    print("[%s] 映射 %d 条，命中并写入 %d 条%s，映射里 %d 条没有对上。"
-          % (field, len(mapping), stats["hit"], tail, len(stats["unused"])))
-    if stats["skipped"]:
-        print("     跳过 %d 条：该条已有目标文字，不覆盖。" % stats["skipped"])
-    if stats["hit"] == 0 and not args.dry_run:
+    print("[%s] 映射 %d 条，写入 %d 条%s，其中修正旧译文 %d 条，已是当前值 %d 条。"
+          % (field, len(mapping), stats["hit"], tail, stats["rewrite"],
+             stats["same"]))
+    if stats["applied"]:
+        print("     另有 %d 条已落过盘（值已存在，未重复计）。" % stats["applied"])
+    if not stats["hit"] and not stats["same"] and not args.dry_run:
         print("     命中 0 条：映射要么已应用过（幂等），要么源串对不上。")
     for key in stats["unused"][:10]:
         print("  未对上：%s" % key[:80])

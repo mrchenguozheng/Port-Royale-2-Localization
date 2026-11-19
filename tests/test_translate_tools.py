@@ -119,12 +119,27 @@ class TestApplyMap(unittest.TestCase):
         T.apply_map("ko", {"Hello": "안녕하세요"})
         again = T.apply_map("ko", {"Hello": "안녕하세요"})
         self.assertEqual(again["hit"], 0)
+        self.assertGreaterEqual(again["applied"], 1)
+        self.assertEqual(again["unused"], [])
 
-    def test_existing_translation_is_not_overwritten(self):
+    def test_english_value_is_refused_as_translation(self):
         stats = T.apply_map("ko", {"안녕": "Hello"})
         self.assertEqual(stats["hit"], 0)
-        self.assertEqual(stats["skipped"], 1)
+        self.assertEqual(len(stats["lang"]), 1)
         self.assertEqual(self._read()["0xa4"], "안녕")
+
+    def test_translated_entry_can_be_corrected(self):
+        stats = T.apply_map("ko", {"안녕": "안녕하십니까"})
+        self.assertEqual(stats["hit"], 1)
+        self.assertEqual(stats["rewrite"], 1)
+        self.assertEqual(self._read()["0xa4"], "안녕하십니까")
+
+    def test_hash_key_corrects_already_translated_entry(self):
+        T.apply_map("ko", {"Hello": "안녕하세요"})
+        stats = T.apply_map("ko", {"0xa1": "안녕하십니까"})
+        self.assertEqual(stats["hit"], 1)
+        self.assertEqual(stats["unused"], [])
+        self.assertEqual(self._read()["0xa1"], " 안녕하십니까 ")
 
     def test_bare_particle_blocks_the_write(self):
         stats = T.apply_map("ko", {"Take %1 now": "지금 %1를 가지세요"})
