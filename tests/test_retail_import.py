@@ -162,6 +162,28 @@ class TestRepair(unittest.TestCase):
         self.assertIsNone(fixed)
         self.assertIn("<n:25>", why)
 
+    def test_percent_column_is_normalized(self):
+        """零售把「`%2` 制表 `%3%`」写成「`%2` 空格 `(%3%)`」，按基准还原。"""
+        base = "%2<t>%3%<t>%4"
+        out = "%2    (%3%)<t>%4"
+        fixed, note = RI.repair_tags(base, out)
+        self.assertEqual(fixed, base)
+        self.assertIn("还原百分列 1", note)
+
+    def test_percent_columns_all_occurrences(self):
+        base = "%2<t>%3%<t>%4<n>%5<t>%6%<t>%7"
+        out = "%2    (%3%)<t>%4<n>%5\t(%6%)<t>%7"
+        fixed, _ = RI.repair_tags(base, out)
+        self.assertEqual(fixed, base)
+
+    def test_percent_parenthesis_without_base_pattern_is_not_guessed(self):
+        """基准那一处不是 `%A<t>%B%<t>`，就不能把括注自行拆开。"""
+        base = "Coste %1<t>%2<t>%3"
+        out = "Coste %1    (%2%)<t>%3"
+        fixed, why = RI.repair_tags(base, out)
+        self.assertIsNone(fixed)
+        self.assertIn("<t>", why)
+
     def test_token_deficit_is_left_to_humans(self):
         base = "Toma %1 y %2."
         out = "Toma %1."

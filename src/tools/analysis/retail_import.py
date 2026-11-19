@@ -231,8 +231,38 @@ def _restore_bullets(base, out, need):
     return out, fixed
 
 
+#: 零售把「`%1` 制表 `%2` 百分号」一栏写成「`%1` 空格 `(%2%)`」：制表位被拍成空格，
+#: 百分号从跟在数字后面变成括注里的一部分。es 只有 `0x08bb47a4` 一条，其余零售语言
+#: （de/pl/ru/fr）都是基准写法，所以按「基准有 `%A<t>%B%<t>`、参照有 `%A …(%B%)<t>`」
+#: 成对认，不按 id 认。
+PCT_TAB_RX = re.compile(r"(%[0-9]+)<t>(%[0-9]+)%<t>")
+PCT_PAREN_RX = re.compile(r"(%[0-9]+)[ \t]*\((%[0-9]+)%\)<t>")
+
+
+def _pct_columns(base, out):
+    """把零售的「`%1` 空格 `(%2%)`」写法还原成基准的「`%1<t>%2%<t>`」，返回 (文本, 处数)。
+
+    只认成对的：基准同一处得是 `%A<t>%B%<t>`，参照同一处得是 `%A …(%B%)<t>`，A、B 也要
+    对得上。别处的括注（玩家自己写的百分比说明）不会被动。
+    """
+    pairs = [(a, b) for a, b in PCT_TAB_RX.findall(base)]
+    if not pairs:
+        return out, 0
+    fixed = [0]
+
+    def repl(m):
+        pair = (m.group(1), m.group(2))
+        if pair not in pairs:
+            return m.group(0)
+        fixed[0] += 1
+        return "%s<t>%s%%<t>" % pair
+
+    # 交给 re.sub 一次扫完：边改边算位置会让后面几处的下标全错位（第一处多了一个字符）。
+    return PCT_PAREN_RX.sub(repl, out), fixed[0]
+
+
 def repair_tags(base, text):
-    """只调 `<n>` 与 `<t>`：段落数按基准对齐、项目符号补回；一个字不动。
+    """只调 `<n>` 与 `<t>`：段落数按基准对齐、项目符号补回、百分列还原；一个字不动。
 
     能用机械规则修的只有这两样：零售 1.0.0 常把两段并成一段（`<n><n>` 写成一个
     `<n>`），或把列表前的 `-<t>` 去掉（连破折号一起）。字体标签、`<c>`、`<n:25>` 与
@@ -241,6 +271,9 @@ def repair_tags(base, text):
     返回 (修好的文本, 说明) 或 (None, 放弃原因)。
     """
     out, notes = text, []
+    out, cols = _pct_columns(base, out)
+    if cols:
+        notes.append("还原百分列 %d" % cols)
     need_t = base.count("<t>") - out.count("<t>")
     if need_t > 0:
         fixed = 0
