@@ -88,9 +88,14 @@ def check_runtime_version(log=print):
 
 
 def build_pack(lang, stage, log):
-    """发行包里的语言包恒为**并集**：GOG 用 PR2LocalizationGUI.exe 注入、Steam 用
-    PR2HostMount 改 VERSION.dll，两条注入路径读的是同一份 packs\\<lang>.txt，
-    所以两个 zip 里放同一个文件，装哪种版本都行。逐版对照在 build\\variants 里。"""
+    """发行包里的语言包恒为**并集**：GOG 由启动器 PR2LocalizationGUI.exe /
+    PR2Localization.exe 挂起启动后远程注入 PR2LocalizationCore.dll，Steam 由
+    PR2HostMount.ps1 替换宿主 Ascaron.Logging-2.6.dll（代理再加载同一个
+    PR2LocalizationCore.dll）；两条注入路径读的都是 packs\\<lang>.txt，
+    所以两个 zip 里放同一个文件，装哪种版本都行。逐版对照在 build\\variants 里。
+
+    （VERSION.dll 代理是历史路线：GOG 直启 PR2.exe 时它会被解析到 SysWOW64，
+    同目录代理进不了进程，Steam 发行包也已改用宿主 DLL，两边都不再依赖它。）"""
     out = os.path.join(stage, DATA_DIR, "packs")
     os.makedirs(out, exist_ok=True)
     log("编译语言包 %s（并集）…" % lang)
