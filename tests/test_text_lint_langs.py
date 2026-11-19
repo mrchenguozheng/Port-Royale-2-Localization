@@ -64,6 +64,31 @@ class TestKoParticle(unittest.TestCase):
         TL.ko_checks({"0x00000002": "@a$Amount$를(을) 가지고 오십시오."}, W)
         self.assertNotIn("占位符后接助词", [w[1] for w in W])
 
+    def test_reversed_pair_order_is_reported(self):
+        """反序 `과(와)`／`는(은)`／`로(으로)` 语义没错，但排版与全库不一致。"""
+        W = []
+        TL.ko_checks({"0x00000008": "%1과(와) 전쟁 중입니다."}, W)
+        kinds = [w[1] for w in W]
+        self.assertIn("并列助词次序", kinds)
+        detail = "".join(w[2] for w in W if w[1] == "并列助词次序")
+        self.assertIn("%1와(과)", detail)
+
+    def test_canonical_pair_order_is_silent(self):
+        W = []
+        TL.ko_checks({"0x00000009": "%1와(과) 전쟁 중입니다."}, W)
+        self.assertNotIn("并列助词次序", [w[1] for w in W])
+
+    def test_bare_particle_after_graphic_tag_is_reported(self):
+        W = []
+        TL.ko_checks({"0x0000000a": "<g:INTEXT_GOLD_800x600.screen>를 받았습니다."}, W)
+        self.assertIn("标签后接助词", [w[1] for w in W])
+
+    def test_plain_tag_before_word_is_silent(self):
+        """`<n>이 마을은…` 的「이」是正文指示词，不是助词。"""
+        W = []
+        TL.ko_checks({"0x0000000b": "<n>이 마을은 번성합니다."}, W)
+        self.assertNotIn("标签后接助词", [w[1] for w in W])
+
     @unittest.skipUnless(HAS_KIWI, "需要 kiwipiepy")
     def test_wrong_jongseong_is_reported(self):
         W = []

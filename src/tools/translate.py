@@ -449,20 +449,23 @@ def cmd_status(args):
 
 
 def josa_rules():
-    """占位符-助词检查的两条正则，取 `text_lint` 的唯一一份实现。
+    """占位符-助词检查的四条正则，取 `text_lint` 的唯一一份实现。
 
-    取不到就返回 (None, None)：检查缺失不该让落盘失败，但会打印提示 ——
-    宁可少一道门，也不要偷偷改成另一份规则。
+    取不到就返回 (None, None, None, None)：检查缺失不该让落盘失败，但会打印
+    提示 —— 宁可少一道门，也不要偷偷改成另一份规则。
+
+    返回 `(裸助词, 并列形, 反序并列形, 图形标签后裸助词)`。
     """
     path = os.path.join(HERE, "analysis")
     if path not in sys.path:
         sys.path.insert(0, path)
     try:
         import text_lint
-        return text_lint.PH_BARE, text_lint.PH_PAIR
+        return (text_lint.PH_BARE, text_lint.PH_PAIR,
+                text_lint.PH_PAIR_BAD, text_lint.PH_BARE_G)
     except Exception as exc:                    # noqa: BLE001
         print("提示：取不到 text_lint 的占位符-助词规则（%s），跳过这道检查。" % exc)
-        return None, None
+        return None, None, None, None
 
 
 def unit_violations(lang, hid, val):
@@ -535,8 +538,9 @@ def apply_map(lang, mapping, dry_run=False):
 
     hit_ids, used, same, rewritten = [], set(), 0, 0
     bad_josa, bad_tok, bad_lang, bad_unit, bad_tag = [], [], [], [], []
+    bad_pair = []
     script = lang_rules.script_re(lang)
-    ph_bare, _ph_pair = josa_rules()
+    ph_bare, _ph_pair, ph_pair_bad, ph_bare_g = josa_rules()
     #: 有意不译的条目：它们**正确**的值就是英文原串，写回去不算「抄错行」。
     keep_ids = set(keep_as_is(lang))
     #: 英文基准：占位符个数以它为准。拿现值比是没用的 —— 现值本身可能就是
@@ -605,7 +609,18 @@ def apply_map(lang, mapping, dry_run=False):
         if ph_bare is not None:
             for m in ph_bare.finditer(val):
                 bad_josa.append((hid, m.group(0)))
+            # 图形标签后的裸助词与占位符同类：`<g:…screen>을(를)` 合规，`…>을` 不合规。
+            if ph_bare_g is not None:
+                for m in ph_bare_g.finditer(val):
+                    bad_josa.append((hid, m.group(0)))
             if bad_josa and bad_josa[-1][0] == hid:
+                continue
+        # 并列形次序：`과(와)`／`는(은)`／`로(으로)` 语义没错，但与全库 `와(과)`／
+        # `은(는)`／`으로(로)` 不一致。写成反序就是排版错，落盘前改掉。
+        if ph_pair_bad is not None:
+            for m in ph_pair_bad.finditer(val):
+                bad_pair.append((hid, m.group(0)))
+            if bad_pair and bad_pair[-1][0] == hid:
                 continue
         # 量词：`%1 배`（缺 척）、`5척의 병사`（搭配错）。以前只在 text_lint
         # 阶段查，那时已经写盘；放在这里就是落盘前的门。
@@ -630,26 +645,35 @@ def apply_map(lang, mapping, dry_run=False):
                   if k not in used and v.strip() in landed)
     stats = {"hit": len(hit_ids), "unused": unused, "josa": bad_josa,
              "tokens": bad_tok, "lang": bad_lang, "same": same,
-             "unit": bad_unit, "tag": bad_tag,
+             "unit": bad_unit, "tag": bad_tag, "pair": bad_pair,
              "rewrite": rewritten, "applied": applied, "ids": hit_ids}
 
-    if bad_tok or bad_josa or bad_lang or bad_unit or bad_tag:
-        print("拒绝落盘：%d 条 token 与原文不齐、%d 条占位符后接助词、"
-              "%d 条量词不对、%d 条标签与原文不一致、%d 条映射值不是目标文字。"
+    if bad_tok or bad_josa or bad_lang or bad_unit or bad_tag or bad_pair:
+        print("拒绝落盘：%d 条 token 与原文不齐、%d 条占位符／标签后接助词、"
+              "%d 条量词不对、%d 条标签与原文不一致、%d 条并列助词次序反了、"
+              "%d 条映射值不是目标文字。"
               % (len(bad_tok), len(bad_josa), len(bad_unit), len(bad_tag),
-                 len(bad_lang)))
+                 len(bad_pair), len(bad_lang)))
         # 全列，不再只印前 5 条：一批 40 条里往往一次就有七八条同类问题，
         # 只印 5 条就得改—重跑—再改，白跑两三轮。
         for hid in bad_tok:
             print("  token  %s  %s" % (hid, doc.get(hid, "")[:60]))
         for hid, tok in bad_josa:
             print("  助词   %s  %s" % (hid, tok))
+        for hid, tok in bad_pair:
+            print("  次序   %s  %s" % (hid, tok))
         for hid, detail in bad_unit:
             print("  量词   %s  %s" % (hid, detail))
         for hid, detail in bad_tag:
             print("  标签   %s  %s" % (hid, detail))
         for hid, val in bad_lang:
             print("  非目标文字 %s  %s" % (hid, val[:60]))
+        if bad_josa:
+            # 只报片段的话，每条都得重新想一遍改法。三条路都给出来，选最省事的：
+            # 量词后置（`…만큼을`）、换作定语、整句换述，实在不行才写并列形。
+            print("     助词改法：① 量词后置（`@g$Reward$` → `@g$Reward$만큼을`）"
+                  " ② 换句式（`…에 이르렀습니다` / `…, 그 값을`）"
+                  " ③ 写并列形（`은(는)`／`을(를)`／`이(가)`／`와(과)`／`으로(로)`，只此一套次序）")
         print("改完映射后重跑；本次一个字节都没写。")
         return stats
 
@@ -684,7 +708,7 @@ def cmd_apply(args):
     was = set(pending_ids(entries(load_toml()), field))
     stats = apply_map(field, mapping, dry_run=args.dry_run)
     if (stats["tokens"] or stats["josa"] or stats["lang"]
-            or stats["unit"] or stats["tag"]):
+            or stats["unit"] or stats["tag"] or stats["pair"]):
         return 1
     tail = "（--dry-run，未写盘）" if args.dry_run else ""
     print("[%s] 映射 %d 条，写入 %d 条%s，其中修正旧译文 %d 条，已是当前值 %d 条。"

@@ -175,6 +175,35 @@ class TestApplyMap(unittest.TestCase):
         stats = T.apply_map("ko", {"Get %1 and %2 now": "%1를 %2를 가지세요"})
         self.assertEqual([t for _, t in stats["josa"]], ["%1를", "%2를"])
 
+    def test_reversed_paired_order_blocks_the_write(self):
+        """`%1를(을)` 反序：语义没错，但与全库 `%1을(를)` 不一致，落盘前改掉。"""
+        stats = T.apply_map("ko", {"Take %1 now": "지금 %1를(을) 가지세요"})
+        self.assertEqual(stats["hit"], 0)
+        self.assertEqual([t for _, t in stats["pair"]], ["%1를(을)"])
+        self.assertEqual(self._read()["0xa3"], "Take %1 now")
+
+    def test_canonical_paired_order_passes(self):
+        stats = T.apply_map("ko", {"Take %1 now": "지금 %1(을)를 가지세요"})
+        self.assertEqual(stats["pair"], [])
+
+    def test_bare_particle_after_graphic_tag_blocks_the_write(self):
+        """`<g:…>` 后面跟裸助词与占位符同类；`<n>이` 那种正文词不算（34 条误报的来源）。"""
+        with open(self.path, "w", encoding="utf-8", newline="\n") as f:
+            f.write('"0xa6" = "<g:INTEXT_GOLD_800x600.screen> 받았습니다"\n')
+        bad = T.apply_map("ko", {"0xa6": "<g:INTEXT_GOLD_800x600.screen>를 받았습니다"},
+                          dry_run=True)
+        self.assertEqual(bad["hit"], 0)
+        self.assertEqual([t for _, t in bad["josa"]],
+                         ["<g:INTEXT_GOLD_800x600.screen>를"])
+
+    def test_plain_tag_before_word_is_not_a_particle_site(self):
+        """`<n>이 마을은…` 里的「이」是正文冠词性指示词，不是助词，不许拦。"""
+        with open(self.path, "w", encoding="utf-8", newline="\n") as f:
+            f.write('"0xa6" = "<n>This town"\n')
+        ok = T.apply_map("ko", {"0xa6": "<n>이 마을"}, dry_run=True)
+        self.assertEqual(ok["hit"], 1)
+        self.assertEqual(ok["josa"], [])
+
     def test_wrong_counter_blocks_the_write(self):
         """`%1 물자`（缺量词）在落盘前就拦下，不再等 text_lint 那一步。"""
         try:
