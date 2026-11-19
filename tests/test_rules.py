@@ -33,6 +33,27 @@ class TestZhText(unittest.TestCase):
         zh = lang_rules.get("zh")
         self.assertEqual(zh.normalize("你好,世界!"), "你好，世界！")
 
+    def test_ascii_token_kept(self):
+        """半角记号内部的标点不转全角：版本号、时间、文件名、英文词。"""
+        zh = lang_rules.get("zh")
+        for src, want in (
+            ("版本 1.0.0 已发布", "版本 1.0.0 已发布"),
+            ("每天 12:30 开市", "每天 12:30 开市"),
+            ("缺少 14x14aaFHk.res 文件", "缺少 14x14aaFHk.res 文件"),
+            ("Port Royale 2!", "Port Royale 2!"),
+            ("你好,世界!", "你好，世界！"),
+        ):
+            self.assertEqual(zh.normalize(src), want)
+
+    def test_punct_context(self):
+        from text.lang_rules import base
+        t = "版本 1.0.0 已发布, 端口 Port Royale 2 在 12:30 开市"
+        self.assertEqual(base.punct_context(t, t.index(", ")), base.CTX_CJK)
+        self.assertEqual(base.punct_context(t, t.index("1.0.0") + 1), base.CTX_NUM)
+        self.assertEqual(base.punct_context(t, t.index("12:30") + 2), base.CTX_TIME)
+        lo, hi = base.ascii_token(t, t.index("Royale"))
+        self.assertEqual(t[lo:hi], "Royale")
+
     def test_placeholder_kept(self):
         zh = lang_rules.get("zh")
         out = zh.normalize("支付 @g$TotalPrice$ 元")

@@ -457,11 +457,14 @@ def _dp_solve(block, max_chars, soft=False):
 
 
 def _ascii_split(block, i, j):
-    """这一刀是不是切在两个半角字符之间（「5 %」「% 1」那种）。"""
+    """这一刀是不是切在两个半角字符之间（「5 %」「% 1」那种）。
+
+    「半角字符」的口径取自 `base.is_ascii_ch()`，和标点全角化的豁免判定同源。
+    """
     tail = block[j - 1][0]
     head = block[j][0]
-    return bool(tail and head and tail[-1].isascii() and not tail[-1].isspace()
-                and head[0].isascii() and not head[0].isspace())
+    return bool(tail and head and base.is_ascii_ch(tail[-1])
+                and base.is_ascii_ch(head[0]))
 
 
 def _cut_ok(block, i, j):
@@ -479,8 +482,7 @@ def _cut_ok(block, i, j):
     if tail and tail[-1] in OPEN:
         return False
     # 数字、单位、`%`、`$` 这类半角串必须连在一起（「5 %」「% 1」都是坏的）。
-    if tail and head and tail[-1].isascii() and not tail[-1].isspace() \
-            and head[0].isascii() and not head[0].isspace():
+    if tail and head and base.is_ascii_ch(tail[-1]) and base.is_ascii_ch(head[0]):
         return False
     return True
 
