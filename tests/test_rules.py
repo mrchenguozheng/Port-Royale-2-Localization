@@ -264,22 +264,26 @@ class TestSpecInterface(unittest.TestCase):
         self.assertEqual(out, doc)
 
     def test_fr_spec_parts(self):
-        """法语：标点前置不换行空格；分词与补空格显式不做。"""
+        """法语：只把已有一格改成 NBSP；不补空格、分词与补空格显式不做。"""
         sp = lang_rules.get_spec("fr")
         self.assertEqual((sp.code, sp.spacing.mode), ("fr", "none"))
         self.assertIsNone(sp.segmenter.tag("x"))
         norm = sp.punct.normalize
-        self.assertEqual(norm("Vraiment?"), "Vraiment\u00a0?")
+        self.assertEqual(norm("Vraiment ?"), "Vraiment\u00a0?")
         self.assertEqual(norm("Vraiment  ?"), "Vraiment\u00a0?")   # 多格并成一格
-        self.assertEqual(norm("Or: 100"), "Or\u00a0: 100")
-        self.assertEqual(norm("50%"), "50\u00a0%")
-        # 时间、网址、标签内的冒号不是句子标点
+        self.assertEqual(norm("Or : 100"), "Or\u00a0: 100")
+        self.assertEqual(norm("50 %"), "50\u00a0%")
+        self.assertEqual(norm("le pirate %1 ?"), "le pirate %1\u00a0?")
+        # 没写格子的一律不补（补空格是译文作者的事）
+        self.assertEqual(norm("Vraiment?"), "Vraiment?")
+        self.assertEqual(norm("50%"), "50%")
+        self.assertEqual(norm("%1:"), "%1:")
+        self.assertEqual(norm("@T$DestTown$?"), "@T$DestTown$?")
+        self.assertEqual(norm("<gs:TEXT:X>? oui"), "<gs:TEXT:X>? oui")
+        # 时间、网址、标签里的冒号不是句子标点
         self.assertEqual(norm("12:30"), "12:30")
         self.assertEqual(norm("http://a.b"), "http://a.b")
-        self.assertEqual(norm("<gs:TEXT:X>? oui"), "<gs:TEXT:X>\u00a0? oui")
-        # 变量紧贴标点也要补，且标签/变量本身一字不动
-        self.assertEqual(norm("@T$DestTown$?"), "@T$DestTown$\u00a0?")
-        self.assertEqual(norm("le pirate %1?"), "le pirate %1\u00a0?")
+        self.assertEqual(norm("<gs:TEXT:X> oui"), "<gs:TEXT:X> oui")
         # 字符集自检串（0x11f0398f）整条不动
         sym = "``°§$%&()=?\\^';,:<|>@/*~[]²³€"
         self.assertEqual(norm(sym), sym)
