@@ -61,6 +61,15 @@ class TestCarried(unittest.TestCase):
             self.assertIsNone(body)
             self.assertIn("另一道工序", why)
 
+    def test_long_riddle_mark_still_defers(self):
+        # 诗谜的 arg 里带 `source=…@sha256=…`，上千字都有；按前缀判，不能因为长就漏掉。
+        mark = "[riddle:answer=Tortuga;group=a,b,level=town;source=original-en" \
+               "&manual:docs/x.md@sha256=" + "a" * 300 + "]"
+        body, why = RI.carried("La ciudad que buscas es %s un lugar desierto." % mark,
+                               "La ciudad que buscas es un lugar desierto.", self._resolve)
+        self.assertIsNone(body)
+        self.assertIn("另一道工序", why)
+
     def test_bracketed_reference_is_refused(self):
         body, why = RI.carried("Hola", "Hola [algo]", self._resolve)
         self.assertIsNone(body)

@@ -44,6 +44,9 @@ from text import marks as MK  # noqa: E402
 
 #: 一条标注的完整写法：`[key:arg]`。arg 里允许再出现冒号（`ref:键`）与斜杠（形态）。
 MARK_RX = re.compile(r"\[(ref|town|lit|term|riddle):([^\[\]]{1,200})\]")
+#: 判「要不要绕开」只认前缀，不看 arg 多长：诗谜的 arg 里带 `source=…@sha256=…`，
+#: 上千字都有，用带上限的 MARK_RX 去找会漏掉，整行就被当成没标注覆盖掉了。
+DEFER_RX = re.compile(r"\[(riddle|ref):")
 #: 需要绕开的两类标注：诗谜要重算 clue，引用牵出另一条文本。
 DEFER_KEYS = ("riddle", "ref")
 OUT_DIR = os.path.join(T.ROOT, "build", "qa")
@@ -73,10 +76,11 @@ def carried(cur, ref, resolve):
     """
     if "[" in ref or "]" in ref:
         return None, "参照自带方括号，不敢动"
+    deferred = DEFER_RX.search(cur)
+    if deferred:
+        return None, "含 [%s:…]，要另一道工序" % deferred.group(1)
     out = ref
     for key, arg in MARK_RX.findall(cur):
-        if key in DEFER_KEYS:
-            return None, "含 [%s:…]，要另一道工序" % key
         span = "[%s:%s]" % (key, arg)
         shown = resolve(span, "")
         if not shown:

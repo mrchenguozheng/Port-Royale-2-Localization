@@ -151,6 +151,12 @@ class TestEsInvertedMarks(unittest.TestCase):
         TL.es_checks({"0x0000000b": "Nació en 1682? ¡No lo sé!"}, W)
         self.assertEqual([w[1] for w in W], ["倒置符号不配对"])
 
+    def test_birth_year_uncertainty_with_space_is_not_a_question(self):
+        # 零售版写的是 `(1682? – 1722)`：问号与破折号之间有空格，同样不是疑问句。
+        W = []
+        TL.es_checks({"0x0000000d": "El galés Bartholomew Roberts (1682? – 1722) fue pirata."}, W)
+        self.assertEqual(W, [])
+
     def test_punctuation_only_entry_is_silent(self):
         W = []
         TL.es_checks({"0x0000000c": "?"}, W)

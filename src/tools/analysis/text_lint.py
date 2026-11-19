@@ -51,7 +51,7 @@ MARK_ANY = re.compile(r"\[(?:town|lit|term):?")
 JA_QUOTE = re.compile(r"「[^「」]*」|『[^『』]*』")
 #: 西语里「年份后紧跟破折号」的 `?` 是生卒年不确定标记（`1682?-1722`），
 #: 不是疑问句。只认这种形状，句末真正的 `?` 不能被它吃掉。
-ES_YEAR_RX = re.compile(r"\d{3,4}\?(?=[-–—])")
+ES_YEAR_RX = re.compile(r"\d{3,4}\?\s*(?=[-–—])")
 #: 一个条目里连一个字母都没有（纯标点、纯数字）就没有句子可配倒置符号。
 ES_WORD_RX = re.compile(r"[^\W\d_]")
 ANS_MARK = re.compile(r"\[riddle:")
