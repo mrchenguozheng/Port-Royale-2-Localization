@@ -66,6 +66,10 @@ KEEP = {"0xfc512ea5"}
 # 全是货物数量，没有一处例外。
 AMT_VAR = re.compile(r"@[aA]\$Amount\$")
 BAD_AMT_UNIT = re.compile(r"@[aA]\$Amount\$(?:单位|份|件|担|公斤|箱)")
+# 别的语言只在「桶模板族」里查：这批文本同屏带每桶价与桶图，数量单位必须是本语的
+# 「桶」。不能全域硬卡——日语「10ずつ」「10個」语法合法，西语「10 de mercancía」
+# 是合法的部分量表达，俄语数词直接管名词二格，都不需要量词。
+BARREL_HINT = re.compile(r"@g\$GoldPerBarrel\$|INTEXT_FASS")
 
 sys.path.insert(0, os.path.dirname(HERE))
 if ROOT not in sys.path:
@@ -215,6 +219,22 @@ def es_checks(tr, W):
                       % (s.count("¿"), s.count("?"), s.count("¡"), s.count("!"))))
 
 
+def ja_unit_checks(tr):
+    """日语：桶模板族里数量变量必须带量词「樽」（E 级）。
+
+    只卡这批文本（同屏有每桶价 + 桶图），因为日语此处不能省量词：
+    `@a$Amount$を届けて` 会渲成「10を届けて」。别的位置「10ずつ」「10個」合法，不查。
+    """
+    out = []
+    for k, v in tr.items():
+        if k in KEEP or not v or not BARREL_HINT.search(v):
+            continue
+        for m in AMT_VAR.finditer(v):
+            if not v[m.end():].lstrip().startswith("樽"):
+                out.append((k, "缺樽量词", v[max(0, m.start() - 8):m.end() + 10]))
+    return out
+
+
 def main(argv):
     lang = "zh"
     show_all = "--all" in argv
@@ -300,6 +320,7 @@ def main(argv):
         ko_checks(tr, W)
     elif lang == "ja":
         ja_checks(tr, W)
+        E.extend(ja_unit_checks(tr))
     elif lang == "es":
         es_checks(tr, W)
 
