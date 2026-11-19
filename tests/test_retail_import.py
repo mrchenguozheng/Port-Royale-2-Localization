@@ -76,6 +76,100 @@ class TestCarried(unittest.TestCase):
         self.assertIn("方括号", why)
 
 
+class TestForeignWords(unittest.TestCase):
+    """拉丁文字语言没有「字种」可判，只能按词典命中率判。"""
+
+    def _known(self, words):
+        vocab = set(words)
+
+        def known(w):
+            return w.lower() in vocab
+        return known
+
+    def test_spanish_sentence_passes(self):
+        text = "La ciudad de Cartagena es muy rica y tiene muchas casas viejas"
+        self.assertIsNone(RI.foreign_words(text, self._known(
+            ["la", "ciudad", "de", "es", "muy", "rica", "y", "tiene", "muchas",
+             "casas", "viejas"])))
+
+    def test_german_row_is_flagged(self):
+        # es 参照里真有一行是德语原文：字种、令牌、标签全对，只有词不是西语。
+        text = "Sie sitzt seit vielen Tagen am Cap und winkt vorbeifahrenden Schiffe zu"
+        hit, total = RI.foreign_words(text, self._known(["sie", "am"]))
+        self.assertEqual((hit, total), (2, 12))
+
+    def test_short_text_is_not_judged(self):
+        self.assertIsNone(RI.foreign_words("Hola amigo",
+                                           self._known(["hola"])))
+
+    def test_no_dictionary_means_no_judgement(self):
+        self.assertIsNone(RI.foreign_words(
+            "Die Stadt ist sehr reich und hat viele alte Häuser am Hafen", None))
+
+    def test_tokens_and_marks_are_masked_out(self):
+        text = "%1 %2 [town:Cartagena] <n> <g:INTEXT.scr> La ciudad es rica y vieja"
+        self.assertIsNone(RI.foreign_words(text, self._known(
+            ["la", "ciudad", "es", "rica", "y", "vieja"])))
+
+
+class TestRepair(unittest.TestCase):
+    """结构修复只动 `<n>`／`<t>`，修不动就明确放弃。"""
+
+    def test_missing_paragraph_break_is_inserted(self):
+        base = "<g:x>A logo.<n>The logo is used."
+        out = "<g:x>A logo. The logo is used."
+        fixed, note = RI.repair_tags(base, out)
+        self.assertEqual(fixed.count("<n>"), 1)
+        self.assertIn("<n>", fixed)
+        self.assertNotIn(".  ", fixed)
+        self.assertIn("补 <n>", note)
+
+    def test_paired_deficit_becomes_one_paragraph(self):
+        """差额是 1，实际却要补两个 `<n>`：一段里两句并成了一段。"""
+        base = "Uno.<n><n>Dos."
+        out = "Primero es largo. Segundo es largo."
+        fixed, note = RI.repair_tags(base, out)
+        self.assertEqual(fixed.count("<n>"), base.count("<n>"))
+        self.assertIn("<n>", fixed)
+        self.assertIn("补 <n> 2", note)
+
+    def test_surplus_breaks_are_removed_with_one_space(self):
+        base = "<g:x>Fin de la costa.<n><g:x>La ciudad."
+        out = "<g:x>Fin de la costa.<n><n><n><g:x>La ciudad."
+        fixed, note = RI.repair_tags(base, out)
+        self.assertEqual(fixed.count("<n>"), 1)
+        self.assertNotIn(".La", fixed)
+        self.assertIn("删 <n>", note)
+
+    def test_bullet_is_restored_with_its_dash(self):
+        base = "<g:x>-<t>Hay cinco tipos."
+        out = "<g:x>Hay cinco tipos."
+        fixed, note = RI.repair_tags(base, out)
+        self.assertEqual(fixed, base)
+        self.assertIn("补 <t>", note)
+
+    def test_bullets_go_to_their_own_occurrences(self):
+        """同一标签在一行里出现多次时，符号要按基准的第几处对齐，不能全塞在第一处。"""
+        base = "<g:x>-<t>Uno.<n><g:x>Dos.<n><g:x>-<t>Tres."
+        out = "<g:x>Uno.<n><g:x>Dos.<n><g:x>Tres."
+        fixed, _ = RI.repair_tags(base, out)
+        self.assertEqual(fixed, base)
+
+    def test_unknown_font_tag_is_not_guessed(self):
+        base = "<n:25>Texto largo."
+        out = "Texto largo."
+        fixed, why = RI.repair_tags(base, out)
+        self.assertIsNone(fixed)
+        self.assertIn("<n:25>", why)
+
+    def test_token_deficit_is_left_to_humans(self):
+        base = "Toma %1 y %2."
+        out = "Toma %1."
+        fixed, why = RI.repair_tags(base, out)
+        self.assertIsNone(fixed)
+        self.assertIn("%2", why)
+
+
 class TestBuildAndWrite(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp()
@@ -87,13 +181,16 @@ class TestBuildAndWrite(unittest.TestCase):
 
         self.en = {"0xa1": "Hello", "0xa2": "Take %1 now",
                   "0xa3": "The town of Cartagena", "0xa4": "Bye",
-                  "0xa5": "IDM_CONTEST_01"}
+                  "0xa5": "IDM_CONTEST_01",
+                  "0xa6": "The ship sits at the cape and waves at passing vessels"}
         self.cur = {"0xa1": "Buenos días", "0xa2": "Toma %1 ahora",
                     "0xa3": "La ciudad de Cartagena",
-                    "0xa4": "Bye", "0xa5": "IDM_CONTEST_01"}
+                    "0xa4": "Bye", "0xa5": "IDM_CONTEST_01",
+                    "0xa6": "El barco está en el cabo y saluda a los barcos que pasan"}
         self.ref = {"0xa1": "Hola", "0xa2": "Toma %2 ahora",
                     "0xa3": "La ciudad de Cartagena es rica",
-                    "0xa4": "Adiós", "0xa5": "IDM_CONTEST_01"}
+                    "0xa4": "Adiós", "0xa5": "IDM_CONTEST_01",
+                    "0xa6": "Sie sitzt seit vielen Tagen am Cap und winkt vorbeifahrenden Schiffe zu"}
         TI.write_doc_atomic(os.path.join(self.src, "orig", "en.gog_1.1.2.3.toml"),
                             self.en, list(self.en), ["# 头"])
         TI.write_doc_atomic(os.path.join(self.src, "translations", "es.toml"),
@@ -118,6 +215,18 @@ class TestBuildAndWrite(unittest.TestCase):
         """参照里没翻的行（`IDM_CONTEST_01`）不能被当成译文写进去。"""
         _, why = RI.build("es", "es.retail-1.0.0")
         self.assertIn("0xa5", why["参照没翻（等于英文）"])
+
+    def test_foreign_row_in_reference_is_refused(self):
+        """拉丁文字之间没有字种可判：参照里的德语行靠词典命中率拦下。"""
+        mapping, why = RI.build("es", "es.retail-1.0.0")
+        self.assertNotIn("0xa6", mapping)
+        self.assertTrue([r for r in why if "不是目标语言" in r],
+                        why.keys())
+
+    def test_repair_map_leaves_fitting_rows_alone(self):
+        fixed, notes = RI.repair_map("es", {"0xa1": "Hola", "0xa3": "La ciudad es rica"})
+        self.assertEqual(fixed, {"0xa1": "Hola", "0xa3": "La ciudad es rica"})
+        self.assertEqual(notes, [])
 
     def test_only_empty_skips_already_translated(self):
         mapping, why = RI.build("es", "es.retail-1.0.0", only_empty=True)
