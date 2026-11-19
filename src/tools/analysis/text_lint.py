@@ -241,10 +241,10 @@ def ko_checks(tr, W):
     for k, v in tr.items():
         if k in KEEP or not v:
             continue
-        if PH_PAIR.search(v):
-            continue
-        m = PH_BARE.search(v)
-        if m:
+        # 逐处判。以前是「整条里出现过并列形就跳过整条」，于是
+        # `@T$TOWN$이(가) … @T$Town$으로` 这种半对半错的条目两头都查不到。
+        # PH_BARE 自带 `(?![가-힣(])`，并列形本身不会被误抓。
+        for m in PH_BARE.finditer(v):
             W.append((k, "占位符后接助词",
                       "%s（替换值末音节未知；改写句式或写并列形）" % m.group(0)))
 

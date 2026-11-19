@@ -97,7 +97,8 @@ class TestApplyMap(unittest.TestCase):
         T.set_src(self.src)
         self.path = os.path.join(self.src, "translations", "ko.toml")
         self.doc = {"0xa1": " Hello ", "0xa2": "World",
-                    "0xa3": "Take %1 now", "0xa4": "안녕"}
+                    "0xa3": "Take %1 now", "0xa4": "안녕",
+                    "0xa5": "Get %1 and %2 now"}
         TI.write_doc_atomic(self.path, self.doc, list(self.doc), ["# 头"])
 
     def tearDown(self):
@@ -161,6 +162,29 @@ class TestApplyMap(unittest.TestCase):
     def test_paired_particle_is_allowed(self):
         stats = T.apply_map("ko", {"Take %1 now": "지금 %1(을)를 가지세요"})
         self.assertEqual(stats["hit"], 1)
+
+    def test_one_paired_form_does_not_excuse_another_bare(self):
+        """同一句里 `%1이(가)` 与 `%2로` 并存：后者仍是错的，不许整条放过。"""
+        stats = T.apply_map("ko", {"Get %1 and %2 now": "%1이(가) 나오면 %2로 가세요"})
+        self.assertEqual(stats["hit"], 0)
+        self.assertEqual([h for h, _ in stats["josa"]], ["0xa5"])
+        self.assertEqual(self._read()["0xa5"], "Get %1 and %2 now")
+
+    def test_every_bare_particle_is_listed(self):
+        """一条里两处裸助词：两处都印，不是只印第一处。"""
+        stats = T.apply_map("ko", {"Get %1 and %2 now": "%1를 %2를 가지세요"})
+        self.assertEqual([t for _, t in stats["josa"]], ["%1를", "%2를"])
+
+    def test_wrong_counter_blocks_the_write(self):
+        """`%1 물자`（缺量词）在落盘前就拦下，不再等 text_lint 那一步。"""
+        try:
+            import kiwipiepy                       # noqa: F401
+        except ImportError:
+            self.skipTest("kiwipiepy 不在，量词检查整条跳过")
+        stats = T.apply_map("ko", {"Take %1 now": "지금 %1 물자 가지세요"})
+        self.assertEqual(stats["hit"], 0)
+        self.assertTrue(stats["unit"], "缺量词应当在 apply 阶段被拦")
+        self.assertEqual(self._read()["0xa3"], "Take %1 now")
 
     def test_token_loss_blocks_the_write(self):
         stats = T.apply_map("ko", {"Take %1 now": "지금 가지세요"})
@@ -230,6 +254,22 @@ class TestDumpLines(unittest.TestCase):
         rows = [l for l in T.dump_lines(es, "ko", (81, None), 2, order="short")
                 if not l.startswith("#")]
         self.assertEqual([r.split("\t")[0] for r in rows], ["0xb2", "0xb7"])
+
+    def test_ids_pick_ignores_band_and_limit(self):
+        """同模板族按 id 单独成批：不受 `--band` 与 `--limit` 管。"""
+        rows = [l for l in T.dump_lines(self._es(), "ko", (81, None), 1,
+                                        ids=["0xb1", "0xb3"])
+                if not l.startswith("#")]
+        self.assertEqual([r.split("\t")[0] for r in rows], ["0xb1", "0xb3"])
+
+    def test_ids_header_says_handpicked(self):
+        lines = T.dump_lines(self._es(), "ko", None, 0, ids=["0xb1"])
+        self.assertIn("手选批次：1 条", lines[0])
+
+    def test_dump_defaults_to_shortest_first(self):
+        """不写 `--order` 也按字数从短到长，不再回表序把短档压在后面。"""
+        args = T.build_parser().parse_args(["dump", "--lang", "ko"])
+        self.assertEqual(args.order, "short")
 
     def test_identical_sources_are_flagged(self):
         es = [{"id": "0xb2", "ko": "Same " + "A" * 85},

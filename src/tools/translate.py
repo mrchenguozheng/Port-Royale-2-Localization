@@ -464,6 +464,24 @@ def josa_rules():
         return None, None
 
 
+def unit_violations(lang, hid, val):
+    """量词检查（只有 ko 有）：返回 text_lint 的 E 级命中，取不到就空。
+
+    规则本身只有一份（`text_lint.ko_unit_checks`），这里只借过来当落盘前的门 ——
+    抄一份到 apply 里，两处判据早晚各算各的。
+    """
+    if lang != "ko":
+        return []
+    path = os.path.join(HERE, "analysis")
+    if path not in sys.path:
+        sys.path.insert(0, path)
+    try:
+        import text_lint
+        return text_lint.ko_unit_checks({hid: val})
+    except Exception:                          # noqa: BLE001
+        return []
+
+
 def load_map(path):
     """读 `{英文原串: 译文}`；值不是字符串、或源串重复归一化后撞车就报错。"""
     with open(path, encoding="utf-8") as f:
@@ -515,9 +533,9 @@ def apply_map(lang, mapping, dry_run=False):
     header = toml_io.head_lines(path)
 
     hit_ids, used, same, rewritten = [], set(), 0, 0
-    bad_josa, bad_tok, bad_lang = [], [], []
+    bad_josa, bad_tok, bad_lang, bad_unit = [], [], [], []
     script = lang_rules.script_re(lang)
-    ph_bare, ph_pair = josa_rules()
+    ph_bare, _ph_pair = josa_rules()
     #: 有意不译的条目：它们**正确**的值就是英文原串，写回去不算「抄错行」。
     keep_ids = set(keep_as_is(lang))
     #: 英文基准：占位符个数以它为准。拿现值比是没用的 —— 现值本身可能就是
@@ -572,8 +590,18 @@ def apply_map(lang, mapping, dry_run=False):
         if bad:
             bad_tok.append(hid)
             continue
-        if ph_bare is not None and not ph_pair.search(val) and ph_bare.search(val):
-            bad_josa.append((hid, val))
+        # 逐处判，不再「整条里只要有一处并列形就放过整条」：同一句里
+        # `@T$TOWN$이(가)` 与 `@T$Town$으로` 并存时，后者仍是错的。
+        if ph_bare is not None:
+            for m in ph_bare.finditer(val):
+                bad_josa.append((hid, m.group(0)))
+            if bad_josa and bad_josa[-1][0] == hid:
+                continue
+        # 量词：`%1 배`（缺 척）、`5척의 병사`（搭配错）。以前只在 text_lint
+        # 阶段查，那时已经写盘；放在这里就是落盘前的门。
+        for _k, why, detail in unit_violations(lang, hid, val):
+            bad_unit.append((hid, "%s %s" % (why, detail)))
+        if bad_unit and bad_unit[-1][0] == hid:
             continue
         # 映射值必须是目标文字：韩语映射里写回英文，多半是抄错了行。
         # 例外是名单内条目 —— 它们的正确值本来就是英文，用来把译错的名字改回去。
@@ -592,18 +620,21 @@ def apply_map(lang, mapping, dry_run=False):
                   if k not in used and v.strip() in landed)
     stats = {"hit": len(hit_ids), "unused": unused, "josa": bad_josa,
              "tokens": bad_tok, "lang": bad_lang, "same": same,
+             "unit": bad_unit,
              "rewrite": rewritten, "applied": applied, "ids": hit_ids}
 
-    if bad_tok or bad_josa or bad_lang:
+    if bad_tok or bad_josa or bad_lang or bad_unit:
         print("拒绝落盘：%d 条 token 与原文不齐、%d 条占位符后接助词、"
-              "%d 条映射值不是目标文字。" % (len(bad_tok), len(bad_josa),
-                                          len(bad_lang)))
+              "%d 条量词不对、%d 条映射值不是目标文字。"
+              % (len(bad_tok), len(bad_josa), len(bad_unit), len(bad_lang)))
         # 全列，不再只印前 5 条：一批 40 条里往往一次就有七八条同类问题，
         # 只印 5 条就得改—重跑—再改，白跑两三轮。
         for hid in bad_tok:
             print("  token  %s  %s" % (hid, doc.get(hid, "")[:60]))
-        for hid, val in bad_josa:
-            print("  助词   %s  %s" % (hid, val[:60]))
+        for hid, tok in bad_josa:
+            print("  助词   %s  %s" % (hid, tok))
+        for hid, detail in bad_unit:
+            print("  量词   %s  %s" % (hid, detail))
         for hid, val in bad_lang:
             print("  非目标文字 %s  %s" % (hid, val[:60]))
         print("改完映射后重跑；本次一个字节都没写。")
@@ -619,7 +650,7 @@ def cmd_apply(args):
     mapping = load_map(args.map)
     was = set(pending_ids(entries(load_toml()), field))
     stats = apply_map(field, mapping, dry_run=args.dry_run)
-    if stats["tokens"] or stats["josa"] or stats["lang"]:
+    if stats["tokens"] or stats["josa"] or stats["lang"] or stats["unit"]:
         return 1
     tail = "（--dry-run，未写盘）" if args.dry_run else ""
     print("[%s] 映射 %d 条，写入 %d 条%s，其中修正旧译文 %d 条，已是当前值 %d 条。"
@@ -686,7 +717,7 @@ def skeleton(text):
     return re.sub(r"\u00a7+", "\u00a7", text).strip()
 
 
-def dump_lines(es, field, band, limit, by_group=False, order=None):
+def dump_lines(es, field, band, limit, by_group=False, order=None, ids=None):
     """把待译条目渲染成批次清单的行（首行是注释头的第 1 行）。
 
     纯函数，不碰文件：`cmd_dump` 只负责读数据与写盘，单测直接喂合成条目。
@@ -694,6 +725,10 @@ def dump_lines(es, field, band, limit, by_group=False, order=None):
     `order="short"` 按可见字数从短到长取，短档先清。默认（None）保持表序，
     也就是 `--band long` 一直是 >80 那一档 —— 41–80 的 42 条因此会被 8 批
     `>80` 压在后面，而它们更短、在界面和任务板上出现得更频繁。
+
+    `ids` 给了就只取这几条（无视 band / limit）：同模板换词的那一族（桶模板
+    五条、四国公告六条）按字数散在整个长文队列里，一次只碰上一两条，靠手抄
+    id 单独成批才收拾得干净。
     """
     pend = pending_of(es, field)
 
@@ -708,6 +743,9 @@ def dump_lines(es, field, band, limit, by_group=False, order=None):
 
     in_band = [e for e in pend
                if band is None or band_of(content_of(e.get(field, ""))) == band]
+    if ids:
+        want = {h.lower() for h in ids}
+        in_band = [e for e in pend if e["id"].lower() in want]
     if by_group:
         # 每个骨架只留第一条：先翻一版代表句，再按变量替换回填
         seen = set()
@@ -723,7 +761,7 @@ def dump_lines(es, field, band, limit, by_group=False, order=None):
         in_band = sorted(in_band, key=lambda e: len(content_of(e.get(field, ""))))
     elif order == "long":
         in_band = sorted(in_band, key=lambda e: -len(content_of(e.get(field, ""))))
-    rows = in_band[:limit] if limit > 0 else in_band
+    rows = in_band[:limit] if (limit > 0 and not ids) else in_band
 
     # 队列全貌：只报当前档的话，「还剩多少、别的档排在哪」看不见
     queue = {}
@@ -732,9 +770,11 @@ def dump_lines(es, field, band, limit, by_group=False, order=None):
         queue[lab] = queue.get(lab, 0) + 1
     qsum = "  ".join("%s:%d" % (band_label(*b), queue[band_label(*b)])
                      for b in BANDS if band_label(*b) in queue)
-    lines = ["# 待译批次：%s  共 %d 条（待译 %d 条，该档 %d 条）%s"
-             % (band_label(*band) if band else "全部", len(rows), len(pend),
-                len(in_band), "  按骨架分组" if by_group else ""),
+    head = ("# 手选批次：%d 条（待译 %d 条）" % (len(rows), len(pend)) if ids
+            else "# 待译批次：%s  共 %d 条（待译 %d 条，该档 %d 条）%s"
+                 % (band_label(*band) if band else "全部", len(rows), len(pend),
+                    len(in_band), "  按骨架分组" if by_group else ""))
+    lines = [head,
              "# 全队列 %s" % qsum,
              "# 制表符分隔：id / 可见字数 / 英文原文（换行写作 \\n）",
              "# 行末 dup:N = 与另外几条共用同一句英文；需不同译法时用 id 作键"
@@ -787,8 +827,10 @@ def cmd_dump(args):
         raise SystemExit("--band 只认 %s。" % "、".join(BAND_KEYS))
     field = args.lang or target_field()
     order = getattr(args, "order", None)
+    ids = [h.strip() for h in getattr(args, "ids", "").split(",") if h.strip()]
     lines = dump_lines(entries(load_toml()), field,
-                       BAND_KEYS[args.band], args.limit, args.by_group, order)
+                       BAND_KEYS[args.band], args.limit, args.by_group, order,
+                       ids or None)
     body = "\n".join(lines) + "\n"
     n_rows = sum(1 for ln in lines if not ln.startswith("#"))
     if args.out:
@@ -864,7 +906,7 @@ def cmd_gaps(args):
     return 0
 
 
-def main():
+def build_parser():
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
@@ -885,8 +927,12 @@ def main():
     p.add_argument("--limit", type=int, default=40, help="最多导几条，0 = 不限")
     p.add_argument("--by-group", action="store_true",
                    help="按骨架去重：只留每组一条代表句")
-    p.add_argument("--order", choices=("short", "long"), default=None,
-                   help="short=可见字数从短到长取，先把短档清掉；默认按表序")
+    p.add_argument("--order", choices=("short", "long", "table"), default="short",
+                   help="short=可见字数从短到长取（默认，先把短档清掉）；"
+                        "long=从长到短；table=按表序")
+    p.add_argument("--ids", default="",
+                   help="只导这几条（逗号分隔 id），无视 --band/--limit；"
+                        "同模板换词的一族用这个单独成批")
     p.add_argument("--out", default="", help="写到这个文件；不给就打到 stdout")
     p.set_defaults(fn=cmd_dump)
 
@@ -902,8 +948,11 @@ def main():
     p = sub.add_parser("gaps", help="源缺失自查：英文原值是令牌、译文有实文")
     p.add_argument("--lang", default="", help="译文语言代码，默认第一个可编辑语言")
     p.set_defaults(fn=cmd_gaps)
+    return ap
 
-    args = ap.parse_args()
+
+def main():
+    args = build_parser().parse_args()
     sys.exit(args.fn(args) or 0)
 
 
