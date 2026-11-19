@@ -291,7 +291,10 @@ class TestBuildAndWrite(unittest.TestCase):
     def test_takes_retail_where_it_differs(self):
         mapping, why = RI.build("es", "es.retail-1.0.0")
         self.assertEqual(mapping["0xa1"], "Hola")
-        self.assertEqual(mapping["0xa2"], "Toma %2 ahora")
+        # `%1` 被零售写成 `%2`：现值本来是对的，`regress` 在映射阶段就挡下，
+        # 不必等 `apply` 再拦一次。
+        self.assertIn("0xa2", why["候选结构比现值差（令牌/标签与基准不齐）"])
+        self.assertEqual(self._cur()["0xa2"], "Toma %1 ahora")
 
     def test_ref_equal_to_english_is_not_a_translation(self):
         """参照里没翻的行（`IDM_CONTEST_01`）不能被当成译文写进去。"""
@@ -315,6 +318,35 @@ class TestBuildAndWrite(unittest.TestCase):
             "es", os.path.join(self.src, "orig", "es.retail-1.0.2.toml"))
         self.assertNotIn("0xa1", mapping)
         self.assertIn("0xa1", why["与参照只差首尾空白（保留现值）"])
+
+    def test_moved_paragraph_break_is_not_a_change(self):
+        """正文一字不差、只是 `<n>` 落在别的句子后面：不该覆盖。
+
+        零售参照的断点是 `ref_clean` 按最长段机械补的；现值是按基准段落
+        手工对齐的，覆盖只会把断点挪回机械位置。
+        """
+        en = dict(self.en)
+        en["0xa7"] = "Hello.<n><n>Bye"
+        cur = dict(self.cur)
+        cur["0xa7"] = "Hola.<n><n>Adiós"
+        ref = dict(self.ref)
+        ref["0xa7"] = "Hola.<n>Adiós"              # 正文一样，断点位置不同
+        TI.write_doc_atomic(os.path.join(self.src, "orig", "en.gog_1.1.2.3.toml"),
+                            en, list(en), ["# 头"])
+        TI.write_doc_atomic(os.path.join(self.src, "translations", "es.toml"),
+                            cur, list(cur), ["# 头"])
+        TI.write_doc_atomic(os.path.join(self.src, "orig", "es.retail-1.0.3.toml"),
+                            ref, list(ref), ["# 头"])
+        mapping, why = RI.build(
+            "es", os.path.join(self.src, "orig", "es.retail-1.0.3.toml"))
+        self.assertNotIn("0xa7", mapping)
+        self.assertIn("0xa7", why["与参照只差换行位置（现值已按基准分段，保留现值）"])
+
+    def test_regress_blocks_a_candidate_with_fewer_breaks(self):
+        """候选比现值少换行时，即使基准本身不齐也要拦。"""
+        base = "A.<n><n>B"
+        now = "A.<n><n>B.<n><n>C"                   # 现值比基准多，结构判据不成立
+        self.assertIn("换行", RI.regress(base, now, "A.<n>B.<n><n>C", None))
 
     def test_coverage_counts_missing_and_extra_rows(self):
         """换语言前先看覆盖：零售没给的行，导入无从下手。"""
@@ -363,9 +395,9 @@ class TestBuildAndWrite(unittest.TestCase):
         self.assertGreaterEqual(stats["hit"], 1)
         self.assertEqual(self._cur()["0xa1"], "Hola")
         again, _ = RI.build("es", "es.retail-1.0.0")
-        # 落过盘的行不再出现；被结构缺陷挡住的那条每次都会留下 —— 那是有意的提醒，
-        # 参照里的 `<n>` / `%1` 不改，它就永远进不去。
-        self.assertEqual(list(again), ["0xa2"])
+        # 落过盘的行不再出现；被 `regress` 挡住的那几条也不出现 —— 它们每一轮
+        # 都会进报告，但不会因为「重跑一次」就混进去。
+        self.assertEqual(list(again), [])
         self.assertEqual(T.apply_map("es", again)["hit"], 0)
 
 
@@ -485,8 +517,10 @@ class TestCleanRef(unittest.TestCase):
         mapping, _ = RI.build("es", "es.retail-1.0.0", ref_doc=out)
         self.assertEqual(mapping["0xa1"], "Hola.")
         self.assertEqual(mapping["0xa3"], "¡Adiós!")
-        # 清洁版不补令牌：缺 `%1` 的那条照样被 `apply` 拦下。
-        self.assertEqual(len(T.apply_map("es", mapping, dry_run=True)["tokens"]), 1)
+        # 清洁版把现值已经对齐的行判成「与参照已一致」：没有新东西要写，
+        # `0xa2` 的 `%1` 也与现值一致，不会再进映射让 `apply` 拦。
+        self.assertNotIn("0xa2", mapping)
+        self.assertEqual(len(T.apply_map("es", mapping, dry_run=True)["tokens"]), 0)
 
     def test_clean_ref_is_recognised_by_path(self):
         """落盘只该认清洁版；原始零售路径必须被识别成「未清洁」。"""

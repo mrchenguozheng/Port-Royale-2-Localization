@@ -736,6 +736,25 @@ def build(lang, ref_name, only_empty=False, ref_doc=None):
             # 这种差异没有语义，整行覆盖只会把已落盘的值改一遍空白——判「已一致」，不动。
             note(hid, "与参照只差首尾空白（保留现值）")
             continue
+        # 正文一字不差，只是 `<n>` 落在不同的句子后面。零售参照的断点
+        # 是 `ref_clean` 按最长段机械补的，现值是按基准段落手工对齐的；
+        # 覆盖只会把断点挪回机械位置，总数不变但分段变差。
+        # 比正文前先抹掉标签/标注、压掉空白：零售版没有 `[town:…]` 标注，
+        # 原来被 `<n>` 顶掉的那个空格也会一起没掉。
+        if not structure_off(str(src), now) and same_skeleton(now, rv):
+            # 现值里的 `[town:…]` 要展开才和零售版的裸地名对得上：`MASK_RX`
+            # 抹掉标注只剩「de , porque」，那边是「de Cartagena, porque」。
+            expanded = now
+            if "[" in now:
+                try:
+                    expanded = MK.expand(now, table, lang, hid, terms=terms, doc=cur)
+                except MK.MarkError:
+                    expanded = now
+            bare_now = re.sub(r"\s+", "", MASK_RX.sub("", expanded))
+            bare_ref = re.sub(r"\s+", "", MASK_RX.sub("", rv))
+            if bare_now and bare_now == bare_ref:
+                note(hid, "与参照只差换行位置（现值已按基准分段，保留现值）")
+                continue
         if "[" in now:
             try:
                 body, reason = carried(now, rv, lambda s, h: MK.expand(
@@ -747,6 +766,10 @@ def build(lang, ref_name, only_empty=False, ref_doc=None):
                 note(hid, reason)
                 continue
             rv = body
+        bad = regress(str(src), now, rv, known)
+        if bad:
+            note(hid, bad)
+            continue
         mapping[hid] = rv
     return mapping, why
 
@@ -756,6 +779,52 @@ def structure_off(base, text):
     from collections import Counter
     return (Counter(TAG_RX.findall(base)) != Counter(TAG_RX.findall(text))
             or Counter(TOK_RX.findall(base)) != Counter(TOK_RX.findall(text)))
+
+
+def same_skeleton(one, two):
+    """`<n>` 之外的标签与令牌完全一致 —— 只差断点位置时成立。
+
+    `structure_off` 把 `<n>` 也算进去，用来判「结构比基准差」；这里要的是
+    反过来的问题：两行正文一样、`<n>` 数量可以不同，那就不该覆盖。
+    """
+    from collections import Counter
+
+    def core(text):
+        return (Counter(t for t in TAG_RX.findall(text) if t != "<n>"),
+                Counter(TOK_RX.findall(text)))
+    return core(one) == core(two)
+
+
+def regress(base, now, cand, known):
+    """候选是否比现值更差；更差就别导。返回原因字符串或 None。
+
+    零售版有自己的年代和口径，改成它更差的地方不该覆盖已经修对的译文。
+    es 那次就是这么翻的车：`0xdb0108dd` 零售版少一个 `<n>`（现值已按多数票
+    补齐）、`0xd34819b0` 零售版整条是德语原文（现值是西语），两条都被
+    `--write` 打回去了。判据三条，都只在「现值本来是对的」时才算退步：
+
+      · 结构：现值与基准一致、候选与基准不一致；
+      · 语言：现值过得了语言闸、候选过不了（短句也要判 —— 四五个词的行
+        正是 `foreign_words` 默认 `min_words=8` 放过去的那一类）；
+      · 换行：候选的 `<n>` 比现值少，段落会被并掉。
+
+    es 那两条后来查清不是「少一个 `<n>`」，而是断点被挪到了别的句子后面
+    （总数没变）。那种情况由 `same_skeleton` 在更早一步判「只差换行位置」。
+    """
+    if not now.strip():
+        return None                        # 现值是空的，候选再差也比空着强
+    if not structure_off(base, now) and structure_off(base, cand):
+        return "候选结构比现值差（令牌/标签与基准不齐）"
+    n_now, n_cand = now.count("<n>"), cand.count("<n>")
+    if n_cand < n_now:
+        return ("候选比现值少 %d 个换行（段落会被并掉）"
+                % (n_now - n_cand))
+    w_now = foreign_words(now, known, min_words=3)
+    w_cand = foreign_words(cand, known, min_words=3)
+    if w_cand and not w_now:
+        return ("候选不是目标语言（词典只认得 %d/%d 个词），现值是"
+                % w_cand)
+    return None
 
 
 def repair_map(lang, mapping):
