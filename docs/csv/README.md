@@ -10,7 +10,7 @@ CSV 是分析和人工审校的附属数据，不是游戏运行需要的文件�
 | 文件 | 生成方式 | 用途 |
 |---|---|---|
 | `analysis/speaker-audit.csv` | `python src/tools/analysis/speaker_audit.py` | 逐条说话人/语气分级；[说话人分级](../说话人分级.md) 引用 |
-| `analysis/tone-proposal.csv` | `python src/tools/analysis/tone_proposal.py` | 语体建议；[语体拟改清单](../语体拟改清单.md) 引用 |
+| `analysis/tone-proposal.csv` | `python src/tools/analysis/tone_proposal.py` | 语体建议；[语体拟改清单](../archive/语体拟改清单.md) 引用 |
 | `analysis/占位符语义.zh.csv` / `.ja.csv` | `python src/tools/placeholder_roles.py --report --lang zh` | 相邻 `%N %N` 的连接符建议；[译文与语言包](../译文与语言包.md) 引用 |
 
 ## voice/：语音
@@ -25,7 +25,7 @@ CSV 是分析和人工审校的附属数据，不是游戏运行需要的文件�
 | 文件 | 说明 |
 |---|---|
 | `review/人工修订.csv` | 人工确认过的中文修订记录（hash / 原译 / 改为 / 日期） |
-| `review/zh-text-edits.csv` | 中文文本历史改动对照；[中文文本改动对比](../中文文本改动对比.md) 引用 |
+| `review/zh-text-edits.csv` | 中文文本历史改动对照；[中文文本改动对比](../archive/中文文本改动对比.md) 引用 |
 
 ## generated/：可重跑的中间产物
 

@@ -6,7 +6,7 @@
 
 用法:
     python src/tools/analysis/de_lint.py
-    python src/tools/analysis/de_lint.py --json build/qa/de_lint.json --md docs/德语校对清单.md
+    python src/tools/analysis/de_lint.py --json build/qa/de_lint.json --md docs/archive/德语校对清单.md
 
 退出码：存在 E 级命中时返回 1，否则 0（可直接串进提交前检查）。
 """
@@ -159,7 +159,7 @@ def check_dup(key, de):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", default="build/qa/de_lint.json")
-    ap.add_argument("--md", default="docs/德语校对清单.md")
+    ap.add_argument("--md", default="docs/archive/德语校对清单.md")
     args = ap.parse_args()
 
     en = tomllib.loads(EN.read_text(encoding="utf-8"))

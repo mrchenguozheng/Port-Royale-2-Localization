@@ -7,7 +7,7 @@
 语言列只作对照；采集时用的是德语排查包，中文列直接取 `zh.toml`，
 没有逐条实机核实过（中文界面要用 `zh-debug` 再走一遍）。
 
-采集方法见 `docs/德语校对流程.md` 第 8 节。反查（看到 `[XXXX]` 想知道是哪条）用
+采集方法见 `docs/archive/德语校对流程.md` 第 8 节。反查（看到 `[XXXX]` 想知道是哪条）用
 `build/qa/de_index.csv` 按标记尾数 grep，或查 `build/debug/<lang>-debug/<lang>.txt`（带全标记的中间产物）。
 
 ## 分卷
