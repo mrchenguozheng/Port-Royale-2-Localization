@@ -9,7 +9,7 @@ src/tools/
 ├─ text/       归一化、中文/日文排版、标注、术语表、版本基线
 ├─ font/       字体生成、压缩与导出
 ├─ analysis/   译文检查、进度、说话人与语体分析
-├─ qa/         读数比对、命中导出、占位前文、串语言扫描
+├─ qa/         读数比对、命中导出、占位前文、串语言扫描、参照 gap 分级
 ├─ install/    pr2ctl 构建/部署/启动/宿主 DLL
 ├─ translate.py / glossary.py / terms_check.py / placeholder_roles.py   译文数据层
 ├─ extract_strings.py                                                  从 PR2.exe 重提基准原文
@@ -72,6 +72,7 @@ src/tools/
 | `text/entries.py` | 把译文条目按结构分类 |
 | `text/marks.py` | 译文层内联标注：解析、展开、剥标 |
 | `text/toml_io.py` | 译文与产物共用的 TOML 读写（id 顺序、转义、原子写） |
+| `text/lang_id.py` | 语种判定共享模块：停用词表 `STOP`、`guess()`（返回语种／命中数／各语言得分）、`is_foreign()`（「整条是别的语言」的判据 + 版权声明白名单）。`lang_check` 的串语言层、`lang_mix` 与 `ref_clean --align-foreign` 共用这一份，口径只写一次 |
 | `text/apply_zh_rules.py` | 中文构建入口的兼容门面，新代码用 `zh_pipeline` |
 | `text/zh_pipeline.py` | 中文「分词前」：连词、人名、数字/破折号/`<n><n>` 空格 |
 | `text/zh_space.py` | 中文分词与按字数成组补空格（spaCy → 机械兜底，不用 jieba） |
@@ -136,8 +137,9 @@ src/tools/
 | `qa/dump_hits.py` | 全量语法命中导出（含长尾），首行写「提交／语言／送检／命中／规则数／渲染种子」；产物 `build/qa/<lang>_hits_all.txt`。没有这行元数据，同名文件在不同提交下就会混读 |
 | `qa/prefix_stat.py` | 统计各语言位置／国家占位的前一词与前 20 字符，全量输出；产物 `build/qa/prefix_<lang>.txt`。判定替身该带什么形态靠这一列「前一词」（旧版按 10 字符硬截，读出来是断词碎片） |
 | `qa/lang_mix.py` | 扫六份 `-clean` 的串语言条目：同 id 在 ≥3 份逐字相同、≥2 份判出同一个外来语种、单份外来判定，三种判据分开标；产物 `build/qa/lang_mix.txt` |
+| `qa/ref_gap.py` | 参照层 gap 分级：读 `ref_check_<lang>-clean.txt` 的 E 段，按令牌数／`<n>` 数／长度比／句数分成「疑似缺令牌／疑似参照少分段／疑似减译／疑似缺句／疑似结构差」，并把每条疑似的 EN／FR／参照 clean／本语言译文四段全文写进 `build/qa/ref_gap_view.txt`；产物 `build/qa/ref_gap.txt`。级别带「疑似」是因为全是启发式读数，真缺句必须并排读过全文才落 `apply` |
 
-四支脚本只读 `src/` 与 `build/ref/clean/`，产物写 `build/qa/`，不改任何译文或参照层。
+五支脚本只读 `src/` 与 `build/ref/clean/`，产物写 `build/qa/`，不改任何译文或参照层。
 
 ## 字体
 

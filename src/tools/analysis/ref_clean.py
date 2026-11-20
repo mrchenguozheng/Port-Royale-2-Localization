@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.dirname(HERE))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+from text import lang_id as LI            # noqa: E402
 from text import toml_io as TI            # noqa: E402
 from analysis import retail_import as RI  # noqa: E402
 
@@ -176,6 +177,9 @@ def main(argv=None):
                     help="基准是 `IDM_` 占位名、本参照却写成了正文的行：对齐成那个占位名")
     ap.add_argument("--align-empty", action="store_true",
                     help="`+++EMPTY+++` 按多数票定：过半语言都是占位，本参照也退成占位")
+    ap.add_argument("--align-foreign", action="store_true",
+                    help="整条是别的语言的正文（零售串语言）就退成 `+++EMPTY+++`；"
+                         "版权／许可声明白名单不收")
     ap.add_argument("--empty-votes", default="en,fr,de,es,pl,ru",
                     help="算占位票的来源（逗号分隔），自己那份自动排除")
     ap.add_argument("--write", action="store_true", help="真写盘；默认只出报告")
@@ -203,6 +207,9 @@ def main(argv=None):
                 continue
             empty_docs.append(load(p))
 
+    # 本参照的语言短名（`es.retail-1.0.0` → `es`），判串语言用。
+    ref_lang = ref_name.split(".")[0]
+
     out = {}
     changed, issues = [], []
     for hid, val in doc.items():
@@ -219,6 +226,17 @@ def main(argv=None):
                               % (why, len(val), val[:26].replace("\n", " ")))
             elif act == "warn":
                 issues.append((hid, why))
+        # 整条就是别的语言的正文（零售包串语言）：直接退成占位。判据在
+        # `text/lang_id.py`，版权／许可声明有白名单，不当外语。必须在结构对齐之前——
+        # 拿一段德语去对法语的结构，无论对齐成什么样都还是德语。
+        if args.align_foreign:
+            foreign = LI.is_foreign(text, ref_lang, min_hits=3)
+            if foreign:
+                out[hid] = PLACEHOLDER
+                changed.append((hid, "按语种退成占位（像 %s；原 %d 字：%s）"
+                                % (foreign, len(val), val[:26].replace("\n", " ")),
+                                diff_snip(val, PLACEHOLDER)))
+                continue
         b_pre = (base or {}).get(hid)
         if args.align_idm:
             text, hit = align_idm(b_pre, text)

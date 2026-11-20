@@ -25,54 +25,22 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 sys.path.insert(0, os.path.join(ROOT, "src", "tools"))
 sys.path.insert(0, ROOT)
 
+from text import lang_id as LI  # noqa: E402
 from text import toml_io  # noqa: E402
 
-LANGS = ["de", "en", "es", "fr", "pl", "ru"]
+LANGS = LI.LANGS
 
-STOP = {
-    "de": "der die das und ist nicht ein eine mit für von zu den dem sich auf im am "
-          "wir sie ich ihr es auch aber wenn nach bei aus".split(),
-    "en": "the and of to in is that for it with as on was are this you your they "
-          "we not be have from by".split(),
-    "fr": "le la les des et est une un pour dans que qui avec sur pas au du ce "
-          "il elle nous vous sont être".split(),
-    "es": "el la los las de que y en un una por con para se del al es son "
-          "no su lo como".split(),
-    "pl": "i w nie się na z że do to jest jak o co po za od oraz ale "
-          "przez jego".split(),
-    "ru": "и в не на что с по это он она как из у же за от для или "
-          "его было".split(),
-}
-
-STRIP = [
-    (re.compile(r"<[^<>]*>"), " "),
-    (re.compile(r"\[[^\[\]]*\]"), " "),
-    (re.compile(r"@[a-zA-Z]\$[^$]*\$"), " "),
-    (re.compile(r"%\d"), " "),
-    (re.compile(r"\b[fgh]:[^<> ]*"), " "),
-]
-WORD = re.compile(r"[^\W\d_]+", re.UNICODE)
 LETTER = re.compile(r"[^\W\d_]", re.UNICODE)
 NON_ASCII = re.compile(r"[^\x00-\x7f]")
 IDENT_ONLY = re.compile(r"^[A-Z0-9_]+$")
 
-
-def plain(t):
-    for rx, rep in STRIP:
-        t = rx.sub(rep, t)
-    return t
+plain = LI.plain
+words_of = LI.words
 
 
-def words_of(t):
-    return [w.lower() for w in WORD.findall(plain(t))]
-
-
-def guess(words):
-    """返回 (判定语种, 得分)。得分 <2 判不出，返回 (None, ...)。"""
-    sc = {lang: sum(1 for w in words if w in STOP[lang]) for lang in STOP}
-    top = max(sc, key=lambda x: sc[x])
-    if sc[top] < 2:
-        return None, sc
+def guess(ws):
+    """返回 (判定语种, 得分)。判据在 `text/lang_id.py`，这里只做二元组适配。"""
+    top, _n, sc = LI.guess(ws)
     return top, sc
 
 
