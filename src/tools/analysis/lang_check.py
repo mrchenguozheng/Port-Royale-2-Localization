@@ -449,10 +449,24 @@ def render(text, lang, tr):
     def pick(seq):
         return rng.choice(seq)
 
-    # <n> 是游戏里的硬换行，多数落在两句之间。送检要换成空行：LanguageTool 只在
-    # 空行切段，单换行它当同一段，`wollt.  feindliche` 这种句号后接小写的开头会被
-    # 当成「句中大写」或「句首小写」判掉
-    s = str(text).replace("<n>", "\n\n")
+    # <n> 是游戏里的硬换行，**落在句末才断句**。送检时只有句末的那个换成空行
+    # （LanguageTool 只在空行切段），行内的保留单换行：`Protect minimum<n>stock
+    # level`、`Donated by %1<n>on %2.` 这类是列表项与标签的行内折行，换成空行会让
+    # 下半行被当成新段，凭空判「句首小写」。
+    SENT_END = ".!?…\"'”»)"
+
+    def _n(m):
+        head = m.string[:m.start()]
+        while True:
+            h2 = head.rstrip(" \t\r\n\u00a0")
+            if h2.endswith("<n>"):
+                head = h2[:-3]
+            else:
+                head = h2
+                break
+        return "\n\n" if head and head[-1] in SENT_END else "\n"
+
+    s = re.sub(r"<n>", _n, str(text))
     whole = s.strip()
     if whole and (whole in p["townset"] or name_only(whole)):
         # 整条就是一个地名（城镇清单、地名列表项）：没有句子可读，换占位城镇，
