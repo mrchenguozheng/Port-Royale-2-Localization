@@ -85,6 +85,27 @@ class TestRender(unittest.TestCase):
         out = self.out("Marchandises :<t>%2")
         self.assertRegex(out, r"Marchandises : \d+")
 
+    def test_ship_stand_in_matches_the_gender_of_its_article(self):
+        """`un %1` 只能填阳性船型，`una %1` 只能填阴性——否则送检报告会以为译文
+        把冠词写错了（西语 `un Fragata` 就是这种假命中）。"""
+        tr = LC.load("es")
+        fem = {w for w, g in LC.SHIP_GENDER["es"].items() if g == "f"}
+        masc = {w for w, g in LC.SHIP_GENDER["es"].items() if g == "m"}
+        for _ in range(30):
+            out = LC.render("Debido al desgaste, un %1 se ha hundido hoy.", "es", tr)
+            word = out.split("un ", 1)[1].split(" se ha")[0].strip()
+            self.assertIn(word, masc, out)
+            out = LC.render("Debido al desgaste, una %1 se ha hundido hoy.", "es", tr)
+            word = out.split("una ", 1)[1].split(" se ha")[0].strip()
+            self.assertIn(word, fem, out)
+
+    def test_ship_placeholder_reads_the_article_before_it(self):
+        tr = LC.load("es")
+        for _ in range(20):
+            out = LC.render("Siempre quise conocer a un @S$ShipType$.", "es", tr)
+            word = out.split("un ", 1)[1].split(".")[0].strip()
+            self.assertIn(word, {w for w, g in LC.SHIP_GENDER["es"].items() if g == "m"}, out)
+
     def test_a_bare_town_name_entry_becomes_a_placeholder_town(self):
         out = self.out("Carthagène")
         self.assertTrue(any(t in out for t in self.p["town"]), out)

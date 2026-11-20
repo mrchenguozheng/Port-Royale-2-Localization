@@ -108,7 +108,7 @@ src/tools/
 | `analysis/riddle_marks.py` | 诗谜标注搬运：从已核语言搬 `answer`／`group`／`level`／`certainty`／`source`，逐条核对本语言 `clue` 真的在谜面里；副本正文与代表不同会逐条点名 |
 | `analysis/terms_seed.py` | 术语表取证起草：整行标签档直接成值，全库共现档按词干簇＋位置吻合＋密度比，不足只列候选（`--write` 落 `src/data/terms/<语言>.toml`） |
 | `analysis/line_run.py` | 断行复核：断完最长一段有没有超上限（逐语言报告 `build/qa/line_run_*.txt`） |
-| `analysis/lang_check.py` | 外语形态层：语法、拼写、复合词拆分（与 `text_lint` 分工：一个查形态，一个查定则）。语法层送检前把占位符换成同语言的城镇／人名／国家／货物／数字／日期，纯图形标签抹成空白，不拿原文占位或下划线硬塞；译文里词典没收录的大写专名（`Tortuga`、`Edward Teach`）与地名清单条目一并抽出来换成占位城镇，替换表落在 `build/qa/lang_check_<lang>_names.txt`，下次运行先读这张表，不再为补专名重跑一遍；`keep_as_is` 里按原文保留的名单条目（`name`／`id`／`label`）豁免，缺变音符单独成节（`lang_check_<lang>_accents.txt`，清零时也落盘写 `0 个`），变音符映射按语言分表——同一个 `a` 在法语补 `à`、西语补 `á`、德语补 `ä`，共表会打架；取词的正则字符类必须含小写带变音符的字母，否则 `nación` 会被截成 `naci`、`travesía` 截成 `traves`，碎片全被当成缺变音符；界面、任务标识、测试串与编号行整条跳过 |
+| `analysis/lang_check.py` | 外语形态层：语法、拼写、复合词拆分（与 `text_lint` 分工：一个查形态，一个查定则）。语法层送检前把占位符换成同语言的城镇／人名／国家／货物／数字／日期，纯图形标签抹成空白，不拿原文占位或下划线硬塞；译文里词典没收录的大写专名（`Tortuga`、`Edward Teach`）与地名清单条目一并抽出来换成占位城镇，替换表落在 `build/qa/lang_check_<lang>_names.txt`，下次运行先读这张表，不再为补专名重跑一遍；条形参数与船型占位按前面的冠词取词（`un`／`el` 只填阳性船型，`una`／`la` 只填阴性），`SHIP_GENDER`／`ART_GENDER` 缺表语言退回随机；`keep_as_is` 里按原文保留的名单条目（`name`／`id`／`label`）豁免，缺变音符单独成节（`lang_check_<lang>_accents.txt`，清零时也落盘写 `0 个`），变音符映射按语言分表——同一个 `a` 在法语补 `à`、西语补 `á`、德语补 `ä`，共表会打架；取词的正则字符类必须含小写带变音符的字母，否则 `nación` 会被截成 `naci`、`travesía` 截成 `traves`，碎片全被当成缺变音符；界面、任务标识、测试串与编号行整条跳过 |
 | `analysis/progress.py` | 翻译进度：已译 / 原样保留 / 还没动 |
 | `analysis/speaker_audit.py` | 按「能不能判断说话人」给全部条目分级，只依据英/法原文 |
 | `analysis/tone_proposal.py` | 生成「语体拟改清单」，只列能判定的 |

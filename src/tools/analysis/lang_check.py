@@ -92,6 +92,26 @@ RENDER_SEED = 20261120
 SHIP_IDS = ("0x24646e0b", "0x24646e0d", "0x24646e0e", "0x24646e10",
             "0x24646e12", "0x24646e13", "0x24646e7d", "0x24646e7e")
 
+#: 船型的语法性别：冠词显式标性别的语言才需要。西语 `un Fragata` 一读就错，
+#: 冠词是阳的就得配阳性船型；不筛的话每次随机取词，这条规则全靠骰子。
+#: pl / ru 的船名不带冠词，这张表用不上，缺省按「没有性别」处理。
+SHIP_GENDER = {
+    "es": {"Pinaza": "f", "Bergantín": "m", "Bricbarca": "f", "Filibote": "m",
+           "Corbeta": "f", "Fragata": "f", "Galeón": "m", "Carraca": "f"},
+    "fr": {"Caravelle": "f", "Brick": "m", "Pinasse": "f", "Flûte": "f",
+           "Corvette": "f", "Frégate": "f", "Galion": "m", "Caraque": "f"},
+    "de": {"Pinasse": "f", "Brigg": "f", "Barke": "f", "Fleute": "f",
+           "Korvette": "f", "Fregatte": "f", "Galeone": "f", "Karacke": "f"},
+}
+
+#: 冠词 → 名词语法性别。`les`、`de las`、没有性别表的语言记空串，不筛。
+ART_GENDER = {
+    "es": {"un": "m", "el": "m", "del": "m", "los": "m",
+           "una": "f", "la": "f", "de la": "f", "las": "f"},
+    "fr": {"un": "m", "le": "m", "une": "f", "la": "f"},
+    "de": {"ein": "m", "der": "m", "eine": "f", "die": "f"},
+}
+
 #: 替身池。城镇与人名用各语言「典型占位名」——首都级大城市、通用姓名——
 #: 这类名字在词典和语料里都常见，不会因为生僻把拼写规则拱起来；国家、货物、
 #: 月份、位置介词、船队取本语言的常用词。只为让句子读得通，不追原文直译。
@@ -140,6 +160,34 @@ def _val(entry):
     if isinstance(entry, dict):
         return str(entry.get("default", "") or "")
     return str(entry or "")
+
+
+def _ships(tr, lang):
+    """本语言的船型候选：{词: 语法性别}。没有性别表的语言性别记空串。"""
+    kind = SHIP_GENDER.get(lang, {})
+    out = {}
+    for k in SHIP_IDS:
+        w = _val(tr.get(k, "")).strip()
+        if w:
+            out[w] = kind.get(w, "")
+    return out
+
+
+def _ship_noun(lang, art, tr, rng):
+    """按冠词性别挑船型：阴性冠词配阴名词，阳性冠词配阳名词。
+
+    `un Fragata`、`del Galeón` 这类性别错配是冠词与占位的接口问题，不是哪条译文
+    写错：同一个模板 `un %1` 会填进阴／阳不同的船型，冠词定不下来。渲染层按冠词
+    性别取词，送检才不会把这条当成译文的错。
+
+    冠词不标性别（`les`、无冠词、语言没有性别表）时同性别候选为空，退回全表随机。
+    """
+    ships = _ships(tr, lang)
+    if not ships:
+        return ""
+    want = ART_GENDER.get(lang, {}).get((art or "").strip().lower(), "")
+    cands = [w for w, g in ships.items() if not want or not g or g == want]
+    return rng.choice(cands or list(ships))
 
 
 def pools(lang, tr):
@@ -417,7 +465,16 @@ def render(text, lang, tr):
         if kind == "D":
             return _date(lang, rng.randrange(1, 29), rng.randrange(1, 13), rng.randrange(1660, 1701))
         if kind == "S":
-            return _val(tr.get(pick(SHIP_IDS), "")) or pick(p["goods"])
+            tail = m.string[max(0, m.start() - 16):m.start()]
+            words = re.findall(r"[^\W\d_]+", tail.lower())
+            art = ""
+            if words and len(words) >= 2:
+                two = words[-2] + " " + words[-1]
+                if two in ART_GENDER.get(lang, {}):
+                    art = two
+            if words and not art and words[-1] in ART_GENDER.get(lang, {}):
+                art = words[-1]
+            return _ship_noun(lang, art, tr, rng) or pick(p["goods"])
         if kind == "C":
             return p["convoy"]
         # @l/@d/@r/@M 是位置。首字母大写：这类占位常落在段首或句号之后，
@@ -425,15 +482,15 @@ def render(text, lang, tr):
         return "%s %s" % (p["near"][:1].upper() + p["near"][1:], pick(p["town"]))
     s = re.sub(r"@([a-zA-Z])\$([^$]*)\$", at, s)
 
-    # 条形参数 %N：默认填数；紧跟冠词时原文多半是船名或货物名，改填名词
+    # 条形参数 %N：默认填数；紧跟冠词时原文多半是船名或货物名，改填同性名词
     def pct(m):
         art = m.group(1)
         if art:
-            noun = _val(tr.get(pick(SHIP_IDS), "")) or pick(p["goods"])
-            return "%s %s" % (art, noun)
+            noun = _ship_noun(lang, art, tr, rng) or pick(p["goods"])
+            return "%s %s" % (art.strip(), noun)
         # 无冠词时是条形参数，多半跟单数名词（`%d troupe`），同样避开 0–10
         return str(rng.randrange(11, 100))
-    s = re.sub(r"(?:(un|une|le|la|les|ein|eine|der|die|das|el|los|las)\s+)?%[0-9]+", pct, s)
+    s = re.sub(r"(?:(de las|de la|una|un|une|le|la|les|ein|eine|der|die|das|el|los|las|del)\s+)?%[0-9]+", pct, s)
     # 其余尖括号标签全是图形与排版，抹成空白——不留空会把前后词粘成一个词
     s = re.sub(r"<[^<>]*>", " ", s)
     s = re.sub(r"[ \t]{2,}", " ", s)
