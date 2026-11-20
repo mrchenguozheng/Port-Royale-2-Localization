@@ -9,6 +9,7 @@ src/tools/
 ├─ text/       归一化、中文/日文排版、标注、术语表、版本基线
 ├─ font/       字体生成、压缩与导出
 ├─ analysis/   译文检查、进度、说话人与语体分析
+├─ qa/         读数比对、命中导出、占位前文、串语言扫描
 ├─ install/    pr2ctl 构建/部署/启动/宿主 DLL
 ├─ translate.py / glossary.py / terms_check.py / placeholder_roles.py   译文数据层
 ├─ extract_strings.py                                                  从 PR2.exe 重提基准原文
@@ -126,6 +127,17 @@ src/tools/
 | `analysis/de_register.py` | 德语口语语体回补（一次性批次工具） |
 | `analysis/de_riddles.py` | 德语藏宝诗谜重译（押韵，一次性批次工具） |
 | `analysis/de_riddles2.py` | 德语诗谜二轮打磨（一次性批次工具） |
+
+## QA 探针
+
+| 脚本 | 作用 |
+|---|---|
+| `qa/ab_diff.py` | 改前／改后读数比对：基线提交与工作树两份 `lang_check` 各跑一遍 `grammar()`，输出规则集合 gone／new／delta（`--rev` 指定基线，默认 HEAD）。改替身池会让 `rng` 序列整体漂移、总数不可比，只有规则集合差异能判「有没有引入新规则」；产物 `build/qa/ab_diff_<lang>.txt` |
+| `qa/dump_hits.py` | 全量语法命中导出（含长尾），首行写「提交／语言／送检／命中／规则数／渲染种子」；产物 `build/qa/<lang>_hits_all.txt`。没有这行元数据，同名文件在不同提交下就会混读 |
+| `qa/prefix_stat.py` | 统计各语言位置／国家占位的前一词与前 20 字符，全量输出；产物 `build/qa/prefix_<lang>.txt`。判定替身该带什么形态靠这一列「前一词」（旧版按 10 字符硬截，读出来是断词碎片） |
+| `qa/lang_mix.py` | 扫六份 `-clean` 的串语言条目：同 id 在 ≥3 份逐字相同、≥2 份判出同一个外来语种、单份外来判定，三种判据分开标；产物 `build/qa/lang_mix.txt` |
+
+四支脚本只读 `src/` 与 `build/ref/clean/`，产物写 `build/qa/`，不改任何译文或参照层。
 
 ## 字体
 
