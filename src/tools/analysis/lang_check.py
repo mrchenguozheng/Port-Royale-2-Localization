@@ -67,35 +67,41 @@ RENDER_SEED = 20261120
 SHIP_IDS = ("0x24646e0b", "0x24646e0d", "0x24646e0e", "0x24646e10",
             "0x24646e12", "0x24646e13", "0x24646e7d", "0x24646e7e")
 
-#: 表里取不到的小词类：国家、货物、月份、位置介词、船队。只为让句子读得通，
-#: 不追原文直译；城镇与人名一律从 src/data/names 的实表里取。
+#: 替身池。城镇与人名用各语言「典型占位名」——首都级大城市、通用姓名——
+#: 这类名字在词典和语料里都常见，不会因为生僻把拼写规则拱起来；国家、货物、
+#: 月份、位置介词、船队取本语言的常用词。只为让句子读得通，不追原文直译。
 POOL = {
-    "fr": {"nation": ["Espagne", "Angleterre", "France", "Pays-Bas"],
-           "person": ["Jean Bart", "Michel de Grammont", "Henry Avery", "Barbe Noire"],
+    "fr": {"town": ["Paris", "Lyon", "Marseille", "Bordeaux"],
+           "person": ["Jean Dupont", "Pierre Martin", "Paul Durand", "Jacques Moreau"],
+           "nation": ["Espagne", "Angleterre", "France", "Pays-Bas"],
            "goods": ["café", "sucre", "tabac", "rhum", "cacao", "indigo"],
            "month": ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
                      "août", "septembre", "octobre", "novembre", "décembre"],
            "near": "près de", "convoy": "convoi marchand"},
-    "de": {"nation": ["Spanien", "England", "Frankreich", "Holland"],
-           "person": ["Jean Bart", "Michel de Grammont", "Henry Avery", "Schwarzbart"],
+    "de": {"town": ["Berlin", "Hamburg", "München", "Köln"],
+           "person": ["Max Mustermann", "Erika Mustermann", "Hans Schmidt", "Anna Müller"],
+           "nation": ["Spanien", "England", "Frankreich", "Holland"],
            "goods": ["Kaffee", "Zucker", "Tabak", "Rum", "Kakao", "Indigo"],
            "month": ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
                      "August", "September", "Oktober", "November", "Dezember"],
            "near": "bei", "convoy": "Handelskonvoi"},
-    "es": {"nation": ["España", "Inglaterra", "Francia", "Holanda"],
-           "person": ["Jean Bart", "Michel de Grammont", "Henry Avery", "Barbanegra"],
+    "es": {"town": ["Madrid", "Barcelona", "Sevilla", "Valencia"],
+           "person": ["Juan Pérez", "María García", "José López", "Ana Martínez"],
+           "nation": ["España", "Inglaterra", "Francia", "Holanda"],
            "goods": ["café", "azúcar", "tabaco", "ron", "cacao", "índigo"],
            "month": ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
                      "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
            "near": "cerca de", "convoy": "convoy mercante"},
-    "ru": {"nation": ["Испания", "Англия", "Франция", "Голландия"],
-           "person": ["Жан Бар", "Мишель де Граммон", "Генри Эвери", "Чёрная Борода"],
+    "ru": {"town": ["Москва", "Санкт-Петербург", "Казань", "Одесса"],
+           "person": ["Иван Иванов", "Пётр Петров", "Сергей Смирнов", "Анна Кузнецова"],
+           "nation": ["Испания", "Англия", "Франция", "Голландия"],
            "goods": ["кофе", "сахар", "табак", "ром", "какао", "индиго"],
            "month": ["января", "февраля", "марта", "апреля", "мая", "июня", "июля",
                      "августа", "сентября", "октября", "ноября", "декабря"],
            "near": "около", "convoy": "торговый конвой"},
-    "pl": {"nation": ["Hiszpania", "Anglia", "Francja", "Holandia"],
-           "person": ["Jan Bart", "Michel de Grammont", "Henry Avery", "Czarnobrody"],
+    "pl": {"town": ["Warszawa", "Kraków", "Gdańsk", "Łódź"],
+           "person": ["Jan Kowalski", "Anna Nowak", "Piotr Wiśniewski", "Maria Wójcik"],
+           "nation": ["Hiszpania", "Anglia", "Francja", "Holandia"],
            "goods": ["kawa", "cukier", "tytoń", "rum", "kakao", "indygo"],
            "month": ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
                      "lipca", "sierpnia", "września", "października", "listopada", "grudnia"],
@@ -112,24 +118,12 @@ def _val(entry):
 
 
 def pools(lang):
-    """本语言的替身池：城镇、人名从实表按 entities 的 kind 分类取，其余取 POOL。"""
+    """本语言的替身池。城镇与人名用典型占位名，不拿游戏里的真实专名去顶替——
+    真实的卡塔赫纳、黑胡子这类名字在词典里是生僻词，容易把拼写规则带起来。"""
     if lang in _CACHE:
         return _CACHE[lang]
-    names = MK.load_names(lang)
-    doc, _ = toml_io.read_doc(os.path.join(ROOT, "src", "data", "names", "entities.toml"))
-    towns, people = [], []
-    for key, meta in doc.items():
-        kind = meta.get("kind") if isinstance(meta, dict) else None
-        v = _val(names.get(key, ""))
-        if not v:
-            continue
-        if kind == "town":
-            towns.append(v)
-        elif kind == "person":
-            people.append(v)
     base = POOL.get(lang, POOL["fr"])
-    _CACHE[lang] = dict(base, town=towns or ["Port Royale"],
-                        person=people or base["person"])
+    _CACHE[lang] = dict(base)
     return _CACHE[lang]
 
 
