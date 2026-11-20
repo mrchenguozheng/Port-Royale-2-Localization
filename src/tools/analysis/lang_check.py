@@ -466,7 +466,8 @@ def render(text, lang, tr):
                 break
         return "\n\n" if head and head[-1] in SENT_END else "\n"
 
-    s = re.sub(r"<n>", _n, str(text))
+    s = re.sub(r"<n(?::[^<>]*)>", "<n>", str(text))
+    s = re.sub(r"<n>", _n, s)
     whole = s.strip()
     if whole and (whole in p["townset"] or name_only(whole)):
         # 整条就是一个地名（城镇清单、地名列表项）：没有句子可读，换占位城镇，
