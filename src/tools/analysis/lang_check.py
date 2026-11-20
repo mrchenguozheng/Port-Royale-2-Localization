@@ -413,7 +413,11 @@ def render(text, lang, tr):
 
     换法是同类替换：城镇换成城镇表里的城镇，人名换成人名表里的人名，国家、货物、
     船型、日期各取本语言的词或格式，数字落在一个合理区间。纯图形标签（字体、图片、
-    颜色、尺寸、屏幕）没有语义可换，抹成空白；段落标记 <n> 还原成换行。
+    颜色、尺寸、屏幕）没有语义可换，抹成空白；段落标记 <n> 还原成空行。
+
+    随机种子带上本条原文，同一条永远渲染出同一个结果（报告可复现），不同条目
+    则取到不同的替身词。种子只按语言定死时，条目一多、地名清单一批拼起来，
+    全批二十条都换成同一个 `Hamburg`，送检就判成「重复词」「拼写错」。
     """
     rng = random.Random("%s-%d" % (lang, RENDER_SEED))
     p = pools(lang, tr)
@@ -422,7 +426,10 @@ def render(text, lang, tr):
     def pick(seq):
         return rng.choice(seq)
 
-    s = str(text).replace("<n>", "\n")
+    # <n> 是游戏里的硬换行，多数落在两句之间。送检要换成空行：LanguageTool 只在
+    # 空行切段，单换行它当同一段，`wollt.  feindliche` 这种句号后接小写的开头会被
+    # 当成「句中大写」或「句首小写」判掉
+    s = str(text).replace("<n>", "\n\n")
     whole = s.strip()
     if whole and (whole in p["townset"] or name_only(whole)):
         # 整条就是一个地名（城镇清单、地名列表项）：没有句子可读，换占位城镇，
