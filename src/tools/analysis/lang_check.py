@@ -540,8 +540,12 @@ def render(text, lang, tr):
         # 无冠词时是条形参数，多半跟单数名词（`%d troupe`），同样避开 0–10
         return str(rng.randrange(11, 100))
     s = re.sub(r"(?:(de las|de la|una|un|une|le|la|les|ein|eine|der|die|das|el|los|las|del)\s+)?%[0-9]+", pct, s)
-    # 其余尖括号标签全是图形与排版，抹成空白——不留空会把前后词粘成一个词
+    # 其余尖括号标签全是图形与排版，抹成空白——不留空会把前后词粘成一个词。
+    # 紧跟句号、逗号、右括号的标签串例外：抹成空，否则 `por cada <金币图标>.` 会渲染成
+    # `por cada .`，凭空多出一处「标点前有空格」。
+    s = re.sub(r"(?:<[^<>]*>)+(?=[.,)\]])", "", s)
     s = re.sub(r"<[^<>]*>", " ", s)
+    s = re.sub(r"[ \t]+([.,)\]])", r"\1", s)
     s = re.sub(r"[ \t]{2,}", " ", s)
     s = re.sub(r"[ \t]+\n", "\n", s)
     s = re.sub(r"\n[ \t]+", "\n", s)
