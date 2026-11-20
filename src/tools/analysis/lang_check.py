@@ -122,8 +122,8 @@ ART_GENDER = {
 POOL = {
     "fr": {"town": ["Paris", "Lyon", "Marseille", "Bordeaux"],
            "person": ["Jean Dupont", "Pierre Martin", "Paul Durand", "Jacques Moreau"],
-           "nation": ["Espagne", "Angleterre", "France", "Pays-Bas"],
-           "goods": ["café", "sucre", "tabac", "rhum", "cacao", "indigo"],
+           "nation": ["France", "Espagne", "Angleterre", "Portugal"],
+           "goods": ["café", "sucre", "tabac", "rhum", "cacao", "coton"],
            "month": ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
                      "août", "septembre", "octobre", "novembre", "décembre"],
            "near": "près de", "convoy": "convoi marchand"},
@@ -156,6 +156,9 @@ POOL = {
                      "lipca", "sierpnia", "września", "października", "listopada", "grudnia"],
            "near": "koło", "convoy": "konwój handlowy"},
 }
+
+#: 法语元音起首（含哑音 h）：国名替身据此选 `l'` 还是 `le`。
+_FR_VOWELS = "aàâeéèêëiîïoôuûüyh"
 
 _CACHE = {}
 
@@ -492,13 +495,36 @@ def render(text, lang, tr):
         return ""
     s = re.sub(r"\[([^\[\]]*)\]", bracket, s)
 
+    # 国名占位紧跟 `à`／`de` 时把介词一起吞掉改成缩合形式（`au Portugal`、
+    # `d'Espagne`），否则 `à` + 带冠词国名会拼出 `à le Portugal` 这种新错。
+    def nation_after_prep(m):
+        name = pick(p["nation"])
+        el = name[:1].lower() in _FR_VOWELS
+        if m.group(1) == "à":
+            return ("à l'" if el else "au ") + name
+        return ("de l'" if el else "du ") + name
+
+    if lang == "fr":
+        s = re.sub(r"(à|de)\s+@n\$[^$]*\$", nation_after_prep, s)
+
     # @ 占位：按前缀决定替身类别
     def at(m):
         kind, name = m.group(1), m.group(2)
         if kind == "T":
             return pick(p["town"])
         if kind == "n":
-            return pick(p["nation"])
+            # 国家替身自带定冠词：原文多数落在 `appartenant à`／`guerre avec`／
+            # `visant` 这类要限定词的位置，填裸国名会凭空造出「介词后缺冠词」。
+            # 紧跟在 `à`／`de` 后的情形另由前面的 `_nation_after_prep` 吞掉介词改缩合。
+            name = pick(p["nation"])
+            if lang == "fr":
+                el = name[:1].lower() in _FR_VOWELS
+                v = ("l'" if el else "le ") + name
+                head = m.string[:m.start()].rstrip()
+                if not head or head[-1] in ".!?…\"'”»)":
+                    v = v[:1].upper() + v[1:]
+                return v
+            return name
         if kind in ("P", "N", "F", "L", "A", "s"):
             return pick(p["person"])
         if kind == "G":
