@@ -270,31 +270,51 @@ def proper_names(lang, tr):
     return names
 
 
-#: 缺变音符的替换表：法语、西语里 `Ecole`→`École`、`Espanol`→`Español` 这类
-ACCENT = {"E": "É", "A": "À", "e": "é", "a": "à", "n": "ñ", "N": "Ñ"}
+#: 每个字符位置能补上的变音符，按语言分开——同一个 `a`，法语补成 `à`、西语补成
+#: `á`、德语补成 `ä`，混在一张表里会互相打架
+ACCENT_OF = {
+    "fr": {"e": "é", "a": "à", "E": "É", "A": "À", "i": "ï", "u": "ù"},
+    "es": {"n": "ñ", "N": "Ñ", "a": "á", "e": "é", "i": "í", "o": "ó", "u": "ú",
+           "A": "Á", "E": "É", "I": "Í", "O": "Ó", "U": "Ú"},
+    "de": {"a": "ä", "o": "ö", "u": "ü", "A": "Ä", "O": "Ö", "U": "Ü"},
+    "pl": {"a": "ą", "e": "ę", "o": "ó", "l": "ł", "n": "ń", "s": "ś", "c": "ć",
+           "z": "ź", "A": "Ą", "E": "Ę", "O": "Ó", "L": "Ł", "N": "Ń", "S": "Ś",
+           "C": "Ć", "Z": "Ź"},
+    "ru": {"e": "ё", "E": "Ё"},
+}
+
+#: 单词：至少三个字母，不许带数字与下划线。字符类必须含小写带变音符的字母，
+#: 否则 `nación` 会被截成 `nacion`、`travesía` 截成 `traves`，碎片全被当成缺变音符
+ACCENT_RX = re.compile(r"[^\W\d_][^\W\d_'’-]{2,}")
 
 
 def accents(lang, tr):
-    """缺变音符的真词：原词词典查不到、加上变音符后查得到。
+    """缺变音符的真词：原词词典查不到，把某一位换成带变音符的形式后查得到。
 
-    只扫大写开头的词——小写词形多，逐个试变音符会把 `ete`（été）、`a`（à）这类
-    全拱出来，噪声大于收益。名单条目同样豁免，它们的写法由原文定。
+    逐位试一次，只收「一词一改就成立」的情形：`Espanol`→`Español`、
+    `Ecole`→`École`、`Periodo`→`Período`。原词本来就在词典里的（`solo`、
+    `periodo` 这类两种写法都合法的）不会被报。名单条目的写法由原文定，豁免。
     """
     known = dict_of(lang)
     out = {}
-    if known is None:
+    fixmap = ACCENT_OF.get(lang)
+    if known is None or not fixmap:
         return out
     skip = keep_entries(lang)
     for k, v in tr.items():
         if str(k).lower() in skip:
             continue
-        for m in PROPER_RX.finditer(clean(str(v))):
-            w = m.group(0).strip()
-            if len(w) < 3 or w[0] not in ACCENT:
+        for w in ACCENT_RX.findall(clean(str(v))):
+            if known(w):
                 continue
-            w2 = ACCENT[w[0]] + w[1:]
-            if known(w2) and not known(w):
-                out.setdefault(w, []).append(k)
+            for i, ch in enumerate(w):
+                fix = fixmap.get(ch)
+                if not fix:
+                    continue
+                cand = w[:i] + fix + w[i + 1:]
+                if known(cand):
+                    out.setdefault(cand, []).append((w, k))
+                    break
     return out
 
 
@@ -675,17 +695,21 @@ def main(argv):
     acc = accents(lang, tr)
     if acc:
         lines.append("## 缺变音符（%d 个）\n" % len(acc))
-        lines.append("判据：原词查不到、加上变音符后查得到；只扫大写开头的词，"
-                     "名单条目豁免。\n")
+        lines.append("判据：原词查不到、任一位换成带变音符的形式后查得到；"
+                     "原词本就在词典里的不报，名单条目豁免。\n")
         for w, ks in sorted(acc.items(), key=lambda x: (-len(x[1]), x[0]))[:60]:
-            lines.append("%s | %d | %s" % (w, len(ks), ", ".join(ks[:3])))
+            lines.append("%s | %d | %s" % (w, len(ks), ", ".join(
+                "%s@%s" % (o, i) for o, i in ks[:2])))
         lines.append("")
-        path = os.path.join(ROOT, "build", "qa", "lang_check_%s_accents.txt" % lang)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with io.open(path, "w", encoding="utf-8", newline="\n") as f:
-            f.write("# %s 缺变音符（%d 个）\n\n" % (lang, len(acc)))
-            for w, ks in sorted(acc.items(), key=lambda x: (-len(x[1]), x[0])):
-                f.write("%s | %d | %s\n" % (w, len(ks), ", ".join(ks)))
+
+    # 清零时也要落盘：留着上一轮的文件会让人以为还没修完
+    path = os.path.join(ROOT, "build", "qa", "lang_check_%s_accents.txt" % lang)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with io.open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("# %s 缺变音符（%d 个）\n\n" % (lang, len(acc)))
+        for w, ks in sorted(acc.items(), key=lambda x: (-len(x[1]), x[0])):
+            f.write("%s | %d | %s\n" % (w, len(ks),
+                                       ", ".join("%s@%s" % (o, i) for o, i in ks)))
 
     if not a.grammar_only:
         allow = build_allow(lang, tr)
