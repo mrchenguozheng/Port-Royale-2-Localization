@@ -219,11 +219,34 @@ def pools(lang, tr):
 #: `Population`、`Battre` 这类单词标签也当专名换掉。
 NAME_RX = re.compile(r"^[A-ZÀ-ÖØ-Ý][\w'’.-]*(?:\s+[A-ZÀ-ÖØ-Ý\d][\w'’.-]*)+$")
 
+#: 整条只有一个大写开头的词（`Collingwood`、`Otchaqua`、`Biloxi`）：名单里的一条，
+#: 语法层没有句子可检。至少三个字符，`OK`／`QA` 这类标识另有 ident_only 先排除。
+WORD_RX = re.compile(r"^[A-ZÀ-ÖØ-Ý][\w'’.-]{2,}$")
+
 
 def name_only(text):
     """整条是否只是一串首字母大写的词，且没有句末标点（排除 `Fin. Suite.` 这种断行）。"""
     s = clean(text)
     return bool(s) and bool(NAME_RX.match(s)) and s[-1] not in ".?!"
+
+
+def list_item(text, p):
+    """整条只是一个地名或一串专名（`Biloxi`、`Collingwood`、`New Orleans`、`St. Kitts`）。
+
+    这类条目语法层没有句子可检：一条就是一个词，没有主谓、没有冠词与名词的搭配
+    关系。留在语法层只会被渲染层整条换成同一个占位城镇——每个地名条目都换一次，
+    一批二十条拼起来就是 `Hamburg  Hamburg  Hamburg  Hamburg`，被判重复词与拼写错，
+    凭空造出原文里没有的噪声。拼写层另有词表与 allow 表兜底，不靠这里。
+
+    单个词也算（`Collingwood` 这种人名条目在名单里成百条，`NAME_RX` 要求两词，
+    漏掉它们才是连排的主因）。两词大写标题（`Feindliche Stadt`、`Militärische
+    Stärke`）与两词地名（`New Orleans`）在文本上不可分，一并排除；这类短语本来
+    也没有 LT 能判的语法，单词拼错仍由拼写层抓。
+    """
+    s = clean(text)
+    if not s:
+        return False
+    return s in p["townset"] or bool(NAME_RX.match(s)) or bool(WORD_RX.match(s))
 
 
 #: 专名候选：大写开头的词，可带 `de`／`van`／`von` 这类小写虚词再接词
@@ -534,12 +557,14 @@ def grammar(lang, tr):
     # 拼写规则保持开启：替身已换成词典里的常见词（Paris、Jean Dupont 这类），
     # 专名不会再把拼写命中拱起来。`## 拼写` 一节的 hunspell 统计照旧独立跑，
     # 两处口径并列，不互相替代。
-    keys = [k for k in tr if checkable(tr[k])]
     # 上一次落盘的专名表先并进来：第一遍就按已知专名替换，只有这次新冒出来的
     # 词才触发第二轮，常态下省掉一整遍 LanguageTool
     p = pools(lang, tr)
     for w, n in _read_names(lang).items():
         p["proper"].setdefault(w, n)
+    # 地名与专名清单项不进语法层：一条一个词，没有句子可查，渲染后被换成同一个
+    # 占位城镇，一批拼起来就是 `Hamburg  Hamburg  Hamburg`（见 list_item）
+    keys = [k for k in tr if checkable(tr[k]) and not list_item(tr[k], p)]
 
     # 按字符数切批：百科长文不跟短标签挤在一批，否则一批几万字要跑几分钟
     BATCH_CHARS = 3000
@@ -749,9 +774,12 @@ def main(argv):
     n_ident = sum(1 for v in tr.values() if ident_only(v))
     n_skip = sum(1 for v in tr.values() if clean(v) and not checkable(v))
     n_keys = sum(1 for v in tr.values() if checkable(v))
+    p = pools(lang, tr)
+    n_list = sum(1 for v in tr.values() if checkable(v) and list_item(v, p))
     lines.append("口径：空值 %d 条、纯占位 %d 条、跳过 %d 条（其中 %d 条整条只有大写"
-                 "字母、数字、下划线，其余是测试串与编号行）、送检 %d 条。\n"
-                 % (n_blank, n_phold, n_skip, n_ident, n_keys))
+                 "字母、数字、下划线，其余是测试串与编号行）、送检 %d 条"
+                 "（另 %d 条是地名／专名清单，只进拼写层）。\n"
+                 % (n_blank, n_phold, n_skip, n_ident, n_keys - n_list, n_list))
 
     if not a.spell_only:
         n, hits = grammar(lang, tr)
