@@ -43,9 +43,23 @@ import translate as T                                   # noqa: E402
 SKIP_FILE = os.path.join(ROOT, "src", "data", "check_skip.txt")
 
 
+def _echo(p, tail=8):
+    """把子进程输出原样打出来；失败时再补一小段尾部，省得往上翻几十行找原因。"""
+    if p.stdout:
+        sys.stdout.write(p.stdout)
+    if p.stderr:
+        sys.stderr.write(p.stderr)
+    if p.returncode:
+        rows = [l for l in (p.stdout or "").splitlines() if l.strip()]
+        rows += [l for l in (p.stderr or "").splitlines() if l.strip()]
+        for l in rows[-tail:]:
+            print("   | %s" % l)
+
+
 def run(title, cmd):
     print("\n== %s ==" % title)
-    p = subprocess.run(cmd, cwd=ROOT)
+    p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8")
+    _echo(p)
     if p.returncode:
         print("失败：%s（exit %d）" % (title, p.returncode))
         return False
@@ -99,7 +113,9 @@ def run_each_lang(title, script, langs_, extra=()):
     print("\n== %s ==" % title)
     ok = True
     for lang in langs_:
-        p = subprocess.run([PY, script, "--lang", lang] + list(extra), cwd=ROOT)
+        p = subprocess.run([PY, script, "--lang", lang] + list(extra), cwd=ROOT,
+                           capture_output=True, text=True, encoding="utf-8")
+        _echo(p)
         if p.returncode:
             print("失败：%s（%s，exit %d）" % (title, lang, p.returncode))
             ok = False

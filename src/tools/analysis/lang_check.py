@@ -186,6 +186,36 @@ _DICT = {}
 #: 抽进替换表只会把表弄脏
 JUNK = {"Dummy", "EMPTY", "Conv", "Suppr"}
 
+#: 句首大写常常是冠词／介词，`PROPER_RX` 会把它们连到后面的名字上
+LEAD = {"À", "A", "Le", "La", "Les", "L'", "Un", "Une", "Des", "Du", "De",
+        "Au", "Aux", "Et", "Ou", "Si", "Ce", "Cette", "Ces"}
+
+
+#: keep_as_is 里这些理由的值是「原文即本语言写法」的专名，不能当普通译文改
+KEEP_KINDS = ("name", "id", "label", "key", "credit")
+
+_KEEP = {}
+
+
+def keep_entries(lang):
+    """`src/data/keep_as_is/<lang>.txt` 里按原文保留的条目 id（小写集合）。
+
+    理由为 `save-name` 的是存档文件名，写法由各语言自己定（`Sauvegarde
+    automatique` 合法），仍需检查拼写与语法，不在此列。
+    """
+    if lang in _KEEP:
+        return _KEEP[lang]
+    path = os.path.join(ROOT, "src", "data", "keep_as_is", "%s.txt" % lang)
+    ids = set()
+    if os.path.isfile(path):
+        with io.open(path, encoding="utf-8") as f:
+            for line in f:
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) >= 2 and parts[0].strip() and parts[1].strip() in KEEP_KINDS:
+                    ids.add(parts[0].strip().lower())
+    _KEEP[lang] = ids
+    return ids
+
 
 def dict_of(lang):
     """本语言的 hunspell 查询函数；没有词典的语言返回 None。"""
@@ -209,25 +239,63 @@ def proper_names(lang, tr):
 
     句首大写不算证据——`Bonjour`、`Population` 也会大写，但它们在词典里，被这道
     词典闸拦住。`Tortuga`、`Nombre de Dios` 这类词典没有的大写串就是专名，抽取后
-    换成占位城镇再送检。注意 hunspell 的法语词典本身收了 `nassau`、`smith`，所以
-    这两类词抽不出来，它们在语法层仍会由 LanguageTool 报拼写——两套词典口径不同。
+    换成占位城镇再送检。
+
+    两个例外：
+    * `keep_as_is` 里按原文保留的名单条目（`name`／`id`／`label`／`key`／`credit`）
+      是「原文即本语言写法」的专名（`Elisabeth`、`Tampa`），text_lint 要求它们与
+      原文一字不差，抽进替换表只会掩盖门禁要看的东西，直接跳过。
+    * hunspell 的法语词典收了 `nassau`、`smith`，这两类抽不出来，语法层仍会由
+      LanguageTool 报拼写——两套词典口径不同，不在这里调和。
     """
     known = dict_of(lang)
     names = {}
     if known is None:
         return names
-    for v in tr.values():
+    skip = keep_entries(lang)
+    for k, v in tr.items():
+        if str(k).lower() in skip:
+            continue
         for m in PROPER_RX.finditer(clean(str(v))):
             s = m.group(0).strip()
             if len(s) < 4 or "@" in s or "%" in s:
                 continue
             # 界面标识整条进不了句子，测试残留（`Dummy`）与截断标签（`Suppr`）
-            # 也不是名字，都别进表
-            if ident_only(s) or s in JUNK:
+            # 也不是名字，都别进表；句首的冠词与介词（`À Tortuga`、`Le Havre`）
+            # 更不是名字的一部分
+            if ident_only(s) or s in JUNK or s.split()[0] in LEAD:
                 continue
             if any(not known(w.strip(".,;:!?'’")) for w in s.split()):
                 names[s] = names.get(s, 0) + 1
     return names
+
+
+#: 缺变音符的替换表：法语、西语里 `Ecole`→`École`、`Espanol`→`Español` 这类
+ACCENT = {"E": "É", "A": "À", "e": "é", "a": "à", "n": "ñ", "N": "Ñ"}
+
+
+def accents(lang, tr):
+    """缺变音符的真词：原词词典查不到、加上变音符后查得到。
+
+    只扫大写开头的词——小写词形多，逐个试变音符会把 `ete`（été）、`a`（à）这类
+    全拱出来，噪声大于收益。名单条目同样豁免，它们的写法由原文定。
+    """
+    known = dict_of(lang)
+    out = {}
+    if known is None:
+        return out
+    skip = keep_entries(lang)
+    for k, v in tr.items():
+        if str(k).lower() in skip:
+            continue
+        for m in PROPER_RX.finditer(clean(str(v))):
+            w = m.group(0).strip()
+            if len(w) < 3 or w[0] not in ACCENT:
+                continue
+            w2 = ACCENT[w[0]] + w[1:]
+            if known(w2) and not known(w):
+                out.setdefault(w, []).append(k)
+    return out
 
 
 def _skeleton(text):
@@ -235,6 +303,28 @@ def _skeleton(text):
     import unicodedata
     return "".join(c for c in unicodedata.normalize("NFD", text.lower())
                    if not unicodedata.combining(c))
+
+
+def _read_names(lang):
+    """上一次落盘的专名表（`build/qa/lang_check_<lang>_names.txt`），没有就空。
+
+    表里是 `词 | 次数` 的行。复用这张表，第一遍就能按已知专名替换，第二轮只用来
+    收这次新冒出来的词。
+    """
+    path = os.path.join(ROOT, "build", "qa", "lang_check_%s_names.txt" % lang)
+    out = {}
+    if not os.path.isfile(path):
+        return out
+    with io.open(path, encoding="utf-8") as f:
+        for line in f:
+            if " | " not in line or line.lstrip().startswith("#"):
+                continue
+            k, _, n = line.rpartition(" | ")
+            try:
+                out[k.strip()] = int(n.strip())
+            except ValueError:
+                continue
+    return out
 
 
 def _date(lang, day, month, year):
@@ -266,19 +356,14 @@ def render(text, lang, tr):
         # 整条就是一个地名（城镇清单、地名列表项）：没有句子可读，换占位城镇，
         # 免得把真实地名丢给词典判未收录
         return pick(p["town"])
-    # 正文里出现的本语言城镇真名同样换掉：送检只求词库覆盖，不核对真地名。
-    # 按词边界替换，别用裸 str.replace——`Conv`、`Suppr` 这类截断标签会咬掉
-    # `Convoi`、`Supprimer` 的开头，凭空造出 `Bordeauxoi` 这种词
-    def swap(name, text):
-        return re.sub(r"\b%s\b" % re.escape(name), lambda m: pick(p["town"]), text)
-
-    for name in sorted(p["townset"], key=len, reverse=True):
-        if name in s:
-            s = swap(name, s)
-    # 抽取出来的专名（词典里没有的大写串）一并换掉
-    for name in sorted(p["proper"], key=len, reverse=True):
-        if name in s:
-            s = swap(name, s)
+    # 正文里出现的本语言城镇真名、抽取出来的专名，一律换占位城镇：送检只求词库
+    # 覆盖，不核对真地名。合并成一个 alternation 一次扫完——逐个 `re.sub` 的成本
+    # 是名字数乘以条目数（397 × 3445）。按词边界匹配，`Conv` 这类短标签才不会咬掉
+    # `Convoi` 的开头。
+    names = sorted(set(p["townset"]) | set(p["proper"]), key=len, reverse=True)
+    if names:
+        rx = re.compile(r"\b(?:%s)\b" % "|".join(re.escape(n) for n in names))
+        s = rx.sub(lambda m: pick(p["town"]), s)
     # 方括号标注：城镇与术语展开成该语言的词，其余（谜题、引用）没有语义，抹掉
     def bracket(m):
         body = m.group(1)
@@ -362,6 +447,11 @@ def grammar(lang, tr):
     # 专名不会再把拼写命中拱起来。`## 拼写` 一节的 hunspell 统计照旧独立跑，
     # 两处口径并列，不互相替代。
     keys = [k for k in tr if checkable(tr[k])]
+    # 上一次落盘的专名表先并进来：第一遍就按已知专名替换，只有这次新冒出来的
+    # 词才触发第二轮，常态下省掉一整遍 LanguageTool
+    p = pools(lang, tr)
+    for w, n in _read_names(lang).items():
+        p["proper"].setdefault(w, n)
 
     # 按字符数切批：百科长文不跟短标签挤在一批，否则一批几万字要跑几分钟
     BATCH_CHARS = 3000
@@ -410,12 +500,13 @@ def grammar(lang, tr):
     ren = {k: render(tr[k], lang, tr) for k in keys}
     hits, extra = run(ren)
     if extra:
-        # 第二轮：把这一遍认出来的专名补进替换表，重新渲染再检一次
+        # 这一遍认出的专名并入替换表，下一轮生效。不重跑 LanguageTool：重跑一遍
+        # 是全量成本，而每次替换的组合不同，重跑常又冒出一两个新的假专名，收敛
+        # 不了；报告里多报一次，表里留一条，下次就干净。
         p = pools(lang, tr)
         for w in extra:
             p["proper"][w] = p["proper"].get(w, 0) + 1
-        ren = {k: render(tr[k], lang, tr) for k in keys}
-        hits, _ = run(ren)
+        sys.stderr.write("新认出 %d 个专名，已并入替换表，下一轮生效\n" % len(extra))
     return len(keys), hits
 
 
@@ -542,12 +633,14 @@ def main(argv):
     lang = a.lang
     tr = load(lang)
     lines = ["# %s 形态层检查（%d 条）\n" % (lang, len(tr))]
+    n_blank = sum(1 for v in tr.values() if not str(v).strip())
+    n_phold = sum(1 for v in tr.values() if str(v).strip() and not clean(v))
     n_ident = sum(1 for v in tr.values() if ident_only(v))
     n_skip = sum(1 for v in tr.values() if clean(v) and not checkable(v))
-    if n_skip:
-        lines.append("跳过界面／任务标识／测试残留 %d 条（其中 %d 条整条只有大写字母、"
-                     "数字、下划线；其余是测试串与编号行），不当句子送检。\n"
-                     % (n_skip, n_ident))
+    n_keys = sum(1 for v in tr.values() if checkable(v))
+    lines.append("口径：空值 %d 条、纯占位 %d 条、跳过 %d 条（其中 %d 条整条只有大写"
+                 "字母、数字、下划线，其余是测试串与编号行）、送检 %d 条。\n"
+                 % (n_blank, n_phold, n_skip, n_ident, n_keys))
 
     if not a.spell_only:
         n, hits = grammar(lang, tr)
@@ -569,13 +662,30 @@ def main(argv):
             lines.append("")
 
     proper = pools(lang, tr)["proper"]
+    for w, n in _read_names(lang).items():
+        proper.setdefault(w, n)
     if proper:
         lines.append("## 抽取的专名（替换表）\n")
-        lines.append("%d 个，送检前换成占位城镇。判据：大写开头，且至少一个词不在词典里。\n"
-                     % len(proper))
+        lines.append("%d 个，送检前换成占位城镇。判据：大写开头、至少一个词不在词典里，"
+                     "且不是 keep_as_is 里按原文保留的名单条目。\n" % len(proper))
         for w, c in sorted(proper.items(), key=lambda x: (-x[1], x[0]))[:80]:
             lines.append("%s | %d" % (w, c))
         lines.append("")
+
+    acc = accents(lang, tr)
+    if acc:
+        lines.append("## 缺变音符（%d 个）\n" % len(acc))
+        lines.append("判据：原词查不到、加上变音符后查得到；只扫大写开头的词，"
+                     "名单条目豁免。\n")
+        for w, ks in sorted(acc.items(), key=lambda x: (-len(x[1]), x[0]))[:60]:
+            lines.append("%s | %d | %s" % (w, len(ks), ", ".join(ks[:3])))
+        lines.append("")
+        path = os.path.join(ROOT, "build", "qa", "lang_check_%s_accents.txt" % lang)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with io.open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write("# %s 缺变音符（%d 个）\n\n" % (lang, len(acc)))
+            for w, ks in sorted(acc.items(), key=lambda x: (-len(x[1]), x[0])):
+                f.write("%s | %d | %s\n" % (w, len(ks), ", ".join(ks)))
 
     if not a.grammar_only:
         allow = build_allow(lang, tr)
@@ -598,10 +708,12 @@ def main(argv):
     if proper:
         out2 = os.path.join(ROOT, "build", "qa", "lang_check_%s_names.txt" % lang)
         body = ["# %s 专名替换表（%d 个）\n" % (lang, len(proper)),
-                "抽取判据：大写开头，且至少一个词不在 hunspell 词典里。送检前换成占位城镇。\n\n"]
+                "抽取判据：大写开头、至少一个词不在 hunspell 词典里，且不是 keep_as_is\n"
+                "里按原文保留的名单条目。送检前换成占位城镇；下次运行会先读这张表。\n\n"]
         for w, c in sorted(proper.items(), key=lambda x: (-x[1], x[0])):
             body.append("%s | %d" % (w, c))
-        io.open(out2, "w", encoding="utf-8", newline="").write("\n".join(body) + "\n")
+        with io.open(out2, "w", encoding="utf-8", newline="\n") as f:
+            f.write("\n".join(body) + "\n")
 
     text = "\n".join(lines) + "\n"
     out = os.path.join(ROOT, "build", "qa", "lang_check_%s.txt" % lang)
