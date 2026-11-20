@@ -60,6 +60,23 @@ def clean(text):
     return s.strip()
 
 
+#: 界面与任务标识：整条只有大写字母、数字、下划线（`IDM_CONTEST_01_2004_LOG_01_HDR`、
+#: `CAT`、`OK`）。这类串不是句子，送检只会被词典判未收录，显式跳过。
+IDENT_RX = re.compile(r"^[A-Z0-9]+(?:_[A-Z0-9]+)*(?:[.\-/][A-Z0-9]+)*$")
+
+
+def ident_only(text):
+    """整条是否只有一个标识串（界面键、任务编号、调试开关）。"""
+    s = clean(text)
+    return bool(s) and bool(IDENT_RX.match(s))
+
+
+def checkable(text):
+    """这条值要不要送检：空的跳过，整条只有标识串的也跳过。"""
+    s = clean(text)
+    return bool(s) and not IDENT_RX.match(s)
+
+
 #: 固定种子：同一份文件两次体检拿到同一批替身，两次报告能逐行对照。
 RENDER_SEED = 20261120
 
@@ -119,12 +136,34 @@ def _val(entry):
 
 def pools(lang):
     """本语言的替身池。城镇与人名用典型占位名，不拿游戏里的真实专名去顶替——
-    真实的卡塔赫纳、黑胡子这类名字在词典里是生僻词，容易把拼写规则带起来。"""
+    真实的卡塔赫纳、黑胡子这类名字在词典里是生僻词，容易把拼写规则带起来。
+    `townset` 收集本语言译名表里的城镇名，用来认出「整条就是一个城镇名」的清单条目。
+    """
     if lang in _CACHE:
         return _CACHE[lang]
     base = POOL.get(lang, POOL["fr"])
-    _CACHE[lang] = dict(base)
+    names = MK.load_names(lang)
+    ent, _ = toml_io.read_doc(os.path.join(ROOT, "src", "data", "names", "entities.toml"))
+    townset = set()
+    for key, meta in ent.items():
+        if isinstance(meta, dict) and meta.get("kind") == "town":
+            v = _val(names.get(key, ""))
+            if v:
+                townset.add(v.strip())
+    _CACHE[lang] = dict(base, townset=townset)
     return _CACHE[lang]
+
+
+#: 整条只是两三个首字母大写的词（`Villa Hermosa`、`Nouvelle Orléans`、`Port St. Joe`）：
+#: 地名清单条目，送检时换占位城镇。至少两词，单字留给 townset 判定，免得把
+#: `Population`、`Battre` 这类单词标签也当专名换掉。
+NAME_RX = re.compile(r"^[A-ZÀ-ÖØ-Ý][\w'’.-]*(?:\s+[A-ZÀ-ÖØ-Ý\d][\w'’.-]*)+$")
+
+
+def name_only(text):
+    """整条是否只是一串首字母大写的词，且没有句末标点（排除 `Fin. Suite.` 这种断行）。"""
+    s = clean(text)
+    return bool(s) and bool(NAME_RX.match(s)) and s[-1] not in ".?!"
 
 
 def _date(lang, day, month, year):
@@ -146,18 +185,26 @@ def render(text, lang, tr):
     rng = random.Random("%s-%d" % (lang, RENDER_SEED))
     p = pools(lang)
     terms = MK.load_terms(lang)
-    names = MK.load_names(lang)
 
     def pick(seq):
         return rng.choice(seq)
 
     s = str(text).replace("<n>", "\n")
+    whole = s.strip()
+    if whole and (whole in p["townset"] or name_only(whole)):
+        # 整条就是一个地名（城镇清单、地名列表项）：没有句子可读，换占位城镇，
+        # 免得把真实地名丢给词典判未收录
+        return pick(p["town"])
+    # 正文里出现的本语言城镇真名同样换掉：送检只求词库覆盖，不核对真地名
+    for name in sorted(p["townset"], key=len, reverse=True):
+        if name in s:
+            s = s.replace(name, pick(p["town"]))
     # 方括号标注：城镇与术语展开成该语言的词，其余（谜题、引用）没有语义，抹掉
     def bracket(m):
         body = m.group(1)
         if body.startswith("town:"):
-            key = body[5:]
-            return _val(names.get(key, "")) or key
+            # 方括号里的城镇同样换占位城镇：送检只求词库覆盖，不还原原文语境
+            return pick(p["town"])
         if body.startswith("term:"):
             return str(terms.get(body[5:], "") or "")
         return ""
@@ -234,7 +281,7 @@ def grammar(lang, tr):
     # 拼写规则保持开启：替身已换成词典里的常见词（Paris、Jean Dupont 这类），
     # 专名不会再把拼写命中拱起来。`## 拼写` 一节的 hunspell 统计照旧独立跑，
     # 两处口径并列，不互相替代。
-    keys = [k for k in tr if clean(tr[k])]
+    keys = [k for k in tr if checkable(tr[k])]
     ren = {k: render(tr[k], lang, tr) for k in keys}
 
     # 按字符数切批：百科长文不跟短标签挤在一批，否则一批几万字要跑几分钟
@@ -318,6 +365,8 @@ def spell(lang, tr, allow):
     words, per_key = {}, {}
     WORD = ANY_WORD
     for k, v in tr.items():
+        if ident_only(v):                       # 界面键与任务编号不是词，不查拼写
+            continue
         for w in WORD.findall(clean(str(v))):
             if w.lower() in allow or w in allow:
                 continue
@@ -389,6 +438,10 @@ def main(argv):
     lang = a.lang
     tr = load(lang)
     lines = ["# %s 形态层检查（%d 条）\n" % (lang, len(tr))]
+    n_ident = sum(1 for v in tr.values() if ident_only(v))
+    if n_ident:
+        lines.append("跳过界面／任务标识 %d 条（整条只有大写字母、数字、下划线，不当句子送检）。\n"
+                     % n_ident)
 
     if not a.spell_only:
         n, hits = grammar(lang, tr)

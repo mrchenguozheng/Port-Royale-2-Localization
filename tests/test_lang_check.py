@@ -85,10 +85,18 @@ class TestRender(unittest.TestCase):
         out = self.out("Marchandises :<t>%2")
         self.assertRegex(out, r"Marchandises : \d+")
 
-    def test_town_annotation_uses_the_language_name(self):
+    def test_a_bare_town_name_entry_becomes_a_placeholder_town(self):
+        out = self.out("Carthagène")
+        self.assertTrue(any(t in out for t in self.p["town"]), out)
+
+    def test_inline_town_names_are_swapped_too(self):
+        out = self.out("Le gouverneur de Carthagène vous attend.")
+        self.assertNotIn("Carthagène", out)
+
+    def test_town_annotation_is_rendered_as_a_placeholder_town(self):
         out = self.out("Voir le gouverneur de [town:Cartagena].")
-        self.assertIn("Carthagène", out)
         self.assertNotIn("[", out)
+        self.assertTrue(any(t in out for t in self.p["town"]), out)
 
     def test_graphic_tags_are_masked_to_blank_not_empty(self):
         out = self.out("a<f:fonts/Tiepolo.res><c>b")
@@ -109,6 +117,21 @@ class TestRender(unittest.TestCase):
         self.assertNotIn("@", out)
         self.assertNotIn("[", out)
         self.assertNotIn("<", out)
+
+
+class TestSkip(unittest.TestCase):
+    def test_interface_identifiers_are_not_sent(self):
+        self.assertFalse(LC.checkable("IDM_CONTEST_01_2004_LOG_01_HDR"))
+        self.assertFalse(LC.checkable("CAT"))
+        self.assertTrue(LC.ident_only("CAT"))
+
+    def test_normal_sentences_stay_checkable(self):
+        self.assertTrue(LC.checkable("Le port est calme."))
+        self.assertTrue(LC.checkable("Port Royale"))
+
+    def test_entries_with_only_placeholders_are_skipped(self):
+        self.assertFalse(LC.checkable("[term:en_pirate]"))
+        self.assertFalse(LC.checkable(""))
 
 
 if __name__ == "__main__":
