@@ -49,7 +49,7 @@ class TestRender(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tr = LC.load("fr")
-        cls.p = LC.pools("fr")
+        cls.p = LC.pools("fr", cls.tr)
 
     def out(self, text):
         return LC.render(text, "fr", self.tr)
@@ -117,6 +117,18 @@ class TestRender(unittest.TestCase):
         self.assertNotIn("@", out)
         self.assertNotIn("[", out)
         self.assertNotIn("<", out)
+
+    def test_proper_names_are_extracted_from_the_translations(self):
+        got = LC.proper_names("fr", {"0x1": "Le port de Tortuga est calme."})
+        self.assertIn("Tortuga", got)
+
+    def test_extracted_proper_names_are_swapped_before_the_check(self):
+        name = next((n for n in ("Tortuga", "Hispaniola", "Santa Marta")
+                     if n in self.p["proper"]), None)
+        if name:
+            out = self.out("Le port de %s est calme." % name)
+            self.assertNotIn(name, out)
+            self.assertTrue(any(t in out for t in self.p["town"]), out)
 
 
 class TestSkip(unittest.TestCase):

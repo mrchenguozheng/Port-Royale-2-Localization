@@ -134,10 +134,10 @@ def _val(entry):
     return str(entry or "")
 
 
-def pools(lang):
+def pools(lang, tr):
     """本语言的替身池。城镇与人名用典型占位名，不拿游戏里的真实专名去顶替——
     真实的卡塔赫纳、黑胡子这类名字在词典里是生僻词，容易把拼写规则带起来。
-    `townset` 收集本语言译名表里的城镇名，用来认出「整条就是一个城镇名」的清单条目。
+    `townset` 是译名表里的城镇名，`proper` 是从译文里抽出来的专名替换表。
     """
     if lang in _CACHE:
         return _CACHE[lang]
@@ -150,7 +150,7 @@ def pools(lang):
             v = _val(names.get(key, ""))
             if v:
                 townset.add(v.strip())
-    _CACHE[lang] = dict(base, townset=townset)
+    _CACHE[lang] = dict(base, townset=townset, proper=proper_names(lang, tr))
     return _CACHE[lang]
 
 
@@ -164,6 +164,61 @@ def name_only(text):
     """整条是否只是一串首字母大写的词，且没有句末标点（排除 `Fin. Suite.` 这种断行）。"""
     s = clean(text)
     return bool(s) and bool(NAME_RX.match(s)) and s[-1] not in ".?!"
+
+
+#: 专名候选：大写开头的词，可带 `de`／`van`／`von` 这类小写虚词再接词
+#: （`Nombre de Dios`、`Villa Hermosa`、`Port St`）。
+PROPER_RX = re.compile(
+    r"\b[A-ZÀ-ÖØ-Ý][\w'’-]*"
+    r"(?:\s+(?:(?:de|du|des|van|von|di|da|del|della|of|the|la|le)\s+)?[A-ZÀ-ÖØ-Ý][\w'’-]*)*")
+
+_DICT = {}
+
+
+def dict_of(lang):
+    """本语言的 hunspell 查询函数；没有词典的语言返回 None。"""
+    if lang in _DICT:
+        return _DICT[lang]
+    base = HUNSPELL.get(lang)
+    dic = os.path.join(ROOT, "src", "data", "qa", "dict", base or "")
+    known = None
+    if base and os.path.isfile(dic + ".dic"):
+        from spylls.hunspell import Dictionary
+        hd = Dictionary.from_files(dic)
+
+        def known(w):
+            return hd.lookup(w) or hd.lookup(w.capitalize()) or hd.lookup(w.lower())
+    _DICT[lang] = known
+    return known
+
+
+def proper_names(lang, tr):
+    """抽取专名候选：大写开头、且至少一个词不在词典里。
+
+    句首大写不算证据——`Bonjour`、`Population` 也会大写，但它们在词典里，被这道
+    词典闸拦住。`Tortuga`、`Nombre de Dios` 这类词典没有的大写串就是专名，抽取后
+    换成占位城镇再送检。注意 hunspell 的法语词典本身收了 `nassau`、`smith`，所以
+    这两类词抽不出来，它们在语法层仍会由 LanguageTool 报拼写——两套词典口径不同。
+    """
+    known = dict_of(lang)
+    names = {}
+    if known is None:
+        return names
+    for v in tr.values():
+        for m in PROPER_RX.finditer(clean(str(v))):
+            s = m.group(0).strip()
+            if len(s) < 4 or "@" in s or "%" in s:
+                continue
+            if any(not known(w.strip(".,;:!?'’")) for w in s.split()):
+                names[s] = names.get(s, 0) + 1
+    return names
+
+
+def _skeleton(text):
+    """去掉变音符的粗比较键：`Événement`／`Evénement` 同键，`Nassau`／`Naco` 不同键。"""
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", text.lower())
+                   if not unicodedata.combining(c))
 
 
 def _date(lang, day, month, year):
@@ -183,7 +238,7 @@ def render(text, lang, tr):
     颜色、尺寸、屏幕）没有语义可换，抹成空白；段落标记 <n> 还原成换行。
     """
     rng = random.Random("%s-%d" % (lang, RENDER_SEED))
-    p = pools(lang)
+    p = pools(lang, tr)
     terms = MK.load_terms(lang)
 
     def pick(seq):
@@ -195,10 +250,19 @@ def render(text, lang, tr):
         # 整条就是一个地名（城镇清单、地名列表项）：没有句子可读，换占位城镇，
         # 免得把真实地名丢给词典判未收录
         return pick(p["town"])
-    # 正文里出现的本语言城镇真名同样换掉：送检只求词库覆盖，不核对真地名
+    # 正文里出现的本语言城镇真名同样换掉：送检只求词库覆盖，不核对真地名。
+    # 按词边界替换，别用裸 str.replace——`Conv`、`Suppr` 这类截断标签会咬掉
+    # `Convoi`、`Supprimer` 的开头，凭空造出 `Bordeauxoi` 这种词
+    def swap(name, text):
+        return re.sub(r"\b%s\b" % re.escape(name), lambda m: pick(p["town"]), text)
+
     for name in sorted(p["townset"], key=len, reverse=True):
         if name in s:
-            s = s.replace(name, pick(p["town"]))
+            s = swap(name, s)
+    # 抽取出来的专名（词典里没有的大写串）一并换掉
+    for name in sorted(p["proper"], key=len, reverse=True):
+        if name in s:
+            s = swap(name, s)
     # 方括号标注：城镇与术语展开成该语言的词，其余（谜题、引用）没有语义，抹掉
     def bracket(m):
         body = m.group(1)
@@ -282,36 +346,59 @@ def grammar(lang, tr):
     # 专名不会再把拼写命中拱起来。`## 拼写` 一节的 hunspell 统计照旧独立跑，
     # 两处口径并列，不互相替代。
     keys = [k for k in tr if checkable(tr[k])]
-    ren = {k: render(tr[k], lang, tr) for k in keys}
 
     # 按字符数切批：百科长文不跟短标签挤在一批，否则一批几万字要跑几分钟
     BATCH_CHARS = 3000
     SEP = "\n\n"
-    batches, cur, cur_chars = [], [], 0
-    for k in keys:
-        n = len(ren[k])
-        if cur and cur_chars + n > BATCH_CHARS:
-            batches.append(cur)
-            cur, cur_chars = [], 0
-        cur.append(k)
-        cur_chars += n
-    if cur:
-        batches.append(cur)
 
-    hits = []
-    for batch in batches:
-        joined = SEP.join(ren[k] for k in batch)
-        spans, pos = [], 0
-        for k in batch:
-            spans.append((k, pos, pos + len(ren[k])))
-            pos += len(ren[k]) + len(SEP)
-        for m in tool.check(joined):
-            off = m.offset
-            for k, s, e in spans:
-                if s <= off < e:
-                    hits.append((k, m.rule_id, m.context.replace("\n", " ")[:80],
-                                 (m.replacements[0] if m.replacements else "")[:40]))
-                    break
+    def batches_of(ren):
+        batches, cur, cur_chars = [], [], 0
+        for k in keys:
+            n = len(ren[k])
+            if cur and cur_chars + n > BATCH_CHARS:
+                batches.append(cur)
+                cur, cur_chars = [], 0
+            cur.append(k)
+            cur_chars += n
+        if cur:
+            batches.append(cur)
+        return batches
+
+    def run(ren):
+        hits, extra = [], set()
+        for batch in batches_of(ren):
+            joined = SEP.join(ren[k] for k in batch)
+            spans, pos = [], 0
+            for k in batch:
+                spans.append((k, pos, pos + len(ren[k])))
+                pos += len(ren[k]) + len(SEP)
+            for m in tool.check(joined):
+                off = m.offset
+                for k, s, e in spans:
+                    if s <= off < e:
+                        hits.append((k, m.rule_id, m.context.replace("\n", " ")[:80],
+                                     (m.replacements[0] if m.replacements else "")[:40]))
+                        break
+                # 拼写命中的大写词若被建议换成完全不同的词，就是词典没收录的专名
+                # （`Nassau`→`Naco`）。若只是差变音符（`Evénement`→`Événement`），
+                # 那是真拼写错，留给报告，不吸收进替换表。
+                txt = (getattr(m, "matched_text", "") or "").strip().strip(".,;:!?«»\"'’")
+                if (getattr(m, "category", "") == "TYPOS" and txt[:1].isupper()
+                        and len(txt) >= 3 and not re.search(r"[@%<>\[\]]", txt)):
+                    rep = (m.replacements[0] if m.replacements else "").strip()
+                    if rep and _skeleton(rep) != _skeleton(txt):
+                        extra.add(txt)
+        return hits, extra
+
+    ren = {k: render(tr[k], lang, tr) for k in keys}
+    hits, extra = run(ren)
+    if extra:
+        # 第二轮：把这一遍认出来的专名补进替换表，重新渲染再检一次
+        p = pools(lang, tr)
+        for w in extra:
+            p["proper"][w] = p["proper"].get(w, 0) + 1
+        ren = {k: render(tr[k], lang, tr) for k in keys}
+        hits, _ = run(ren)
     return len(keys), hits
 
 
@@ -462,6 +549,15 @@ def main(argv):
                 lines.append("%s | %-24s | %s | → %s" % (k, r, msg, rep))
             lines.append("")
 
+    proper = pools(lang, tr)["proper"]
+    if proper:
+        lines.append("## 抽取的专名（替换表）\n")
+        lines.append("%d 个，送检前换成占位城镇。判据：大写开头，且至少一个词不在词典里。\n"
+                     % len(proper))
+        for w, c in sorted(proper.items(), key=lambda x: (-x[1], x[0]))[:80]:
+            lines.append("%s | %d" % (w, c))
+        lines.append("")
+
     if not a.grammar_only:
         allow = build_allow(lang, tr)
         unk = spell(lang, tr, allow)
@@ -479,6 +575,14 @@ def main(argv):
             lines.append("\n未能切分的长词 %d 个（前 60）：\n" % len(misses))
             for w, k in misses:
                 lines.append("%s | %s" % (w, k))
+
+    if proper:
+        out2 = os.path.join(ROOT, "build", "qa", "lang_check_%s_names.txt" % lang)
+        body = ["# %s 专名替换表（%d 个）\n" % (lang, len(proper)),
+                "抽取判据：大写开头，且至少一个词不在 hunspell 词典里。送检前换成占位城镇。\n\n"]
+        for w, c in sorted(proper.items(), key=lambda x: (-x[1], x[0])):
+            body.append("%s | %d" % (w, c))
+        io.open(out2, "w", encoding="utf-8", newline="").write("\n".join(body) + "\n")
 
     text = "\n".join(lines) + "\n"
     out = os.path.join(ROOT, "build", "qa", "lang_check_%s.txt" % lang)
