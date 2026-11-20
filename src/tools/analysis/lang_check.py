@@ -17,6 +17,7 @@
 import argparse
 import io
 import os
+import random
 import re
 import sys
 
@@ -39,13 +40,181 @@ LT_CODE = {"de": "de-DE", "fr": "fr", "es": "es", "ru": "ru-RU", "nl": "nl", "pt
 #: 字母串：任何非 ASCII 标点、非数字、非中日韩的字母（法语重音、西语 ñ、俄语西里尔都靠它）
 ANY_WORD = re.compile(r"[^\W\d_\u4e00-\u9fff\u3400-\u4dbf\u3040-\u30ff\uac00-\ud7af]{2,}")
 
-#: 引擎占位与标签：等长替换成下划线，既让 LT 不把它们当单词，又不打乱 offset
+#: 引擎占位与标签：送检前抹掉，免得 LanguageTool 把它们当单词或当句子成分读。
+#: 抹成空白而不是下划线：下划线会把 `considération.<n><n>Les` 读成「句号紧跟字母」，
+#: 反过来造出「此处应加空格」的假命中，遮蔽本身成了误报来源。
 MASK = re.compile(r"%[0-9]+|@[a-zA-Z]\$[^$]*\$|<[^>]*>|\[[^\]]*\]")
 
 
-def mask(text):
-    """把占位符与标签替换成等长的下划线，保持字符位置不变。"""
-    return MASK.sub(lambda m: "_" * len(m.group(0)), text)
+def clean(text):
+    """抹掉占位符与标签，把段落标记 <n> 还原成换行，收掉多余空白。
+
+    拼写层与「这条值有没有可检内容」的判断用它；语法层用 render()。
+    """
+    s = str(text).replace("<n>", "\n")
+    s = MASK.sub(" ", s)
+    s = re.sub(r"[ \t]{2,}", " ", s)
+    s = re.sub(r"[ \t]+\n", "\n", s)
+    s = re.sub(r"\n[ \t]+", "\n", s)
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
+
+
+#: 固定种子：同一份文件两次体检拿到同一批替身，两次报告能逐行对照。
+RENDER_SEED = 20261120
+
+#: 船型：取本语言船型列表里已落盘的那几条，不另造词。
+SHIP_IDS = ("0x24646e0b", "0x24646e0d", "0x24646e0e", "0x24646e10",
+            "0x24646e12", "0x24646e13", "0x24646e7d", "0x24646e7e")
+
+#: 表里取不到的小词类：国家、货物、月份、位置介词、船队。只为让句子读得通，
+#: 不追原文直译；城镇与人名一律从 src/data/names 的实表里取。
+POOL = {
+    "fr": {"nation": ["Espagne", "Angleterre", "France", "Pays-Bas"],
+           "person": ["Jean Bart", "Michel de Grammont", "Henry Avery", "Barbe Noire"],
+           "goods": ["café", "sucre", "tabac", "rhum", "cacao", "indigo"],
+           "month": ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
+                     "août", "septembre", "octobre", "novembre", "décembre"],
+           "near": "près de", "convoy": "convoi marchand"},
+    "de": {"nation": ["Spanien", "England", "Frankreich", "Holland"],
+           "person": ["Jean Bart", "Michel de Grammont", "Henry Avery", "Schwarzbart"],
+           "goods": ["Kaffee", "Zucker", "Tabak", "Rum", "Kakao", "Indigo"],
+           "month": ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
+                     "August", "September", "Oktober", "November", "Dezember"],
+           "near": "bei", "convoy": "Handelskonvoi"},
+    "es": {"nation": ["España", "Inglaterra", "Francia", "Holanda"],
+           "person": ["Jean Bart", "Michel de Grammont", "Henry Avery", "Barbanegra"],
+           "goods": ["café", "azúcar", "tabaco", "ron", "cacao", "índigo"],
+           "month": ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+                     "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
+           "near": "cerca de", "convoy": "convoy mercante"},
+    "ru": {"nation": ["Испания", "Англия", "Франция", "Голландия"],
+           "person": ["Жан Бар", "Мишель де Граммон", "Генри Эвери", "Чёрная Борода"],
+           "goods": ["кофе", "сахар", "табак", "ром", "какао", "индиго"],
+           "month": ["января", "февраля", "марта", "апреля", "мая", "июня", "июля",
+                     "августа", "сентября", "октября", "ноября", "декабря"],
+           "near": "около", "convoy": "торговый конвой"},
+    "pl": {"nation": ["Hiszpania", "Anglia", "Francja", "Holandia"],
+           "person": ["Jan Bart", "Michel de Grammont", "Henry Avery", "Czarnobrody"],
+           "goods": ["kawa", "cukier", "tytoń", "rum", "kakao", "indygo"],
+           "month": ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
+                     "lipca", "sierpnia", "września", "października", "listopada", "grudnia"],
+           "near": "koło", "convoy": "konwój handlowy"},
+}
+
+_CACHE = {}
+
+
+def _val(entry):
+    if isinstance(entry, dict):
+        return str(entry.get("default", "") or "")
+    return str(entry or "")
+
+
+def pools(lang):
+    """本语言的替身池：城镇、人名从实表按 entities 的 kind 分类取，其余取 POOL。"""
+    if lang in _CACHE:
+        return _CACHE[lang]
+    names = MK.load_names(lang)
+    doc, _ = toml_io.read_doc(os.path.join(ROOT, "src", "data", "names", "entities.toml"))
+    towns, people = [], []
+    for key, meta in doc.items():
+        kind = meta.get("kind") if isinstance(meta, dict) else None
+        v = _val(names.get(key, ""))
+        if not v:
+            continue
+        if kind == "town":
+            towns.append(v)
+        elif kind == "person":
+            people.append(v)
+    base = POOL.get(lang, POOL["fr"])
+    _CACHE[lang] = dict(base, town=towns or ["Port Royale"],
+                        person=people or base["person"])
+    return _CACHE[lang]
+
+
+def _date(lang, day, month, year):
+    m = POOL.get(lang, POOL["fr"])["month"][month - 1]
+    if lang == "de":
+        return "%d. %s %d" % (day, m, year)
+    if lang == "es":
+        return "%d de %s de %d" % (day, m, year)
+    return "%d %s %d" % (day, m, year)
+
+
+def render(text, lang, tr):
+    """把占位符与标注换成该语言说得出、读得通的具体词，再交给 LanguageTool。
+
+    换法是同类替换：城镇换成城镇表里的城镇，人名换成人名表里的人名，国家、货物、
+    船型、日期各取本语言的词或格式，数字落在一个合理区间。纯图形标签（字体、图片、
+    颜色、尺寸、屏幕）没有语义可换，抹成空白；段落标记 <n> 还原成换行。
+    """
+    rng = random.Random("%s-%d" % (lang, RENDER_SEED))
+    p = pools(lang)
+    terms = MK.load_terms(lang)
+    names = MK.load_names(lang)
+
+    def pick(seq):
+        return rng.choice(seq)
+
+    s = str(text).replace("<n>", "\n")
+    # 方括号标注：城镇与术语展开成该语言的词，其余（谜题、引用）没有语义，抹掉
+    def bracket(m):
+        body = m.group(1)
+        if body.startswith("town:"):
+            key = body[5:]
+            return _val(names.get(key, "")) or key
+        if body.startswith("term:"):
+            return str(terms.get(body[5:], "") or "")
+        return ""
+    s = re.sub(r"\[([^\[\]]*)\]", bracket, s)
+
+    # @ 占位：按前缀决定替身类别
+    def at(m):
+        kind, name = m.group(1), m.group(2)
+        if kind == "T":
+            return pick(p["town"])
+        if kind == "n":
+            return pick(p["nation"])
+        if kind in ("P", "N", "F", "L", "A", "s"):
+            return pick(p["person"])
+        if kind == "G":
+            return pick(p["goods"])
+        if kind == "g":
+            return str(rng.randrange(100, 1000))
+        if kind == "a":
+            return str(rng.randrange(20, 201))
+        if kind == "I":
+            # 一律两位以上：法语把 0–10 写作字母（`un`、`deux`），填个位数会触发
+            # 「数字应写成词」这条规则，等于替身自己造错
+            return str(rng.randrange(11, 61))
+        if kind == "D":
+            return _date(lang, rng.randrange(1, 29), rng.randrange(1, 13), rng.randrange(1660, 1701))
+        if kind == "S":
+            return _val(tr.get(pick(SHIP_IDS), "")) or pick(p["goods"])
+        if kind == "C":
+            return p["convoy"]
+        # @l/@d/@r/@M 是位置。首字母大写：这类占位常落在段首或句号之后，
+        # 小写开头会凭空触发「句首应大写」
+        return "%s %s" % (p["near"][:1].upper() + p["near"][1:], pick(p["town"]))
+    s = re.sub(r"@([a-zA-Z])\$([^$]*)\$", at, s)
+
+    # 条形参数 %N：默认填数；紧跟冠词时原文多半是船名或货物名，改填名词
+    def pct(m):
+        art = m.group(1)
+        if art:
+            noun = _val(tr.get(pick(SHIP_IDS), "")) or pick(p["goods"])
+            return "%s %s" % (art, noun)
+        # 无冠词时是条形参数，多半跟单数名词（`%d troupe`），同样避开 0–10
+        return str(rng.randrange(11, 100))
+    s = re.sub(r"(?:(un|une|le|la|les|ein|eine|der|die|das|el|los|las)\s+)?%[0-9]+", pct, s)
+    # 其余尖括号标签全是图形与排版，抹成空白——不留空会把前后词粘成一个词
+    s = re.sub(r"<[^<>]*>", " ", s)
+    s = re.sub(r"[ \t]{2,}", " ", s)
+    s = re.sub(r"[ \t]+\n", "\n", s)
+    s = re.sub(r"\n[ \t]+", "\n", s)
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
 
 
 def load(lang):
@@ -56,20 +225,30 @@ def load(lang):
 # ---------------------------------------------------------------- 语法
 
 def grammar(lang, tr):
-    """整包过一遍 LanguageTool，命中按规则归纳。"""
+    """过 LanguageTool，命中按规则归纳。
+
+    条目先各自渲染成读得通的句子，再按字符数分批拼起来送检。批内一律用空行
+    （两个换行）分隔——LanguageTool 只在空行处切段，单换行它当成同一段，
+    `Population` 这类没有句末标点的短标签就会与下一条首句粘成一句而被判错。
+    """
     code = LT_CODE.get(lang)
     if not code:
         return None, []
     import language_tool_python
 
     tool = language_tool_python.LanguageTool(code)
-    keys = [k for k in tr if mask(str(tr[k])).strip("_ ")]
-    hits = []
-    # 按字符数切批：百科长文单独成批，否则一批几万字 LanguageTool 会跑几分钟到几十分钟
+    # 拼写由下面的 spell() 用 hunspell 词典单独做；这里关掉 LT 自带的拼写规则，
+    # 否则替身里替换进去的城镇名、人名会反过来被报成拼写错。
+    tool.disable_spellchecking()
+    keys = [k for k in tr if clean(tr[k])]
+    ren = {k: render(tr[k], lang, tr) for k in keys}
+
+    # 按字符数切批：百科长文不跟短标签挤在一批，否则一批几万字要跑几分钟
     BATCH_CHARS = 3000
+    SEP = "\n\n"
     batches, cur, cur_chars = [], [], 0
     for k in keys:
-        n = len(str(tr[k]))
+        n = len(ren[k])
         if cur and cur_chars + n > BATCH_CHARS:
             batches.append(cur)
             cur, cur_chars = [], 0
@@ -77,13 +256,14 @@ def grammar(lang, tr):
         cur_chars += n
     if cur:
         batches.append(cur)
-    for bi, batch in enumerate(batches):
-        chunk = [(k, mask(str(tr[k]))) for k in batch]
-        joined = "\n".join(t for _, t in chunk)
+
+    hits = []
+    for batch in batches:
+        joined = SEP.join(ren[k] for k in batch)
         spans, pos = [], 0
-        for k, t in chunk:
-            spans.append((k, pos, pos + len(t)))
-            pos += len(t) + 1
+        for k in batch:
+            spans.append((k, pos, pos + len(ren[k])))
+            pos += len(ren[k]) + len(SEP)
         for m in tool.check(joined):
             off = m.offset
             for k, s, e in spans:
@@ -144,7 +324,7 @@ def spell(lang, tr, allow):
     words, per_key = {}, {}
     WORD = ANY_WORD
     for k, v in tr.items():
-        for w in WORD.findall(mask(str(v))):
+        for w in WORD.findall(clean(str(v))):
             if w.lower() in allow or w in allow:
                 continue
             words.setdefault(w, set()).add(k)
