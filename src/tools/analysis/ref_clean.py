@@ -233,7 +233,14 @@ def main(argv=None):
                                % (text.count(old), old)))
                 continue
             text = text.replace(old, new)
-            notes.append("按补丁补结构")
+            notes.append("按补丁改")
+        # 补丁把整条退成占位（零售版这条塞的是别种语言的正文）就到此为止：
+        # 占位没有句子，往下再对结构只会往 `+++EMPTY+++` 里插 `<n>`。
+        if is_placeholder(text):
+            out[hid] = text
+            if text != val:
+                changed.append((hid, "、".join(notes), diff_snip(val, text)))
+            continue
         b = (base or {}).get(hid)
         if isinstance(b, str):
             fixed, how = RI.structural_fix(b, text, strip=not args.add_only,

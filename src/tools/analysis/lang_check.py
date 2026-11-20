@@ -88,6 +88,10 @@ def checkable(text):
 #: 固定种子：同一份文件两次体检拿到同一批替身，两次报告能逐行对照。
 RENDER_SEED = 20261120
 
+#: 重复词类规则：批内相邻两条会互相干扰（`nun` 在两条各出现一次就报重复），
+#: 这类命中必须拿单条复检一遍才算数。
+REPEAT_RX = re.compile(r"REPEATEDWORDS|WORD_REPEAT|PHRASE_REPETITION")
+
 #: 船型：取本语言船型列表里已落盘的那几条，不另造词。
 SHIP_IDS = ("0x24646e0b", "0x24646e0d", "0x24646e0e", "0x24646e10",
             "0x24646e12", "0x24646e13", "0x24646e7d", "0x24646e7e")
@@ -572,7 +576,30 @@ def grammar(lang, tr):
                     if (rep and _skeleton(rep) != _skeleton(txt)
                             and txt not in JUNK and not ident_only(txt)):
                         extra.add(txt)
-        return hits, extra
+        return drop_cross_batch(hits, ren), extra
+
+    def drop_cross_batch(hits, ren):
+        """重复词类规则只认单条内的重复：批内相邻两条被当成同一段。
+
+        把一批 3000 字的文本连着送检，`nun` 这种高频词在 A 条出现一次、B 条出现一次，
+        LanguageTool 就判「同一段里重复」——加几个换行都拦不住，它把整个 check 文本
+        当一个文档。判据用「单条复检」：单条文本也报同一条规则才算真命中。实测
+        `GERMAN_WORD_REPEAT_BEGINNING_RULE` 抽 15 条有 14 条单条不报，
+        `DE_REPEATEDWORDS_NUN`、`GERMAN_WORD_REPEAT_RULE` 则全部不报。
+        只复检这一类规则，命中约 200 条、去重后 150 条上下，多花几秒。
+        """
+        kept, cache, dropped = [], {}, 0
+        for k, rule, ctx, rep in hits:
+            if REPEAT_RX.search(rule):
+                if k not in cache:
+                    cache[k] = {m.rule_id for m in tool.check(ren[k])}
+                if rule not in cache[k]:
+                    dropped += 1
+                    continue
+            kept.append((k, rule, ctx, rep))
+        if dropped:
+            sys.stderr.write("跨条重复噪声丢弃 %d 处（单条复检不报）\n" % dropped)
+        return kept
 
     ren = {k: render(tr[k], lang, tr) for k in keys}
     hits, extra = run(ren)

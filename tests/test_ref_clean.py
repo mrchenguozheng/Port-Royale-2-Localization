@@ -144,7 +144,7 @@ class TestPatch(unittest.TestCase):
             io.open(p, "w", encoding="utf-8").write(json.dumps(
                 {"0xdb0108dd": [["convoy.<n>Now return", "convoy.<n><n>Now return"]]}))
             text = self._run(p)
-        self.assertIn("0xdb0108dd  按补丁补结构", text)
+        self.assertIn("0xdb0108dd  按补丁改", text)
         self.assertIn("改动 1 条", text)
 
 
