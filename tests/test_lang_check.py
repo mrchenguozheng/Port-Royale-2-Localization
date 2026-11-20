@@ -122,6 +122,12 @@ class TestRender(unittest.TestCase):
         got = LC.proper_names("fr", {"0x1": "Le port de Tortuga est calme."})
         self.assertIn("Tortuga", got)
 
+    def test_junk_strings_are_not_extracted(self):
+        got = LC.proper_names("fr", {"0x1": "Dummy", "0x2": "+++EMPTY+++",
+                                     "0x3": "Suppr", "0x4": "IDM_CONTEST_01_2004_LOG_01_HDR"})
+        for w in ("Dummy", "EMPTY", "Suppr", "IDM_CONTEST_01_2004_LOG_01_HDR"):
+            self.assertNotIn(w, got)
+
     def test_extracted_proper_names_are_swapped_before_the_check(self):
         name = next((n for n in ("Tortuga", "Hispaniola", "Santa Marta")
                      if n in self.p["proper"]), None)
@@ -144,6 +150,8 @@ class TestSkip(unittest.TestCase):
     def test_entries_with_only_placeholders_are_skipped(self):
         self.assertFalse(LC.checkable("[term:en_pirate]"))
         self.assertFalse(LC.checkable(""))
+        self.assertFalse(LC.checkable("Dummy"))
+        self.assertFalse(LC.checkable("+++EMPTY+++"))
 
 
 if __name__ == "__main__":

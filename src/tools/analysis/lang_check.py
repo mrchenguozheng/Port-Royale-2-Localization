@@ -72,9 +72,17 @@ def ident_only(text):
 
 
 def checkable(text):
-    """这条值要不要送检：空的跳过，整条只有标识串的也跳过。"""
+    """这条值要不要送检：空的跳过，整条只有标识串的也跳过。
+
+    `Dummy`、`+++EMPTY+++` 这类测试残留同样不是句子，送检只会往拼写里记一笔。
+    `scenario004 - @I$Idx$` 是编号行，占位抹掉后只剩「编号 + 连字符」，也跳过。
+    """
     s = clean(text)
-    return bool(s) and not IDENT_RX.match(s)
+    if not s or IDENT_RX.match(s):
+        return False
+    if s.strip("+. ") in JUNK:
+        return False
+    return not re.fullmatch(r"[A-Za-z]*[0-9]+(?:\s*[-–:|.\s]+)*", s)
 
 
 #: 固定种子：同一份文件两次体检拿到同一批替身，两次报告能逐行对照。
@@ -174,6 +182,10 @@ PROPER_RX = re.compile(
 
 _DICT = {}
 
+#: 测试残留与截断标签：`Dummy`、`+++EMPTY+++`、`Conv`、`Suppr` 不是名字，
+#: 抽进替换表只会把表弄脏
+JUNK = {"Dummy", "EMPTY", "Conv", "Suppr"}
+
 
 def dict_of(lang):
     """本语言的 hunspell 查询函数；没有词典的语言返回 None。"""
@@ -208,6 +220,10 @@ def proper_names(lang, tr):
         for m in PROPER_RX.finditer(clean(str(v))):
             s = m.group(0).strip()
             if len(s) < 4 or "@" in s or "%" in s:
+                continue
+            # 界面标识整条进不了句子，测试残留（`Dummy`）与截断标签（`Suppr`）
+            # 也不是名字，都别进表
+            if ident_only(s) or s in JUNK:
                 continue
             if any(not known(w.strip(".,;:!?'’")) for w in s.split()):
                 names[s] = names.get(s, 0) + 1
@@ -386,7 +402,8 @@ def grammar(lang, tr):
                 if (getattr(m, "category", "") == "TYPOS" and txt[:1].isupper()
                         and len(txt) >= 3 and not re.search(r"[@%<>\[\]]", txt)):
                     rep = (m.replacements[0] if m.replacements else "").strip()
-                    if rep and _skeleton(rep) != _skeleton(txt):
+                    if (rep and _skeleton(rep) != _skeleton(txt)
+                            and txt not in JUNK and not ident_only(txt)):
                         extra.add(txt)
         return hits, extra
 
@@ -526,9 +543,11 @@ def main(argv):
     tr = load(lang)
     lines = ["# %s 形态层检查（%d 条）\n" % (lang, len(tr))]
     n_ident = sum(1 for v in tr.values() if ident_only(v))
-    if n_ident:
-        lines.append("跳过界面／任务标识 %d 条（整条只有大写字母、数字、下划线，不当句子送检）。\n"
-                     % n_ident)
+    n_skip = sum(1 for v in tr.values() if clean(v) and not checkable(v))
+    if n_skip:
+        lines.append("跳过界面／任务标识／测试残留 %d 条（其中 %d 条整条只有大写字母、"
+                     "数字、下划线；其余是测试串与编号行），不当句子送检。\n"
+                     % (n_skip, n_ident))
 
     if not a.spell_only:
         n, hits = grammar(lang, tr)
