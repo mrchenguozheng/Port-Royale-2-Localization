@@ -231,9 +231,9 @@ def grammar(lang, tr):
     import language_tool_python
 
     tool = language_tool_python.LanguageTool(code)
-    # 拼写由下面的 spell() 用 hunspell 词典单独做；这里关掉 LT 自带的拼写规则，
-    # 否则替身里替换进去的城镇名、人名会反过来被报成拼写错。
-    tool.disable_spellchecking()
+    # 拼写规则保持开启：替身已换成词典里的常见词（Paris、Jean Dupont 这类），
+    # 专名不会再把拼写命中拱起来。`## 拼写` 一节的 hunspell 统计照旧独立跑，
+    # 两处口径并列，不互相替代。
     keys = [k for k in tr if clean(tr[k])]
     ren = {k: render(tr[k], lang, tr) for k in keys}
 
