@@ -35,7 +35,11 @@ def deploy_steps(target, langs, edition=None):
     # 四个 TTF 平铺在 build\runtime\PR2Localization\fonts\；也兼容旧的语言子目录。
     # 复制到游戏 PR2Localization\fonts\，不覆盖根目录的原版字体。
     font_lang = _font_lang(target, langs)
-    cfg = os.path.join(RUNTIME, FONT_DIR, "font-map.default.ini")
+    # 默认映射以 src\font-map.ini 为准：runtime 里的 default 是派生物，可能落后于
+    # 模板（[pl] 一节就是这么丢的）。模板不在时才退回 runtime 的旧文件。
+    cfg = os.path.join(SRC, "font-map.ini")
+    if not os.path.isfile(cfg):
+        cfg = os.path.join(RUNTIME, FONT_DIR, "font-map.default.ini")
     if not os.path.isfile(cfg):
         # 兼容旧构建目录：旧文件只能作为默认映射复制，不能覆盖用户配置。
         cfg = os.path.join(RUNTIME, FONT_DIR, "font-map.ini")
@@ -55,6 +59,17 @@ def deploy_steps(target, langs, edition=None):
         steps.append(("PR2Localization\\fonts\\%s" % name,
                       os.path.join(font_src, name),
                       os.path.join(target, FONT_DIR, name)))
+    # 新布局按语言分子目录放字体；游戏只认 fonts\ 根下的文件名，这里平铺复制
+    # 当前语言那一份。只拷子目录、不拷别的语言，保持「一次安装一个语言」。
+    if font_lang:
+        sub = os.path.join(font_src, font_lang)
+        if os.path.isdir(sub):
+            for name in sorted(os.listdir(sub)):
+                if not name.lower().endswith(".ttf") or name in names:
+                    continue
+                steps.append(("PR2Localization\\fonts\\%s" % name,
+                              os.path.join(sub, name),
+                              os.path.join(target, FONT_DIR, name)))
 
     ui_src = os.path.join(RUNTIME, UI_DIR)
     if os.path.isdir(ui_src):
