@@ -14,10 +14,17 @@ janome>=0.5.0
 fugashi>=1.5.2
 unidic-lite>=1.0.8
 
+# hunspell 词典查询（lang_check.py 的 proper_names 抽专名、retail_import 判
+# 「参照行不是目标语言」）。词典 .dic/.aff 本身已在 src/data/qa/dict 入库，
+# 这里只是读它的库；缺了这两处判据失效、测试直接报错，所以 CI 用
+# requirements-ci.txt 强制装。
+spylls>=0.1.7
+
 # 韩语形态分析（text_lint.py --lang ko 的助词收音检查）。缺了只跳过该条检查，
 # 占位符后接助词那条纯正则，不依赖它：
 #   pip install kiwipiepy        # 0.24.x，Apache-2.0，随带约 100 MB 模型
 # 换 mecab-ko 也行，但 Windows 要自己编译引擎与词典，pip 装不了。
+# CI 会装它（requirements-ci.txt），判据不能靠「本机恰好装了」。
 
 # 字体生成与调整（make_noto_fonts.py / build_cyr_fonts.py / squeeze_fonts.py）。
 # 本机目前装在 WorkBuddy 的 Python 环境里，脚本会自动找到；想统一就装进主环境。

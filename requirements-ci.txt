@@ -1,0 +1,21 @@
+# CI 判据要的包 —— 与开发机实际生效的集合对齐，不留「缺包降级」。
+#
+# 这些包在 check.ps1 的判定路径上真被调用，缺了不是降级，而是判据失真或测试直接
+# 报错：
+#   spylls     hunspell 词典闸：lang_check 的 proper_names 抽专名、
+#              retail_import 判「参照行不是目标语言」；词典 .dic/.aff 已在
+#              src/data/qa/dict 入库，缺的只是读它的库
+#   janome     日语分词（lang_rules/ja.py 优先用它）：断行长度、助词空格
+#   kiwipiepy  韩语助词收音（text_lint.py --lang ko，按世宗标签判 JKS/JKO/JX）
+#   fonttools  字体度量与生成（字体相关检查与用例）
+#
+# 不列 fugashi / unidic-lite：ja.py 的分词器顺序是 janome → fugashi → 无，janome
+# 在场时这两个永不参与判定，装上也改变不了任何结论；unidic-lite 在 PyPI 只有
+# sdist（47 MB 源码包），装上还要现构建。CI 与开发机是同一路径，不靠它。
+#
+# spaCy 与 zh_core_web_sm 也不在这里：中文分词走仓库里的 .venv-spacy
+# （zh_space.spacy_python() 自动发现），由 ci.yml 单独建。
+spylls>=0.1.0
+janome>=0.5.0
+kiwipiepy>=0.24
+fonttools>=4.0
