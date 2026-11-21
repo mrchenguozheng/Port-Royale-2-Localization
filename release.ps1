@@ -101,7 +101,7 @@ function Get-ReleaseLanguages {
         return @($names | Select-Object -Unique)
     }
 
-    # 发行语言只认 src\release-languages.txt：有 pack 但没验收的语言（de/es/fr/ko）
+    # 发行语言只认 src\release-languages.txt：有 pack 但没验收的语言（pl）
     # 不进正式包，避免自动发现把未完成语言也打进去。
     $listPath = Join-Path $Src 'release-languages.txt'
     if (-not (Test-Path -LiteralPath $listPath)) {

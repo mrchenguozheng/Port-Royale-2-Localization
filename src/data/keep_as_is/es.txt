@@ -3,7 +3,7 @@
 # id=脚本/资源标识、credit=职员表、save-name=存档文件名（必须纯 ASCII）、
 # name=专名（原文就是西语写法，零售版也一字未改）。
 #
-# 七语共用的条目（职员表、场景存档名、存档名模板）在 _common.txt，本文件只写本语言独有的。
+# 各语言共用的条目（职员表、场景存档名、存档名模板）在 _common.txt，本文件只写本语言独有的。
 #
 # 这批 name 是城镇名与海盗/姓氏池：Tampa、Campeche、Nombre de Dios、
 # Edward Teach 这些在官方西语零售版（`src/orig/es.retail-1.0.0.toml`）里

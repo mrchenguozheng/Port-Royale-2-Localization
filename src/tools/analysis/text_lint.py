@@ -118,7 +118,7 @@ def term_hit(value, text, lang):
 
 
 def load_keep(lang):
-    """{id: 理由}；读 `_common.txt`（七语共用）再读 `<lang>.txt`，后者覆盖前者。"""
+    """{id: 理由}；读 `_common.txt`（各语言共用）再读 `<lang>.txt`，后者覆盖前者。"""
     out = {}
     for name in ("_common.txt", lang + ".txt"):
         path = os.path.join(KEEP_DIR, name)

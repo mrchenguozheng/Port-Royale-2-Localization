@@ -10,11 +10,17 @@ original `PR2.exe` is not modified.
 |---|---|---|
 | Simplified Chinese | `zh` | `zh` |
 | Japanese | `ja` | `ja` |
+| Korean | `ko` | `en` |
+| Russian | `ru` | `en` |
+| German | `de` | `en` |
+| Spanish | `es` | `en` |
+| French | `fr` | `en` |
+| Italian | `it` | `en` |
 | English (original) | built-in | `en` |
 
-`zh` and `ja` are the shipped language packs. English is the original game
-language and the fallback when a pack is missing. The launcher UI is available
-in `en`, `ja`, and `zh`.
+`zh`, `ja`, `ko`, `ru`, `de`, `es`, `fr` and `it` are the shipped language
+packs. English is the original game language and the fallback when a pack is
+missing. The launcher UI is available in `en`, `ja`, and `zh`.
 
 **Translation marks: fan-made · community · AI-assisted (preview).** These
 packs are unofficial: produced by the community, drafted with AI assistance and
