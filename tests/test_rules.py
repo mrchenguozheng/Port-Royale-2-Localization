@@ -189,6 +189,13 @@ class TestZhSpace(unittest.TestCase):
                          ["这些城镇之间", "运输"])
         self.assertEqual(zh_space.bind(["%1", "之间", "运输"]), ["%1", "之间", "运输"])
 
+    def test_bind_merges_direction_phrase(self):
+        """方位短语合成一件：实机出过「点击贸易窗口右 / 下角那个……」。"""
+        self.assertEqual(zh_space.bind(["窗口", "右", "下角", "那个"]),
+                         ["窗口", "右下角", "那个"])
+        self.assertEqual(zh_space.bind(["窗口", "右下", "角", "那个"]),
+                         ["窗口", "右下角", "那个"])
+
     def test_compact_keeps_short_name_template(self):
         """`%1·%2` 这种只有三件的姓名模板放得下就不断，别再插空格。"""
         whole = lambda run: list(run)

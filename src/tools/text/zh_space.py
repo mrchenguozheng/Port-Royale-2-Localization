@@ -205,11 +205,32 @@ def bind(words):
                     and prev not in POSTPOS and _is_han(w[0]) and _is_han(w[1]):
                 merged[-1] += w
                 continue
+            if _edge_pair(prev, w):
+                merged[-1] += w
+                continue
             if w in POSTPOS and prev and _is_han(prev[-1]):
                 merged[-1] += w
                 continue
         merged.append(w)
     return merged
+
+
+#: 方位字：「右下角」被分词器切成「右」+「下角」，断在中间就成了
+#: 「点击贸易窗口右 / 下角那个……」。
+FANGWEI = set("上下左右前后内外")
+#: 方位短语的后缀：角、边、侧、方、端、面。
+EDGE = set("角边侧方端面")
+
+
+def _edge_pair(prev, w):
+    """把「方位字 + 方位后缀」两块拼回一件（「右」+「下角」→「右下角」）。"""
+    if len(prev) == 1 and prev in FANGWEI and len(w) == 2 \
+            and w[0] in FANGWEI and w[1] in EDGE:
+        return True
+    if 1 <= len(prev) <= 2 and all(c in FANGWEI for c in prev) \
+            and len(w) == 1 and w in EDGE:
+        return True
+    return False
 
 
 def pack(words, max_chars=MAX_CHARS):
