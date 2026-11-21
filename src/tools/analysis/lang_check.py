@@ -197,6 +197,43 @@ def _ship_noun(lang, art, tr, rng):
     return rng.choice(cands or list(ships))
 
 
+#: 变格语言：城镇名替身要跟住前置词支配的格。一律填主格会把译文里本来正确的
+#: `для Тортуги`、`до Номбре`、`в Одессе` 抹成 `для Одесса`、`до Одесса`、
+#: `в Одесса`，由替身自己造出「介词 + 主格」的假阳性。位置占位 `@l$…$` 的替身
+#: 同理：`около`、`koło` 支配属格，填主格等于每条含位置的译文都必错。
+TOWN_CASE = {
+    "ru": {"nom": ["Москва", "Санкт-Петербург", "Казань", "Одесса"],
+           "gen": ["Москвы", "Санкт-Петербурга", "Казани", "Одессы"],
+           "pre": ["Москве", "Санкт-Петербурге", "Казани", "Одессе"]},
+    "pl": {"nom": ["Warszawa", "Kraków", "Gdańsk", "Łódź"],
+           "gen": ["Warszawy", "Krakowa", "Gdańska", "Łodzi"],
+           "pre": ["Warszawie", "Krakowie", "Gdańsku", "Łodzi"]},
+}
+
+#: 前置词支配的格。只收支配关系单一的前置词：`с`／`у`（俄语）、`po`（波兰语）
+#: 同时能带多个格，判不准就退回主格，宁可漏判也不自造假阳性。
+GOVERN = {
+    "ru": {"gen": {"до", "от", "для", "около", "возле", "из", "без", "после",
+                   "кроме", "против", "ради", "вокруг", "мимо", "вдоль", "у"},
+           "pre": {"в", "во", "на", "о", "об", "при", "по"}},
+    "pl": {"gen": {"do", "od", "dla", "koło", "obok", "bez", "przed", "oprócz",
+                   "wzdłuż", "u"},
+           "pre": {"w", "we", "na", "o", "przy"}},
+}
+
+
+def town_case_pool(lang, prep):
+    """前置词 `prep` 支配的城镇名替身池；判不出格（或非变格语言）返回 None。"""
+    spec = TOWN_CASE.get(lang)
+    if not spec:
+        return None
+    word = (prep or "").strip().lower()
+    for case, preps in GOVERN.get(lang, {}).items():
+        if word in preps:
+            return spec[case]
+    return None
+
+
 def pools(lang, tr):
     """本语言的替身池。城镇与人名用典型占位名，不拿游戏里的真实专名去顶替——
     真实的卡塔赫纳、黑胡子这类名字在词典里是生僻词，容易把拼写规则带起来。
@@ -483,7 +520,14 @@ def render(text, lang, tr):
     names = sorted(set(p["townset"]) | set(p["proper"]), key=len, reverse=True)
     if names:
         rx = re.compile(r"\b(?:%s)\b" % "|".join(re.escape(n) for n in names))
-        s = rx.sub(lambda m: pick(p["town"]), s)
+
+        def town_sub(m):
+            head = m.string[:m.start()]
+            words = re.findall(r"[^\W\d_]+", head)
+            pool = town_case_pool(lang, words[-1]) if words else None
+            return rng.choice(pool) if pool else pick(p["town"])
+
+        s = rx.sub(town_sub, s)
     # 方括号标注：城镇与术语展开成该语言的词，其余（谜题、引用）没有语义，抹掉
     def bracket(m):
         body = m.group(1)
@@ -510,8 +554,13 @@ def render(text, lang, tr):
     # @ 占位：按前缀决定替身类别
     def at(m):
         kind, name = m.group(1), m.group(2)
-        if kind == "T":
-            return pick(p["town"])
+        if kind in ("T", "t"):
+            # 城镇占位同样跟住前置词：`в @T$Town$`、`для @T$Town$` 要填变格形式，
+            # 否则替身自己拼出「в + 主格」再判译文错。
+            head = m.string[:m.start()]
+            words = re.findall(r"[^\W\d_]+", head)
+            pool = town_case_pool(lang, words[-1]) if words else None
+            return rng.choice(pool) if pool else pick(p["town"])
         if kind == "n":
             # 国家替身自带定冠词：原文多数落在 `appartenant à`／`guerre avec`／
             # `visant` 这类要限定词的位置，填裸国名会凭空造出「介词后缺冠词」。
@@ -553,8 +602,11 @@ def render(text, lang, tr):
         if kind == "C":
             return p["convoy"]
         # @l/@d/@r/@M 是位置。首字母大写：这类占位常落在段首或句号之后，
-        # 小写开头会凭空触发「句首应大写」
-        return "%s %s" % (p["near"][:1].upper() + p["near"][1:], pick(p["town"]))
+        # 小写开头会凭空触发「句首应大写」。`около`／`koło` 这类支配属格，
+        # 替身城镇也取属格，否则每条含位置的译文都会被判「介词 + 主格」。
+        near = p["near"][:1].upper() + p["near"][1:]
+        pool = town_case_pool(lang, p["near"])
+        return "%s %s" % (near, rng.choice(pool) if pool else pick(p["town"]))
     s = re.sub(r"@([a-zA-Z])\$([^$]*)\$", at, s)
 
     # 条形参数 %N：默认填数；紧跟冠词时原文多半是船名或货物名，改填同性名词
