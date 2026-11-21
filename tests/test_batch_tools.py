@@ -19,6 +19,7 @@ sys.path.insert(0, os.path.join(ROOT, "src", "tools", "pack"))
 
 import split_batches as S  # noqa: E402
 import merge_batches as M  # noqa: E402
+from shared.core import en_base as EB  # noqa: E402
 
 
 def write(path, text):
@@ -154,11 +155,26 @@ class TestEnBase(unittest.TestCase):
 
     @unittest.skipUnless(os.path.isfile(M.CLEAN) and os.path.isfile(orig_path),
                          "没有 clean 或 en 原件")
-    def test_clean_has_the_padded_placeholder(self):
+    def test_both_bases_are_padded(self):
+        """补齐在代码里做，两份来源对同一键给出同样的占位符数。"""
         clean, _ = M.load_en_doc(M.CLEAN)
         orig, _ = M.load_en_doc(self.orig_path)
-        self.assertGreater(clean.get("0xdb0108dd", "").count("<n>"),
-                           orig.get("0xdb0108dd", "").count("<n>"))
+        for key, want in EB.EXPECTED.items():
+            self.assertEqual(clean.get(key, "").count("<n>"), want)
+            self.assertEqual(orig.get(key, "").count("<n>"), want)
+
+    @unittest.skipUnless(os.path.isfile(orig_path), "没有 en 原件")
+    def test_orig_fallback_is_padded_without_clean(self):
+        """干净 clone 上没有 clean，退回原件也必须补齐——CI 就栽在这。"""
+        keep = M.CLEAN
+        try:
+            M.CLEAN = os.path.join(tempfile.gettempdir(), "no-such-clean.toml")
+            doc, path = M.load_en_doc()
+            self.assertEqual(os.path.normcase(path), os.path.normcase(self.orig_path))
+            for key, want in EB.EXPECTED.items():
+                self.assertEqual(doc.get(key, "").count("<n>"), want)
+        finally:
+            M.CLEAN = keep
 
     @unittest.skipUnless(os.path.isfile(orig_path), "没有 en 原件")
     def test_fallback_to_orig_when_clean_missing(self):

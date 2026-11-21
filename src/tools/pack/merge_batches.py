@@ -34,6 +34,7 @@ for p in (TOOLS, ROOT, HERE):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from shared.core import en_base as EB                  # noqa: E402
 from text import toml_io as TI                       # noqa: E402
 from compile_pack import KEEP_ORIGINAL               # noqa: E402
 from shared.core.validate import check_text          # noqa: E402
@@ -73,10 +74,15 @@ def read_rows(paths):
 
 
 def load_en_doc(explicit=""):
-    """取英文基准：`--base` > clean 版 > 原件；返回 (doc, 用的是哪个文件)。"""
+    """取英文基准：`--base` > clean 版 > 原件；返回 (doc, 用的是哪个文件)。
+
+    两份来源都过一遍 `en_base.apply`：原件那两处漏 `<n>`，clean 由只报不修的
+    `ref_clean.py` 生成、也没有，干净 clone 上更是没有 clean——补齐写在代码里，
+    判据才不依赖 `build/`。
+    """
     for cand in (explicit, CLEAN, os.path.join(ORIG, BASE + ".toml")):
         if cand and os.path.isfile(cand):
-            return TI.read_doc(cand)[0], cand
+            return EB.apply(TI.read_doc(cand)[0]), cand
     raise ValueError("找不到英文基准：%s" % os.path.join(ORIG, BASE + ".toml"))
 
 

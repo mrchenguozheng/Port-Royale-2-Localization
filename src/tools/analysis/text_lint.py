@@ -219,6 +219,7 @@ BARREL_HINT = re.compile(r"@g\$GoldPerBarrel\$|INTEXT_FASS")
 sys.path.insert(0, os.path.dirname(HERE))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
+from shared.core import en_base as EB  # noqa: E402
 from shared.core.validate import is_identifier, tag_literals  # noqa: E402
 from text import marks as MK  # noqa: E402
 import terms_check as TC  # noqa: E402
@@ -598,7 +599,7 @@ def main(argv):
     strict = "--strict" in argv
     if "--lang" in argv:
         lang = argv[argv.index("--lang") + 1]
-    en = tomllib.load(open(EN, "rb"))
+    en = EB.apply(tomllib.load(open(EN, "rb")))
     tr_raw = tomllib.load(open(TR % lang, "rb"))
     # 规则比对一律用展开后的文本：否则 [ref:Tortuga]的麻烦 与字面「托尔图加的麻烦」
     # 会被当成同原文异译。标注本身的检查另走 check_doc（用带标注原文）。

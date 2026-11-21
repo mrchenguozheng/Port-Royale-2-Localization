@@ -25,9 +25,20 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(name, "fr.gog_1.1.2.42")
 
     def test_clean_name_is_resolvable(self):
+        """clean 是 `build/` 下的派生件，干净 clone 上没有；没有就跳过，别让
+        `resolve` 退回到 `en.*` 原件再断言（那会让 CI 红在一条路径断言上）。"""
+        clean = os.path.join(ROOT, "build", "ref", "clean", "en-clean.toml")
+        if not os.path.isfile(clean):
+            self.skipTest("没有 clean 产物（干净 clone）")
         path, name = RC.resolve("en-clean")
         self.assertTrue(path.endswith("en-clean.toml"))
         self.assertEqual(name, "en-clean")
+
+    def test_clean_name_candidates(self):
+        """名字构造不依赖文件存在：短名 `en-clean` 的候选里有一份 clean 路径。"""
+        cands = RC._cand("en-clean")
+        self.assertIn(os.path.join("build", "ref", "clean", "en-clean.toml"),
+                      [os.path.relpath(p, ROOT) for p in cands])
 
     def test_unknown_name_raises(self):
         with self.assertRaises(SystemExit):
