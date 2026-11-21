@@ -51,6 +51,20 @@ TPL = re.compile(r"%[0-9]+|@[a-zA-Z]\$[^$]*\$|<(?:n|c|t|ts:[0-9]+|gs:[^>]*|r|b)>
 FONT = re.compile(r"<f:([^>]*)>")
 HAN = re.compile(r"[\u4e00-\u9fff]")
 LATIN = re.compile(r"[A-Za-z]")
+# 串字检查：抄写/输入法切换时混进来的别种文字（西里尔 а 形同拉丁 a，肉眼极难发现）。
+# 汉字不在此列——各语言的人员名单里本来就可能出现中文名。
+FOREIGN = {
+    "西里尔": re.compile(r"[\u0400-\u04FF]"),
+    "希腊": re.compile(r"[\u0370-\u03FF\u1F00-\u1FFF]"),
+    "阿拉伯": re.compile(r"[\u0600-\u06FF\u0750-\u077F]"),
+    "希伯来": re.compile(r"[\u0590-\u05FF]"),
+    "泰文": re.compile(r"[\u0E00-\u0E7F]"),
+    "谚文": re.compile(r"[\uAC00-\uD7AF\u1100-\u11FF]"),
+    "假名": re.compile(r"[\u3040-\u30FF]"),
+}
+#: 各语言本来就会用到的非拉丁文字；没列出的语言出现任何一类都算串字。
+OWN_SCRIPT = {"ru": ("西里尔",), "ja": ("假名", "谚文"), "ko": ("谚文", "假名"),
+              "zh": ("假名", "谚文")}
 MARK_ANY = re.compile(r"\[(?:town|lit|term):?")
 #: 日语引号（「」『』）。判语体前先把引文抹掉，引文里的常体不算叙述混用。
 JA_QUOTE = re.compile(r"「[^「」]*」|『[^『』]*』")
@@ -616,6 +630,13 @@ def main(argv):
                           "@%s$%s$（该变量本文 %d 处用 %s）"
                           % (m.group(1), m.group(2), top,
                              max(per, key=per.get))))
+        for name, rx in FOREIGN.items():
+            if name in OWN_SCRIPT.get(lang, ()):
+                continue
+            hit = rx.search(v)
+            if hit:
+                E.append((k, "串字：%s" % name,
+                          v[max(0, hit.start() - 20):hit.end() + 20]))
         src = en.get(k)
         # 纯符号／纯数字条目：字符清单、单个标点，不参与中文规则
         if zh_mode and not HAN.search(v) and not LATIN.search(v):
