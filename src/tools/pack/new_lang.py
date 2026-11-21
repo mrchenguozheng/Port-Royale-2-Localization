@@ -151,6 +151,28 @@ def toml_str(s, multiline_ok=True):
     return json.dumps(s, ensure_ascii=False)
 
 
+def clean_fixes():
+    """`build/ref/clean/en-clean.toml` 相对原件的修正值 `{hash: 文本}`。
+
+    原件有两处漏掉的 `<n>`（`0x0cf7abf0`、`0xdb0108dd`），`text_lint` 的模板比对按
+    clean 版算。新语言若照原件复制，一进来就带着两条 E 级「模板不一致」——
+    补在这里，骨架就没有这两条噪声。
+    """
+    import tomllib
+    clean = os.path.join(ROOT, "build", "ref", "clean", "en-clean.toml")
+    orig = os.path.join(REFS, BASE + ".toml")
+    if not os.path.isfile(clean) or not os.path.isfile(orig):
+        return {}
+
+    def load(p):
+        with io.open(p, "rb") as f:
+            d = tomllib.load(f)
+        return d.get("strings", d)
+
+    c, b = load(clean), load(orig)
+    return {k: c[k] for k in c if k in b and c[k] != b[k]}
+
+
 def new_lang(code, source=None):
     """新建一种语言的译文文件：复制一份原文，逐条改右边的值。
 
@@ -169,6 +191,18 @@ def new_lang(code, source=None):
         raise SystemExit("%s 已存在，不覆盖。要重做先自己删掉或改名。" % dpath)
     with io.open(spath, encoding="utf-8") as f:
         txt = f.read()
+    fixes = clean_fixes() if src == BASE else {}
+    if fixes:
+        out = []
+        for line in txt.split("\n"):
+            m = re.match(r'"(0x[0-9A-Fa-f]+)"\s*=', line)
+            if m and m.group(1).lower() in fixes:
+                line = '"%s" = %s' % (m.group(1).lower(),
+                                      json.dumps(fixes[m.group(1).lower()],
+                                                 ensure_ascii=False))
+            out.append(line)
+        txt = "\n".join(out)
+        print("按 clean 基准修正 %d 条（原件漏掉的 <n>）" % len(fixes))
     with io.open(dpath, "w", encoding="utf-8", newline="\n") as f:
         f.write(txt)
     print("已复制 %s -> %s（%d 条）" % (spath, dpath, txt.count("\n")))
@@ -178,6 +212,18 @@ def new_lang(code, source=None):
 
 
 ARGS = sys.argv[1:]
+
+USAGE = """用法
+----
+  python src\\tools\\pack\\new_lang.py --new-lang <代码> [--from <来源>]   复制原文做新语言骨架
+  python src\\tools\\pack\\new_lang.py                                   从 editor-data.json 重建 en/fr/zh
+
+`--from` 写语言代码即可（en 会解析成基准文件 en.gog_1.1.2.3），
+也可以写完整文件名（fr.gog_1.1.2.42）。
+
+⚠ 不带任何参数会**覆盖** src\\orig\\en / fr 与 src\\translations\\zh，
+只在换游戏版本时用；日常加语言请给 --new-lang。
+"""
 
 
 def argval(flag):
@@ -190,13 +236,25 @@ def argval(flag):
 
 
 def main():
-    if "--new-lang" in ARGS:
-        code = argval("--new-lang")
-        if not code:
-            raise SystemExit("用法：--new-lang <代码> [--from <语言代码>]")
-        return new_lang(code, argval("--from"))
+    if "--help" in ARGS or "-h" in ARGS:
+        print(USAGE)
+        return 0
 
-    return rebuild_all()
+    if not ARGS:
+        return rebuild_all()
+
+    if "--new-lang" not in ARGS:
+        raise SystemExit("认不出的参数：%s\n\n%s" % (" ".join(ARGS), USAGE))
+
+    code = argval("--new-lang")
+    if not code:
+        raise SystemExit("用法：--new-lang <代码> [--from <语言代码>]")
+    src = argval("--from")
+    # 只写 `--from en` 时补成基准文件全名，否则会去找 src\orig\en.toml
+    if src and "." not in src and src == BASE.split(".")[0]:
+        src = BASE
+    return new_lang(code, src)
+
 
 def rebuild_all():
     """从 editor-data.json 重建 en / fr / zh 三份文件。

@@ -95,6 +95,7 @@ src/tools/
 | `text/lang_rules/de.py` | 德文：显式 no-op（「不处理」是一份声明，不是缺失） |
 | `text/lang_rules/es.py` | 西文：显式 no-op |
 | `text/lang_rules/fr.py` | 法文：不补空格、不换空格、不引入任何特殊空白 |
+| `text/lang_rules/it.py` | 意大利文：显式 no-op（省音撇号与标点前空格写成守卫正则，交 `text_lint` 守） |
 | `text/lang_rules/ko.py` | 韩文：显式 no-op |
 | `text/lang_rules/pl.py` | 波兰文：显式 no-op（字形覆盖待实机确认） |
 | `text/lang_rules/ru.py` | 俄文：显式 no-op |

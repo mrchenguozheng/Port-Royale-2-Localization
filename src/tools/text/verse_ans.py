@@ -46,7 +46,7 @@ EN_PATH = os.path.join(ROOT, "src", "orig", "en.gog_1.1.2.3.toml")
 ENTITIES = os.path.join(ROOT, "src", "data", "names", "entities.toml")
 NAMES_DIR = os.path.join(ROOT, "src", "data", "names")
 TRANS = os.path.join(ROOT, "src", "translations")
-LANGS = ("zh", "de", "es", "fr", "ja", "ru")
+LANGS = ("zh", "de", "es", "fr", "ja", "ru", "it")
 #: 城镇名在英文表里分 8 段，段间留空，合起来 76 条 = staedte.ini 的段数。
 #: 早先只认了第一段（50 镇），Maracaibo / Caracas / Gibraltar / Port of Spain 这些
 #: 落在后面的段里，查不到就等于「不在城镇表」。
