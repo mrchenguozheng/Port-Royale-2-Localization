@@ -179,7 +179,12 @@ class TestZhSpace(unittest.TestCase):
         self.assertEqual(zh_space.bind(["好几", "件事", "让"]), ["好几件事", "让"])
         self.assertEqual(zh_space.bind(["好几件", "事"]), ["好几件事"])
 
+    def test_compact_keeps_short_name_template(self):
+        """`%1·%2` 这种只有三件的姓名模板放得下就不断，别再插空格。"""
+        whole = lambda run: list(run)
+        self.assertEqual(zh_space.compact("%1·%2", whole, 13), "%1·%2")
 
+    def test_compact_breaks_on_particle_not_mid_word(self):
         """超预算时才断，且断点落在停顿字「的」后面，不切「英格兰/船」。"""
         lookup = lambda run: ["一艘", "满载", "移民", "的",
                               "英格兰", "船", "沉了"]

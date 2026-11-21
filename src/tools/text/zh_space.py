@@ -444,12 +444,17 @@ def _pack(units, max_chars):
     间隔号要断两刀：`·` 后一刀（把它留在上一行）、姓氏那个单位之后再来一刀
     （姓名整体独占一行，下一行从「到某某城镇」这类正文起）。所以断在 `·`
     之后要记一个 `after_dot`，等姓那一件收尾时再断一次。
+
+    这两刀只对**整段超预算**的串生效：`%1·%2` 这种只有三件的姓名模板
+    本身就在一行里，再断只会变成「名· 姓」（多一个空格），没必要。
+    标点收尾的断（`_break_after_punct()`）仍是无条件的。
     """
     blocks, cur = [], []
     after_dot = False
+    dot_cut = sum(u[1] for u in units) > max_chars
     for u in units:
         if cur and (u[2] or _break_after_punct(cur[-1], u)
-                    or _break_after_dot(cur[-1]) or after_dot):
+                    or (dot_cut and (_break_after_dot(cur[-1]) or after_dot))):
             blocks.append(cur)
             cur = []
             after_dot = _break_after_dot(blocks[-1][-1])
