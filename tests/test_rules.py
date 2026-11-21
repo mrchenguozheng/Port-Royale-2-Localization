@@ -161,7 +161,25 @@ class TestZhSpace(unittest.TestCase):
                          "他说「走」 然后离开了。")
         self.assertNotIn(" 」", zh_space.compact("他说「走」然后离开了。", whole, 99))
 
-    def test_compact_breaks_on_particle_not_mid_word(self):
+    def test_compact_keeps_dot_at_line_end(self):
+        """间隔号黏左：`·` 只能断在它后面，不能起头；姓氏后面再断一刀。
+
+        消息模板是 `%1 %2·%3到…` 这种变量拼出来的，名字整体保护（`NAME`）
+        管不到，早先 DP 会把刀落在 `%2 / ·%3`，实机行首就是孤零零一个「·」。
+        """
+        whole = lambda run: list(run)
+        out = zh_space.compact("%1 %2·%3到西班牙城镇%4碰碰运气。", whole, 13)
+        self.assertNotIn(" ·", out)
+        self.assertIn("· ", out)
+        # `·` 后一刀、姓氏那一件之后再来一刀：姓名整体独占两行
+        self.assertIn("%2· %3 ", out)
+
+    def test_bind_merges_quantity_phrase(self):
+        """数量/指示短语粘右：「好几」「件事」不能留成两个可断点。"""
+        self.assertEqual(zh_space.bind(["好几", "件事", "让"]), ["好几件事", "让"])
+        self.assertEqual(zh_space.bind(["好几件", "事"]), ["好几件事"])
+
+
         """超预算时才断，且断点落在停顿字「的」后面，不切「英格兰/船」。"""
         lookup = lambda run: ["一艘", "满载", "移民", "的",
                               "英格兰", "船", "沉了"]

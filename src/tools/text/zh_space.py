@@ -74,6 +74,17 @@ BIND_LEFT = set("的地得了着过是等们吗呢吧啊呀哦嗯中上里外其
 BIND_RIGHT = set("一二三四五六七八九十每各半几这那些不没未别很太更最都也还就才总副前"
                  "在把被给对从向为于跟同与和及或而")
 
+#: 数量/指示短语（两字以内、首字或末字落在这里）：整词粘到后面的中心语上。
+#: spaCy 把「好几件事」切成「好几 / 件事」、「几乎没有商人」切成「几乎 / 没有」，
+#: 只靠单字粘右消不掉：DP 会在两词之间落刀，实机就是「好几 件事」「几乎 没有商人」
+#: ——前者用户判定为词内断刀。这类词天然修饰后一个词，粘上不会拼出坏边界。
+QUANT_HEAD = set("一二三四五六七八九十每各半几这那些")
+
+#: 量词收尾：后面紧跟**单字**名词时粘上（spaCy 会把「好几件事」切成
+#: 「好几件 / 事」，「件事」硬拆成量词和名词两段，照样被 DP 拦腰断）。
+QUANT_TAIL = set("件个只条艘座名位张支门枚种项份类批群次段块片句页行章节层根粒颗"
+                 "滴束把间所处场轮趟番期笔封幅顶")
+
 #: 默认每组最多多少字（预算，不是像素）。
 #:
 #: 这个数字决定的是「一个空格片段有多长」，不是控件宽度，所以它有上下两个约束：
@@ -162,7 +173,11 @@ def segment(runs):
 
 
 def bind(words):
-    """单字虚词粘左、指示词粘右，减少碎词。"""
+    """单字虚词粘左、指示词粘右，减少碎词。
+
+    `BIND_RIGHT` 只收单字，两字以上的数量/指示短语交给 `QUANT_HEAD`：
+    「好几」+「件事」拼成一件，断点就不会落在「好几」和「件事」之间。
+    """
     out = []
     for w in words:
         if out and len(w) == 1 and w in BIND_LEFT:
@@ -171,10 +186,18 @@ def bind(words):
             out.append(w)
     merged = []
     for w in out:
-        if merged and len(merged[-1]) == 1 and merged[-1][0] in BIND_RIGHT:
-            merged[-1] += w
-        else:
-            merged.append(w)
+        if merged:
+            prev = merged[-1]
+            if len(prev) == 1 and prev[0] in BIND_RIGHT:
+                merged[-1] += w
+                continue
+            if len(prev) <= 2 and (prev[0] in QUANT_HEAD or prev[-1] in QUANT_HEAD):
+                merged[-1] += w
+                continue
+            if len(prev) <= 3 and prev[-1] in QUANT_TAIL and len(w) == 1 and _is_han(w):
+                merged[-1] += w
+                continue
+        merged.append(w)
     return merged
 
 
@@ -263,6 +286,9 @@ STICKY = set("的了着过地得们呢吧啊吗呀")
 CONJ = set("与和及或而")
 #: 标点字符集（前面能断、后面不能断的那种）。
 PUNCT_CHARS = PAUSE | CLOSE
+#: 间隔号。它连着西文姓名的名与姓（「罗德里戈·德埃斯科瓦尔」），排版上**黏左**：
+#: 只能断在它后面，不能让它起头（行首孤零零一个「·」再跟姓氏，实机里就是这个样子）。
+DOT = "·"
 #: 可以出现在行首的标点：破折号与省略号不占「禁则」，断在它们前面是合法的。
 LINE_HEAD_OK = set("—…")
 #: 拆件：名字占位符整体一件、汉字串一件、其余单字一件。
@@ -397,19 +423,36 @@ def _break_after_punct(prev, nxt):
     return True
 
 
+def _break_after_dot(prev):
+    """上一件以间隔号收尾：断在 `·` 之后，让它留在上一行行末。
+
+    `·` 连的是名与姓（「罗德里戈·德埃斯科瓦尔」），黏左。名字整体受 `NAME`
+    保护时不会拆到这里；会拆到的只有变量拼出来的写法（`%1 %2·%3` 这类
+    消息模板），原本 DP 可以在 `·` 前落刀，实机行首就是孤零零一个「·」。
+    """
+    return bool(prev[0]) and prev[0][-1] == DOT
+
+
 def _pack(units, max_chars):
     """把单位按预算拼回去：预算内不插空格，超了才挑一个最像停顿的位置断。
 
     断点由 DP 挑，不再「填满就断」：贪心会在「…「X」/的按钮」这种地方落刀，
     前半截成了残句。代价函数见 `_cut_cost()`；`hard`（来自原文空格与 `<n>`）
-    是死断点，标点收尾处（见 `_break_after_punct()`）也算死断点，先把 units
-    切块，块内再各自挑。
+    是死断点，标点收尾处（见 `_break_after_punct()`）与间隔号之后（见
+    `_break_after_dot()`）也算死断点，先把 units 切块，块内再各自挑。
+
+    间隔号要断两刀：`·` 后一刀（把它留在上一行）、姓氏那个单位之后再来一刀
+    （姓名整体独占一行，下一行从「到某某城镇」这类正文起）。所以断在 `·`
+    之后要记一个 `after_dot`，等姓那一件收尾时再断一次。
     """
     blocks, cur = [], []
+    after_dot = False
     for u in units:
-        if cur and (u[2] or _break_after_punct(cur[-1], u)):
+        if cur and (u[2] or _break_after_punct(cur[-1], u)
+                    or _break_after_dot(cur[-1]) or after_dot):
             blocks.append(cur)
             cur = []
+            after_dot = _break_after_dot(blocks[-1][-1])
         cur.append(u)
     if cur:
         blocks.append(cur)
@@ -463,6 +506,10 @@ def _dp_solve(block, max_chars, soft=False):
                     cost += 40 * over
                 if not legal:
                     cost += 300 if _ascii_split(block, i, j) else 60
+            # 代价打平时保留**最早**的分割（`<`，同级不覆盖）：这样断点会落在
+            # 前一个词界刚过预算的位置，不会为了「填满」把专名和后面的名词切开
+            # （「英格兰 / 船沉了」是这条规则挡住的）。词内断刀另由 `bind()`
+            # 合并数量短语解决（「好几件事」成一件），不靠这里偏后断来凑。
             if cost < dp[j]:
                 dp[j] = cost
                 back[j] = i
@@ -497,11 +544,14 @@ def _cut_ok(block, i, j):
 
     行内标签（`<o:…>`、`<c>`、`<f:…>`）不占位、渲染成空，断在它前后都无所谓，
     所以不在这里拦；拦了反而会把「…享受<o:…>5%<o> / 的折扣」逼回无断点的长句。
+    间隔号同标点：不能起头（`·德埃斯科瓦尔` 那种断法），只能断在它后面。
     """
     head = block[j][0]
     # 破折号「——」和省略号「…」可以起头（中文排版禁则只管逗号句号那一类），
     # 拦掉它们会让「…印度人——」这种尾巴多出两格，窄框里就多占一格。
     if head and head[0] in PUNCT_CHARS and head[0] not in LINE_HEAD_OK:
+        return False
+    if head and head[0] == DOT:
         return False
     tail = block[j - 1][0]
     if tail and tail[-1] in OPEN:
