@@ -18,21 +18,25 @@
 语言代码就是文件名。条目数与顺序必须和 `orig/en.gog_1.1.2.3.toml` 完全一致
 —— 合并与校验都靠位置对齐，多一条少一条都会让后面的 hash 全部错位。
 
-重建全部原文（极少用）
-----------------------
-    python src/tools/pack/new_lang.py
+重建全部原文（破坏性，极少用）
+------------------------------
+    python src/tools/pack/new_lang.py --rebuild-originals --dry-run   # 先看清单
+    python src/tools/pack/new_lang.py --rebuild-originals             # 真写
 
-不带参数时走这条路，从 `editor/data/editor-data.json` 重新生成
-en / fr / zh 三份文件。只在初次建立或**换游戏版本**（英法原文变了）时用。
-日常改译文直接编辑 `src/translations/<语言>.toml`，不要跑它
-—— 它会用旧数据覆盖你的改动。
+从 `editor/data/editor-data.json` 重新生成 en / fr / zh 三份文件。只在初次建立或
+**换游戏版本**（英法原文变了）时用。它会覆盖 `src/orig` 下的 en、fr 与
+`src/translations/zh`，写之前逐个备份成 `<文件>.bak-<时间戳>`，并打印新旧条数。
+**不带参数时脚本什么都不做**——这个默认以前是会直接覆盖那三份文件的。
+日常改译文直接编辑 `src/translations/<语言>.toml`。
 """
 
 import json
 import io
 import os
 import re
+import shutil
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -216,13 +220,15 @@ ARGS = sys.argv[1:]
 USAGE = """用法
 ----
   python src\\tools\\pack\\new_lang.py --new-lang <代码> [--from <来源>]   复制原文做新语言骨架
-  python src\\tools\\pack\\new_lang.py                                   从 editor-data.json 重建 en/fr/zh
+  python src\\tools\\pack\\new_lang.py --rebuild-originals [--dry-run]     从 editor-data.json 重建 en/fr/zh
 
 `--from` 写语言代码即可（en 会解析成基准文件 en.gog_1.1.2.3），
 也可以写完整文件名（fr.gog_1.1.2.42）。
 
-⚠ 不带任何参数会**覆盖** src\\orig\\en / fr 与 src\\translations\\zh，
-只在换游戏版本时用；日常加语言请给 --new-lang。
+⚠ 不带参数什么都不做。重建原文是**破坏性**操作：会覆盖 src\\orig\\en、
+src\\orig\\fr 与 src\\translations\\zh，所以必须显式给 --rebuild-originals；
+给之前建议先 --dry-run 看清单与新旧条数。它只在换游戏版本时用，
+日常加语言请给 --new-lang。
 """
 
 
@@ -240,8 +246,21 @@ def main():
         print(USAGE)
         return 0
 
+    # 【防呆】不带参数什么都不做。这条默认以前是 rebuild_all()，会把
+    # src\orig 下的 en / fr 与 src\translations\zh 一起覆盖成 editor-data.json
+    # 的内容 —— 敲错一次就丢三份文件，且没有提示。
     if not ARGS:
-        return rebuild_all()
+        raise SystemExit(
+            "什么都没做：这个脚本不会在没有参数的情况下覆盖任何文件。\n\n%s" % USAGE)
+
+    if "--rebuild-originals" in ARGS:
+        if "--new-lang" in ARGS:
+            raise SystemExit(
+                "--rebuild-originals 与 --new-lang 不能同时用。\n\n%s" % USAGE)
+        return rebuild_all(dry_run="--dry-run" in ARGS)
+
+    if "--dry-run" in ARGS:
+        raise SystemExit("--dry-run 只能跟 --rebuild-originals 一起用。\n\n%s" % USAGE)
 
     if "--new-lang" not in ARGS:
         raise SystemExit("认不出的参数：%s\n\n%s" % (" ".join(ARGS), USAGE))
@@ -256,11 +275,12 @@ def main():
     return new_lang(code, src)
 
 
-def rebuild_all():
+def rebuild_all(dry_run=False):
     """从 editor-data.json 重建 en / fr / zh 三份文件。
 
-    只在初次建立或**换游戏版本**（英法原文变了）时跑。日常改译文
-    不要跑它 —— 它会用旧数据覆盖你的改动。
+    只在初次建立或**换游戏版本**（英法原文变了）时跑，必须显式给
+    `--rebuild-originals`。写之前逐个备份成 `<文件>.bak-<时间戳>`，
+    并打印新旧条数——条数变了通常意味着 editor-data.json 与当前版本不是同一版。
     """
     ref = read_ref()
     zh = read_zh_txt()
@@ -276,6 +296,9 @@ def rebuild_all():
 
     os.makedirs(STRINGS, exist_ok=True)
     plan = [("en.gog_1.1.2.3", 1), ("fr.gog_1.1.2.42", 2), ("zh", 3)]
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    if dry_run:
+        print("[dry-run] 只列清单，不写文件")
     for lang, idx in plan:
         body = "\n".join('"%s" = %s' % (r[0], toml_str(r[idx])) for r in rows)
         txt = body + "\n"
@@ -283,11 +306,28 @@ def rebuild_all():
         d = REFS if lang in REFERENCE_LANGS else STRINGS
         os.makedirs(d, exist_ok=True)
         path = os.path.join(d, lang + ".toml")
+        old_n = None
+        if os.path.isfile(path):
+            with io.open(path, encoding="utf-8") as f:
+                old_n = sum(1 for line in f if line.strip())
+        n_ph = sum(1 for r in rows if RE_PLACEHOLDER.match(r[idx]))
+        head = "%s -> %d 条%s" % (path, len(rows),
+                                 "" if old_n is None else "（原 %d 条）" % old_n)
+        if dry_run:
+            print("[dry-run] 将覆盖 %s，占位 %d，%.1f KB" %
+                  (head, n_ph, len(txt.encode("utf-8")) / 1024.0))
+            continue
+        if old_n is not None:
+            bak = path + ".bak-" + stamp
+            shutil.copy2(path, bak)
+            print("已备份 %s" % bak)
+            if old_n != len(rows):
+                print("注意：条数从 %d 变成 %d，确认 editor-data.json 与当前版本一致"
+                      % (old_n, len(rows)))
         with io.open(path, "w", encoding="utf-8", newline="\n") as f:
             f.write(txt)
-        n_ph = sum(1 for r in rows if RE_PLACEHOLDER.match(r[idx]))
-        print("已生成 %s（%d 条，占位 %d，%.1f KB）"
-              % (path, len(rows), n_ph, len(txt.encode("utf-8")) / 1024.0))
+        print("已生成 %s，占位 %d，%.1f KB"
+              % (head, n_ph, len(txt.encode("utf-8")) / 1024.0))
     return 0
 
 
