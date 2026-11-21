@@ -1,0 +1,30 @@
+# 日语「不处理」名单：不是正文、切了也没意义的条目。
+#
+# 一行 `id<TAB>理由`。命中这里的条目，机械断行完全不碰：不切、不计「切不动」、
+# 不进 build\qa\line_manual_ja.txt。要放行（允许超限但仍算正文）也写在这里，
+# 理由里写清是「放行」。
+#
+# 判据：译文本身不是给人读的句子，而是键名、资源名、开发占位数字、字体覆盖
+# 测试串——这些字串的换行由控件与调试界面决定，不是排版问题。
+
+0x0204aa22	键名 IDM_CONTEST_01_2004_LOG_00_TEXT，不处理
+0x0b715286	键名 IDM_CONTEST_01_2004_LOG_02_TEXT，不处理
+0x25940110	键名 IDM_CONTEST_01_2004_LOG_05_TEXT，不处理
+0x3426834a	键名 IDM_CONTEST_01_2004_LOG_06_TEXT，不处理
+0xccd432a5	键名 IDM_CONTEST_01_2004_LOG_03_TEXT，不处理
+0xdb66b4df	键名 IDM_CONTEST_01_2004_LOG_04_TEXT，不处理
+0xfcded04c	键名 IDM_CONTEST_01_2004_LOG_01_TEXT，不处理
+0xc7537475	键名 IDM_CONTEST_01_2004_LOG_01_HDR，不处理
+0xd10b5c36	键名 IDM_CONTEST_01_2004_LOG_02_HDR，不处理
+0xdac343f7	键名 IDM_CONTEST_01_2004_LOG_03_HDR，不处理
+0xe47b2bb8	键名 IDM_CONTEST_01_2004_LOG_04_HDR，不处理
+0xee331379	键名 IDM_CONTEST_01_2004_LOG_05_HDR，不处理
+0xf7eafb3a	键名 IDM_CONTEST_01_2004_LOG_06_HDR，不处理
+0xf93656ab	键名 IDM_CONTEST_01_2004_LOG_00_HDR，不处理
+0x0f3a5490	键名 IDM_CONTEST_01_2004_POPUP_HDR，不处理
+0x0760fe3e	字体资源名 Tiepolo_black14x14aaFHk.res，不处理
+0x15d892f9	字体资源名 Tiepolo_bold14x14aaFH.res，不处理
+0xd3481940	开发占位数字 9.9990000000000006，不处理
+0xd34819b1	开发占位数字 999.99900000000002，不处理
+0x11f0398f	字体覆盖测试串，不处理
+0x1e6d4ddb	拉丁人名 Niestadtkötter，放行（允许超限）

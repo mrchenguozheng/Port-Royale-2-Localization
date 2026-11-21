@@ -37,6 +37,9 @@ import tomllib
 
 UNIT = re.compile(r"<n(?::\d+)?>|@[A-Za-z]\$[^$]*\$|%[0-9]+[A-Za-z]?|<[^<>]*>")
 NODE = re.compile(r"^<n(?::\d+)?>$")
+SEG_SPLIT = re.compile(r"(<n(?::\d+)?>|[ \t]+)")
+BLOCK_SPLIT = re.compile(r"([ \t]+)")
+TAG_ONLY = re.compile(r"<n(?::\d+)?>")
 SPACE = (" ", "\t", "\u3000")
 
 
@@ -46,6 +49,34 @@ class ManualBreakError(ValueError):
 
 def data_path(root, lang):
     return os.path.join(root, "src", "data", "line_breaks", "%s.toml" % lang)
+
+
+def skip_path(root, lang):
+    return os.path.join(root, "src", "data", "line_breaks", "%s_skip.txt" % lang)
+
+
+def read_skip(root, lang):
+    """读「不处理」名单：{id: 理由}。
+
+    一行 `id<TAB>理由`，`#` 开头是注释。命中这里的条目机械层完全不碰：
+    不切、不计「切不动」、不进手工清单。键名、字体资源名、开发占位数字、
+    字体覆盖测试串都属这一类——它们不是正文，切了反而制造问题。
+    """
+    path = skip_path(root, lang)
+    if not os.path.isfile(path):
+        return {}
+    out = {}
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.rstrip("\n")
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            parts = line.split("\t", 1)
+            hid = parts[0].strip()
+            if not hid:
+                continue
+            out[hid] = (parts[1].strip() if len(parts) > 1 else "")
+    return out
 
 
 def read_table(root, lang):
@@ -151,9 +182,59 @@ def insert(text, positions, limit=None, hid=""):
         raise ManualBreakError("%s: 位置没有全部落地，表比文本长" % hid)
     if limit is not None:
         # 引擎在空格与 `<n>` 处都断行，两处都算段边界
-        for seg in re.split(r"<n(?::\d+)?>[ \t]*|[ \t]+", result):
-            if visible_length(seg) > limit:
+        for seg in SEG_SPLIT.split(result):
+            if seg and not SEG_SPLIT.fullmatch(seg) and visible_length(seg) > limit:
                 raise ManualBreakError(
                     "%s: 补完仍有 %d 字段超过上限 %d：%s"
                     % (hid, visible_length(seg), limit, seg[:40]))
     return result
+
+
+def cover(text, positions, limit=None, hid=""):
+    """在机械已断好的整条上，用人工位置**接管**位置所在的整块。
+
+    块 = 原文里空格分隔的一段（空格是译者自己写的断点，可信；`<n>` 是机械猜
+    的，待人工裁决）。机械断行先跑，长条目里大部分块已经切好；人工只需要给
+    切不动的那一块、或切得不合适的那一块补位置。位置按整条累计，先算出每个
+    位置落在哪一块，然后：
+
+    * 该块里机械插的 `<n>` 全部丢掉——人工点了这一块的断点，这一块的断法就
+      由人工决定，机械在这里的刀（比如把「かもしれません」从「かも」处割开）
+      作废；
+    * 按块内偏移补空格；
+    * 不涉及人工位置的块原样保留机械结果。
+
+    位置正好落在块末（那里本来就断）时跳过。补完仍有块超过上限抛
+    `ManualBreakError`——说明人工位置给少了，得再看一眼清单。
+    """
+    parts = BLOCK_SPLIT.split(text)
+    starts, spans = {}, {}
+    acc = 0
+    for i, piece in enumerate(parts):
+        if not piece or BLOCK_SPLIT.fullmatch(piece):
+            continue
+        width = visible_length(piece)
+        starts[i], spans[i] = acc, width
+        acc += width
+
+    owners = {}
+    for pos in positions:
+        hit = None
+        for i in starts:
+            if starts[i] < pos < starts[i] + spans[i]:
+                hit = i
+                break
+            if pos == starts[i] + spans[i]:
+                hit = "skip"
+                break
+        if hit is None:
+            raise ManualBreakError("%s: 位置 %d 不落在任何块内（总字数 %d）"
+                                   % (hid, pos, acc))
+        if hit == "skip":
+            continue
+        owners.setdefault(hit, []).append(pos - starts[hit])
+
+    for i, offsets in owners.items():
+        bare = TAG_ONLY.sub("", parts[i])
+        parts[i] = insert(bare, offsets, limit=limit, hid=hid)
+    return "".join(parts)

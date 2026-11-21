@@ -72,7 +72,7 @@ src/tools/
 | `text/entries.py` | 把译文条目按结构分类 |
 | `text/marks.py` | 译文层内联标注：解析、展开、剥标 |
 | `text/toml_io.py` | 译文与产物共用的 TOML 读写（id 顺序、转义、原子写） |
-| `text/line_breaks.py` | 手工断点层：`src/data/line_breaks/<lang>.toml` 的位置校验与插 `<n>`（可见字口径、越界/递增/超限即报错） |
+| `text/line_breaks.py` | 手工断点层：`src/data/line_breaks/<lang>.toml` 的位置校验与补空格、`<lang>_skip.txt` 的「不处理」名单，`cover()` 只接管位置所在的块（可见字口径、越界/递增/超限即报错） |
 | `text/lang_id.py` | 语种判定共享模块：停用词表 `STOP`、`guess()`（返回语种／命中数／各语言得分）、`is_foreign()`（「整条是别的语言」的判据 + 版权声明白名单）。`lang_check` 的串语言层、`lang_mix` 与 `ref_clean --align-foreign` 共用这一份，口径只写一次 |
 | `text/apply_zh_rules.py` | 中文构建入口的兼容门面，新代码用 `zh_pipeline` |
 | `text/zh_pipeline.py` | 中文「分词前」：连词、人名、数字/破折号/`<n><n>` 空格 |

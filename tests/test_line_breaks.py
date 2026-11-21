@@ -94,6 +94,16 @@ class TestReadTable(unittest.TestCase):
         self.assertIsInstance(table, dict)
 
 
+class TestReadSkip(unittest.TestCase):
+
+    def test_missing_file_is_empty_set(self):
+        self.assertEqual(LB.read_skip(os.path.join(ROOT, "build", "qa"), "zz"), {})
+
+    def test_shipped_ja_skip_has_dev_placeholder(self):
+        skip = LB.read_skip(ROOT, "ja")
+        self.assertIn("0xd3481940", skip)
+
+
 class TestJaWrap(unittest.TestCase):
 
     @classmethod
@@ -101,32 +111,89 @@ class TestJaWrap(unittest.TestCase):
         cls.lb = ja.JaLineBreak()
 
     def test_short_text_untouched(self):
-        self.assertEqual(self.lb.wrap("短い文です。"), ("短い文です。", True, ""))
+        self.assertEqual(self.lb.wrap("短い文です。"), ("短い文です。", True, "", False))
 
     def test_spaces_alone_already_break(self):
         # 每段都在上限内，不该插 <n>
         self.assertEqual(self.lb.wrap("これは とても 短い 文です。"),
-                         ("これは とても 短い 文です。", True, ""))
+                         ("これは とても 短い 文です。", True, "", False))
 
     def test_cuts_after_particle(self):
         self.assertEqual(self.lb.wrap("所在地であってはなりません！"),
-                         ("所在地であっては<n>なりません！", True, ""))
+                         ("所在地であっては<n>なりません！", True, "", False))
 
     def test_key_name_is_unbreakable(self):
         t = "IDM_CONTEST_01_2004_LOG_00_TEXT"
-        self.assertEqual(self.lb.wrap(t), (t, False, t))
+        self.assertEqual(self.lb.wrap(t), (t, False, t, False))
 
     def test_proper_noun_is_unbreakable(self):
         t = "インターナショナルプロダクトマネージャー"
-        self.assertEqual(self.lb.wrap(t), (t, False, t))
+        self.assertEqual(self.lb.wrap(t), (t, False, t, False))
 
     def test_reports_the_failed_segment_not_the_longest(self):
         # 前面能切的段照切，报的是后面那段含长专名的
         t = "所在地であってはなりません！ クラウス・シュテルテベッカーを"
-        new, ok, bad = self.lb.wrap(t)
+        new, ok, bad, _used = self.lb.wrap(t)
         self.assertFalse(ok)
         self.assertEqual(bad, "クラウス・シュテルテベッカーを")
         self.assertIn("<n>", new)
+
+    def test_fix_covers_the_block_it_lands_in(self):
+        # 手工位置落在后一块：那一块由人工决定，前一块的机械 <n> 保留
+        t = "所在地であってはなりません！ クラウス・シュテルテベッカーを"
+        fix = lambda whole: LB.cover(whole, [18, 19], limit=13, hid="x")
+        new, ok, bad, used = self.lb.wrap(t, fix=fix)
+        self.assertTrue(ok)
+        self.assertTrue(used)
+        self.assertEqual(bad, "")
+        self.assertIn("<n>", new)                      # 前一块的机械切还在
+        self.assertIn("クラウス ・ シュテルテベッカーを", new)
+
+    def test_fix_drops_mechanical_cut_inside_the_block(self):
+        # 机械把「かも」割开；人工点了这一块，块里的 <n> 就作废
+        t = "船が沈んで生存者がいるかもしれません。"
+        fix = lambda whole: LB.cover(whole, [9], limit=13, hid="x")
+        new, ok, _bad, used = self.lb.wrap(t, fix=fix)
+        self.assertTrue(ok)
+        self.assertTrue(used)
+        self.assertNotIn("<n>", new)
+        self.assertEqual(new, "船が沈んで生存者が いるかもしれません。")
+
+    def test_fix_that_still_overflows_stays_unresolved(self):
+        t = "所在地であってはなりません！ クラウス・シュテルテベッカーを"
+        fix = lambda whole: LB.cover(whole, [400], limit=13, hid="x")
+        new, ok, bad, used = self.lb.wrap(t, fix=fix)
+        self.assertFalse(ok)
+        self.assertFalse(used)
+        self.assertEqual(bad, "クラウス・シュテルテベッカーを")
+
+    def test_fix_that_changes_nothing_does_not_count_as_manual(self):
+        # 位置全落在已有空白上时不改文本，也不该算「用了手工」
+        t = "これは とても 短い 文です。"
+        fix = lambda whole: LB.cover(whole, [3], limit=13, hid="x")
+        new, ok, _bad, used = self.lb.wrap(t, fix=fix)
+        self.assertTrue(ok)
+        self.assertFalse(used)
+        self.assertEqual(new, t)
+
+
+class TestCover(unittest.TestCase):
+
+    def test_leaves_other_blocks_alone(self):
+        t = "あ<n>い かきくけこ"
+        self.assertEqual(LB.cover(t, [2, 3], limit=13, hid="x"), "あ<n>い か きくけこ")
+
+    def test_position_between_blocks_is_skipped(self):
+        t = "あい かき"
+        self.assertEqual(LB.cover(t, [2], limit=13, hid="x"), "あい かき")
+
+    def test_position_outside_raises(self):
+        with self.assertRaises(LB.ManualBreakError):
+            LB.cover("あい かき", [9], limit=13, hid="x")
+
+    def test_too_long_block_raises(self):
+        with self.assertRaises(LB.ManualBreakError):
+            LB.cover("あいかき", [1], limit=2, hid="x")
 
 
 if __name__ == "__main__":

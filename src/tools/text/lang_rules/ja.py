@@ -164,8 +164,10 @@ class JaLineBreak:
     在词中间下刀，读起来比换行更糟。切完仍超限的条目记进
     `build\qa\line_manual_ja.txt`，由 `src\data\line_breaks\ja.toml` 的手工位置兜底。
 
-    手工表优先：某条在表里就直接用人工断点，不再跑机械切（人工位置未必是
-    机械层会选的点）。机械层写 `<n>`，手工层只补空格。
+    两层顺序：先机械切，再按手工表补空格。手工表不是「整条接管」——长条目
+    里机械层已经切好的段要留着，人工只给切不动的那一段补位置；机械层能切
+    但切得不合适的（`0xc73939cf` 把「かもしれません」割开），人工位置同样落在
+    机械结果上改。机械层写 `<n>`，手工层只补空格。
     """
 
     def __init__(self, root=None, limit=None):
@@ -173,6 +175,7 @@ class JaLineBreak:
         self.root = root or _root()
         self.limit = int(limit or 13)
         self.table = self.LB.read_table(self.root, LANG)
+        self.skip = self.LB.read_skip(self.root, LANG)
 
     # ---- 对外 ----------------------------------------------------
     def run(self, out, order):
@@ -182,33 +185,40 @@ class JaLineBreak:
             text = out.get(hid)
             if not text:
                 continue
-            if hid in self.table:
-                new = self.LB.insert(text, self.table[hid], limit=self.limit, hid=hid)
-                if new != text:
-                    out[hid] = new
-                    changed += 1
-                    manual += 1
+            if hid in self.skip:
                 continue
-            new, ok, bad = self.wrap(text)
+            pos = self.table.get(hid)
+            fixer = None
+            if pos:
+                fixer = (lambda whole, _p=pos, _h=hid:
+                         self.LB.cover(whole, _p, limit=self.limit, hid=_h))
+            new, ok, bad, used = self.wrap(text, fix=fixer)
             if not ok:
                 unresolved += 1
                 missed.append((hid, bad))
-            elif new != text:
+                continue
+            if new != text:
                 out[hid] = new
                 changed += 1
+                if used:
+                    manual += 1
         self.write_missed(missed)
         return {"changed": changed, "manual": manual, "unresolved": unresolved}
 
-    def wrap(self, text):
-        """按段机械断行。返回 (新文本, 是否全部解决, 第一个切不动的段)。
+    def wrap(self, text, fix=None):
+        """先机械断行，再让手工断点整段改一遍。返回 (新文本, 是否全部解决, 第一个切不动的段, 是否用了手工)。
 
         引擎在空格与 `<n>` 处都断，所以两者都是段边界；只有一段里没有空格才
         需要靠 `<n>` 切。第三项回的是**真正切不动的那一段**，不是最长段——
         清单要拿它给人工填位置。
+
+        `fix(text)` 是手工断点：拿到机械切完的整条，按人工位置补空格。位置是
+        整条口径，所以长条目里人工只点名的那一段会被改，其余段保留机械切。
+        `fix` 抛 `ManualBreakError`（位置落不下来、补完仍超限）时不采用，仍按
+        切不动报清单。
         """
         segs = re.split(r"(<n(?::\d+)?>|[ \t]+)", text)
         out = []
-        bad = ""
         for part in segs:
             if not part:
                 continue
@@ -219,13 +229,27 @@ class JaLineBreak:
                 out.append(part)
                 continue
             wrapped = self.wrap_segment(part)
-            if wrapped is None:
-                if not bad:
-                    bad = part
-                out.append(part)
-            else:
-                out.append(wrapped)
-        return "".join(out), (bad == ""), bad
+            out.append(part if wrapped is None else wrapped)
+        new = "".join(out)
+        bad = self.first_over(new)
+        used = False
+        if fix is not None:
+            try:
+                fixed = fix(new)
+            except self.LB.ManualBreakError:
+                fixed = None
+            if fixed is not None:
+                used = fixed != new
+                new = fixed
+                bad = self.first_over(new)
+        return new, (bad == ""), bad, used
+
+    def first_over(self, text):
+        """整条里第一个超过上限的段（没有则空串）。"""
+        for part in re.split(r"<n(?::\d+)?>[ \t]*|[ \t]+", text):
+            if part and self.LB.visible_length(part) > self.limit:
+                return part
+        return ""
 
     def wrap_segment(self, seg):
         """一段超限文本 → 加 `<n>` 的文本；切不动返回 None。"""
