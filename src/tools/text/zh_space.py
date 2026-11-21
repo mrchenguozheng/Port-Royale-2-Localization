@@ -311,8 +311,15 @@ def compact(text, lookup, max_chars=MAX_CHARS):
     旧实现只切「连续汉字串」，这类多短句段落一条空格都拿不到，正是长文空白的成因。
 
     断点顺序：先按停顿标点（，。！？；：、…— 与收尾引号括号）分段，
-    段内放得下就不再动；放不下时用 `_dp_pack()` 在词界里挑断点。标点本身不留
-    空格，空格只落在「已经放不下了」的位置上，比逢词插空格干净得多。
+    **标点后强制断一刀**（`_break_after_punct()`）：标点本来就是行末最自然的
+    位置，留一刀在这里，行只会更短，不会更长。分句内部放得下就不再动；
+    放不下时用 `_dp_pack()` 在词界里挑断点。
+
+    早先的做法是「标点后不额外留空格，只在放不下时才落刀」，理由是少刀、
+    行更饱满。代价是逗号会被并进下一条 13 字预算里：两个标点之间那段只要没
+    超预算，这一刀就丢，行随之后移。行数多不是问题（实机窄框关心的是一行能
+    不能放下，行多了顶多滚动），所以改成逢标点必断。
+    禁则仍生效：下一件若是收尾引号括号（`」` `』`）这类不能起头的标点，不断。
     """
     parts = _HARD.split(text)
     out = []
@@ -374,16 +381,33 @@ def _atom_weight(atom, names):
     return 6 if atom.startswith("@") else 3
 
 
+def _break_after_punct(prev, nxt):
+    """上一件是停顿标点收尾时，这里是否强制断一刀。
+
+    `，。！？；：、…—` 与收尾引号括号之后一律断：标点在行末本来就合法，
+    断在这里的行只会比不断更短。唯一例外是下一件以不能起头的标点开头
+    （`」` `』` `）` 这类连在一起写的收尾符号），那会把标点顶到行首。
+    """
+    tail = prev[0][-1:] if prev[0] else ""
+    if not tail or (tail not in PAUSE and tail not in CLOSE):
+        return False
+    head = nxt[0][:1] if nxt[0] else ""
+    if head and head in PUNCT_CHARS and head not in LINE_HEAD_OK:
+        return False
+    return True
+
+
 def _pack(units, max_chars):
     """把单位按预算拼回去：预算内不插空格，超了才挑一个最像停顿的位置断。
 
     断点由 DP 挑，不再「填满就断」：贪心会在「…「X」/的按钮」这种地方落刀，
-    前半截成了残句。代价函数见 `_cut_cost()`；`hard`（来自原文空格）是死断点，
-    先把 units 切块，块内再各自挑。
+    前半截成了残句。代价函数见 `_cut_cost()`；`hard`（来自原文空格与 `<n>`）
+    是死断点，标点收尾处（见 `_break_after_punct()`）也算死断点，先把 units
+    切块，块内再各自挑。
     """
     blocks, cur = [], []
     for u in units:
-        if u[2] and cur:
+        if cur and (u[2] or _break_after_punct(cur[-1], u)):
             blocks.append(cur)
             cur = []
         cur.append(u)

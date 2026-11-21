@@ -136,18 +136,37 @@ class TestZhSpace(unittest.TestCase):
         self.assertEqual(zh_space.fallback_wrap("短句"), "短句")
 
     def test_compact_leaves_short_text_alone(self):
-        """紧凑排版：不到预算就一个字都不动，标点旁也不插空格。"""
+        """紧凑排版：不到预算、也没有句中标点就一个字都不动。"""
         whole = lambda run: [run]
         self.assertEqual(zh_space.compact("我刚听说。", whole), "我刚听说。")
         self.assertEqual(zh_space.compact("我刚听说，一艘船沉了。", whole, 20),
-                         "我刚听说，一艘船沉了。")
+                         "我刚听说， 一艘船沉了。")
+
+    def test_compact_breaks_after_punct_always(self):
+        """句中标点后一律断一刀：行只会更短，不会更长。
+
+        早先只在超预算时才在标点落刀，逗号会被并进下一条预算。行数多不是
+        约束（实机窄框只关心一行放不放得下），所以改成逢标点必断。
+        """
+        whole = lambda run: [run]
+        self.assertEqual(zh_space.compact("我刚听说，一艘船沉了", whole, 99),
+                         "我刚听说， 一艘船沉了")
+        self.assertEqual(zh_space.compact("第一句；第二句！第三句？", whole, 99),
+                         "第一句； 第二句！ 第三句？")
+
+    def test_compact_keeps_closing_punct_on_same_line(self):
+        """`」` `』` 这类收尾符号不能起头：标点后那刀要让位，不能把符号顶到行首。"""
+        whole = lambda run: [run]
+        self.assertEqual(zh_space.compact("他说「走」然后离开了。", whole, 99),
+                         "他说「走」 然后离开了。")
+        self.assertNotIn(" 」", zh_space.compact("他说「走」然后离开了。", whole, 99))
 
     def test_compact_breaks_on_particle_not_mid_word(self):
         """超预算时才断，且断点落在停顿字「的」后面，不切「英格兰/船」。"""
         lookup = lambda run: ["一艘", "满载", "移民", "的",
                               "英格兰", "船", "沉了"]
         out = zh_space.compact("我刚听说，一艘满载移民的英格兰船沉了。", lookup, 10)
-        self.assertTrue(out.startswith("我刚听说，"))
+        self.assertTrue(out.startswith("我刚听说， "))
         self.assertIn(" ", out)
         self.assertNotIn("英格兰 船", out)
 
