@@ -138,5 +138,45 @@ class TestApply(unittest.TestCase):
         self.assertEqual(report["filled"], 0)
 
 
+class TestEnBase(unittest.TestCase):
+    """合并用的英文基准：默认读 clean 版，与 text_lint 同源。
+
+    照 en 原件判，`0xdb0108dd` 这类被 clean 补过 `<n>` 的条目会被判成「Extra tag」
+    而整批拒写；这里钉住「默认取 clean」「clean 缺了退回原件」「--base 显式优先」。
+    """
+
+    orig_path = os.path.join(M.ORIG, M.BASE + ".toml")
+
+    @unittest.skipUnless(os.path.isfile(M.CLEAN), "没有 clean 产物")
+    def test_default_base_is_clean(self):
+        doc, path = M.load_en_doc()
+        self.assertEqual(os.path.normcase(path), os.path.normcase(M.CLEAN))
+
+    @unittest.skipUnless(os.path.isfile(M.CLEAN) and os.path.isfile(orig_path),
+                         "没有 clean 或 en 原件")
+    def test_clean_has_the_padded_placeholder(self):
+        clean, _ = M.load_en_doc(M.CLEAN)
+        orig, _ = M.load_en_doc(self.orig_path)
+        self.assertGreater(clean.get("0xdb0108dd", "").count("<n>"),
+                           orig.get("0xdb0108dd", "").count("<n>"))
+
+    @unittest.skipUnless(os.path.isfile(orig_path), "没有 en 原件")
+    def test_fallback_to_orig_when_clean_missing(self):
+        keep = M.CLEAN
+        try:
+            M.CLEAN = os.path.join(tempfile.gettempdir(), "no-such-clean.toml")
+            doc, path = M.load_en_doc()
+            self.assertEqual(os.path.normcase(path),
+                             os.path.normcase(self.orig_path))
+        finally:
+            M.CLEAN = keep
+
+    @unittest.skipUnless(os.path.isfile(orig_path), "没有 en 原件")
+    def test_explicit_base_wins(self):
+        doc, path = M.load_en_doc(self.orig_path)
+        self.assertEqual(os.path.normcase(path),
+                         os.path.normcase(self.orig_path))
+
+
 if __name__ == "__main__":
     unittest.main()

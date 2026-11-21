@@ -41,6 +41,10 @@ from build_artifacts import compile_pack             # noqa: E402
 
 BASE = "en.gog_1.1.2.3"
 ORIG = os.path.join(SRC, "orig")
+#: 英文基准读清洁版（`ref_clean.py` 产出），与 `text_lint.py` 同源：en 原件有两处漏掉的
+#: `<n>`（`0x0cf7abf0`、`0xdb0108dd`），照原件判会把已补齐的译文判成「Extra tag」。
+#: clean 不在时（干净 clone、临时 src）退回原件，行为与从前一致。
+CLEAN = os.path.join(ROOT, "build", "ref", "clean", "en-clean.toml")
 TRANS = os.path.join(SRC, "translations")
 PACK_OUT = os.path.join(ROOT, "build", "runtime", "PR2Localization", "packs")
 DEFAULT_IN = os.path.join(ROOT, "build", "qa", "batches")
@@ -66,6 +70,14 @@ def read_rows(paths):
                 row["_batch"] = os.path.basename(path)
                 rows.append(row)
     return rows, bad
+
+
+def load_en_doc(explicit=""):
+    """取英文基准：`--base` > clean 版 > 原件；返回 (doc, 用的是哪个文件)。"""
+    for cand in (explicit, CLEAN, os.path.join(ORIG, BASE + ".toml")):
+        if cand and os.path.isfile(cand):
+            return TI.read_doc(cand)[0], cand
+    raise ValueError("找不到英文基准：%s" % os.path.join(ORIG, BASE + ".toml"))
 
 
 def collect_files(target):
@@ -162,6 +174,9 @@ def main():
     ap.add_argument("--no-fill-dups", action="store_true", help="不回填同文组")
     ap.add_argument("--strict", action="store_true", help="警告也拒绝写入")
     ap.add_argument("--no-compile", action="store_true", help="只写 TOML，不出包")
+    ap.add_argument("--base", default="",
+                    help="英文基准文件，默认取 build\\ref\\clean\\en-clean.toml，"
+                         "缺省再退回 src\\orig\\en.gog_1.1.2.3.toml")
     ap.add_argument("--dry-run", action="store_true", help="只校验，不改文件")
     ap.add_argument("--json", action="store_true", help="只输出 JSON 摘要")
     args = ap.parse_args()
@@ -179,7 +194,7 @@ def main():
               % (path, args.lang), file=sys.stderr)
         return 2
 
-    en_doc = TI.read_doc(os.path.join(ORIG, BASE + ".toml"))[0]
+    en_doc, en_path = load_en_doc(args.base)
     doc, order = TI.read_doc(path)
     rows, bad = read_rows(paths)
 
