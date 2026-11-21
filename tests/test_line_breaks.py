@@ -54,21 +54,26 @@ class TestParsePositions(unittest.TestCase):
 
 class TestInsert(unittest.TestCase):
 
-    def test_inserts_before_visible_char(self):
-        self.assertEqual(LB.insert("あいうえお", [2], hid="0x1"), "あい<n>うえお")
+    def test_inserts_space_before_visible_char(self):
+        # 手工层只补空格，不写 <n>
+        self.assertEqual(LB.insert("あいうえお", [2], hid="0x1"), "あい うえお")
 
     def test_skips_tags_when_counting(self):
         # 第 2 个可见字之前，标签不占位
         self.assertEqual(LB.insert("あ<gs:x>いう", [2], hid="0x1"),
-                         "あ<gs:x>い<n>う")
+                         "あ<gs:x>い う")
 
     def test_limit_counts_space_as_boundary(self):
         # 位置不数空白：位置 3 是第 3 个非空白可见字（「え」）之前
         self.assertEqual(LB.insert("あいう えお", [3], limit=3, hid="0x1"),
-                         "あいう <n>えお")
+                         "あいう えお")
 
     def test_space_does_not_consume_a_position(self):
-        self.assertEqual(LB.insert("あ い う", [2], hid="0x1"), "あ い <n>う")
+        self.assertEqual(LB.insert("あ い う", [2], hid="0x1"), "あ い う")
+
+    def test_no_double_space_when_position_lands_on_space(self):
+        # 位置落在已有空白上，不再补第二个空格
+        self.assertEqual(LB.insert("あ い", [1], hid="0x1"), "あ い")
 
     def test_limit_raises_when_segment_too_long(self):
         with self.assertRaises(LB.ManualBreakError):

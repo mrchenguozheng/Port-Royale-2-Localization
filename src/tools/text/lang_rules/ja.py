@@ -165,7 +165,7 @@ class JaLineBreak:
     `build\qa\line_manual_ja.txt`，由 `src\data\line_breaks\ja.toml` 的手工位置兜底。
 
     手工表优先：某条在表里就直接用人工断点，不再跑机械切（人工位置未必是
-    机械层会选的点）。
+    机械层会选的点）。机械层写 `<n>`，手工层只补空格。
     """
 
     def __init__(self, root=None, limit=None):
@@ -344,7 +344,7 @@ class JaLineBreak:
             f.write("# 多数是段里有超过上限的不可切串（专名、职位名、键名、数字），\n")
             f.write("# 机械层不硬拆；有的只能靠改译缩短或容忍超限。\n")
             f.write("# 确实要换个人工位置的，写进 src\\data\\line_breaks\\ja.toml：\n")
-            f.write('#   "0x…" = [12]   # 在第 12 个可见字之前插 <n>（段首记 0）\n')
+            f.write('#   "0x…" = [12]   # 在第 12 个可见字之前补一个空格（段首记 0）\n')
             f.write("\n## 含日文（%d 条）\n" % len(need))
             for hid, seg, plain in sorted(need):
                 f.write("%s\t%d 字\t%s\n"
