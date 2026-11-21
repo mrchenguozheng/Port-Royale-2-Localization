@@ -179,6 +179,16 @@ class TestZhSpace(unittest.TestCase):
         self.assertEqual(zh_space.bind(["好几", "件事", "让"]), ["好几件事", "让"])
         self.assertEqual(zh_space.bind(["好几件", "事"]), ["好几件事"])
 
+    def test_bind_merges_quantifier_and_noun(self):
+        """量词 + 双字名词粘住：「一座 城镇」实机拆过。"""
+        self.assertEqual(zh_space.bind(["一座", "城镇", "派往"]), ["一座城镇", "派往"])
+
+    def test_bind_merges_postposition(self):
+        """后置方位词粘左：实机出过「在这些城镇 之间运输」这种拆法。"""
+        self.assertEqual(zh_space.bind(["这些", "城镇", "之间", "运输"]),
+                         ["这些城镇之间", "运输"])
+        self.assertEqual(zh_space.bind(["%1", "之间", "运输"]), ["%1", "之间", "运输"])
+
     def test_compact_keeps_short_name_template(self):
         """`%1·%2` 这种只有三件的姓名模板放得下就不断，别再插空格。"""
         whole = lambda run: list(run)

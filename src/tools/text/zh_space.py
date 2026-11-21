@@ -84,6 +84,10 @@ QUANT_HEAD = set("一二三四五六七八九十每各半几这那些")
 #: 「好几件 / 事」，「件事」硬拆成量词和名词两段，照样被 DP 拦腰断）。
 QUANT_TAIL = set("件个只条艘座名位张支门枚种项份类批群次段块片句页行章节层根粒颗"
                  "滴束把间所处场轮趟番期笔封幅顶")
+#: 后置方位/范围词：紧贴前一个名词才读得顺。spaCy 把「这些城镇之间」切成
+#: 「这些 / 城镇 / 之间」，DP 就在「城镇」和「之间」中间落刀，实机出
+#: 「在这些城镇 之间运输」——名词和它的后置词被拆到两行，读起来别扭。
+POSTPOS = set("之间 之后 之前 以上 以下 以内 以外 之中 中间 附近 周围 旁边 里面 外面 当中".split())
 
 #: 默认每组最多多少字（预算，不是像素）。
 #:
@@ -195,6 +199,13 @@ def bind(words):
                 merged[-1] += w
                 continue
             if len(prev) <= 3 and prev[-1] in QUANT_TAIL and len(w) == 1 and _is_han(w):
+                merged[-1] += w
+                continue
+            if len(prev) <= 3 and prev[-1] in QUANT_TAIL and len(w) == 2 \
+                    and prev not in POSTPOS and _is_han(w[0]) and _is_han(w[1]):
+                merged[-1] += w
+                continue
+            if w in POSTPOS and prev and _is_han(prev[-1]):
                 merged[-1] += w
                 continue
         merged.append(w)
