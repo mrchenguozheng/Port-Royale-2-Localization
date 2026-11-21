@@ -40,9 +40,8 @@ def esc(text):
 
 def order_of(path):
     """按 `"id" = ...` 的行序取 id 列表（注释与空行忽略）。"""
-    return [m.group(1) for m in
-            (_ORDER_RX.match(line) for line in io.open(path, encoding="utf-8"))
-            if m]
+    with io.open(path, encoding="utf-8") as fh:
+        return [m.group(1) for m in map(_ORDER_RX.match, fh) if m]
 
 
 def read_doc(path):
@@ -64,10 +63,11 @@ def head_lines(path):
     """取文件开头的连续 `#` 注释行（写回时原样保留）。"""
     out = []
     try:
-        for line in io.open(path, encoding="utf-8"):
-            if not line.startswith("#"):
-                break
-            out.append(line.rstrip("\n"))
+        with io.open(path, encoding="utf-8") as fh:
+            for line in fh:
+                if not line.startswith("#"):
+                    break
+                out.append(line.rstrip("\n"))
     except OSError:
         pass
     return out

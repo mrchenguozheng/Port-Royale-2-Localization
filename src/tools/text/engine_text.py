@@ -119,6 +119,10 @@ def main():
         kinds = stats.get("kinds") or {}
         if kinds:
             print("分类：" + "｜".join("%s %d" % (k, n) for k, n in kinds.items()))
+        if "break" in stats:
+            print("断行：机械改动 %d 条｜手工断点 %d 条｜切不动 %d 条" % (
+                stats["break"], stats.get("break_manual", 0),
+                stats.get("break_unresolved", 0)))
 
     if a.check:
         old = toml_io.read_doc_loose(out_path(a.lang))

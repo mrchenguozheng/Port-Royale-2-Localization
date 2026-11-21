@@ -102,6 +102,9 @@ class LangSpec:
     punct: object = None
     segmenter: object = field(default_factory=NullSegmenter)
     spacing: object = field(default_factory=NoSpacing)
+    #: 引擎层断行（可选）。`run(out, order)` 就地改 out，返回统计字典。
+    #: 日语用它做「机械断行 + 手工断点」；其他语言不声明就是不断行。
+    linebreak: object = None
 
 
 #: 没有专用声明的语言：原样返回（用空格分词的语言不需要加工）
@@ -149,6 +152,14 @@ def build_texts(spec, doc, order=None):
         d = spec.spacing.apply(c, ctx)
         stats["space"] += int(d != c)
         out[hid] = d
+
+    # 断行是最后一步：它只看已经排好的引擎文本，不回头改字。
+    stats["break"] = 0
+    if spec.linebreak is not None:
+        lb = spec.linebreak.run(out, order)
+        stats["break"] = lb.get("changed", 0)
+        stats["break_manual"] = lb.get("manual", 0)
+        stats["break_unresolved"] = lb.get("unresolved", 0)
 
     spec.spacing.report()
     seg_name = getattr(ctx, "segmenter_name", "") or getattr(spec.segmenter, "name", "")
