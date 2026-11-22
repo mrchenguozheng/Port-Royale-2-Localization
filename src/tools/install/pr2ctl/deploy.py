@@ -7,7 +7,7 @@ from . import steam_host
 
 
 def edition_of(target, edition=None):
-    """显式传入优先；否则按 Steam 宿主 DLL 或 PR2.exe 哈希判断。"""
+    """显式传入优先；否则按宿主 DLL 或 PR2.exe 哈希判断版别（只用于显示）。"""
     return edition or steam_host.detect_edition(target)
 
 
@@ -96,7 +96,7 @@ def deploy_steps(target, langs, edition=None):
             steps.append(("%s\\%s" % (PACK_DIR, name), src,
                           os.path.join(target, PACK_DIR, name)))
 
-    # Steam 宿主代理不在这里复制：替换必须校验原版、留备份、写完临时文件再换名，
+    # 宿主代理不在这里复制：替换必须校验原版、留备份、写完临时文件再换名，
     # 这件事只在 steam_host.swap_host 里做（部署末尾单独调用）。
     return steps
 
@@ -167,12 +167,14 @@ def deploy(target, langs=None, edition=None):
             "最常见的原因是游戏正在运行 —— 请先关闭 Port Royale 2 再试。"
         )
     edition = edition_of(target, edition)
+    has_host = steam_host.has_host(target)
     try:
-        if edition == "steam":
+        if has_host:
+            # 两版都带同名宿主 DLL，挂载不分版别。
             # 先验证原版并建立 .orig / host-backup 备份；失败就完全不改目录。
             steam_host.prepare_mount(target)
     except steam_host.HostError as exc:
-        return False, "Steam 宿主 DLL 检查失败，未挂载：\n\n%s" % exc
+        return False, "宿主 DLL 检查失败，未挂载：\n\n%s" % exc
 
     copied, same, failed = [], [], []
     try:
@@ -187,13 +189,13 @@ def deploy(target, langs=None, edition=None):
             name = os.path.basename(dst)
             (copied if r == "copied" else same if r == "same" else failed).append(name)
 
-        if edition == "steam" and not failed:
+        if has_host and not failed:
             # 宿主替换是独立动作：校验原版 → 备份 → 写临时文件 → 校验 → 换名 → 再校验。
             steam_host.swap_host(
                 target, os.path.join(RUNTIME, steam_host.HOST_DLL))
 
     except steam_host.HostError as exc:
-        return False, "Steam 宿主 DLL 替换失败，原文件未改动：\n\n%s" % exc
+        return False, "宿主 DLL 替换失败，原文件未改动：\n\n%s" % exc
     except PermissionError:
         return False, "权限不足。请确认游戏已关闭，且该目录允许写入。"
     except OSError as exc:
@@ -202,9 +204,9 @@ def deploy(target, langs=None, edition=None):
     if failed:
         return False, "以下文件复制失败：%s\n\n请确认游戏已关闭。" % "、".join(failed)
     extra = ""
-    if edition == "steam":
+    if has_host:
         extra = (
-            "\n\nSteam 宿主：原版已备份为 %s 和 %s；"
+            "\n\n宿主 DLL：原版已备份为 %s 和 %s；"
             "还原时运行 PR2HostMount.ps1 -Action Restore（或删掉根目录的代理后把 .orig.dll 改名回 %s）。"
             % (steam_host.HOST_ORIG, steam_host.HOST_BACKUP,
                steam_host.HOST_DLL)
@@ -231,12 +233,13 @@ def run_deploy(target, langs, events, edition=None):
             return
 
         edition = edition_of(target, edition)
-        if edition == "steam":
+        has_host = steam_host.has_host(target)
+        if has_host:
             try:
                 steam_host.prepare_mount(target)
-                events.put(("line", "已校验并备份 Steam 宿主 DLL"))
+                events.put(("line", "已校验并备份宿主 DLL"))
             except steam_host.HostError as exc:
-                events.put(("line", "Steam 宿主检查失败，未挂载：%s" % exc))
+                events.put(("line", "宿主检查失败，未挂载：%s" % exc))
                 events.put(("deploy_failed", ""))
                 return
 
@@ -261,14 +264,14 @@ def run_deploy(target, langs, events, edition=None):
                 events.put(("deploy_failed", ""))
                 return
 
-        if edition == "steam":
+        if has_host:
             steam_host.swap_host(
                 target, os.path.join(RUNTIME, steam_host.HOST_DLL))
-            events.put(("line", "已校验原版、建立备份并替换 Steam 宿主 DLL"))
+            events.put(("line", "已校验原版、建立备份并替换宿主 DLL"))
 
         events.put(("deploy_ok", target))
     except steam_host.HostError as exc:
-        events.put(("line", "Steam 宿主 DLL 替换失败，原文件未改动：%s" % exc))
+        events.put(("line", "宿主 DLL 替换失败，原文件未改动：%s" % exc))
         events.put(("deploy_failed", ""))
     except Exception as exc:                      # 兜底，别让线程静默死掉
         events.put(("line", "部署出错：%s" % exc))

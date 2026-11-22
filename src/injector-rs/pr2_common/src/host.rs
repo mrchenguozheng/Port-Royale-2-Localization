@@ -1,4 +1,8 @@
-//! Steam 宿主 DLL：版别判断、状态查询与挂载脚本位置。
+//! 宿主 DLL：版别判断、状态查询与挂载脚本位置。
+//!
+//! GOG 与 Steam 的 `PR2.exe` 都静态导入同目录的 `Ascaron.Logging-2.6.dll`
+//! （导入表里只有 `Log` 一个函数），两版的原版 DLL 也是同一份字节。所以两版
+//! 走同一条启动路径：先挂载宿主代理，再直启 `PR2.exe`，由代理去加载 Core。
 //!
 //! 替换动作本身只有一份实现 —— 发行包里的 `PR2HostMount.ps1`（先校验原版
 //! 大小/SHA-256、建两份备份、写 `.new` 校验后换名）。启动器和 GUI 只判断
@@ -18,7 +22,10 @@ pub const HOST_BACKUP_REL: &str =
 pub const HOST_MANIFEST_REL: &str = "PR2Localization/host-mount.json";
 pub const HOST_MOUNT_SCRIPT: &str = "PR2HostMount.ps1";
 
-/// Steam 英文 1.1.2.3 自带的 Ascaron.Logging-2.6.dll，必须大小和哈希同时对上。
+/// 原版 `Ascaron.Logging-2.6.dll`，必须大小和哈希同时对上。
+///
+/// 三份实测样本逐字节相同：Steam 英文 1.1.2.3、GOG 英文 1.1.2.3、
+/// GOG 法语 1.1.2.42。所以一份常量覆盖两版，不需要按版别维护指纹表。
 pub const HOST_ORIGINAL_SIZE: u64 = 11776;
 pub const HOST_ORIGINAL_SHA256: &str =
     "0568EC654E147B6D80F60B779843F020A9C8A7C4E53AE0BC364EC6937024D160";
@@ -141,9 +148,12 @@ pub fn host_state(root: &Path) -> HostState {
 
 /// 判断是 Steam 还是 GOG。
 ///
+/// 只用来说明「这是哪个发行版」，**不决定启动路径**：两版都走宿主挂载，
+/// 能不能挂只看根目录有没有宿主 DLL（`has_host_dll`）。
+///
 /// 顺序：GOG 的 `goggame-*.info/.id/.script` 优先（法语 GOG 版也带同名宿主
 /// DLL，不能按 DLL 存在与否猜）；然后是 Steam 的 `steam_appid.txt`；最后才是
-/// 「根目录有宿主 DLL 就当 Steam」。两边都不像时按 GOG 处理，走注入启动。
+/// 「根目录有宿主 DLL 就当 Steam」。两边都不像时按 GOG 处理。
 pub fn detect_edition(root: &Path) -> Edition {
     if has_gog_marker(root) {
         return Edition::Gog;
@@ -176,6 +186,58 @@ fn has_gog_marker(root: &Path) -> bool {
 /// 发行包里的挂载脚本。放在游戏根目录。
 pub fn host_script_path(root: &Path) -> PathBuf {
     root.join(HOST_MOUNT_SCRIPT)
+}
+
+/// 根目录有没有宿主 DLL。有就能挂载直启；没有只能退回注入。
+///
+/// 这是两版共用的唯一判据：`detect_edition` 只决定显示哪个版别名。
+pub fn has_host_dll(root: &Path) -> bool {
+    root.join(HOST_DLL).is_file()
+}
+
+/// 代理自己写的启动日志，在 `PR2Localization\logs\` 下。
+pub const PROXY_LOG_FILE: &str = "proxy.log";
+
+/// 代理进到 `PR2.exe` 进程后写的第一行。
+///
+/// 这是「挂载到底生效没有」的唯一运行时证据：静态导入表只能证明「应该会加载」，
+/// 这行才能证明「这一次真的加载了」。
+pub const PROXY_LOADED_MARKER: &str = "[host] DllMain loaded";
+
+pub fn proxy_log_path(root: &Path) -> PathBuf {
+    crate::log_dir(root).join(PROXY_LOG_FILE)
+}
+
+/// 日志当前长度，用来在启动游戏前记一个基线偏移。
+pub fn proxy_log_len(root: &Path) -> u64 {
+    fs::metadata(proxy_log_path(root))
+        .map(|meta| meta.len())
+        .unwrap_or(0)
+}
+
+/// `offset` 之后新写入的内容里有没有代理加载标记。
+///
+/// 只看增量而不是整份文件：同一个目录反复启动过几十次，整份文件里到处都是
+/// 旧标记，按整份判会把「这次没加载」误当成「加载了」。
+pub fn proxy_loaded_after(root: &Path, offset: u64) -> bool {
+    use std::io::{Read, Seek, SeekFrom};
+    let Ok(mut file) = fs::File::open(proxy_log_path(root)) else {
+        return false;
+    };
+    let Ok(meta) = file.metadata() else {
+        return false;
+    };
+    if meta.len() <= offset {
+        return false;
+    }
+    if file.seek(SeekFrom::Start(offset)).is_err() {
+        return false;
+    }
+    let mut buf = Vec::new();
+    if file.read_to_end(&mut buf).is_err() {
+        return false;
+    }
+    String::from_utf8_lossy(&buf).contains(PROXY_LOADED_MARKER)
 }
 
 /// `steam_appid.txt` 里的 appid，取不到返回 None。
@@ -292,6 +354,48 @@ mod tests {
         fs::write(dir.join(HOST_MANIFEST_REL),
                   b"{\"proxy_sha256\": \"short\"}").unwrap();
         assert_eq!(manifest_proxy_sha(&dir), None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn has_host_dll_is_the_only_gate_for_mounting() {
+        // 两版都带同名宿主 DLL，挂载能力只看这个文件在不在。
+        let dir = tmp("has-host");
+        assert!(!has_host_dll(&dir));
+        fs::write(dir.join(HOST_DLL), b"x").unwrap();
+        assert!(has_host_dll(&dir));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn proxy_marker_only_counts_bytes_after_offset() {
+        let dir = tmp("proxy-log");
+        let log = proxy_log_path(&dir);
+        fs::create_dir_all(log.parent().unwrap()).unwrap();
+        // 上一次启动留下的旧标记，不能算作这一次的。
+        fs::write(&log, "old run\n[host] DllMain loaded\n").unwrap();
+        let base = proxy_log_len(&dir);
+        assert!(!proxy_loaded_after(&dir, base));
+
+        // 这一次启动追加了别的行但没有标记 —— 仍然是「没加载」。
+        let mut file = fs::OpenOptions::new().append(true).open(&log).unwrap();
+        use std::io::Write;
+        writeln!(file, "[host] bootstrap thread start").unwrap();
+        drop(file);
+        assert!(!proxy_loaded_after(&dir, base));
+
+        let mut file = fs::OpenOptions::new().append(true).open(&log).unwrap();
+        writeln!(file, "[host] DllMain loaded").unwrap();
+        drop(file);
+        assert!(proxy_loaded_after(&dir, base));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn proxy_log_absent_is_not_loaded() {
+        let dir = tmp("proxy-log-missing");
+        assert_eq!(proxy_log_len(&dir), 0);
+        assert!(!proxy_loaded_after(&dir, 0));
         let _ = fs::remove_dir_all(&dir);
     }
 }

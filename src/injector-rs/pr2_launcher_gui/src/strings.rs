@@ -14,7 +14,7 @@ const BUILTIN: &[(&str, &str)] = &[
     ("label.language", "Language pack:"),
     ("button.launch", "Launch localized"),
     ("button.vanilla", "Launch original"),
-    ("button.restore", "Restore Steam original"),
+    ("button.restore", "Restore original"),
     ("button.refresh", "Refresh"),
     ("button.kill", "End game process"),
     ("status.count", "%d language pack(s)"),
@@ -29,12 +29,11 @@ const BUILTIN: &[(&str, &str)] = &[
     ("status.none", "No .txt in PR2Localization\\packs"),
     ("status.launched", "Localized game launched."),
     ("status.vanilla", "Original game launched."),
-    ("status.restored", "Restored the original Steam DLL and fonts."),
-    ("status.restore_gog", "This is the GOG edition; nothing to restore."),
+    ("status.restored", "Restored the original host DLL and fonts."),
     ("status.killed", "Ended %d PR2.exe process(es)."),
     (
         "confirm.restore",
-        "Restore the original Steam DLL and original fonts?\n\
+        "Restore the original host DLL and original fonts?\n\
          The game will start in English until you launch localized again.",
     ),
     (

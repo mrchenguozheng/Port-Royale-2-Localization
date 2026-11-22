@@ -9,7 +9,13 @@ use windows_sys::Win32::System::LibraryLoader::GetModuleFileNameW;
 mod host;
 pub use host::*;
 
-pub const RUNTIME_VERSION: u32 = 1;
+/// 运行时契约版本。
+///
+/// v1：GOG 走远程注入、Steam 走宿主 DLL 挂载，两条启动路径。
+/// v2：两版都走宿主 DLL 挂载 + 直启，远程注入只在根目录没有宿主 DLL 时用。
+/// 语言包的 `min_runtime` 只约束这个数字；从 v1 升到 v2 是因为启动契约变了，
+/// 不是包格式变了（包头与正文格式都没动）。
+pub const RUNTIME_VERSION: u32 = 2;
 
 /// 发行版本号（如 `v1.0.0`），由构建脚本通过 `PR2_VERSION` 注入；开发构建为空串。
 /// 语言包里的 `# pack-meta version=` 与它同源，都由 `release.ps1 -Version` 给。

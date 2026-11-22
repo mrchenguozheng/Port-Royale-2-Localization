@@ -1,7 +1,8 @@
-﻿# PR2HostMount.ps1 —— Steam 版宿主 DLL 的备份、挂载与还原。
+﻿# PR2HostMount.ps1 —— 宿主 DLL 的备份、挂载与还原（GOG 与 Steam 通用）。
 #
-# Steam 的 PR2.exe 静态导入 Ascaron.Logging-2.6.dll。本脚本只替换这一个
-# DLL，并在替换前验证原版大小和 SHA-256。校验不通过时不覆盖任何文件。
+# 两版 PR2.exe 都静态导入 Ascaron.Logging-2.6.dll，原版也是同一份字节，
+# 所以脚本不区分版别。本脚本只替换这一个 DLL，并在替换前验证原版大小和
+# SHA-256。校验不通过时不覆盖任何文件。
 #
 #   powershell -ExecutionPolicy Bypass -File .\PR2HostMount.ps1 -Action Status
 #   powershell -ExecutionPolicy Bypass -File .\PR2HostMount.ps1 -Action Mount
@@ -66,8 +67,16 @@ function Write-Manifest([string]$Root, [string]$ProxySha) {
     if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
+    # edition 只作诊断：goggame-* 标记优先，其次 steam_appid.txt，都没有就 unknown。
+    $edition = 'unknown'
+    $gog = @(Get-ChildItem -LiteralPath $Root -Filter 'goggame-*.info' -ErrorAction SilentlyContinue).Count
+    if ($gog -gt 0) {
+        $edition = 'gog'
+    } elseif (Test-Path -LiteralPath (Join-Path $Root 'steam_appid.txt') -PathType Leaf) {
+        $edition = 'steam'
+    }
     $data = [ordered]@{
-        edition = 'steam'
+        edition = $edition
         host = $HostDll
         original_sha256 = $ExpectedSha
         proxy_sha256 = $ProxySha
@@ -122,7 +131,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $Root 'PR2.exe') -PathType Leaf)) {
     throw "目标目录没有 PR2.exe：$Root"
 }
 if (-not (Test-Path -LiteralPath $RootDll -PathType Leaf)) {
-    throw "目标目录没有 $HostDll，不能按 Steam 版处理"
+    throw "目标目录没有 $HostDll，不能挂载宿主代理"
 }
 
 $manifest = Read-Manifest $Root
@@ -194,7 +203,7 @@ if ($Action -eq 'Mount') {
 
     if ((Get-FileSha256 $RootDll) -ne $proxySha) {
         Copy-DllAtomically -Source $ProxyPath -Dest $RootDll -ExpectSha $proxySha `
-            -What 'Steam 宿主代理'
+            -What '宿主代理'
     }
     Write-Manifest $Root $proxySha
     Write-Output "已挂载：$RootDll"

@@ -7,20 +7,23 @@
 ## 项目边界
 
 - 这是《Port Royale 2》的**外挂式本地化运行时**：原版 `PR2.exe` 不改字节。
-  两个版本的正式入口都是 `PR2LocalizationGUI.exe` / `PR2Localization.exe`：GOG 由启动器注入
-  `PR2LocalizationCore.dll`，Steam 由启动器先挂载宿主代理再直启。不要按“GOG 双击 `PR2.exe` 自然加载”做回归：GOG 加载器会把
-  `VERSION.dll` 解析到 `C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入
-  `PR2.exe` 进程。
-- **GOG 英文版 `1.1.2.3` 已通过启动器入口实测；Steam 英文版 `1.1.2.3` 已通过宿主 DLL
-  代理实测（中文界面）**。Steam 不再走 `VERSION.dll`：`PR2.exe` 静态导入
-  `Ascaron.Logging-2.6.dll`，代理接管它的 `Log` 导出。
+  两个版本的正式入口都是 `PR2LocalizationGUI.exe` / `PR2Localization.exe`：启动器先挂载
+  宿主代理 `Ascaron.Logging-2.6.dll`，再直启 `PR2.exe`。挂载之后直接双击 `PR2.exe`
+  也是有效路径——代理在工作线程里加载 `PR2LocalizationCore.dll`。
+  不要再用 `VERSION.dll`：它属于 Windows 的 KnownDLLs，同目录代理永远进不去 `PR2.exe`。
+- **GOG 英文版 `1.1.2.3` 与 Steam 英文版 `1.1.2.3` 都已通过宿主 DLL 代理实测（中文界面）**。
+  两版的 `PR2.exe` 导入表逐项一致（21 个 DLL，`Ascaron.Logging-2.6.dll` 只导入 `Log`），
+  原版 `Ascaron.Logging-2.6.dll` 也是同一份字节（11,776 B / 同一个 SHA-256），
+  所以启动路径不按版别分叉，`detect_edition` 只用来显示版别。
   GOG 法语版和其他版本不在支持范围内；不要在未支持版本上部署后把“注入不生效”
   当作本仓库回归。
 - 发行包按语言分组，**一个包同时面向 GOG 与 Steam**：包内恒定带
-  `PR2HostMount.ps1` 和 `PR2Localization\host\Ascaron.Logging-2.6.dll`，GOG 侧不执行它们。
-  不需要 Python 或 Rust 工具链。Steam 挂载必须先校验原版
+  `PR2HostMount.ps1` 和 `PR2Localization\host\Ascaron.Logging-2.6.dll`。
+  不需要 Python 或 Rust 工具链。挂载必须先校验原版
   `Ascaron.Logging-2.6.dll` 的 11,776 B / SHA-256，再备份、替换；未知文件不覆盖。
-  还原走 `PR2Localization.exe --restore` 或 GUI 的「还原 Steam 原版」按钮。
+  根目录没有这个 DLL 的版本自动退回注入，理由写进 `PR2Localization\logs\host.log`；
+  不要把这个回退做成静默跳过。
+  还原走 `PR2Localization.exe --restore` 或 GUI 的「还原原版」按钮，两版同一套动作。
   版本只有一份来源：`release.ps1 -Version` 同时编进 exe（`--version` 与 GUI 副标题）
   和语言包头 `# pack-meta version=`；不要在任何一处另写版本号。
   语言包里另有三项由编译期自己算的内容描述（`entries` / `untranslated` / `digest`）
@@ -50,11 +53,11 @@ Rust 产物：
 - `PR2LocalizationCore.dll`
 - `PR2Localization.exe`
 - `PR2LocalizationGUI.exe`
-- `PR2LocalizationProxy.dll`（旧 `VERSION.dll` 代理构建；Steam 发行包已不再使用）
+- `PR2LocalizationProxy.dll`（旧 `VERSION.dll` 代理构建；发行包已不再使用）
 - `pr2_host_proxy.dll`（日志宿主代理；部署名 `Ascaron.Logging-2.6.dll`）
 
-Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
-`src/tools/install/PR2HostMount.ps1`。代理不是游戏原文件；原版备份为
+发行包使用宿主代理 `Ascaron.Logging-2.6.dll` 和
+`src/tools/install/PR2HostMount.ps1`，两版同一条路径。代理不是游戏原文件；原版备份为
 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\Ascaron.Logging-2.6.dll`，
 不要在未校验原版大小/哈希时覆盖。
 

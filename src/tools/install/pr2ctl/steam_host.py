@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""pr2ctl.steam_host —— Steam 版宿主 DLL 的备份、挂载与还原。
+"""pr2ctl.steam_host —— 宿主 DLL 的备份、挂载与还原（GOG 与 Steam 通用）。
 
-Steam 的 PR2.exe 静态导入 Ascaron.Logging-2.6.dll。这里的原则是
-**先验证、再备份、最后替换**：
+两版的 PR2.exe 都静态导入 Ascaron.Logging-2.6.dll，原版文件也是同一份字节，
+所以这里不分版别。原则是 **先验证、再备份、最后替换**：
 
 - 原版 Ascaron.Logging-2.6.dll 的大小和 SHA-256 固定；
 - 根目录文件不是已知原版时，不强行覆盖；
@@ -24,7 +24,8 @@ HOST_BACKUP_DIR = os.path.join(DATA_DIR, "host-backup")
 HOST_BACKUP = os.path.join(HOST_BACKUP_DIR, HOST_DLL)
 HOST_MANIFEST = os.path.join(DATA_DIR, "host-mount.json")
 
-#: Steam 英文 1.1.2.3 自带的 Ascaron.Logging-2.6.dll。
+#: 原版 Ascaron.Logging-2.6.dll：Steam 英文 1.1.2.3、GOG 英文 1.1.2.3、
+#: GOG 法语 1.1.2.42 三份样本逐字节相同。
 #: 不按文件名猜，必须同时匹配大小和哈希。
 HOST_ORIGINAL_SIZE = 11776
 HOST_ORIGINAL_SHA256 = (
@@ -69,7 +70,7 @@ def _write_manifest(target, original_sha, proxy_sha):
     path = os.path.join(target, HOST_MANIFEST)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     data = {
-        "edition": "steam",
+        "edition": detect_edition(target),
         "host": HOST_DLL,
         "original_sha256": original_sha,
         "proxy_sha256": proxy_sha,
@@ -98,12 +99,21 @@ def _is_gog(target):
                for n in names)
 
 
+def has_host(target):
+    """根目录有没有宿主 DLL。
+
+    两版（GOG 与 Steam）都带同名的 ``Ascaron.Logging-2.6.dll``，实测三份
+    样本逐字节相同。所以“能不能挂载”只看这个文件在不在，与版别无关；
+    ``detect_edition`` 只用来显示版别名。
+    """
+    return os.path.isfile(os.path.join(target, HOST_DLL))
+
+
 def detect_edition(target):
-    """判断是 Steam 还是 GOG。
+    """判断是 Steam 还是 GOG，**只用于显示，不决定启动路径**。
 
     不能只看 ``Ascaron.Logging-2.6.dll`` 是否存在：GOG 版（例如法语
-    1.1.2.42）也带同名原版 DLL，按存在性判断会把 GOG 误认成 Steam，
-    进而把 Steam 宿主代理挂进 GOG 目录。顺序改为：
+    1.1.2.42）也带同名原版 DLL，按存在性判断会把 GOG 误认成 Steam。顺序：
 
     1. GOG 标记文件优先；
     2. PR2.exe 的 SHA 在已知版本表里，就按表里的 id 判断；
@@ -134,7 +144,7 @@ def status(target):
     if _is_original(root):
         if os.path.isfile(orig) and not _is_original(orig):
             return "unknown", ".orig.dll 不是已知原版"
-        return "original", "根目录是 Steam 原版"
+        return "original", "根目录是原版"
 
     if not os.path.isfile(orig):
         if os.path.isfile(backup) and _is_original(backup):
@@ -169,7 +179,7 @@ def prepare_mount(target, proxy_path=None):
     proxy = _proxy_path(target, proxy_path)
 
     if not os.path.isfile(root):
-        raise HostError("找不到 %s，不能挂载 Steam 宿主" % HOST_DLL)
+        raise HostError("找不到 %s，不能挂载宿主代理" % HOST_DLL)
     if not os.path.isfile(proxy):
         raise HostError("找不到代理：%s" % proxy)
     proxy_sha = _sha256(proxy)
@@ -198,7 +208,7 @@ def prepare_mount(target, proxy_path=None):
         )
     if not _is_original(orig):
         raise HostError(
-            ".orig.dll 的大小/哈希不是 Steam 原版；"
+            ".orig.dll 的大小/哈希不是已知原版；"
             "拒绝把未知文件当作备份"
         )
     os.makedirs(os.path.dirname(backup), exist_ok=True)
@@ -253,7 +263,7 @@ def _replace_atomically(src, dst, expect_sha, what):
 
 
 def swap_host(target, proxy_path=None):
-    """Steam 宿主 DLL 的完整替换动作：校验 → 备份 → 替换 → 复验 → 写清单。
+    """宿主 DLL 的完整替换动作：校验 → 备份 → 替换 → 复验 → 写清单。
 
     这是唯一允许改写根目录 ``Ascaron.Logging-2.6.dll`` 的入口，安装流程
     不再用通用复制去覆盖它。失败抛 HostError，且根目录保持原样。
@@ -266,7 +276,7 @@ def swap_host(target, proxy_path=None):
         _write_manifest(target, info["original_sha256"], info["proxy_sha256"])
         return info                              # 已经是同一份代理，不重复改写
 
-    _replace_atomically(proxy, root, info["proxy_sha256"], "Steam 宿主代理")
+    _replace_atomically(proxy, root, info["proxy_sha256"], "宿主代理")
     _write_manifest(target, info["original_sha256"], info["proxy_sha256"])
     return info
 

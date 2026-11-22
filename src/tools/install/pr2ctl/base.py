@@ -34,7 +34,7 @@ LOCALE_DEFAULT_FILE = "locale.default.ini"
 LOCALE_INI = os.path.join(SRC, LOCALE_FILE)
 
 # 直接复制进游戏目录的文件。名字以 PR2Localization 开头，
-# 和游戏原版文件区分。Steam 的宿主 DLL 由 steam_host.py 单独处理：
+# 和游戏原版文件区分。宿主 DLL 由 steam_host.py 单独处理：
 # 它要先把原版 Ascaron.Logging-2.6.dll 备份，再覆盖，不能走这里。
 FLAT_FILES = (
     "PR2Localization.exe",

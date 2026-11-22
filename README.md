@@ -17,28 +17,28 @@
 
 不需要安装器、不需要 Python、不需要编译。
 
-1. 确认是 **GOG 英文版 `1.1.2.3`**，或 Steam 英文版 `1.1.2.3`（宿主 DLL 入口）；
+1. 确认是 **GOG 英文版 `1.1.2.3`**，或 Steam 英文版 `1.1.2.3`（两者都走宿主 DLL 入口）；
 2. 从 Release 下载对应语言的 zip，例如中文是 `PR2-zh-v1.0.0.zip`——**一个包两种版本都能用**；
 3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
 4. **两版都双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
-   GOG 走注入；Steam 由启动器先挂载宿主 DLL 再直启游戏，不用手工跑脚本，也不用从 Steam 启动；
+   启动器一律先挂载宿主 DLL 再直启游戏，不用手工跑脚本，也不用从 Steam 启动；
 5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... N entries, M overrides`。
 6. 想确认装的是哪一版：GUI 副标题与语言列表都带版本（`简体中文 · v1.0.0`），
    命令行 `PR2Localization.exe --version` 打印同一串；语言包改了什么看状态框第二行
    （`3590 条 · 未译 0 · 摘要 9cfa2931c1c2`）与包根 `README.txt` 的「语言包变化」段。
-7. Steam 想回原版：点 GUI 上的「还原 Steam 原版」，或 `PR2Localization.exe --restore`。
+7. 想回原版：点 GUI 上的「还原原版」，或 `PR2Localization.exe --restore`。
 
-包里不带 `VERSION.dll`（那是历史路线）。包内恒定带 `Ascaron.Logging-2.6.dll` 宿主代理
-（放在 `PR2Localization\host\`，解压不会覆盖根目录原版）和 `PR2HostMount.ps1`，GOG 侧从不执行它们：
-Steam 启动前由脚本校验原版 `Ascaron.Logging-2.6.dll` 的 `11,776 B` /
+GOG 与 Steam 的 `PR2.exe` 都静态导入同目录的 `Ascaron.Logging-2.6.dll`（导入表里只有 `Log`
+一个函数），两版的原版 DLL 还是同一份字节（`11,776 B` / SHA-256 相同），所以两版走同一条
+启动路径。包里不带 `VERSION.dll`（那是历史路线）。包内恒定带 `Ascaron.Logging-2.6.dll`
+宿主代理（放在 `PR2Localization\host\`，解压不会覆盖根目录原版）和 `PR2HostMount.ps1`：
+启动前由脚本校验原版 `Ascaron.Logging-2.6.dll` 的 `11,776 B` /
 SHA-256，通过后备份成 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\`，
 再换代理；原版大小或哈希不对时脚本停止，不强行覆盖。宿主动作每一步都写
 `PR2Localization\logs\host.log`，GUI 的还原失败对话框显示的就是它的末尾几行。
-GOG 从旧包升级时，根目录残留的 `VERSION.dll` 可以删除，GOG 不加载它。
-GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析到
-`C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入游戏进程，结果是原版英文。
-`PR2Localization.exe` / `PR2LocalizationGUI.exe` 是两个版本共用的入口，按版别自动分派；
-原版 `PR2.exe` 本身不改。
+根目录没有这个 DLL 的版本会退回注入启动，理由也写在这份日志里。
+挂载之后直接双击 `PR2.exe` 同样有效；没挂载时双击就是原版英文，挂载由启动器负责。
+`PR2Localization.exe` / `PR2LocalizationGUI.exe` 是两个版本共用的入口；原版 `PR2.exe` 本身不改。
 
 注意：
 
@@ -61,14 +61,15 @@ GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析�
 
 | 游戏版本 | 状态 |
 |---|---|
-| **GOG 英文 `1.1.2.3`** | ✅ 已实测（`PR2LocalizationGUI` 入口） |
-| **Steam 英文 `1.1.2.3`** | ✅ 已实测（宿主 `Ascaron.Logging-2.6.dll` 代理，中文界面） |
+| **GOG 英文 `1.1.2.3`** | ✅ 已实测（宿主 `Ascaron.Logging-2.6.dll` 代理，中文界面） |
+| **Steam 英文 `1.1.2.3`** | ✅ 已实测（同上，走同一条挂载直启路径） |
 | GOG 法语 `1.1.2.42` | ❌ 不支持（只用作翻译参照） |
 | 其他版本 | ❌ 不支持 |
 
-Steam 版不再尝试 `VERSION.dll` 自然加载：`PR2.exe` 静态导入
+两版都不尝试 `VERSION.dll` 自然加载：`PR2.exe` 静态导入
 `Ascaron.Logging-2.6.dll`，本项目的代理接管这个导出，并在工作线程里加载同目录
 `PR2LocalizationCore.dll`；后者等待 `A2dLib-2.20A.dll` 后再装 hook。
+`VERSION.dll` 属于 Windows 的 KnownDLLs，同目录代理永远进不去，那条路线已废弃。
 挂载和还原都经过 `Ascaron.Logging-2.6.dll` 的大小/SHA-256 校验，未知文件不覆盖。
 未验证的版本不要反馈“汉化已支持”，先附 `PR2Localization\logs\runtime.log` 和
 `PR2Localization\logs\proxy.log`。

@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::ptr;
 
 use pr2_common::{
-    build_label, detect_edition, exe_dir, language_fonts_complete, read_locale_language,
-    write_locale_language, Edition, RUNTIME_VERSION,
+    build_label, exe_dir, language_fonts_complete, read_locale_language,
+    write_locale_language, RUNTIME_VERSION,
 };
 use windows_sys::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{
@@ -609,10 +609,7 @@ impl App {
     }
 
     fn restore(&mut self) {
-        if detect_edition(&self.root) != Edition::Steam {
-            self.set_status(&self.strings.t("status.restore_gog"));
-            return;
-        }
+        // 两版都可能挂过宿主代理，还原不再按版别分叉。
         let prompt = self.strings.t("confirm.restore");
         if !self.confirm(&prompt) {
             return;

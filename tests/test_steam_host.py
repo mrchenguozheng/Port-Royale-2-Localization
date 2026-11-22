@@ -73,6 +73,24 @@ class SteamHostSwapTest(unittest.TestCase):
         self.assertEqual(self._read(steam_host.HOST_DLL), before)
         self.assertEqual(self._read(steam_host.HOST_ORIG), self.original)
 
+    def test_has_host_is_the_only_gate(self):
+        # 两版都带同名 DLL，能不能挂只看它在不在，与版别无关。
+        self.assertTrue(steam_host.has_host(self.dir))
+        os.remove(self.orig_path)
+        self.assertFalse(steam_host.has_host(self.dir))
+
+    def test_manifest_records_real_edition(self):
+        # GOG 标记优先于「有宿主 DLL 就当 Steam」，清单里要如实写 gog，
+        # 否则排查时会把 GOG 的挂载记录当成 Steam 的。
+        with open(os.path.join(self.dir, "goggame-1207658698.info"),
+                  "w", encoding="utf-8") as fh:
+            fh.write('{"gameId": "1207658698"}')
+        steam_host.swap_host(self.dir, self.proxy_path)
+        import json
+        with open(os.path.join(self.dir, steam_host.HOST_MANIFEST),
+                  encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh)["edition"], "gog")
+
     def test_unknown_dll_is_refused_untouched(self):
         unknown = b"someone else's mod" + bytes(64)
         with open(self.orig_path, "wb") as fh:

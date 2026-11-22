@@ -6,12 +6,13 @@ use std::process::Command;
 use std::ptr;
 
 use pr2_common::{
-    bundled_fonts_complete, detect_edition, exe_dir, fonts_dir, host_script_path, host_state,
-    log_dir, pack_runtime_ok, read_locale_language, valid_lang_code, Edition, HostState, FONT_NAMES,
+    bundled_fonts_complete, detect_edition, exe_dir, fonts_dir, has_host_dll,
+    host_script_path, host_state, log_dir, pack_runtime_ok, proxy_loaded_after,
+    proxy_log_len, read_locale_language, valid_lang_code, Edition, HostState, FONT_NAMES,
     HOST_DLL, HOST_MOUNT_SCRIPT, HOST_ORIG, RUNTIME_VERSION,
 };
 use sha2::{Digest, Sha256};
-use windows_sys::Win32::Foundation::{CloseHandle, GetLastError};
+use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HANDLE};
 use windows_sys::Win32::System::Console::{SetConsoleCP, SetConsoleOutputCP};
 use windows_sys::Win32::System::Diagnostics::Debug::WriteProcessMemory;
 use windows_sys::Win32::System::LibraryLoader::{
@@ -51,6 +52,7 @@ fn run() -> Result<(), i32> {
     let mut lang: Option<String> = None;
     let mut vanilla = false;
     let mut restore = false;
+    let mut force_inject = false;
 
     for arg in std::env::args().skip(1) {
         if let Some(v) = arg.strip_prefix("--lang=") {
@@ -59,6 +61,8 @@ fn run() -> Result<(), i32> {
             vanilla = true;
         } else if arg == "--restore" {
             restore = true;
+        } else if arg == "--inject" {
+            force_inject = true;
         } else if arg == "--version" {
             // 发行版本与 commit 由构建脚本注入（src\build_injector.ps1）；
             // 开发构建显示 dev，不谎报一个发行版本号。
@@ -69,12 +73,14 @@ fn run() -> Result<(), i32> {
             );
             return Ok(());
         } else if arg == "--help" || arg == "-h" {
-            println!("[PR2Loc] 用法: PR2Localization.exe [--lang=<代码>] [--vanilla] [--restore]");
-            println!("[PR2Loc]   不给参数时按版本自动选路：GOG 注入启动，Steam 先挂载宿主 DLL 再启动。");
+            println!("[PR2Loc] 用法: PR2Localization.exe [--lang=<代码>] [--vanilla] [--restore] [--inject]");
+            println!("[PR2Loc]   不给参数时两版同路：先把宿主代理挂进根目录，再直接启动 PR2.exe；");
+            println!("[PR2Loc]   GOG 与 Steam 的 PR2.exe 都静态导入这个 DLL，两版走同一条路径。");
             println!("[PR2Loc]   --lang     这一次启动用哪个语言包，");
             println!("[PR2Loc]              优先于 PR2Localization\\packs\\locale.ini（或 locale.default.ini）的 language=，不写文件。");
-            println!("[PR2Loc]   --vanilla  恢复原版字体（Steam 还会先还原宿主 DLL），启动 PR2.exe，不注入。");
-            println!("[PR2Loc]   --restore  只还原：Steam 还原 Ascaron.Logging-2.6.dll，两版都恢复原版字体，不启动游戏。");
+            println!("[PR2Loc]   --vanilla  先还原宿主 DLL 与原版字体，再直接启动 PR2.exe，不加载语言包。");
+            println!("[PR2Loc]   --restore  只还原：把 Ascaron.Logging-2.6.dll 换回原版，恢复原版字体，不启动游戏。");
+            println!("[PR2Loc]   --inject   不挂载宿主，退回远程注入启动（只给排查用）。");
             println!("[PR2Loc]   --version  打印发行版本、构建 commit 与运行时版本，不启动游戏。");
             return Ok(());
         }
@@ -102,12 +108,12 @@ fn run() -> Result<(), i32> {
     }
 
     let edition = detect_edition(&root);
+    let edition_label = if edition == Edition::Steam { "Steam" } else { "GOG" };
     backup_original_fonts(&root);
 
     if vanilla {
-        if edition == Edition::Steam {
-            restore_steam_host(&root)?;
-        }
+        // 两版都可能挂过宿主代理，--vanilla 一律先还原再启动。
+        restore_host(&root)?;
         restore_original_fonts(&root);
         match create_process(&exe_path, &root, 0) {
             Ok(pi) => {
@@ -124,7 +130,7 @@ fn run() -> Result<(), i32> {
                 return Err(1);
             }
         }
-        println!("[PR2Loc] 已恢复原版状态，启动原版 PR2.exe（未注入）");
+        println!("[PR2Loc] 已恢复原版状态，启动原版 PR2.exe（未加载语言包）");
         return Ok(());
     }
 
@@ -135,10 +141,6 @@ fn run() -> Result<(), i32> {
             dll_path.display()
         );
         return Err(1);
-    }
-
-    if edition == Edition::Steam {
-        ensure_steam_host(&root)?;
     }
 
     let font_lang = match &lang {
@@ -195,27 +197,162 @@ fn run() -> Result<(), i32> {
         println!("[PR2Loc] 本次使用语言包: {code}.txt (优先于 locale.ini，本次启动生效)");
     }
 
-    if edition == Edition::Steam {
-        // Steam 不注入：根目录的宿主代理由 PR2.exe 静态导入，自己会加载同一个 Core。
-        let pi = match create_process(&exe_path, &root, 0) {
-            Ok(v) => v,
-            Err(_) => {
-                eprintln!(
-                    "[PR2Loc] 启动 PR2.exe 失败 (错误 {})",
-                    unsafe { GetLastError() }
-                );
-                return Err(1);
-            }
-        };
-        unsafe {
-            CloseHandle(pi.hThread);
-            CloseHandle(pi.hProcess);
-        }
-        println!("[PR2Loc] Steam 版：宿主代理已就位，PR2.exe 启动中...");
-        return Ok(());
+    if force_inject {
+        println!("[PR2Loc] --inject：跳过宿主挂载，走远程注入");
+        host_log_line(&root, "--inject：跳过宿主挂载，走远程注入");
+        return launch_by_inject(&root, &exe_path, &dll_path);
     }
 
-    let pi = match create_process(&exe_path, &root, CREATE_SUSPENDED) {
+    if !has_host_dll(&root) {
+        // 没有宿主 DLL 就只剩注入一条路。这不是失败降级，是这个版本本来就没有
+        // 可供代理接管的导入；写清楚理由，别让玩家以为宿主路径静默跳过了。
+        host_log(
+            &root,
+            &format!("根目录没有 {HOST_DLL}（{edition_label} 版），这一版只能走远程注入。"),
+        );
+        return launch_by_inject(&root, &exe_path, &dll_path);
+    }
+
+    ensure_host(&root)?;
+    launch_by_host(&root, &exe_path)
+}
+
+/// 两版共用的挂载入口：原版就调脚本挂载，已挂载就跳过。
+fn ensure_host(root: &Path) -> Result<(), i32> {
+    match host_state(root) {
+        HostState::Mounted => {
+            println!("[PR2Loc] 宿主代理已在位，跳过挂载");
+            host_log_line(root, "宿主代理已在位，跳过挂载");
+            Ok(())
+        }
+        HostState::Original => {
+            println!("[PR2Loc] 校验原版宿主 DLL、建立备份并挂载代理…");
+            host_log_line(root, "校验原版宿主 DLL、建立备份并挂载代理");
+            run_host_script(root, "Mount").map(|_| ())
+        }
+        HostState::Missing => {
+            // 调用方已经用 has_host_dll 判过一遍，走到这里说明文件在检查之后消失。
+            host_log(
+                root,
+                &format!("同目录下找不到 {HOST_DLL}；请确认游戏目录。"),
+            );
+            Err(1)
+        }
+        HostState::ProxyNoBackup => {
+            host_log(
+                root,
+                &format!("根目录 {HOST_DLL} 已是本地化代理，但找不到有效的原版备份（{HOST_ORIG} / PR2Localization\\host-backup）。"),
+            );
+            host_log(
+                root,
+                "没有原版就无法回滚；请用平台的「验证游戏文件完整性」把原版 DLL 恢复，再重新启动。",
+            );
+            Err(1)
+        }
+        HostState::Unknown => {
+            host_log(
+                root,
+                &format!("根目录 {HOST_DLL} 不是已知原版，也不是本工具挂上去的代理。"),
+            );
+            host_log(root, "为避免覆盖其他 mod 或损坏的文件，已停止。");
+            host_log(
+                root,
+                "可以先用平台的「验证游戏文件完整性」把原版 DLL 恢复，再重试。",
+            );
+            Err(1)
+        }
+    }
+}
+
+/// `--vanilla` / `--restore`：把宿主 DLL 换回原版。两版同一套判断。
+fn restore_host(root: &Path) -> Result<(), i32> {
+    match host_state(root) {
+        HostState::Original => Ok(()),
+        HostState::Mounted => run_host_script(root, "Restore").map(|_| ()),
+        // 没有这个文件就没有可还原的东西：GOG 某些版本不带宿主 DLL，不该判失败。
+        HostState::Missing => {
+            println!("[PR2Loc] 同目录下没有 {HOST_DLL}，不需要还原");
+            host_log_line(root, &format!("同目录下没有 {HOST_DLL}，不需要还原"));
+            Ok(())
+        }
+        HostState::ProxyNoBackup => {
+            host_log(
+                root,
+                &format!("根目录 {HOST_DLL} 是本地化代理，但原版备份缺失或不可验证；没有可还原的文件。"),
+            );
+            host_log(
+                root,
+                "请用平台的「验证游戏文件完整性」把原版 DLL 恢复（这会把该 DLL 换回官方版本）。",
+            );
+            Err(1)
+        }
+        HostState::Unknown => {
+            host_log(
+                root,
+                &format!("根目录 {HOST_DLL} 不是本工具挂上去的代理，拒绝覆盖未知文件。"),
+            );
+            Err(1)
+        }
+    }
+}
+
+/// 宿主路径：先记 proxy.log 的基线，再直启 PR2.exe，最后确认代理真的进了进程。
+fn launch_by_host(root: &Path, exe_path: &Path) -> Result<(), i32> {
+    // 基线必须在启动前取：判定只看「这一次新写进来的那几行」。
+    let log_offset = proxy_log_len(root);
+    let pi = match create_process(exe_path, root, 0) {
+        Ok(v) => v,
+        Err(_) => {
+            eprintln!(
+                "[PR2Loc] 启动 PR2.exe 失败 (错误 {})",
+                unsafe { GetLastError() }
+            );
+            return Err(1);
+        }
+    };
+    println!("[PR2Loc] 宿主代理已就位，PR2.exe 启动中...");
+    let loaded = watch_proxy(root, log_offset, pi.hProcess);
+    unsafe {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+    if loaded {
+        println!("[PR2Loc] 宿主代理已进入 PR2.exe 进程");
+        host_log_line(root, "宿主代理已进入 PR2.exe 进程");
+    } else {
+        // 不杀进程、不自动重来：游戏已经在跑，杀掉重开只会更糟。
+        // 只把事实写进日志，并给出可用的下一步。
+        host_log(
+            root,
+            "启动后没看到宿主代理进入 PR2.exe 进程（logs\\proxy.log 没有新的加载标记）。",
+        );
+        host_log(
+            root,
+            "说明这个 PR2.exe 没有加载根目录的宿主 DLL；可用 --inject 走远程注入。",
+        );
+    }
+    Ok(())
+}
+
+/// 等代理在进程里写下加载标记，最多 15 秒；进程提前退出就立刻结束等待。
+fn watch_proxy(root: &Path, offset: u64, process: HANDLE) -> bool {
+    for _ in 0..30 {
+        // 先等 500ms 再看日志，避免抢在代理写盘之前判空。
+        let exited = unsafe { WaitForSingleObject(process, 500) } == 0;
+        if proxy_loaded_after(root, offset) {
+            return true;
+        }
+        if exited {
+            return false;
+        }
+    }
+    false
+}
+
+/// 注入路径：挂起进程 → 远程 LoadLibrary → 恢复。只有 `--inject` 和
+/// 「根目录没有宿主 DLL」会走到这里。
+fn launch_by_inject(root: &Path, exe_path: &Path, dll: &Path) -> Result<(), i32> {
+    let pi = match create_process(exe_path, root, CREATE_SUSPENDED) {
         Ok(v) => v,
         Err(_) => {
             eprintln!(
@@ -226,7 +363,7 @@ fn run() -> Result<(), i32> {
         }
     };
 
-    let result = inject_dll(&pi, &dll_path);
+    let result = inject_dll(&pi, dll);
     unsafe {
         ResumeThread(pi.hThread);
         CloseHandle(pi.hThread);
@@ -241,100 +378,25 @@ fn run() -> Result<(), i32> {
     }
 }
 
-/// Steam：根目录是原版就调脚本挂载，已经挂载就跳过。
-fn ensure_steam_host(root: &Path) -> Result<(), i32> {
-    match host_state(root) {
-        HostState::Mounted => {
-            println!("[PR2Loc] Steam 宿主代理已在位，跳过挂载");
-            host_log_line(root, "宿主代理已在位，跳过挂载");
-            Ok(())
-        }
-        HostState::Original => {
-            println!("[PR2Loc] Steam 版：校验原版宿主 DLL、建立备份并挂载代理…");
-            host_log_line(root, "校验原版宿主 DLL、建立备份并挂载代理");
-            run_host_script(root, "Mount").map(|_| ())
-        }
-        HostState::Missing => {
-            host_log(
-                root,
-                &format!("同目录下找不到 {HOST_DLL}，这不像是 Steam 版；请确认游戏目录。"),
-            );
-            Err(1)
-        }
-        HostState::ProxyNoBackup => {
-            host_log(
-                root,
-                &format!("根目录 {HOST_DLL} 已是本地化代理，但找不到有效的原版备份（{HOST_ORIG} / PR2Localization\\host-backup）。"),
-            );
-            host_log(
-                root,
-                "没有原版就无法回滚；请用 Steam 的「验证游戏文件完整性」把原版 DLL 恢复，再重新启动。",
-            );
-            Err(1)
-        }
-        HostState::Unknown => {
-            host_log(
-                root,
-                &format!("根目录 {HOST_DLL} 不是已知原版，也不是本工具挂上去的代理。"),
-            );
-            host_log(root, "为避免覆盖其他 mod 或损坏的文件，已停止。");
-            host_log(
-                root,
-                "可以先用 Steam 的「验证游戏文件完整性」把原版 DLL 恢复，再重试。",
-            );
-            Err(1)
-        }
-    }
-}
-
-/// `--vanilla` 在 Steam 版下先还原宿主，再启动原版。
-fn restore_steam_host(root: &Path) -> Result<(), i32> {
-    match host_state(root) {
-        HostState::Original => Ok(()),
-        HostState::Mounted => run_host_script(root, "Restore").map(|_| ()),
-        HostState::Missing => {
-            host_log(root, &format!("同目录下找不到 {HOST_DLL}，不需要还原。"));
-            Err(1)
-        }
-        HostState::ProxyNoBackup => {
-            host_log(
-                root,
-                &format!("根目录 {HOST_DLL} 是本地化代理，但原版备份缺失或不可验证；没有可还原的文件。"),
-            );
-            host_log(
-                root,
-                "请用 Steam 的「验证游戏文件完整性」把原版 DLL 恢复（这会把该 DLL 换回官方版本）。",
-            );
-            Err(1)
-        }
-        HostState::Unknown => {
-            host_log(
-                root,
-                &format!("根目录 {HOST_DLL} 不是本工具挂上去的代理，拒绝覆盖未知文件。"),
-            );
-            Err(1)
-        }
-    }
-}
-
-/// `--restore`：Steam 还原宿主 DLL，两版都恢复原版字体，不启动游戏。
+/// `--restore`：把宿主 DLL 换回原版、恢复原版字体，不启动游戏。
 fn restore_all(root: &Path) -> Result<(), i32> {
     // 本次还原的过程单独记一份，GUI 用 CREATE_NO_WINDOW 调起时看不到控制台，
     // 失败后就读这份日志给玩家看。
     clear_host_log(root);
-    let edition = detect_edition(root);
-    if edition == Edition::Steam {
-        if host_state(root) == HostState::Original {
-            println!("[PR2Loc] Steam 宿主 DLL 已经是原版，不需要还原");
+    match host_state(root) {
+        HostState::Original => {
+            println!("[PR2Loc] 宿主 DLL 已经是原版，不需要还原");
             host_log_line(root, "宿主 DLL 已经是原版，不需要还原");
-        } else {
-            restore_steam_host(root)?;
-            println!("[PR2Loc] 已把 {HOST_DLL} 换回 Steam 原版");
-            host_log_line(root, &format!("已把 {HOST_DLL} 换回 Steam 原版"));
         }
-    } else {
-        println!("[PR2Loc] 这是 GOG 版，没有需要还原的宿主 DLL");
-        host_log_line(root, "这是 GOG 版，没有需要还原的宿主 DLL");
+        HostState::Missing => {
+            println!("[PR2Loc] 同目录下没有 {HOST_DLL}，不需要还原");
+            host_log_line(root, &format!("同目录下没有 {HOST_DLL}，不需要还原"));
+        }
+        _ => {
+            restore_host(root)?;
+            println!("[PR2Loc] 已把 {HOST_DLL} 换回原版");
+            host_log_line(root, &format!("已把 {HOST_DLL} 换回原版"));
+        }
     }
     restore_original_fonts(root);
     println!("[PR2Loc] 还原完成（本地化文件仍在，只是不再挂载/注入）");
@@ -344,7 +406,7 @@ fn restore_all(root: &Path) -> Result<(), i32> {
 
 /// 控制台和 `PR2Localization\logs\host.log` 各写一份，给只有 stderr 的失败路径用。
 ///
-/// STEAM 版的所有宿主动作都由 GUI 以 `CREATE_NO_WINDOW` 拉起，玩家看不到控制台，
+/// 宿主动作都由 GUI 以 `CREATE_NO_WINDOW` 拉起，玩家看不到控制台，
 /// 所以失败原因必须落盘，GUI 才能把它显示出来。
 fn host_log(root: &Path, message: &str) {
     eprintln!("[PR2Loc] {message}");
@@ -370,7 +432,7 @@ fn run_host_script(root: &Path, action: &str) -> Result<String, i32> {
     if !script.is_file() {
         host_log(
             root,
-            &format!("同目录下找不到 {HOST_MOUNT_SCRIPT}，无法处理 Steam 宿主 DLL。"),
+            &format!("同目录下找不到 {HOST_MOUNT_SCRIPT}，无法挂载宿主 DLL。"),
         );
         return Err(1);
     }

@@ -70,10 +70,14 @@ class TestUiLayout(unittest.TestCase):
         path = os.path.join(ROOT, "src", "injector-rs", "ui", "ui.default.ini")
         with open(path, encoding="utf-8") as fh:
             text = fh.read()
-        for key in ("button.restore", "status.restored", "status.restore_gog",
+        for key in ("button.restore", "status.restored",
                     "confirm.restore", "error.restore_failed"):
             self.assertIn("\n%s=" % key, text.replace("\r\n", "\n"),
                           "ui.default.ini 缺 %s" % key)
+        # 两版都可能挂过宿主代理，还原不再按版别分叉，这句 GOG 专用文案必须消失。
+        self.assertNotIn("status.restore_gog", text)
+        # 界面上不该再出现「Steam 原版」这种只对一半玩家成立的说法。
+        self.assertNotIn("Steam", text)
         # 还原失败要把退出码和落盘日志一起塞进弹框，两个占位符少一个就白搭。
         self.assertIn("error.restore_failed=", text)
         line = [ln for ln in text.replace("\r\n", "\n").split("\n")
@@ -129,6 +133,8 @@ class TestUiLayout(unittest.TestCase):
                           "strings.rs 的 BUILTIN 缺 %s" % key)
         self.assertNotIn("status.pack_overrides", builtin,
                          "启动器不再统计覆盖条数，BUILTIN 里不该留这个 key")
+        self.assertNotIn("status.restore_gog", builtin,
+                         "还原不再按版别分叉，BUILTIN 里不该留 GOG 专用文案")
 
 
 class TestBundles(unittest.TestCase):
