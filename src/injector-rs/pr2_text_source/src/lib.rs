@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::{c_char, c_void};
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::Write;
 use std::os::windows::ffi::OsStringExt;
 use std::path::Path;
@@ -11,30 +11,27 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, AtomicUsize, Ordering}
 use std::sync::{Mutex, OnceLock};
 
 use pr2_common::{
-    bundled_fonts_complete, exe_dir, font_rel_dir, log_dir, pack_dir, override_path,
-    pack_path, read_locale_language, valid_lang_code, FontMap,
+    bundled_fonts_complete, debug_log_enabled, exe_dir, font_rel_dir, log_dir, open_append_capped,
+    open_truncate, override_path, pack_dir, pack_path, parse_pack_line, read_locale_language,
+    valid_lang_code, FontMap, DEFAULT_MAX_BYTES,
 };
-use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HANDLE, HMODULE};
-use windows_sys::Win32::Storage::FileSystem::{
-    GET_FILEEX_INFO_LEVELS, WIN32_FIND_DATAA,
-};
+use windows_sys::Win32::Foundation::{CloseHandle, BOOL, HANDLE, HMODULE};
+use windows_sys::Win32::Storage::FileSystem::{GET_FILEEX_INFO_LEVELS, WIN32_FIND_DATAA};
 use windows_sys::Win32::System::LibraryLoader::{
     DisableThreadLibraryCalls, GetModuleHandleA, GetProcAddress,
 };
 use windows_sys::Win32::System::Memory::{
-    GetProcessHeap, HeapAlloc, MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_EXECUTE_READWRITE,
-    PAGE_GUARD, PAGE_NOACCESS, PAGE_READWRITE, VirtualProtect, VirtualQuery,
+    GetProcessHeap, HeapAlloc, VirtualProtect, VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_COMMIT,
+    PAGE_EXECUTE_READWRITE, PAGE_GUARD, PAGE_NOACCESS, PAGE_READWRITE,
 };
 use windows_sys::Win32::System::ProcessStatus::{EnumProcessModules, GetModuleBaseNameA};
 use windows_sys::Win32::System::Threading::{CreateThread, GetCurrentProcess, Sleep};
 
 const A2DLIB: &[u8] = b"A2dLib-2.20A.dll\0";
-const ADD_EXPORT: &[u8] =
-    b"?Add@CStringManager@NA2dLib@@QAEXPBDPBXI@Z\0";
+const ADD_EXPORT: &[u8] = b"?Add@CStringManager@NA2dLib@@QAEXPBDPBXI@Z\0";
 const LSR_EXPORT: &[u8] = b"?LoadStringRes@CW32StringManager@NA2dLib@@UAE_NIAAV?$basic_string@GV?$char_traits@G@_STL@@V?$allocator@G@2@@_STL@@@Z\0";
 const ADDSTR_EXPORT: &[u8] = b"?AddStringRes@CW32StringManager@NA2dLib@@MAE_NPBDPBXI@Z\0";
-const STRING_MGR_EXPORT: &[u8] =
-    b"?g_pStringMgr@NA2dLib@@3PAVCStringManager@1@A\0";
+const STRING_MGR_EXPORT: &[u8] = b"?g_pStringMgr@NA2dLib@@3PAVCStringManager@1@A\0";
 
 static REAL_ADD: AtomicUsize = AtomicUsize::new(0);
 static REAL_ADDSTR: AtomicUsize = AtomicUsize::new(0);
@@ -74,6 +71,8 @@ struct Pack {
     locale: String,
     dir: String,
     edits: HashMap<u32, Box<[u16]>>,
+    /// `packs/overrides/<locale>.txt` 里定义了多少个键（去重后）。
+    overrides: usize,
 }
 
 type AddFn = unsafe extern "thiscall" fn(*mut c_void, *const c_char, *const c_void, u32);
@@ -117,10 +116,11 @@ unsafe fn install_hook() {
     load_edit_file();
     install_font_log_hooks();
     log_line(&format!(
-        "[text] pack '{}' from {}: {} overrides",
+        "[text] pack '{}' from {}: {} entries, {} overrides",
         pack_locale(),
         pack_dir_name(),
-        pack_count()
+        pack_count(),
+        override_count()
     ));
 
     patch_add_iat();
@@ -183,9 +183,7 @@ unsafe extern "system" fn hook_retry_thread(_: *mut c_void) -> u32 {
                 patch_add_iat();
             }
             install_resolve_hook();
-            if ADD_IAT_DONE.load(Ordering::Acquire)
-                && RESOLVE_HOOKED.load(Ordering::Acquire)
-            {
+            if ADD_IAT_DONE.load(Ordering::Acquire) && RESOLVE_HOOKED.load(Ordering::Acquire) {
                 return 0;
             }
         }
@@ -211,12 +209,7 @@ unsafe extern "thiscall" fn my_add(
     }
     let (payload, payload_len) = prepare_overlay(data, len);
     let real: AddFn = std::mem::transmute(real);
-    real(
-        overlay_manager(this),
-        name,
-        payload,
-        payload_len,
-    );
+    real(overlay_manager(this), name, payload, payload_len);
 }
 
 unsafe extern "thiscall" fn my_add_str(
@@ -235,12 +228,7 @@ unsafe extern "thiscall" fn my_add_str(
     }
     let (payload, payload_len) = prepare_overlay(data, len);
     let real: AddStrFn = std::mem::transmute(real);
-    real(
-        overlay_manager(this),
-        name,
-        payload,
-        payload_len,
-    )
+    real(overlay_manager(this), name, payload, payload_len)
 }
 
 unsafe fn overlay_manager(this: *mut c_void) -> *mut c_void {
@@ -252,10 +240,7 @@ unsafe fn overlay_manager(this: *mut c_void) -> *mut c_void {
     }
 }
 
-unsafe fn prepare_overlay(
-    data: *const c_void,
-    len: u32,
-) -> (*const c_void, u32) {
+unsafe fn prepare_overlay(data: *const c_void, len: u32) -> (*const c_void, u32) {
     if !VT_DONE.swap(true, Ordering::AcqRel) {
         install_vtable_hooks();
     }
@@ -473,13 +458,7 @@ unsafe fn install_resolve_hook() {
     let thunk = (h as *mut u8).wrapping_add(profile.thunk_rva);
     let detour = my_resolve as *const () as usize;
     let mut old = 0u32;
-    if VirtualProtect(
-        thunk as *const c_void,
-        5,
-        PAGE_EXECUTE_READWRITE,
-        &mut old,
-    ) != 0
-    {
+    if VirtualProtect(thunk as *const c_void, 5, PAGE_EXECUTE_READWRITE, &mut old) != 0 {
         let rel = detour as isize - (thunk as isize + 5);
         *thunk = 0xE9;
         ptr::write_unaligned(thunk.add(1) as *mut i32, rel as i32);
@@ -544,21 +523,17 @@ unsafe fn log_resolve_gap(hash: u32, out: *mut c_void) {
 }
 
 fn resolve_log(line: &str) {
+    // 开发诊断：默认不写盘，`PR2_LOG_DEBUG=1` 时才记录。
+    if !debug_log_enabled() {
+        return;
+    }
     let m = RESOLVE_LOG.get_or_init(|| Mutex::new(None));
     let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
     if guard.is_none() {
         let path = log_dir(&exe_dir()).join("resolve.log");
-        *guard = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(path)
-            .ok();
+        *guard = open_truncate(&path);
         if let Some(f) = guard.as_mut() {
-            let _ = writeln!(
-                f,
-                "=== CScreenStrings::ResolveByHash (menu/UI) gaps ==="
-            );
+            let _ = writeln!(f, "=== CScreenStrings::ResolveByHash (menu/UI) gaps ===");
         }
     }
     if let Some(f) = guard.as_mut() {
@@ -587,15 +562,15 @@ unsafe fn log_lsr_call(hash: u32, found: i32, text: Option<&String>) {
 }
 
 fn lsr_log(line: &str) {
+    // 开发诊断：槽位扫描默认不写盘，`PR2_LOG_DEBUG=1` 时才记录。
+    if !debug_log_enabled() {
+        return;
+    }
     let m = LSR_LOG.get_or_init(|| Mutex::new(None));
     let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
     if guard.is_none() {
         let path = log_dir(&exe_dir()).join("vtable.log");
-        *guard = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .ok();
+        *guard = open_append_capped(&path, DEFAULT_MAX_BYTES);
     }
     if let Some(f) = guard.as_mut() {
         let _ = f.write_all(line.as_bytes());
@@ -607,7 +582,7 @@ fn lsr_log(line: &str) {
 
 fn log_line(msg: &str) {
     let path = log_dir(&exe_dir()).join("runtime.log");
-    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(path) {
+    if let Some(mut f) = open_append_capped(&path, DEFAULT_MAX_BYTES) {
         let _ = writeln!(f, "{msg}");
     }
 }
@@ -763,7 +738,7 @@ unsafe fn table_valid(d: *const u8, len: usize) -> bool {
     if len < 4 || !readable(d as *const c_void, len) {
         return false;
     }
-        let cnt = read_u32(d) as usize;
+    let cnt = read_u32(d) as usize;
     if cnt == 0 || cnt > 200000 {
         return false;
     }
@@ -801,7 +776,14 @@ fn pack_count() -> usize {
 }
 
 fn pack_locale() -> String {
-    pack().map(|p| p.locale.clone()).unwrap_or_else(|| "zh".into())
+    pack()
+        .map(|p| p.locale.clone())
+        .unwrap_or_else(|| "zh".into())
+}
+
+/// 覆盖文件定义了多少条。0 表示没有 `packs/overrides/<locale>.txt`。
+fn override_count() -> usize {
+    pack().map(|p| p.overrides).unwrap_or(0)
 }
 
 fn pack_dir_name() -> String {
@@ -833,24 +815,31 @@ unsafe fn load_edit_file() {
     let dir = pack_dir(&root);
     let mut edits = HashMap::new();
     load_override_file(&pack_path(&root, &locale), &mut edits);
-    load_override_file(&override_path(&root, &locale), &mut edits);
+    let overrides = load_override_file(&override_path(&root, &locale), &mut edits);
     let _ = PACK.set(Pack {
         locale,
         dir: dir.to_string_lossy().into_owned(),
         edits,
+        overrides,
     });
 }
 
-fn load_override_file(path: &Path, edits: &mut HashMap<u32, Box<[u16]>>) {
+/// 读一份包/覆盖文件，返回这份文件自己定义了多少个键（去重后）。
+///
+/// 主包和覆盖文件共用一个 `edits`：同一个键后读的覆盖前面的，所以最终生效
+/// 的条数是两边的并集。状态框和日志要报的「覆盖了几条」只能是覆盖文件自己
+/// 的那一份，因此这里单独统计，而不是拿 `edits.len()` 充数。
+fn load_override_file(path: &Path, edits: &mut HashMap<u32, Box<[u16]>>) -> usize {
     let data = match std::fs::read(path) {
         Ok(v) => v,
-        Err(_) => return,
+        Err(_) => return 0,
     };
     if data.is_empty() || data.len() > 16 * 1024 * 1024 {
-        return;
+        return 0;
     }
     let data = data.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(&data);
     let text = String::from_utf8_lossy(data);
+    let mut keys: HashSet<u32> = HashSet::new();
     for line in text.split('\n') {
         let line = line.trim_end_matches('\r');
         let s = line.trim_start_matches([' ', '\t']);
@@ -861,32 +850,14 @@ fn load_override_file(path: &Path, edits: &mut HashMap<u32, Box<[u16]>>) {
             Some(v) => v,
             None => continue,
         };
+        keys.insert(hash);
         if edits.len() >= 16384 && !edits.contains_key(&hash) {
             continue;
         }
         let units: Vec<u16> = value.encode_utf16().take(2047).collect();
         edits.insert(hash, units.into_boxed_slice());
     }
-}
-
-fn parse_pack_line(s: &str) -> Option<(u32, &str)> {
-    let s = s.trim_start_matches([' ', '\t']);
-    let hex = s
-        .strip_prefix("0x")
-        .or_else(|| s.strip_prefix("0X"))
-        .unwrap_or(s);
-    let end = hex
-        .find(|c: char| !c.is_ascii_hexdigit())
-        .unwrap_or(hex.len());
-    if end == 0 {
-        return None;
-    }
-    let hash = u32::from_str_radix(&hex[..end], 16).ok()?;
-    let rest = hex[end..].trim_start_matches(' ');
-    let value = rest
-        .strip_prefix('=')
-        .or_else(|| rest.strip_prefix('\t'))?;
-    Some((hash, value.trim_start_matches([' ', '\t'])))
+    keys.len()
 }
 
 unsafe fn readable(p: *const c_void, len: usize) -> bool {
@@ -988,7 +959,11 @@ unsafe fn patch_iat_in(
     }
     let opt = nt.add(24);
     let magic = read_u16(opt);
-    let dd = if magic == 0x10B { opt.add(96) } else { opt.add(112) };
+    let dd = if magic == 0x10B {
+        opt.add(96)
+    } else {
+        opt.add(112)
+    };
     let imp_rva = read_u32(dd.add(8)) as usize;
     if imp_rva == 0 {
         return false;
@@ -1067,7 +1042,7 @@ fn cstr_eq_ignore_ascii_case(p: *const u8, s: &[u8]) -> bool {
     loop {
         let a = unsafe { *p.add(i) };
         let b = if i < s.len() { s[i] } else { 0 };
-        if a.to_ascii_lowercase() != b.to_ascii_lowercase() {
+        if !a.eq_ignore_ascii_case(&b) {
             return false;
         }
         if a == 0 {
@@ -1088,11 +1063,7 @@ type FindFirstFileAFn = unsafe extern "system" fn(*const u8, *mut WIN32_FIND_DAT
 type GetFileAttributesExAFn =
     unsafe extern "system" fn(*const u8, GET_FILEEX_INFO_LEVELS, *mut c_void) -> BOOL;
 
-unsafe fn fopen_impl(
-    path: *const u8,
-    mode: *const u8,
-    real: &AtomicUsize,
-) -> *mut c_void {
+unsafe fn fopen_impl(path: *const u8, mode: *const u8, real: &AtomicUsize) -> *mut c_void {
     let real = real.load(Ordering::Acquire);
     if real == 0 {
         return ptr::null_mut();
@@ -1181,10 +1152,7 @@ unsafe extern "system" fn my_create_file_w(
     }
 }
 
-unsafe extern "system" fn my_find_first(
-    name: *const u8,
-    data: *mut WIN32_FIND_DATAA,
-) -> HANDLE {
+unsafe extern "system" fn my_find_first(name: *const u8, data: *mut WIN32_FIND_DATAA) -> HANDLE {
     let real = REAL_FIND_FIRST.load(Ordering::Acquire);
     if real == 0 {
         return 0;
@@ -1338,12 +1306,7 @@ fn font_log_path(path: &str) {
     let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
     if guard.is_none() {
         let p = log_dir(&exe_dir()).join("font-paths.log");
-        *guard = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(p)
-            .ok();
+        *guard = open_truncate(&p);
         if let Some(f) = guard.as_mut() {
             let _ = writeln!(f, "font path log (read-only hook)");
         }
@@ -1364,12 +1327,7 @@ unsafe fn install_font_log_hooks() {
         let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
         if guard.is_none() {
             let p = log_dir(&exe_dir()).join("font-paths.log");
-            *guard = OpenOptions::new()
-                .create(true)
-                .truncate(true)
-                .write(true)
-                .open(p)
-                .ok();
+            *guard = open_truncate(&p);
             if let Some(f) = guard.as_mut() {
                 let _ = writeln!(f, "font path log (read-only hook)");
             }

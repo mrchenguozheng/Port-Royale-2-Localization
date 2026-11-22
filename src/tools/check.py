@@ -29,8 +29,11 @@
 
 import argparse
 import os
+import re
 import subprocess
 import sys
+import unittest
+from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -103,18 +106,35 @@ def langs(skip):
     return [c for c in all_langs if c not in skip], errors
 
 
-def run_each_lang(title, script, langs_, extra=()):
+def run_each_lang(title, script, langs_, extra=(), jobs=1):
     """逐语言跑一遍，任一语言失败即整体失败。
 
     只跑默认语言等于没查：`text_lint.py` 不带 `--lang` 时只看 zh，此前
     `check.ps1` 因此只挡住中文的 E 级，其他七语一条都没进过 CI（pl 的 W1
     就是这么漏过去的）。`--strict` 再把 W 级也算失败。
+
+    各语言之间只读、互不写盘，所以 `jobs > 1` 时并行跑；输出仍按语言顺序
+    逐块打印，日志可读性与串行一致。
     """
     print("\n== %s ==" % title)
+    jobs = max(1, min(int(jobs or 1), len(langs_)))
+
+    def one(lang):
+        return lang, subprocess.run([PY, script, "--lang", lang] + list(extra),
+                                    cwd=ROOT, capture_output=True, text=True,
+                                    encoding="utf-8")
+
+    if jobs == 1:
+        results = [one(lang) for lang in langs_]
+    else:
+        print("（%d 门语言，%d 路并行）" % (len(langs_), jobs))
+        sys.stdout.flush()
+        with ThreadPoolExecutor(max_workers=jobs) as pool:
+            results = list(pool.map(one, langs_))
     ok = True
-    for lang in langs_:
-        p = subprocess.run([PY, script, "--lang", lang] + list(extra), cwd=ROOT,
-                           capture_output=True, text=True, encoding="utf-8")
+    for lang, p in results:
+        if jobs > 1:
+            print("-- %s --" % lang)
         _echo(p)
         if p.returncode:
             print("失败：%s（%s，exit %d）" % (title, lang, p.returncode))
@@ -122,11 +142,98 @@ def run_each_lang(title, script, langs_, extra=()):
     return ok
 
 
+def _flatten(suite):
+    for test in suite:
+        if isinstance(test, unittest.TestSuite):
+            yield from _flatten(test)
+        else:
+            yield test
+
+
+def shard_cases(shard, total, tests_dir=None):
+    """把全部用例按「类」装箱分到 total 片，返回第 shard 片。
+
+    同一测试类不拆：`setUpClass` 只跑一次，与串行时一致。按用例数做贪心
+    装箱，33 个测试文件的条数差得远，按文件名取模分不均匀。
+
+    `tests_dir` 按仓库根解析，不依赖当前目录（分片是自身再拉起的子进程，
+    从别处调用 `check.py` 时 cwd 不一定是仓库根）。`tests/` 不是包（没有
+    `__init__.py`），所以顶层目录就是 `tests/` 本身，与 `-s tests` 一致。
+    """
+    tests_dir = tests_dir or os.path.join(ROOT, "tests")
+    loader = unittest.TestLoader()
+    groups = {}
+    for case in _flatten(loader.discover(tests_dir, top_level_dir=tests_dir)):
+        key = (type(case).__module__, type(case).__qualname__)
+        groups.setdefault(key, []).append(case)
+    buckets = [[] for _ in range(total)]
+    loads = [0] * total
+    for _, cases in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+        i = loads.index(min(loads))
+        buckets[i].extend(cases)
+        loads[i] += len(cases)
+    suite = unittest.TestSuite()
+    for case in buckets[shard]:
+        suite.addTest(case)
+    return suite
+
+
+def run_shard(shard, total):
+    """只跑这一片单测（分片并行时由自身再拉起来）。"""
+    if total < 1 or not 0 <= shard < total:
+        print("分片参数不合法：shard=%d total=%d" % (shard, total))
+        return 2
+    print("\n== 规则单测（片 %d/%d）==" % (shard + 1, total))
+    sys.stdout.flush()
+    suite = shard_cases(shard, total)
+    result = unittest.TextTestRunner(verbosity=1).run(suite)
+    return 0 if result.wasSuccessful() else 1
+
+
+def run_tests(jobs):
+    """规则单测：`jobs > 1` 时分片并行，否则照旧一次 discover。"""
+    jobs = max(1, int(jobs or 1))
+    if jobs == 1:
+        return run("规则单测", [PY, "-m", "unittest", "discover", "-s", "tests", "-q"])
+    print("\n== 规则单测（%d 片并行）==" % jobs)
+    sys.stdout.flush()
+
+    def one(i):
+        return subprocess.run([PY, os.path.join("src", "tools", "check.py"),
+                               "--shard", str(i), "--total", str(jobs)],
+                              cwd=ROOT, capture_output=True, text=True,
+                              encoding="utf-8")
+
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        procs = list(pool.map(one, range(jobs)))
+    ok = True
+    ran = 0
+    for i, p in enumerate(procs):
+        print("-- 片 %d/%d --" % (i + 1, jobs))
+        _echo(p)
+        m = re.search(r"Ran (\d+) tests", (p.stdout or "") + (p.stderr or ""))
+        if m:
+            ran += int(m.group(1))
+        if p.returncode:
+            ok = False
+    if ok:
+        print("合计 Ran %d tests（%d 片）" % (ran, jobs))
+    else:
+        print("失败：规则单测（%d 片中有片 exit 非 0）" % jobs)
+    return ok
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="提交前统一检查")
     ap.add_argument("--skip-lang", action="append", default=[],
                     metavar="代码", help="临时跳过某门语言（可重复，不写进仓库）")
+    ap.add_argument("--jobs", type=int, default=1, metavar="N",
+                    help="并行度：逐语言检查与规则单测都用它（默认 1；CI 传 4）")
+    ap.add_argument("--shard", type=int, default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--total", type=int, default=None, help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    if args.shard is not None:
+        return run_shard(args.shard, args.total or 1)
 
     skip, bad = read_skip_file()
     for line in bad:
@@ -152,21 +259,22 @@ def main(argv=None):
         return 1
     if not run("语言配置", [PY, os.path.join("src", "tools", "config_check.py")]):
         return 1
-    if not run_each_lang("译文规范", lint, langs_, ["--strict"]):
+    if not run_each_lang("译文规范", lint, langs_, ["--strict"], args.jobs):
         return 1
-    if not run_each_lang("断行长度", line_run, langs_):
+    if not run_each_lang("断行长度", line_run, langs_, (), args.jobs):
         return 1
-    if not run_each_lang("不译清单", keep, langs_):
+    if not run_each_lang("不译清单", keep, langs_, (), args.jobs):
         return 1
     steps = [
         ("英文微调层", [PY, os.path.join("src", "tools", "translate.py"), "overrides"]),
         ("文档一致性", [PY, os.path.join("src", "tools", "docs_check.py")]),
         ("脚本地图", [PY, os.path.join("src", "tools", "tools_check.py")]),
-        ("规则单测", [PY, "-m", "unittest", "discover", "-s", "tests", "-q"]),
     ]
     for title, cmd in steps:
         if not run(title, cmd):
             return 1
+    if not run_tests(args.jobs):
+        return 1
     print("\n全部检查通过。")
     return 0
 

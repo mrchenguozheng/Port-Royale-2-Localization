@@ -2,7 +2,7 @@
 """pr2ctl.detect —— 版本识别、补丁状态、语言包盘点。"""
 
 from .base import *  # noqa: F401,F403
-from . import steam_host
+from . import host_action, steam_host
 
 def available_langs():
     r"""src\translations\ 下可编辑的语言代码，供勾选。
@@ -37,7 +37,7 @@ def patch_items(target, edition=None):
     """游戏目录里实际存在的补丁文件。返回 [(相对名, 绝对路径, 是否目录)]。
 
     **只按这张固定清单找**：不扫目录、不猜通配，所以不可能误删 PR2.exe、
-    存档或别的 mod 的 DLL。Steam 的宿主 DLL 不在这里 —— 卸载前先还原
+    存档或别的 mod 的 DLL。宿主 DLL 不在这里 —— 卸载前先还原
     原版，还原成功后才删公共文件。
     """
     out = []
@@ -52,14 +52,14 @@ def remove_patch(target, only=None, edition=None):
     """删掉补丁文件。返回 (是否全部成功, 删掉列表, 失败列表)。
 
     only 给定时只处理其中的相对名 —— 二次确认的勾选框就是靠它生效的。
-    Steam 先还原宿主 DLL；还原失败就停止，不删任何文件。
+    两版都可能挂过宿主代理，先还原宿主 DLL；还原失败就停止，不删任何文件。
+    edition 参数留着是给调用方兼容的，判据改用 has_host。
     """
-    edition = edition or steam_host.detect_edition(target)
-    if edition == "steam":
-        try:
-            steam_host.restore_host(target)
-        except steam_host.HostError as exc:
-            return False, [], ["Steam 宿主还原失败：%s" % exc]
+    del edition                                   # 版别不再决定还原与否
+    if steam_host.has_host(target):
+        ok, detail = host_action.restore(target)
+        if not ok:
+            return False, [], ["宿主还原失败：%s" % detail]
     removed, failed = [], []
     for rel, path, isdir in patch_items(target):
         if only is not None and rel not in only:
@@ -242,8 +242,8 @@ def patch_report(path):
         out.append(("fonts\\" + name,
                     "已替换" if replaced else "原版",
                     "含中日文字形的子集" if replaced else "未动"))
-    if steam_host.detect_edition(path) == "steam":
-        state, note = steam_host.status(path)
-        out.append((steam_host.HOST_DLL, state, note))
+    if steam_host.has_host(path):
+        out.append((steam_host.HOST_DLL, "有",
+                    "挂载/还原由启动器执行；--restore 可换回原版"))
     return out
 

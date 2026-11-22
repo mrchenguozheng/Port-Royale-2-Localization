@@ -53,6 +53,7 @@ src/tools/
 |---|---|
 | `pack/compile_pack.py` | 译文 → 引擎语言包 `packs/<语言>.txt`（含 `--union` 并集基线、`--strict`、`--variant-out`） |
 | `pack/build_artifacts.py` | 构建语言包产物的统一入口（编译 + 字体 + 清单） |
+| `pack/pack_delta.py` | 相对上一次发行（`release-v*`）统计译文条目的增、改、删；出包时给 README 与清单用 |
 | `pack/make_release.py` | 按语言、按 GOG/Steam 入口生成发行 zip（`union=True`，两个 zip 共用同一份并集包） |
 | `pack/release_manifest.py` | 生成并校验发行包根目录的 `manifest.json` |
 | `pack/release_version.py` | 发行版本号与发行语言集的唯一口径 |
@@ -148,6 +149,8 @@ src/tools/
 | 脚本 | 作用 |
 |---|---|
 | `font/make_noto_fonts.py` | 生成 Noto 替换字体（字体只做映射，不做裁剪） |
+| `font/font_sources.py` | 字体来源目录解析：`PR2_FONT_DIRS` → 项目内 → 构建缓存 → 系统字体，缺就抛 `FontMissingError` |
+| `font/fetch_noto_fonts.py` | 按语言清单补齐 Noto 源字体到 `build\cache\noto-src`（Range 续传） |
 | `font/build_cyr_fonts.py` | 俄语四个自建字体（正文 + 标题三档） |
 | `font/build_lat_fonts.py` | 拉丁扩展 A 语言（pl）的三个标题字体：正文原版够用，只换标题槽位 |
 | `font/squeeze_fonts.py` | TrueType（glyf）水平压缩，按原版度量调，供日文等宽字符用 |
@@ -163,7 +166,8 @@ src/tools/
 | `install/pr2ctl/detect.py` | 版本识别、补丁状态、语言包盘点 |
 | `install/pr2ctl/launch.py` | 启动游戏与原版对比 |
 | `install/pr2ctl/settings.py` | 记住游戏目录与上次选择 |
-| `install/pr2ctl/steam_host.py` | Steam 版宿主 DLL 的备份、挂载与还原 |
+| `install/pr2ctl/host_action.py` | 部署末尾调 `PR2Localization.exe --mount`，卸载前调 `--restore`；不实现替换算法 |
+| `install/pr2ctl/steam_host.py` | 只读识别：宿主 DLL 是否存在、GOG/Steam 判版 |
 
 ## 约定
 

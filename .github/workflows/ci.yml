@@ -11,38 +11,152 @@ on:
 permissions:
   contents: read
 
+# 同一分支的新推送取消旧的一轮：排队中的运行白白占 runner，日志也没人看。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"
+  # 版本写死：CI 的判据要和开发机一致，`spacy download` 还会去 GitHub release
+  # 拉模型（本机网络下会卡死），直接用固定 URL 的 wheel 装。
+  SPACY_VERSION: 3.8.18
+  SPACY_MODEL: zh_core_web_sm-3.8.0-py3-none-any.whl
+  SPACY_MODEL_URL: https://github.com/explosion/spacy-models/releases/download/zh_core_web_sm-3.8.0/zh_core_web_sm-3.8.0-py3-none-any.whl
 
 jobs:
   build:
     runs-on: windows-latest
+    # 正常一轮 3m37s；卡住时别耗到默认 6 小时。
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
+        id: py
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements-ci.txt
+            requirements.txt
+
+      # 字体在所有重活之前确认：runner 上没有 Noto 就退回项目内缓存，缓存里缺的
+      # 按 src/fonts-sources.toml 补齐（下载 + 按字重实例化成静态文件）；两处都
+      # 补不上就当场失败，不再等到 build 阶段才"字体检查跳过"。
+      - name: Restore font cache
+        id: font-cache
+        uses: actions/cache@v5
+        with:
+          path: build/cache/noto-src
+          key: noto-${{ runner.os }}-${{ hashFiles('src/fonts-sources.toml') }}
+
+      - name: Ensure Noto source fonts
+        shell: pwsh
+        run: |
+          # 搜索顺序固定为：assets\fonts\noto → build\cache\noto-src，系统字体靠最后；
+          # --no-system 让这一步只认项目内，避免 runner 镜像自带字体把结果带漂。
+          python -m pip install --disable-pip-version-check fonttools==4.68.0
+          $log = Join-Path $env:RUNNER_TEMP 'fonts.log'
+          & python src\tools\font\fetch_noto_fonts.py --langs zh,ja --fetch --no-system *>&1 |
+            Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            "::error::Noto 源字体缺失，项目内也没能补齐；见上方清单与查过的目录。"
+            exit 1
+          }
 
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: i686-pc-windows-msvc
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/injector-rs -> target
+
       # 判据用的包全装，见 requirements-ci.txt。中文分词还要一份 .venv-spacy，
       # 与开发机同名同结构，zh_space.spacy_python() 直接就能发现。
       - name: Python deps
         shell: pwsh
-        run: |
-          python -m pip install --disable-pip-version-check -r requirements-ci.txt
-          python -m venv .venv-spacy
-          .venv-spacy\Scripts\python -m pip install --disable-pip-version-check spacy
-          .venv-spacy\Scripts\python -m spacy download zh_core_web_sm
+        run: python -m pip install --disable-pip-version-check -r requirements-ci.txt
 
-      - name: Static checks
+      # key 里带 setup-python 的实际版本（含 patch）：venv 的 pyvenv.cfg 写死了
+      # base python 的绝对路径，runner 镜像换 patch 版本后旧的 venv 就不能用了。
+      - name: Restore spacy venv
+        id: spacy-cache
+        uses: actions/cache@v5
+        with:
+          path: .venv-spacy
+          key: spacy-${{ runner.os }}-${{ steps.py.outputs.python-version }}-${{ env.SPACY_VERSION }}-${{ env.SPACY_MODEL }}
+
+      - name: Build spacy venv
+        if: steps.spacy-cache.outputs.cache-hit != 'true'
         shell: pwsh
-        run: .\check.ps1 -NoPause
+        run: |
+          python -m venv .venv-spacy
+          .venv-spacy\Scripts\python -m pip install --disable-pip-version-check "spacy==$env:SPACY_VERSION"
+          .venv-spacy\Scripts\python -m pip install --disable-pip-version-check "$env:SPACY_MODEL_URL"
+          .venv-spacy\Scripts\python -c "import spacy, zh_core_web_sm; print('spacy', spacy.__version__, 'model', zh_core_web_sm.__version__)"
+
+      # 失败时 GitHub 只给一行 "process completed with exit code 1"，真正的
+      # 失败语言与行号全在 check.log 里。所以落一份日志、失败时把关键行打成
+      # ::error:: 注解，再整体传成 artifact。
+      #
+      # 必须用 `pwsh -File` 起子进程：check.ps1 内部是 `exit $exitCode`，
+      # 在当前进程里调它会直接结束整个 step，后面的日志注解一行都跑不到。
+      - name: Static checks
+        id: check
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'check.log'
+          & pwsh -NoProfile -NonInteractive -File .\check.ps1 -NoPause -Jobs 4 *>&1 |
+            Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            foreach ($line in (Get-Content $log -Tail 60)) {
+              if ($line -match '失败：|^ERROR:|^FAIL:|^E\d+|^W\d+') {
+                "::error::$line"
+              }
+            }
+            # 有些失败路径的文案不带「失败：」前缀（如 check_skip 参数错），
+            # 注解抓不到，就把尾部原样打到日志里，至少页面上能直接看到。
+            "--- check.log 尾部 ---"
+            Get-Content $log -Tail 15
+            "::error::静态检查失败（exit $code），完整日志见 artifact ci-logs。"
+            exit $code
+          }
 
       - name: Build injector and language packs
+        id: build
         shell: pwsh
-        run: .\build.ps1 -Target All -Lang @('zh','ja') -NoPause
+        timeout-minutes: 15
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'build.log'
+          # 关掉 ANSI 色码：日志里的 "warning:" 要能按行首匹配
+          $env:CARGO_TERM_COLOR = 'never'
+          # 用 -Command 而不是 -File：`-Lang zh,ja` 要让内层 pwsh 解析成数组，
+          # 走 -File 时数组参数会被拍平成字符串。
+          & pwsh -NoProfile -NonInteractive -Command '.\build.ps1 -Target All -Lang zh,ja -NoPause' *>&1 |
+            Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            foreach ($line in (Get-Content $log -Tail 60)) {
+              if ($line -match '错误|ERROR|FAIL|error:') { "::error::$line" }
+            }
+            "--- build.log 尾部 ---"
+            Get-Content $log -Tail 20
+            "::error::构建失败（exit $code），完整日志见 artifact ci-logs。"
+            exit $code
+          }
+          # 构建过了但 cargo 有警告：提成注解，别让它埋在几千行日志里
+          Select-String -Path $log -Pattern '^warning: ' -Encoding utf8 |
+            ForEach-Object { "::warning::build: $($_.Line.Trim())" }
+
+      # 放在最后：前面的步骤失败时它才会执行到，日志才可能已经落盘
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-logs
+          path: ${{ runner.temp }}/*.log
+          if-no-files-found: warn

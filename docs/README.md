@@ -2,29 +2,24 @@
 
 [项目 README](../README.md) · [维护指南](../AGENTS.md) · [English](../README.en.md)
 
-> **GOG 英文版 `1.1.2.3` 已实测；Steam 英文版 `1.1.2.3` 已通过宿主 DLL 代理实测。**
-> GOG 正式入口是 `PR2LocalizationGUI.exe`，不要直接双击 `PR2.exe`；Steam 用
-> `Ascaron.Logging-2.6.dll` + `PR2HostMount.ps1`，不再使用 `VERSION.dll`。
+> **GOG 英文版 `1.1.2.3`、Steam 英文版 `1.1.2.3` 与 GOG 法语版 `1.1.2.42` 都已实测**
+> **（宿主 DLL 代理）。** GOG 正式入口是 `PR2LocalizationGUI.exe`（它负责挂载）；
+> 挂载后直接双击 `PR2.exe` 也能加载译文，未挂载时双击就是原版。
+> Steam 与 GOG 都用 `Ascaron.Logging-2.6.dll`，替换在启动器进程里完成，不再使用 `VERSION.dll`。
 
 文档只维护中文一套。英文入口只有根目录 [README.en.md](../README.en.md)，不镜像完整文档。
 
 ## 当前契约
 
-- 发行口径统一在[发行规范](发行规范.md)：版本号 `vMAJOR.MINOR.PATCH[-pre]`，
-  语言集读 `src/release-languages.txt`，`dist/` 只留 zip 与 `SHA256SUMS.txt`。
-- 发行包按 GOG / Steam 分成两个；GOG 不带 `VERSION.dll`。两个 zip 里的
-  `packs/<语言>.txt` 是**同一份并集包**（GOG 由启动器注入、Steam 由宿主 DLL 代理，
-  两条路径读同一个文件）。
-- 语言：包内只放 `packs/locale.default.ini`；用户活动 `locale.ini` 存在时优先，
-  空值也保留；部署/升级不覆盖，`packs/overrides/` 不删除。
-  运行时把空值当「回到内置 `zh`」，不等于原版英文；原版入口是
-  `PR2Localization.exe --vanilla` 或 GUI「启动原版」。
-- 语言包元数据：`<语言>.txt` 开头的 `# pack-meta alias=…` / `min_runtime=…`。
-- 字体：实际字体平铺在 `PR2Localization/fonts/`；包内放 `font-map.default.ini`，
-  用户 `font-map.ini` 按项覆盖默认；不按语言开子目录，不覆盖根目录原版字体；
-  只认 fonts 里的文件，不读系统字体目录。
-- 启动器界面：固定 `PR2Localization/ui/ui.default.ini`；用户 `ui.ini` 按项覆盖。
-- 运行时版本：`src/injector-rs/pr2_common/src/lib.rs`；发行包根目录 `RUNTIME-VERSION`。
+**运行包内布局、宿主挂载、界面语言与支持环境以[运行契约](运行契约.md)为唯一口径**，
+这里不重复细节。只留三条跨文档的索引：
+
+- 发行口径见[发行规范](发行规范.md)：版本号、发行语言集、分组、tag 与门禁；
+  `dist/` 只留 zip、`SHA256SUMS.txt` 与 `release.json`。
+- 字体只做映射，实际字体与映射规则见[字体与分发](字体与分发.md)；语言包格式见
+  [译文与语言包](译文与语言包.md)。
+- 支持环境是 **Windows 10 / 11**，不支持 Windows 7；界面译文没有母语审校，
+  披露与反馈入口在根 [README](../README.md)。
 
 旧的 `launcher.ini`、`lang/aliases.ini` 已移除；旧语言包不再兼容。
 
@@ -38,6 +33,7 @@
 
 | 文档 | 内容 |
 |---|---|
+| [运行契约](运行契约.md) | **唯一口径**：支持环境、包内布局、界面语言、宿主挂载、locale |
 | [构建与安装](构建与安装.md) | 构建、部署、启动、脚本一览 |
 | [发行规范](发行规范.md) | 版本号、发行语言集、产物与校验和、tag、门禁 |
 | [发行版](发行版.md) | 两个发行包的结构、字体、语言设置、GitHub Actions |

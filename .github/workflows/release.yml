@@ -28,44 +28,31 @@ env:
 jobs:
   release:
     runs-on: windows-latest
+    # 九门语言全量出包 + 字体生成，给足但别无限等候。
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # 需要完整历史：tag 校验要判断提交是否是 main / release/* 的祖先。
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements-ci.txt
 
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: i686-pc-windows-msvc
 
-      - name: Install Python dependencies
-        run: python -m pip install --disable-pip-version-check fonttools
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/injector-rs -> target
 
-      - name: Download Noto variable fonts
+      - name: Install Python dependencies
         shell: pwsh
-        run: |
-          $dir = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts"
-          New-Item -ItemType Directory -Force -Path $dir | Out-Null
-          $fonts = @{
-            "NotoSansSC-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
-            "NotoSerifSC-VF.ttf" = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf"
-            "NotoSansJP-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf"
-            "NotoSerifJP-VF.ttf" = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf"
-            "NotoSansKR-VF.ttf"  = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf"
-            "NotoSerifKR-VF.ttf" = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifkr/NotoSerifKR%5Bwght%5D.ttf"
-          }
-          foreach ($name in $fonts.Keys) {
-            $out = Join-Path $dir $name
-            curl.exe --fail --location --retry 3 --retry-delay 3 --silent --show-error --output $out $fonts[$name]
-            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $out) -or (Get-Item -LiteralPath $out).Length -lt 1024) {
-              throw "字体下载失败：$name"
-            }
-            Write-Host "$name $((Get-Item -LiteralPath $out).Length) B"
-          }
+        run: python -m pip install --disable-pip-version-check -r requirements-ci.txt
 
       - name: Derive version
         shell: pwsh
@@ -108,9 +95,11 @@ jobs:
           }
           throw "tag 提交不在 origin/main 或 origin/release/* 上：$sha；请在 main 上打 tag"
 
-      - name: Read release languages
+      - name: Read release languages and bundles
         shell: pwsh
         run: |
+          # 语言全集：字体准备按它下载（--langs）。分组只认 src\release-bundles.toml，
+          # 由 make_release.py 读出来，PowerShell 不在这一步重复实现解析。
           $list = Join-Path "src" "release-languages.txt"
           $names = @()
           foreach ($raw in Get-Content -LiteralPath $list -Encoding utf8) {
@@ -123,6 +112,36 @@ jobs:
           "LANGS=$($names -join ',')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "LANGS=$($names -join ',')"
 
+          $raw = @(& python src\tools\pack\make_release.py --list-bundles)
+          if ($LASTEXITCODE -ne 0) { throw "读不到发行分组：src\release-bundles.toml" }
+          $ids = @($raw | Where-Object { $_ -match '\|' } |
+            ForEach-Object { ($_ -split '\|')[0] } | Where-Object { $_ })
+          if ($ids.Count -eq 0) { throw "发行分组清单为空：src\release-bundles.toml" }
+          "BUNDLES=$($ids -join ',')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "BUNDLES=$($ids -join ',')"
+
+      # 字体与 CI 走同一套：项目内缓存优先，缓存里缺的按清单下载并实例化成
+      # 静态文件；系统字体不参与，同一 tag 重建出的包才逐字节一致。
+      - name: Restore font cache
+        id: font-cache
+        uses: actions/cache@v5
+        with:
+          path: build/cache/noto-src
+          key: noto-${{ runner.os }}-${{ hashFiles('src/fonts-sources.toml') }}
+
+      - name: Ensure Noto source fonts
+        shell: pwsh
+        run: |
+          # 与 CI 同一套顺序：assets\fonts\noto → build\cache\noto-src，系统字体
+          # 不参与（--no-system），同一 tag 重建出的包才逐字节一致。
+          $log = Join-Path $env:RUNNER_TEMP 'fonts.log'
+          & python src\tools\font\fetch_noto_fonts.py --langs $env:LANGS --fetch --no-system *>&1 |
+            Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            "::error::Noto 源字体缺失，项目内也没能补齐；见上方清单与查过的目录。"
+            exit 1
+          }
+
       - name: Pin build time
         shell: pwsh
         run: |
@@ -132,41 +151,69 @@ jobs:
           Write-Host "SOURCE_DATE_EPOCH=$epoch"
 
       - name: Build release packages
+        id: build
         shell: pwsh
         run: |
-          $langs = $env:LANGS -split ','
-          .\release.ps1 -Version $env:VERSION -Edition all -Lang $langs -NoPause
+          $log = Join-Path $env:RUNNER_TEMP 'release-build.log'
+          $env:CARGO_TERM_COLOR = 'never'
+          & pwsh -NoProfile -NonInteractive -Command '$b = $env:BUNDLES -split ","; .\release.ps1 -Version $env:VERSION -Bundle $b -NoPause' *>&1 |
+            Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            foreach ($line in (Get-Content $log -Tail 60)) {
+              if ($line -match '错误|ERROR|FAIL|error:') { "::error::$line" }
+            }
+            "--- release-build.log 尾部 ---"
+            Get-Content $log -Tail 20
+            "::error::发版打包失败（exit $code），完整日志见 artifact release-logs。"
+            exit $code
+          }
+          Select-String -Path $log -Pattern '^warning: ' -Encoding utf8 |
+            ForEach-Object { "::warning::build: $($_.Line.Trim())" }
+
+      - name: Upload release logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-logs
+          path: ${{ runner.temp }}/*.log
+          if-no-files-found: warn
 
       - name: Verify release assets
         shell: pwsh
         run: |
-          $langs = $env:LANGS -split ','
+          # 产物按**分组**出：latin 一个 zip 顶 de/es/fr/it 四份，
+          # 文件名用分组 id，不是语言代码；一个包同时面向 GOG 与 Steam。
+          $ids = $env:BUNDLES -split ','
           $expected = @()
-          foreach ($lang in $langs) {
-            $expected += "dist/PR2-$lang-gog-$env:VERSION.zip"
-            $expected += "dist/PR2-$lang-steam-$env:VERSION.zip"
+          foreach ($id in $ids) {
+            $expected += "dist/PR2-$id-$env:VERSION.zip"
           }
           $expected += "dist/SHA256SUMS.txt"
+          $expected += "dist/release.json"
           foreach ($path in $expected) {
             if (-not (Test-Path -LiteralPath $path)) { throw "缺少发行产物：$path" }
           }
           Get-Content -LiteralPath "dist/SHA256SUMS.txt" | ForEach-Object { Write-Host $_ }
+          Get-Content -LiteralPath "dist/release.json" | Write-Host
 
       - name: Upload release artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: PR2-${{ env.VERSION }}
           path: |
             dist/*.zip
             dist/SHA256SUMS.txt
+            dist/release.json
           if-no-files-found: error
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/release-v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
             dist/*.zip
             dist/SHA256SUMS.txt
+            dist/release.json

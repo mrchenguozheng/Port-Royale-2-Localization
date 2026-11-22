@@ -15,6 +15,7 @@
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -32,11 +33,10 @@ if INSTALL not in sys.path:
 from pr2ctl.base import KNOWN_BUILDS  # noqa: E402
 
 MANIFEST_NAME = "manifest.json"
-SCHEMA_VERSION = 1
-TARGET_BUILD_BY_EDITION = {
-    "gog": "gog-en-1.1.2.3",
-    "steam": "steam-en-1.1.2.3",
-}
+SCHEMA_VERSION = 2
+#: 合并包同时面向两个版本，清单里把两个目标都列出来（schema 2 起是 targets 列表）。
+TARGET_BUILDS = ("gog-en-1.1.2.3", "steam-en-1.1.2.3")
+TARGET_EDITION = "universal"
 DEFAULT_SOURCE_LANG = "en.gog_1.1.2.3"
 
 
@@ -57,18 +57,22 @@ def _pack_doc(lang):
         return {}
 
 
-def _target(edition):
-    build_id = TARGET_BUILD_BY_EDITION.get(edition)
-    if not build_id:
-        raise ValueError("未知发行入口：%s" % edition)
-    for build in KNOWN_BUILDS:
-        if build["id"] == build_id:
-            return {
-                "build": build["id"],
-                "label": build["label"],
-                "exe_sha256": build["sha256"].upper(),
-            }
-    raise ValueError("KNOWN_BUILDS 里没有目标版本：%s" % build_id)
+def _targets():
+    """合并包要同时声明 GOG 与 Steam 两个已知构建。"""
+    found = []
+    for build_id in TARGET_BUILDS:
+        for build in KNOWN_BUILDS:
+            if build["id"] == build_id:
+                found.append({
+                    "build": build["id"],
+                    "label": build["label"],
+                    "edition": "gog" if build["id"].startswith("gog") else "steam",
+                    "exe_sha256": build["sha256"].upper(),
+                })
+                break
+        else:
+            raise ValueError("KNOWN_BUILDS 里没有目标版本：%s" % build_id)
+    return found
 
 
 def _source(source_lang):
@@ -82,15 +86,68 @@ def _source(source_lang):
     }
 
 
-def _translation(lang):
+def _translation(lang, stage=None):
+    """一门语言的来源信息 + 包内实际头部。
+
+    ``translation.pack`` 是**从包里的语言包读回来的**，不是出包时另算一遍：
+    alias / version / entries / untranslated / scope / digest 与
+    ``PR2Localization/packs/<语言>.txt`` 的头逐字相同，玩家看到的和清单记录
+    的不会分叉。
+    """
     doc = _pack_doc(lang)
     import pack_tags
     tags = pack_tags.normalize_tags(doc.get("tags"))
-    return {
+    entry = {
+        "lang": lang,
         "tags": tags,
         "review_status": doc.get("review_status") or "unspecified",
         "source_lang": doc.get("source_lang") or DEFAULT_SOURCE_LANG,
     }
+    head = _pack_head_info(stage, lang) if stage else {}
+    if head:
+        entry["pack"] = head
+    return entry
+
+
+#: 语言包头里的数据行：``# pack-meta alias=简体中文``。
+_PACK_META = re.compile(r"^# pack-meta\s+([^=\s]+)=(.*)$")
+#: 摘要只可能是 12 位小写十六进制；对不上就不写进清单，免得把写坏的头部
+#: 当成可信记录（校验和那边本来就盖不住这几个字符）。
+_DIGEST_OK = re.compile(r"^[0-9a-f]{12}$")
+
+
+def _pack_head_info(stage, lang):
+    """读包里的 ``PR2Localization/packs/<语言>.txt`` 前 64 行的 ``# pack-meta``。"""
+    path = os.path.join(stage, "PR2Localization", "packs", lang + ".txt")
+    info = {}
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            for _ in range(64):
+                line = fh.readline()
+                if not line:
+                    break
+                line = line.rstrip("\r\n")
+                if not line.startswith("# pack-meta "):
+                    if line.strip():
+                        break          # 正文开始了，头部结束
+                    continue
+                match = _PACK_META.match(line)
+                if not match:
+                    continue
+                key, value = match.group(1), match.group(2).strip()
+                if key in ("alias", "version", "scope"):
+                    info[key] = value[:255]
+                elif key in ("entries", "untranslated"):
+                    try:
+                        info[key] = int(value)
+                    except ValueError:
+                        continue
+                elif key == "digest":
+                    if _DIGEST_OK.match(value):
+                        info[key] = value
+    except OSError:
+        return {}
+    return info
 
 
 def kind_for(path):
@@ -101,14 +158,18 @@ def kind_for(path):
         return "runtime-version"
     if path in ("README.txt", "OFL.txt", "NOTO-SOURCES.txt"):
         return "doc"
-    if path == "PR2HostMount.ps1":
-        return "script"
+    if path.startswith("PR2Localization/docs/"):
+        return "doc"
+    if path.startswith("PR2Localization/host/"):
+        return "host-proxy"
     if path.startswith("PR2Localization/packs/"):
         if path.endswith(".txt"):
             return "pack"
         if path.endswith(".ini"):
             return "locale"
     if path.startswith("PR2Localization/fonts/"):
+        if path.endswith("OFL.txt"):
+            return "doc"
         if path.endswith(".ttf"):
             return "font"
         if path.endswith(".ini"):
@@ -164,10 +225,26 @@ def _build_info():
     }
 
 
-def build_manifest(stage, lang, version, edition, font_mode, package_id=None):
+def _as_langs(lang):
+    """接受单个语言代码或语言列表；合包里是列表。"""
+    return [lang] if isinstance(lang, str) else list(lang)
+
+
+def build_manifest(stage, lang, version, font_mode, package_id=None,
+                   deltas=None):
     stage = os.path.abspath(stage)
     package_id = package_id or os.path.basename(os.path.normpath(stage))
-    translation = _translation(lang)
+    langs = _as_langs(lang)
+    primary = langs[0]
+    translations = [_translation(item, stage) for item in langs]
+    if deltas:
+        # 相对上一次发行改了多少条：由 make_release 算好传进来。
+        # 这里不做 git 调用，清单生成保持纯函数（测试也不依赖仓库状态）。
+        for entry in translations:
+            delta = deltas.get(entry["lang"])
+            if delta:
+                entry["delta"] = delta
+    translation = translations[0]
     files = []
     for rel, full in iter_release_files(stage):
         files.append({
@@ -180,14 +257,17 @@ def build_manifest(stage, lang, version, edition, font_mode, package_id=None):
     return {
         "schema": SCHEMA_VERSION,
         "package_id": package_id,
-        "lang": lang,
-        "edition": edition,
+        # lang 保留为默认语言（兼容旧读法）；合包里的全量在 langs / translations。
+        "lang": primary,
+        "langs": langs,
+        "edition": TARGET_EDITION,
         "version": version,
         "runtime_version": _runtime_version(stage),
         "font_mode": font_mode,
         "build": _build_info(),
-        "target": _target(edition),
+        "targets": _targets(),
         "translation": translation,
+        "translations": translations,
         "source": _source(translation["source_lang"]),
         "counts": {
             "files": len(files),
@@ -206,10 +286,11 @@ def _runtime_version(stage):
         return None
 
 
-def write_release_manifest(stage, lang, version, edition, font_mode, package_id=None):
+def write_release_manifest(stage, lang, version, font_mode, package_id=None,
+                           deltas=None):
     path = os.path.join(stage, MANIFEST_NAME)
-    data = build_manifest(stage, lang, version, edition, font_mode,
-                          package_id=package_id)
+    data = build_manifest(stage, lang, version, font_mode,
+                          package_id=package_id, deltas=deltas)
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
     return path

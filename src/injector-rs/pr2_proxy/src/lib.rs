@@ -9,9 +9,12 @@
 //! loader lock is held.
 
 #![allow(non_snake_case)]
+// 这些 `#[no_mangle] pub extern "system"` 函数是 VERSION.dll 的导出转发壳：
+// 参数原样交给系统 DLL，自己不读指针。改成 `unsafe fn` 不会让调用方更安全，
+// 只会改变导出函数的 Rust 类型标记；ABI 由 Windows 加载器按导出名调用。
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use std::ffi::{c_void, OsString};
-use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::windows::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
@@ -28,10 +31,8 @@ use windows_sys::Win32::System::Threading::{CreateThread, Sleep};
 
 const TEXT_SOURCE: &str = "PR2LocalizationCore.dll";
 
-type GetFileVersionInfoAFn =
-    unsafe extern "system" fn(*const u8, u32, u32, *mut c_void) -> i32;
-type GetFileVersionInfoWFn =
-    unsafe extern "system" fn(*const u16, u32, u32, *mut c_void) -> i32;
+type GetFileVersionInfoAFn = unsafe extern "system" fn(*const u8, u32, u32, *mut c_void) -> i32;
+type GetFileVersionInfoWFn = unsafe extern "system" fn(*const u16, u32, u32, *mut c_void) -> i32;
 type GetFileVersionInfoSizeAFn = unsafe extern "system" fn(*const u8, *mut u32) -> u32;
 type GetFileVersionInfoSizeWFn = unsafe extern "system" fn(*const u16, *mut u32) -> u32;
 type GetFileVersionInfoExAFn =
@@ -166,18 +167,16 @@ fn module_path(h: HMODULE) -> String {
 }
 
 fn log_line(dir: &Path, msg: &str) {
-    if let Ok(mut f) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_dir(dir).join("proxy.log"))
+    let logdir = log_dir(dir);
+    if let Some(mut f) =
+        pr2_common::open_append_capped(&logdir.join("proxy.log"), pr2_common::DEFAULT_MAX_BYTES)
     {
         let _ = writeln!(f, "{msg}");
         return;
     }
-    if let Ok(mut f) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(dir.join("proxy.log"))
+    // `logs\` 写不进去时退回游戏根目录：根目录不可写的话代理本身也加载不了。
+    if let Some(mut f) =
+        pr2_common::open_append_capped(&dir.join("proxy.log"), pr2_common::DEFAULT_MAX_BYTES)
     {
         let _ = writeln!(f, "{msg}");
     }
@@ -193,11 +192,7 @@ unsafe extern "system" fn bootstrap_thread(param: *mut c_void) -> u32 {
     if h == 0 {
         log_line(
             &dir,
-            &format!(
-                "[proxy] {} load failed: {}",
-                TEXT_SOURCE,
-                GetLastError()
-            ),
+            &format!("[proxy] {} load failed: {}", TEXT_SOURCE, GetLastError()),
         );
     } else {
         log_line(&dir, &format!("[proxy] loaded {}", TEXT_SOURCE));
@@ -325,7 +320,11 @@ pub extern "system" fn GetFileVersionInfoExW(
 }
 
 #[no_mangle]
-pub extern "system" fn GetFileVersionInfoSizeExA(flags: u32, filename: *const u8, handle: *mut u32) -> u32 {
+pub extern "system" fn GetFileVersionInfoSizeExA(
+    flags: u32,
+    filename: *const u8,
+    handle: *mut u32,
+) -> u32 {
     let f = api().gfvi_size_ex_a;
     if f == 0 {
         return 0;
@@ -337,7 +336,11 @@ pub extern "system" fn GetFileVersionInfoSizeExA(flags: u32, filename: *const u8
 }
 
 #[no_mangle]
-pub extern "system" fn GetFileVersionInfoSizeExW(flags: u32, filename: *const u16, handle: *mut u32) -> u32 {
+pub extern "system" fn GetFileVersionInfoSizeExW(
+    flags: u32,
+    filename: *const u16,
+    handle: *mut u32,
+) -> u32 {
     let f = api().gfvi_size_ex_w;
     if f == 0 {
         return 0;

@@ -36,17 +36,23 @@ def run_stream(cmd, on_line=None, env=None):
     return proc.wait()
 
 
-def compile_pack(lang, out_dir, no_fonts=True, on_line=None, env=None, union=False):
+def compile_pack(lang, out_dir, no_fonts=True, on_line=None, env=None,
+                 union=False, version=""):
     """把一个语言编成 PR2Localization\\packs\\<lang>.txt；返回退出码。
 
     union=True 时只出一份并集包（en 与 fr 两版键集合并），GOG / Steam 两个
     发行包共用同一份文件；逐版对照仍走默认模式（另写 build\\variants\\）。
+
+    version 非空时写进 pack 头（``# pack-meta version=``），启动器用它显示
+    「简体中文 · v1.0.0」；开发构建不传，pack 头就没有这一行。
     """
     cmd = [sys.executable, COMPILE, "--lang", lang, "--out", out_dir]
     if no_fonts:
         cmd.append("--no-fonts")
     if union:
         cmd.append("--union")
+    if version:
+        cmd += ["--version", version]
     return run_stream(cmd, on_line=on_line, env=env)
 
 
@@ -71,21 +77,29 @@ def build_fonts(langs, out_dir=None, mode="noto", log=None, cache=True):
     import make_noto_fonts
     import build_cyr_fonts
     import build_lat_fonts
+    import font_sources
+    # 字体找不到就是失败：以前这里的异常被吞成"字体检查跳过"，CI 的字体判据
+    # 实际是空的（runner 上没有 Noto 就静默出无字体包）。现在返回 False。
     for lang in langs:
         dst = os.path.join(out_dir or FONT_DIR, lang)
-        if lang == "ru":
-            log("生成俄语字体 %s …（正文 Liberation Sans，标题 Noto Serif 压缩）" % lang)
-            ok, msg = build_cyr_fonts.build(dst, log=log)
-            if not ok:
-                return False, msg
-            continue
-        if lang in build_lat_fonts.LANGS:
-            # 正文原版 ARIAL 就够（拉丁扩展 A 全覆盖），只换三个标题槽位。
-            log("生成 %s 标题字体（Noto Serif 按原版 cap/avg 缩放）…" % lang)
-            ok, msg = build_lat_fonts.build(lang, dst, log=log)
-            if not ok:
-                return False, msg
-            continue
-        log("生成 Noto 替换字体 %s …" % lang)
-        make_noto_fonts.ensure_noto_fonts(lang, dst, log=log, cache=cache)
+        try:
+            if lang == "ru":
+                log("生成俄语字体 %s …（正文 Noto Sans 缩放，标题 Noto Serif 压缩）" % lang)
+                ok, msg = build_cyr_fonts.build(dst, log=log)
+                if not ok:
+                    return False, msg
+                continue
+            if lang in build_lat_fonts.LANGS:
+                # 正文原版 ARIAL 就够（拉丁扩展 A 全覆盖），只换三个标题槽位。
+                log("生成 %s 标题字体（Noto Serif 按原版 cap/avg 缩放）…" % lang)
+                ok, msg = build_lat_fonts.build(lang, dst, log=log)
+                if not ok:
+                    return False, msg
+                continue
+            log("生成 Noto 替换字体 %s …（%s）" % (lang, font_sources.whoami()))
+            make_noto_fonts.ensure_noto_fonts(lang, dst, log=log, cache=cache)
+        except font_sources.FontMissingError as exc:
+            return False, "%s：%s" % (lang, exc)
+        except Exception as exc:                       # 字体库缺失等也按失败算
+            return False, "%s 字体生成失败：%s" % (lang, exc)
     return True, "字体：%s" % "、".join(langs)

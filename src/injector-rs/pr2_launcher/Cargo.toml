@@ -2,6 +2,7 @@
 name = "pr2_launcher"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [[bin]]
 name = "PR2Localization"
@@ -18,4 +19,6 @@ windows-sys = { version = "0.52", features = [
     "Win32_System_LibraryLoader",
     "Win32_System_Memory",
     "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
 ] }

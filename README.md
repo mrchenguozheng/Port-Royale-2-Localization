@@ -4,12 +4,18 @@
 
 [English](README.en.md) · [中文文档索引](docs/README.md)
 
-**Supported languages:** Simplified Chinese (`zh`), Japanese (`ja`), Korean (`ko`), Russian (`ru`), German (`de`), Spanish (`es`), French (`fr`), Italian (`it`); English (`en`) is the original game language and fallback. See [README.en.md](README.en.md#supported-languages).
+**Supported languages:** Simplified Chinese (`zh`), Japanese (`ja`), Korean (`ko`), Russian (`ru`), German (`de`), Spanish (`es`), French (`fr`), Italian (`it`), Polish (`pl`); English (`en`) is the original game language and fallback. See [README.en.md](README.en.md#supported-languages).
 
 **译文标记：** 同人制作 · 社区协作 · AI 辅助（预览版）。这批译文不是官方本地化，
 由社区制作、AI 辅助起草并人工审校；旧语言包若改自原版零售文件会单独标 `retail`。
 标记写在 `src/packs/<语言>.toml` 的 `tags` 里，词表见
 [`pack_tags.py`](src/tools/pack/pack_tags.py)，出包时进 `README.txt` 与 `manifest.json`。
+
+**界面译文没有母语审校。** 启动器的九种界面文案（`zh/ja/ko/ru/pl/de/es/fr/it`）由 AI
+起草，只做了 key 与占位符的机械一致性校验，**没有经过母语者逐句校对**。这是当前
+已知短板，不是“已修复”。如果你是其中某门语言的母语玩家，愿意帮忙校对，请在项目的
+Issue 区贴出「界面截图 + 现在这行文案 + 建议改法」；游戏内语言包的同类问题也欢迎一并指出。
+支持范围和启动器界面选择见[运行契约](docs/运行契约.md)。
 
 ---
 
@@ -17,24 +23,31 @@
 
 不需要安装器、不需要 Python、不需要编译。
 
-1. 确认是 **GOG 英文版 `1.1.2.3`**，或 Steam 英文版 `1.1.2.3`（宿主 DLL 入口）；
-2. 从 Release 下载对应语言和入口的 zip：GOG 版是 `PR2-zh-gog-v1.0.0.zip`，
-   Steam 版是 `PR2-zh-steam-v1.0.0.zip`；
-3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
-4. GOG 双击 `PR2LocalizationGUI.exe`，选语言后点「以所选语言启动」；
-   Steam 先在游戏根目录运行 `PR2HostMount.ps1 -Action Mount`，再从 Steam 启动游戏；
-5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... overrides`。
+挂载与还原都在启动器进程里完成（`pr2_common` 里的 Rust 实现），不调用 PowerShell，
+也不受「禁止执行脚本」这类组策略影响；失败原因写在 `PR2Localization\logs\host.log`。
 
-GOG 包刻意不含 `VERSION.dll`。Steam 包不带 `VERSION.dll`，而是带
-`Ascaron.Logging-2.6.dll` 宿主代理和 `PR2HostMount.ps1`：挂载脚本先校验原版
-`Ascaron.Logging-2.6.dll` 的 `11,776 B` / SHA-256，通过后备份成
-`Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\`，再换代理；
-原版大小或哈希不对时脚本停止，不强行覆盖。GOG 从旧包升级时，根目录残留的
-`VERSION.dll` 可以删除，GOG 不加载它。
-GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析到
-`C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入游戏进程，结果是原版英文。
-`PR2Localization.exe` / `PR2LocalizationGUI.exe` 是 GOG 的正式入口，负责注入
-`PR2LocalizationCore.dll`；原版 `PR2.exe` 本身不改。
+1. 确认系统是 **Windows 10 / Windows 11**（不支持 Windows 7）；
+2. 确认是 **GOG 英文版 `1.1.2.3`**、Steam 英文版 `1.1.2.3`，或 GOG 法语版 `1.1.2.42`（三者都走宿主 DLL 入口）；
+3. 从 Release 下载对应语言的 zip，例如中文是 `PR2-zh-v1.0.0.zip`——**一个包两种版本都能用**；
+4. **全部解压到 `PR2.exe` 所在的游戏根目录**；
+5. **双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
+   GOG 版由启动器挂载宿主 DLL 后直启游戏；Steam 版挂载后交给 Steam 客户端
+   （`steam://rungameid/12470`）拉起，不用你回库里再点一次；
+6. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... N entries, M overrides`。
+7. 想确认装的是哪一版：GUI 副标题与语言列表都带版本（`简体中文 · v1.0.0`），
+   命令行 `PR2Localization.exe --version` 打印同一串；语言包改了什么看状态框第二行
+   （`3590 条 · 未译 0 · 摘要 9cfa2931c1c2`）与包根 `README.txt` 的「语言包变化」段。
+8. 想回原版：点 GUI 上的「还原原版」，或 `PR2Localization.exe --restore`。
+
+GOG 与 Steam 的 `PR2.exe` 静态导入同一份 `Ascaron.Logging-2.6.dll`，所以本地化入口只有一条；
+差别只是 GOG 由启动器直启、Steam 交给客户端。包内代理放在 `PR2Localization\host\`，
+启动前由启动器校验原版、备份后换入，失败即停并写 `PR2Localization\logs\host.log`；
+发行包不带任何 `.ps1`。挂载后直接双击 `PR2.exe` 也有效，没挂载时双击就是原版英文。
+完整校验与备份规则见[运行契约](docs/运行契约.md)。
+
+启动器界面按发包语言选一份：`PR2-zh` 用中文、`PR2-latin` 用德语（组内 de/es/fr/it 共用），
+包内换游戏语言不会换界面。源码九份 `ui.<lang>.ini`，`ui.default.ini` 由构建从 `ui.zh.ini` 生成。
+包内布局、挂载语义与支持环境见[运行契约](docs/运行契约.md)。
 
 注意：
 
@@ -53,18 +66,22 @@ GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析�
 
 ## 支持范围
 
-**本项目用于给英文版套其他语言包；原版 `PR2.exe` 不改。**
+**本项目用于给原版游戏套其他语言包；原版 `PR2.exe` 不改。** 语言包的键是条目 id，
+英文版与 GOG 法语版共用同一套 id，所以同一个包在两版里都能命中。
 
-| 游戏版本 | 状态 |
+| 项目 | 状态 |
 |---|---|
-| **GOG 英文 `1.1.2.3`** | ✅ 已实测（`PR2LocalizationGUI` 入口） |
-| **Steam 英文 `1.1.2.3`** | ✅ 已实测（宿主 `Ascaron.Logging-2.6.dll` 代理，中文界面） |
-| GOG 法语 `1.1.2.42` | ❌ 不支持（只用作翻译参照） |
-| 其他版本 | ❌ 不支持 |
+| **Windows 10 / Windows 11** | ✅ 支持（64 位系统跑 32 位游戏） |
+| Windows 7 | ❌ 不支持，也没有验证过 |
+| **GOG 英文 `1.1.2.3`** | ✅ 已实测（宿主 `Ascaron.Logging-2.6.dll` 代理，中文界面） |
+| **Steam 英文 `1.1.2.3`** | ✅ 已实测（同上，启动交给 Steam 客户端） |
+| **GOG 法语 `1.1.2.42`** | ✅ 已实测（2026-11-22，pl 包；宿主代理生效，游戏内版本号仍是 `1.1.2.42`。该版比英文版多 42 条 `+++EMPTY+++` 空占位、少 19 条，这些条目按原样保留） |
+| 其他游戏版本 | ❌ 不支持（零售版等不在验证范围） |
 
-Steam 版不再尝试 `VERSION.dll` 自然加载：`PR2.exe` 静态导入
+两版都不尝试 `VERSION.dll` 自然加载：`PR2.exe` 静态导入
 `Ascaron.Logging-2.6.dll`，本项目的代理接管这个导出，并在工作线程里加载同目录
 `PR2LocalizationCore.dll`；后者等待 `A2dLib-2.20A.dll` 后再装 hook。
+`VERSION.dll` 属于 Windows 的 KnownDLLs，同目录代理永远进不去，那条路线已废弃。
 挂载和还原都经过 `Ascaron.Logging-2.6.dll` 的大小/SHA-256 校验，未知文件不覆盖。
 未验证的版本不要反馈“汉化已支持”，先附 `PR2Localization\logs\runtime.log` 和
 `PR2Localization\logs\proxy.log`。
@@ -90,15 +107,21 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1
 .\build.ps1 -Target Packs -Lang zh  # 只编中文语言包
 .\build.ps1 -Target Injector        # 只编 Rust 注入器
 
-.\release.ps1 -Version v1.0.0       # 同时生成 gog 和 steam 两套 zip
-.\release.ps1 -Version v1.0.0 -Edition gog    # 只出 GOG 包
-.\release.ps1 -Version v1.0.0 -Edition steam  # 只出 Steam 包
-.\release.ps1 -Version v1.0.0 -Tag  # 额外创建 release-v1.0.0 本地 tag
+.\release.ps1 -Version v1.0.0       # 每个分组一个 zip（GOG / Steam 通用）
+.\release.ps1 -Version v1.0.0 -Bundle zh     # 只出中文分组
+.\release.ps1 -Version v1.0.0 -Bundle latin  # 只出拉丁分组（de+es+fr+it）
+.\release.ps1 -Version v1.0.0 -AllowDirty    # 工作树脏时仍出包（版本头记 dirty）
+.\release.ps1 -Version v1.0.0 -Tag  # 额外创建 release-v1.0.0 本地 tag（要求干净树）
 .\release.ps1 -Version v1.0.0 -Tag -Push  # 再推送 tag
 ```
 
+发版默认拒绝脏工作树，`-Tag` 时无条件拒绝；`-Tag` 只允许在当前分支 `main` 或 `release/*`。
+`dist\` 除六个 zip 与 `SHA256SUMS.txt` 外，还会写 `release.json`（版本、提交、是否 dirty、
+分组与逐包 SHA-256），CI 与下游校验以它为准。
+
 低层脚本仍在 `src\build_injector.ps1`、`src\build_translation.ps1`；日常不需要直接调用。
-每个 zip 根目录带 `manifest.json`，记录目标 exe、参考原文、翻译来源/AI 标记和逐文件
+每个 zip 根目录带 `manifest.json`，记录两个目标 exe（GOG 与 Steam）、参考原文、
+翻译来源/AI 标记和逐文件
 SHA-256；出包前自校验，失败不出包。
 脚本位置和参数见[构建与安装](docs/构建与安装.md#脚本位置)。
 
@@ -133,9 +156,9 @@ pr2-localization/
 
 | 文件 | 角色 |
 |---|---|
-| `PR2Localization.exe` | 启动器。挂起方式启动 `PR2.exe`，注入 DLL 后恢复执行（构建产物） |
+| `PR2Localization.exe` | 启动器。先校验/挂载宿主代理，GOG 版直启 `PR2.exe`，Steam 版交给客户端（构建产物） |
 | `PR2LocalizationCore.dll` | 主逻辑。hook 引擎取字的三条路径，把译文替换进去（构建产物） |
-| `PR2Localization\packs\` | 语言包目录。`<语言>.txt` + `locale.default.ini`（发行默认）；用户 `locale.ini` 优先 |
+| `PR2Localization\packs\` | 语言包目录。`<语言>.txt` + `locale.default.ini`（发行默认）；用户 `locale.ini` 优先；`overrides\` 是空的覆盖位，玩家自己往里放补丁 |
 | `PR2Localization\fonts\` | 本地化字体；缺字会显示空白 |
 
 ## 加一种语言
@@ -159,6 +182,7 @@ pr2-localization/
 
 | 文档 | 内容 |
 |---|---|
+| [运行契约](docs/运行契约.md) | 支持环境、包内布局、界面语言、宿主挂载的唯一口径 |
 | [玩家指南](docs/玩家指南.md) | 下载 zip、解压、启动、卸载、常见问题 |
 | [构建与安装](docs/构建与安装.md) | 构建/部署/启动、脚本一览 |
 | [译文与语言包](docs/译文与语言包.md) | TOML 格式、校验规则、两版键集与出包取值 |
@@ -171,8 +195,9 @@ pr2-localization/
 
 ## 已知限制
 
-- **hook 目标与游戏版本绑定。** 代码按固定偏移取 `A2dLib-2.20A.dll` 的函数，
-  换游戏版本（包括 GOG 的法语版 `1.1.2.42`）很可能需要改偏移，否则整体不生效。
+- **hook 目标与游戏版本绑定。** 代码按固定偏移取 `A2dLib-2.20A.dll` 的函数。
+  已知的三个版本（GOG 英文 `1.1.2.3`、Steam 英文 `1.1.2.3`、GOG 法语 `1.1.2.42`）
+  都用同一组偏移并已实测；换其他版本（零售版、补丁版）很可能需要改偏移，否则整体不生效。
 - **中文条目整条不显示是分词问题，不是标签问题。** 引擎按空格切词，
   整串汉字超宽会被整条丢弃，只能逐条在游戏里实测。
 - **字体统一放在 `PR2Localization\fonts\`。** 实际字体文件（默认保留 Noto 原始文件名）平铺，
@@ -190,7 +215,7 @@ pr2-localization/
 
 ## 语言完成度
 
-八门语言共用一套 3548 条基准（`en.gog_1.1.2.3`），"有意不译"指按键名、职员表、游戏
+九门语言共用一套 3548 条基准（`en.gog_1.1.2.3`），"有意不译"指按键名、职员表、游戏
 标题、场景文件名模板、纯符号与空占位、以及**原文就是本语言写法**的专名（城镇名、
 海盗与姓氏池）这类按规则保留原文的条目（登记在 `src/data/keep_as_is/`），不计入待译。
 所以「可译 = 3548 − 有意不译」，百分比按 **已译 / 可译** 算。数字会变，取实时值时跑

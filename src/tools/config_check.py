@@ -8,7 +8,7 @@
 - `src/packs/*.toml` 的 alias/min_runtime 和可选的
   tags/review_status/source_lang；
 - `src/translations/<code>.toml` 是否存在；
-- `src/injector-rs/ui/ui.default.ini` 是否存在、是否有重复键；
+- `src/injector-rs/ui/ui.zh.ini` 是否存在、界面 ini 是否有重复键；
 - `src/font-map.ini` 的逻辑名、坏行和禁用字体；
 - `src/data/placeholder_roles/<code>.toml` 是否存在且可解析。
 
@@ -254,8 +254,10 @@ def _parse_ui(path, root, errors):
 
 def _check_ui(src, packs, errors):
     ui_dir = os.path.join(src, "injector-rs", "ui")
-    if not os.path.isfile(os.path.join(ui_dir, "ui.default.ini")):
-        errors.append("src/injector-rs/ui/ui.default.ini：默认界面文件不存在")
+    # 源目录不再保存 ui.default.ini：简体中文就是默认来源，构建时复制成
+    # build/runtime/.../ui.default.ini。缺 ui.zh.ini 才是真错误。
+    if not os.path.isfile(os.path.join(ui_dir, "ui.zh.ini")):
+        errors.append("src/injector-rs/ui/ui.zh.ini：简体中文界面文件不存在（运行时默认由它生成）")
     if os.path.isdir(ui_dir):
         for name in sorted(os.listdir(ui_dir)):
             if name.lower().endswith(".ini"):

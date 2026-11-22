@@ -6,7 +6,55 @@ use std::path::{Path, PathBuf};
 
 use windows_sys::Win32::System::LibraryLoader::GetModuleFileNameW;
 
-pub const RUNTIME_VERSION: u32 = 1;
+mod host;
+pub use host::*;
+
+mod log_util;
+pub use log_util::*;
+
+/// 运行时契约版本。
+///
+/// v1：GOG 走远程注入、Steam 走宿主 DLL 挂载，两条启动路径。
+/// v2：两版都走宿主 DLL 挂载；GOG 直启 `PR2.exe`，Steam 交给客户端（`steam://`），
+/// 远程注入只在根目录没有宿主 DLL 时用。
+/// 语言包的 `min_runtime` 只约束这个数字；从 v1 升到 v2 是因为启动契约变了，
+/// 不是包格式变了（包头与正文格式都没动）。
+pub const RUNTIME_VERSION: u32 = 2;
+
+/// 发行版本号（如 `v1.0.0`），由构建脚本通过 `PR2_VERSION` 注入；开发构建为空串。
+/// 语言包里的 `# pack-meta version=` 与它同源，都由 `release.ps1 -Version` 给。
+pub const BUILD_VERSION: &str = env!("PR2_BUILD_VERSION");
+/// 构建对应的短 commit；取不到时为空串。
+pub const BUILD_COMMIT: &str = env!("PR2_BUILD_COMMIT");
+/// `1` 表示构建时工作树有未提交改动。
+pub const BUILD_DIRTY: &str = env!("PR2_BUILD_DIRTY");
+
+/// 拼给玩家/排障看的版本标签：`v1.0.0 (c8aa6e3)`、`v1.0.0 (c8aa6e3+dirty)`、`dev`。
+///
+/// 纯函数，便于单测；真正的值从 [`BUILD_VERSION`] 等常量来。
+pub fn format_build_label(version: &str, commit: &str, dirty: &str) -> String {
+    let mut out = if version.is_empty() {
+        "dev".to_string()
+    } else if version.starts_with('v') {
+        version.to_string()
+    } else {
+        format!("v{version}")
+    };
+    if !commit.is_empty() {
+        let suffix = if dirty.is_empty() || dirty == "0" {
+            commit.to_string()
+        } else {
+            format!("{commit}+dirty")
+        };
+        out.push_str(&format!(" ({suffix})"));
+    }
+    out
+}
+
+/// 当前进程的版本标签，GUI 副标题与 `--version` 共用。
+pub fn build_label() -> String {
+    format_build_label(BUILD_VERSION, BUILD_COMMIT, BUILD_DIRTY)
+}
 pub const DATA_DIR: &str = "PR2Localization";
 pub const FONT_NAMES: [&str; 4] = [
     "ARIAL.TTF",
@@ -181,7 +229,7 @@ fn expand_env(value: &str) -> String {
 
 fn normalize_font_key(value: &str) -> String {
     let mut name = value.trim();
-    if let Some(pos) = name.rfind(|c| c == '\\' || c == '/') {
+    if let Some(pos) = name.rfind(['\\', '/']) {
         name = &name[pos + 1..];
     }
     name.trim_matches('"').to_ascii_lowercase()
@@ -355,11 +403,7 @@ fn language_line(line: &str) -> Option<Option<String>> {
     if !key.trim().eq_ignore_ascii_case("language") {
         return None;
     }
-    let value = value
-        .split(|c| c == ';' || c == '#')
-        .next()
-        .unwrap_or("")
-        .trim();
+    let value = value.split([';', '#']).next().unwrap_or("").trim();
     if value.is_empty() {
         Some(None)
     } else {
@@ -467,6 +511,27 @@ pub fn valid_lang_code(s: &str) -> bool {
         .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
+/// 语言包一行：`0x1234 = 文本`，也接受 `1234<TAB>文本`。
+///
+/// 注入器读主包和读 `packs/overrides/<lang>.txt` 都用这一份解析，格式只有一处。
+pub fn parse_pack_line(s: &str) -> Option<(u32, &str)> {
+    let s = s.trim_start_matches([' ', '\t']);
+    let hex = s
+        .strip_prefix("0x")
+        .or_else(|| s.strip_prefix("0X"))
+        .unwrap_or(s);
+    let end = hex
+        .find(|c: char| !c.is_ascii_hexdigit())
+        .unwrap_or(hex.len());
+    if end == 0 {
+        return None;
+    }
+    let hash = u32::from_str_radix(&hex[..end], 16).ok()?;
+    let rest = hex[end..].trim_start_matches(' ');
+    let value = rest.strip_prefix('=').or_else(|| rest.strip_prefix('\t'))?;
+    Some((hash, value.trim_start_matches([' ', '\t'])))
+}
+
 pub fn wide(s: &str) -> Vec<u16> {
     let mut out: Vec<u16> = s.encode_utf16().collect();
     out.push(0);
@@ -481,6 +546,33 @@ pub fn path_string(path: &Path) -> String {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn parses_pack_lines() {
+        assert_eq!(parse_pack_line("0x1A2B = 文本"), Some((0x1A2B, "文本")));
+        assert_eq!(parse_pack_line("  0X1a2b=文本"), Some((0x1A2B, "文本")));
+        // 老格式：十六进制紧接制表符，没有 0x 前缀。
+        assert_eq!(parse_pack_line("1a2b\t文本"), Some((0x1A2B, "文本")));
+        assert_eq!(parse_pack_line("0x = 空键"), None);
+        assert_eq!(parse_pack_line("这不是一行"), None);
+    }
+
+    #[test]
+    fn build_label_reports_version_and_commit() {
+        // 开发构建：没有注入版本时显示 dev，而不是一个看起来像发行版的假版本号。
+        assert_eq!(format_build_label("", "", ""), "dev");
+        assert_eq!(format_build_label("v1.0.0", "", ""), "v1.0.0");
+        // 写进 pack 头的是不带 v 的 1.0.0；两处都要显示成 v1.0.0。
+        assert_eq!(
+            format_build_label("1.0.0", "c8aa6e3", ""),
+            "v1.0.0 (c8aa6e3)"
+        );
+        assert_eq!(
+            format_build_label("v1.0.0", "c8aa6e3", "1"),
+            "v1.0.0 (c8aa6e3+dirty)"
+        );
+        assert_eq!(format_build_label("", "c8aa6e3", "0"), "dev (c8aa6e3)");
+    }
 
     fn temp_root() -> PathBuf {
         let stamp = SystemTime::now()
@@ -568,10 +660,7 @@ mod tests {
         fs::write(&path, "language=ja\nlanguage = zh\nother=1\n").unwrap();
 
         assert!(write_locale_language(&root, "ko"));
-        assert_eq!(
-            fs::read_to_string(&path).unwrap(),
-            "language=ko\nother=1\n"
-        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), "language=ko\nother=1\n");
     }
 
     #[test]

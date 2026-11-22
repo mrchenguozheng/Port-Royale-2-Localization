@@ -6,16 +6,39 @@ use std::path::Path;
 const BUILTIN: &[(&str, &str)] = &[
     ("title", "Port Royale 2 Localization"),
     ("subtitle", "Port Royale 2 localization runtime"),
+    // %d 运行时版本、%s 发行版本标签（v1.0.0 (c8aa6e3) 或 dev）。
+    (
+        "subtitle.version",
+        "Port Royale 2 localization runtime v%d · %s",
+    ),
     ("label.language", "Language pack:"),
     ("button.launch", "Launch localized"),
     ("button.vanilla", "Launch original"),
+    ("button.restore", "Restore original"),
     ("button.refresh", "Refresh"),
     ("button.kill", "End game process"),
     ("status.count", "%d language pack(s)"),
+    ("status.count_pack", "%d language pack(s) · current %s"),
+    // %d 条目数、%d 未译条目数；没有 digest 的旧包用这一条。
+    ("status.pack_stats", "%d entries · %d untranslated"),
+    // 再加 %s 内容摘要（12 位），用来判断两份包是不是逐字相同。
+    (
+        "status.pack_detail",
+        "%d entries · %d untranslated · digest %s",
+    ),
     ("status.none", "No .txt in PR2Localization\\packs"),
     ("status.launched", "Localized game launched."),
     ("status.vanilla", "Original game launched."),
+    (
+        "status.restored",
+        "Restored the original host DLL and fonts.",
+    ),
     ("status.killed", "Ended %d PR2.exe process(es)."),
+    (
+        "confirm.restore",
+        "Restore the original host DLL and original fonts?\n\
+         The game will start in English until you launch localized again.",
+    ),
     (
         "hint.footer",
         "Language packs live in PR2Localization\\packs.\nIf exit hangs, end PR2.exe here.",
@@ -50,9 +73,14 @@ const BUILTIN: &[(&str, &str)] = &[
         "error.pack_too_new",
         "Language pack needs a newer launcher (runtime v%d, current v%d).",
     ),
+    (
+        "error.restore_failed",
+        "Restore failed (exit code %lu).\n%s",
+    ),
 ];
 
 pub enum Arg {
+    /// `%s`：用来把落盘日志的末尾几行带进对话框。
     Str(String),
     Num(u32),
 }
@@ -65,8 +93,8 @@ impl Strings {
     pub fn load(root: &Path) -> Self {
         let mut values = HashMap::new();
         let dir = ui_dir(root);
-        // 发行包只带 ui.default.ini；用户把要改的项抄进 ui.ini 即可按项覆盖，
-        // 不需要整份替换，升级也不会覆盖用户文件。
+        // 包内只有一份按发包语言选好的 ui.default.ini；用户把要改的项抄进 ui.ini
+        // 即可按项覆盖，不需要整份替换，升级也不会覆盖用户文件。
         let has_default = read_ini(&dir.join(UI_DEFAULT_FILE), &mut values);
         if !has_default {
             // 兼容仍带旧 en.ini 的安装目录；新包不再生成多语言 UI 文件。
@@ -222,6 +250,22 @@ mod tests {
     #[test]
     fn unescapes_newlines() {
         assert_eq!(unescape("a\\nb"), "a\nb");
+    }
+
+    #[test]
+    fn default_ui_keeps_restore_format_placeholders() {
+        // 简体中文是唯一来源（ui.zh.ini）；运行时默认文件由构建脚本从它生成。
+        // 还原失败的弹框要把退出码和落盘日志末尾都填进去。
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/ui.zh.ini");
+        let mut values = HashMap::new();
+        assert!(read_ini(&path, &mut values), "读不到 {}", path.display());
+        let strings = Strings { values };
+        let text = strings.tf(
+            "error.restore_failed",
+            &[Arg::Num(2), Arg::Str("a\nb".into())],
+        );
+        assert!(text.starts_with("还原失败（退出码 2）"), "{text}");
+        assert!(text.ends_with("a\nb"), "{text}");
     }
 
     #[test]

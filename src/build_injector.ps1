@@ -67,7 +67,8 @@ if (-not (Test-Path -LiteralPath $Runtime)) {
 
 $Cargo = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe'
 if (-not (Test-Path -LiteralPath $Cargo -PathType Leaf)) {
-    $cmd = Get-Command cargo.exe -CommandType Application -ErrorAction SilentlyContinue
+    $cmd = Get-Command cargo.exe -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
     if ($cmd) { $Cargo = $cmd.Source } else { $Cargo = $null }
 }
 
@@ -85,6 +86,39 @@ if (-not $Cargo -or -not (Test-Path -LiteralPath $Cargo -PathType Leaf)) {
 }
 
 Write-Host '[build] cargo build --release'
+
+# 版本注入：pr2_common\build.rs 把这三个值编进 exe，启动器用它显示
+# 「本地化运行时 v1 · v1.0.0 (c8aa6e3)」与 --version。
+#   - PR2_VERSION 由 release.ps1 从 -Version 传进来；直接构建时取当前 tag
+#     （release-v1.0.0 → v1.0.0），不在 tag 上就留空，显示成 dev。
+#   - commit / dirty 只有拿不到环境变量时才自己算，CI 可以覆盖。
+# GitHub Windows runner 的 PATH 同时挂了 Git\bin、Git\cmd、Git\ucrt64\bin 三个
+# git.exe，Get-Command 会返回数组；不取第一个时 .Source 会被拼成一整串路径。
+$GitCmd = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+if (-not $GitCmd) {
+    $GitCmd = Get-Command git -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+}
+if (-not $env:PR2_VERSION -and $GitCmd) {
+    $tag = @(& $GitCmd.Source -C $Repo describe --tags --exact-match 2>$null)
+    if ($tag.Count -gt 0 -and $tag[0]) {
+        $env:PR2_VERSION = ($tag[0] -replace '^release-', '')
+    }
+}
+if (-not $env:PR2_COMMIT -and $GitCmd) {
+    $commit = @(& $GitCmd.Source -C $Repo rev-parse --short HEAD 2>$null)
+    if ($commit.Count -gt 0 -and $commit[0]) { $env:PR2_COMMIT = $commit[0] }
+}
+if (-not $env:PR2_DIRTY -and $GitCmd) {
+    $porcelain = @(& $GitCmd.Source -C $Repo status --porcelain 2>$null)
+    $env:PR2_DIRTY = if ($porcelain.Count -gt 0) { '1' } else { '0' }
+}
+$ShowVersion = if ($env:PR2_VERSION) { $env:PR2_VERSION } else { 'dev' }
+$ShowCommit = if ($env:PR2_COMMIT) { $env:PR2_COMMIT } else { 'unknown' }
+$ShowDirty = if ($env:PR2_DIRTY -eq '1') { ' (未提交改动)' } else { '' }
+Write-Host ("[build] 版本：{0} · commit {1}{2}" -f $ShowVersion, $ShowCommit, $ShowDirty)
+
 Push-Location $RustDir
 try {
     & $Cargo build --release --locked
@@ -114,6 +148,12 @@ foreach ($srcName in $artifactMap.Keys) {
         -Destination (Join-Path $Runtime $artifactMap[$srcName]) -Force
 }
 
+# 记录这批产物编进去的版本。release.ps1 -SkipInjector 会拿它与要发版的版本比对：
+# 跳过构建时 exe 里还是上一次的版本号，与包版本错位就是玩家看得见的发行事故。
+# 放在 build\ 根而不是 build\runtime\，是为了不进安装目录、也不进发行包。
+$VersionStamp = Join-Path $Repo 'build\injector-version.txt'
+Set-Content -LiteralPath $VersionStamp -Value $ShowVersion -NoNewline -Encoding utf8
+
 $DataOut = Join-Path $Runtime 'PR2Localization'
 New-Item -ItemType Directory -Force -Path $DataOut | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $DataOut 'logs') | Out-Null
@@ -121,10 +161,23 @@ New-Item -ItemType Directory -Force -Path (Join-Path $DataOut 'logs') | Out-Null
 if (Test-Path -LiteralPath $UiSrc -PathType Container) {
     $UiOut = Join-Path $DataOut 'ui'
     New-Item -ItemType Directory -Force -Path $UiOut | Out-Null
+    # 界面文案按语言分文件（ui.<lang>.ini），源码里没有 ui.default.ini：
+    # 简体中文就是 ui.zh.ini，这一份是唯一来源。运行时用的默认文件在构建时
+    # 从它复制生成，避免同一套中文文案在仓库里存两份、日后各自漂移。
+    # 旧布局的 en/ja/zh.ini 不再被读取，留在 runtime 里会让旧安装带上过期文案。
+    $Zh = Join-Path $UiSrc 'ui.zh.ini'
+    if (-not (Test-Path -LiteralPath $Zh -PathType Leaf)) {
+        Stop-WithError "缺简体中文界面文案：$Zh"
+    }
+    Get-ChildItem -LiteralPath $UiSrc -Filter 'ui.*.ini' -File |
+        ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $UiOut $_.Name) -Force
+        }
+    Copy-Item -LiteralPath $Zh -Destination (Join-Path $UiOut 'ui.default.ini') -Force
     foreach ($lang in @('en', 'ja', 'zh')) {
-        $ini = Join-Path $UiSrc "$lang.ini"
-        if (Test-Path -LiteralPath $ini -PathType Leaf) {
-            Copy-Item -LiteralPath $ini -Destination (Join-Path $UiOut "$lang.ini") -Force
+        $stale = Join-Path $UiOut "$lang.ini"
+        if (Test-Path -LiteralPath $stale -PathType Leaf) {
+            Remove-Item -LiteralPath $stale -Force
         }
     }
 }

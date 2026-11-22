@@ -3,28 +3,29 @@ use std::path::PathBuf;
 use std::ptr;
 
 use pr2_common::{
-    exe_dir, language_fonts_complete, read_locale_language, write_locale_language, RUNTIME_VERSION,
+    build_label, detect_edition, exe_dir, language_fonts_complete, read_locale_language,
+    write_locale_language, Edition, RUNTIME_VERSION,
 };
 use windows_sys::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{
-    CreateFontW, DeleteObject, GetDC, GetDeviceCaps, GetStockObject, HDC, ReleaseDC, SetBkMode,
-    SetTextColor, CLEARTYPE_QUALITY, COLOR_BTNFACE, DEFAULT_CHARSET, DEFAULT_PITCH, FF_DONTCARE,
-    FW_BOLD, FW_NORMAL, HBRUSH, LOGPIXELSX, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, TRANSPARENT,
-    WHITE_BRUSH,
+    CreateFontW, DeleteObject, GetDC, GetDeviceCaps, GetStockObject, ReleaseDC, SetBkMode,
+    SetTextColor, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, COLOR_BTNFACE, DEFAULT_CHARSET,
+    DEFAULT_PITCH, FF_DONTCARE, FW_BOLD, FW_NORMAL, HBRUSH, HDC, LOGPIXELSX, OUT_DEFAULT_PRECIS,
+    TRANSPARENT, WHITE_BRUSH,
 };
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowLongPtrW,
-    LoadCursorW, MessageBoxW, PostQuitMessage, RegisterClassW, SendMessageW, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, TranslateMessage, BS_DEFPUSHBUTTON, BS_PUSHBUTTON, CB_ADDSTRING,
-    CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWNLIST, CREATESTRUCTW,
-    CW_USEDEFAULT, GWLP_USERDATA, IDC_ARROW, IDYES, MB_ICONERROR, MB_ICONWARNING, MB_YESNO, MSG,
-    SW_SHOW, WM_COMMAND, WM_CREATE, WM_CTLCOLORSTATIC, WM_DESTROY, WM_NCDESTROY, WM_SETFONT,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE, WS_VSCROLL, WNDCLASSW,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowLongPtrW, LoadCursorW,
+    MessageBoxW, PostQuitMessage, RegisterClassW, SendMessageW, SetWindowLongPtrW, SetWindowTextW,
+    ShowWindow, TranslateMessage, BS_DEFPUSHBUTTON, BS_PUSHBUTTON, CBS_DROPDOWNLIST, CB_ADDSTRING,
+    CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CREATESTRUCTW, CW_USEDEFAULT, GWLP_USERDATA,
+    IDC_ARROW, IDYES, MB_ICONERROR, MB_ICONWARNING, MB_YESNO, MSG, SW_SHOW, WM_COMMAND, WM_CREATE,
+    WM_CTLCOLORSTATIC, WM_DESTROY, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 
 use crate::packs::{self, Pack};
@@ -37,6 +38,7 @@ const ID_VANILLA: i32 = 1003;
 const ID_REFRESH: i32 = 1004;
 const ID_STATUS: i32 = 1005;
 const ID_KILL: i32 = 1006;
+const ID_RESTORE: i32 = 1011;
 const ID_TITLE: i32 = 1007;
 const ID_SUBTITLE: i32 = 1008;
 const ID_SEPARATOR: i32 = 1009;
@@ -65,6 +67,7 @@ struct App {
     btn_vanilla: HWND,
     btn_refresh: HWND,
     btn_kill: HWND,
+    btn_restore: HWND,
     packs: Vec<Pack>,
     strings: Strings,
     dpi: u32,
@@ -80,11 +83,7 @@ pub fn run() {
     let dpi = dpi_for_system();
     let root = exe_dir();
     let strings = Strings::load(&root);
-    let init = Box::into_raw(Box::new(AppInit {
-        root,
-        strings,
-        dpi,
-    })) as *const c_void;
+    let init = Box::into_raw(Box::new(AppInit { root, strings, dpi })) as *const c_void;
 
     unsafe {
         let inst = GetModuleHandleW(ptr::null()) as HINSTANCE;
@@ -210,6 +209,7 @@ impl App {
             btn_vanilla: 0,
             btn_refresh: 0,
             btn_kill: 0,
+            btn_restore: 0,
             packs: Vec::new(),
             strings: init.strings,
             dpi,
@@ -238,10 +238,16 @@ impl App {
                 0,
                 ptr::null(),
             );
+            // 副标题带两件版本：运行时契约（v1）与本 exe 的发行版本，
+            // 出问题时玩家截图就能说清装的是哪一版。
+            let subtitle = self.strings.tf(
+                "subtitle.version",
+                &[Arg::Num(RUNTIME_VERSION), Arg::Str(build_label())],
+            );
             self.subtitle = CreateWindowExW(
                 0,
                 wide("STATIC").as_ptr(),
-                wide(&self.strings.t("subtitle")).as_ptr(),
+                wide(&subtitle).as_ptr(),
                 WS_CHILD | WS_VISIBLE | ST_LEFT | ST_NOPREFIX,
                 px(24),
                 px(54),
@@ -350,6 +356,20 @@ impl App {
                 0,
                 ptr::null(),
             );
+            self.btn_restore = CreateWindowExW(
+                0,
+                wide("BUTTON").as_ptr(),
+                wide(&self.strings.t("button.restore")).as_ptr(),
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON as u32,
+                px(24),
+                px(214),
+                px(268),
+                px(34),
+                hwnd,
+                ID_RESTORE as isize,
+                0,
+                ptr::null(),
+            );
             self.status = CreateWindowExW(
                 WS_EX_CLIENTEDGE,
                 wide("STATIC").as_ptr(),
@@ -389,6 +409,7 @@ impl App {
             (self.btn_vanilla, self.font_normal),
             (self.btn_refresh, self.font_normal),
             (self.btn_kill, self.font_normal),
+            (self.btn_restore, self.font_normal),
             (self.status, self.font_small),
             (self.hint, self.font_small),
         ] {
@@ -424,6 +445,7 @@ impl App {
             ID_VANILLA => self.launch(true),
             ID_REFRESH => self.load_packs(),
             ID_KILL => self.kill_game(),
+            ID_RESTORE => self.restore(),
             _ => {}
         }
     }
@@ -434,14 +456,11 @@ impl App {
             SendMessageW(self.combo, CB_RESETCONTENT, 0, 0);
         }
         for pack in &self.packs {
-            let label = wide(&pack.label);
+            // 列表项带 pack 头里的版本：同一门语言的 v1.0.0 与 v1.1.0 在目录里
+            // 文件名一样，只能靠这里区分。
+            let label = wide(&pack.display_label());
             unsafe {
-                SendMessageW(
-                    self.combo,
-                    CB_ADDSTRING,
-                    0,
-                    label.as_ptr() as LPARAM,
-                );
+                SendMessageW(self.combo, CB_ADDSTRING, 0, label.as_ptr() as LPARAM);
             }
         }
 
@@ -474,11 +493,43 @@ impl App {
 
     fn update_status(&self) {
         let count = self.packs.len() as u32;
-        let text = if count > 0 {
-            self.strings.tf("status.count", &[Arg::Num(count)])
-        } else {
+        let mut text = if count == 0 {
             self.strings.t("status.none")
+        } else if let Some(pack) = self.selected_pack() {
+            // 状态框把当前选中包连同版本说出来，和下拉列表里的写法一致。
+            self.strings.tf(
+                "status.count_pack",
+                &[Arg::Num(count), Arg::Str(pack.display_label())],
+            )
+        } else {
+            self.strings.tf("status.count", &[Arg::Num(count)])
         };
+        // 第二行说包里的内容：条目数与未译数回答「翻译到哪了」，
+        // 摘要回答「这份包和手上另一份是不是逐字相同」。
+        // 旧包没有 entries 行，这时不显示第二行，而不是显示成「0 条」。
+        // packs/overrides/ 是玩家自己的本机补丁，不属于发行物，界面不统计它：
+        // 数字一旦出现在这里，就成了「包里有这些条目」的暗示。
+        if let Some(pack) = self.selected_pack() {
+            if pack.entries > 0 {
+                let detail = if pack.digest.is_empty() {
+                    self.strings.tf(
+                        "status.pack_stats",
+                        &[Arg::Num(pack.entries), Arg::Num(pack.untranslated)],
+                    )
+                } else {
+                    self.strings.tf(
+                        "status.pack_detail",
+                        &[
+                            Arg::Num(pack.entries),
+                            Arg::Num(pack.untranslated),
+                            Arg::Str(pack.digest.clone()),
+                        ],
+                    )
+                };
+                text.push('\n');
+                text.push_str(&detail);
+            }
+        }
         unsafe {
             SetWindowTextW(self.status, wide(&text).as_ptr());
         }
@@ -510,24 +561,33 @@ impl App {
                 return;
             }
             if !language_fonts_complete(&self.root, code) {
-                let text = self
-                    .strings
-                    .tf("error.font_missing", &[]);
+                let text = self.strings.tf("error.font_missing", &[]);
                 if !self.confirm(&text) {
                     return;
                 }
             }
         }
 
+        let steam = detect_edition(&self.root) == Edition::Steam;
+        if steam && !vanilla {
+            // Steam 版由客户端拉起，启动器的 --lang 会被拒绝：语言只有
+            // locale.ini 一条通道，所以必须在启动之前写进去。
+            if let Some(code) = lang.as_deref() {
+                let _ = write_locale_language(&self.root, code);
+            }
+        }
+
         match process::launch(&self.root, lang.as_deref(), vanilla) {
             Ok(()) => {
-                if !vanilla {
+                if !steam && !vanilla {
                     if let Some(code) = lang.as_deref() {
                         let _ = write_locale_language(&self.root, code);
                     }
                 }
                 let text = if vanilla {
                     self.strings.t("status.vanilla")
+                } else if steam {
+                    self.strings.t("status.steam")
                 } else {
                     self.strings.t("status.launched")
                 };
@@ -542,8 +602,22 @@ impl App {
             LaunchError::NoLauncher => self.show_error("error.no_launcher", &[]),
             LaunchError::NoLanguage => self.show_error("error.no_language", &[]),
             LaunchError::LaunchFailed => self.show_error("error.launch_failed", &[]),
-            LaunchError::ExitCode(code) => {
-                self.show_error("error.exit_code", &[Arg::Num(code)])
+            LaunchError::ExitCode(code) => self.show_error("error.exit_code", &[Arg::Num(code)]),
+        }
+    }
+
+    fn restore(&mut self) {
+        // 两版都可能挂过宿主代理，还原不再按版别分叉。
+        let prompt = self.strings.t("confirm.restore");
+        if !self.confirm(&prompt) {
+            return;
+        }
+        match process::restore(&self.root) {
+            Ok(()) => self.set_status(&self.strings.t("status.restored")),
+            Err(code) => {
+                // 控制台被 CREATE_NO_WINDOW 藏起来了，失败原因从落盘日志里取。
+                let detail = process::host_log_tail(&self.root, 10, 900);
+                self.show_error("error.restore_failed", &[Arg::Num(code), Arg::Str(detail)]);
             }
         }
     }
@@ -574,9 +648,7 @@ impl App {
             self.show_error("error.kill_failed", &[Arg::Num(last_error)]);
             return;
         }
-        let text = self
-            .strings
-            .tf("status.killed", &[Arg::Num(killed)]);
+        let text = self.strings.tf("status.killed", &[Arg::Num(killed)]);
         self.set_status(&text);
     }
 
@@ -590,12 +662,7 @@ impl App {
         let text = self.strings.tf(key, args);
         let title = self.strings.t("title");
         unsafe {
-            MessageBoxW(
-                0,
-                wide(&text).as_ptr(),
-                wide(&title).as_ptr(),
-                MB_ICONERROR,
-            );
+            MessageBoxW(0, wide(&text).as_ptr(), wide(&title).as_ptr(), MB_ICONERROR);
         }
     }
 

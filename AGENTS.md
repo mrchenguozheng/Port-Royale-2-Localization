@@ -1,25 +1,49 @@
 # AGENTS.md — 项目维护指南
 
-> 面向接手本仓库的 agent。先读本页，再读 [文档索引](docs/README.md) 和
-> [当前架构与文件契约](docs/架构与重构.md)。本页只写维护规则和验证入口，不重复全部
-> 玩家文档。
+> 面向接手本仓库的 agent。先读本页，再读 [运行契约](docs/运行契约.md)（包内布局、挂载、
+> 界面语言与支持环境的唯一口径）与 [文档索引](docs/README.md)。本页只写维护规则和验证入口，
+> 不重复全部玩家文档。
 
 ## 项目边界
 
 - 这是《Port Royale 2》的**外挂式本地化运行时**：原版 `PR2.exe` 不改字节。
-  GOG 的正式入口是 `PR2LocalizationGUI.exe` / `PR2Localization.exe`，由启动器注入
-  `PR2LocalizationCore.dll`。不要按“GOG 双击 `PR2.exe` 自然加载”做回归：GOG 加载器会把
-  `VERSION.dll` 解析到 `C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入
-  `PR2.exe` 进程。
-- **GOG 英文版 `1.1.2.3` 已通过启动器入口实测；Steam 英文版 `1.1.2.3` 已通过宿主 DLL
-  代理实测（中文界面）**。Steam 不再走 `VERSION.dll`：`PR2.exe` 静态导入
-  `Ascaron.Logging-2.6.dll`，代理接管它的 `Log` 导出。
-  GOG 法语版和其他版本不在支持范围内；不要在未支持版本上部署后把“注入不生效”
-  当作本仓库回归。
-- 发行包按语言和入口拆分：GOG 版不带宿主 DLL；Steam 版带
-  `Ascaron.Logging-2.6.dll`、`PR2HostMount.ps1`、`PR2LocalizationCore.dll`、语言包和字体，
-  不需要 Python 或 Rust 工具链。Steam 挂载必须先校验原版
+  两个版本的正式入口都是 `PR2LocalizationGUI.exe` / `PR2Localization.exe`：启动器先挂载
+  宿主代理 `Ascaron.Logging-2.6.dll`，再由版本对应的方式拉起游戏——GOG 版直启 `PR2.exe`，
+  Steam 版交给客户端 `steam://rungameid/12470`（`Program Files` 下直接建进程会拿到 740）。
+  挂载之后直接双击 `PR2.exe`（或从 Steam 库里点启动）也是有效路径——代理在工作线程里
+  加载 `PR2LocalizationCore.dll`。
+  不要再用 `VERSION.dll`：它属于 Windows 的 KnownDLLs，同目录代理永远进不去 `PR2.exe`。
+- 支持环境是 **Windows 10 / Windows 11**（64 位系统跑 32 位游戏）；**Windows 7 不在支持范围**，
+  也没有验证过，不要再写「避开 PowerShell 2.0 所以兼容 Win7」这类推导。
+- 启动器界面九种语言（`zh/ja/ko/ru/pl/de/es/fr/it`）是 AI 起草 + 机械一致性校验，
+  **没有母语审校**。文档与 README 必须如实披露并留玩家反馈入口，不能写成“已审校”。
+  反馈方式：Issue 里贴截图、当前文案与建议改法；不要编造不存在的反馈链接。
+- 游戏版本：**GOG 英文版 `1.1.2.3`、Steam 英文版 `1.1.2.3` 与 GOG 法语版 `1.1.2.42` 都已通过宿主 DLL
+  代理实测**（2026-11-22）。两个英文版的 `PR2.exe` 导入表逐项一致（21 个 DLL，
+  `Ascaron.Logging-2.6.dll` 只导入 `Log`），原版 `Ascaron.Logging-2.6.dll` 也是同一份字节
+  （11,776 B / 同一个 SHA-256），所以启动路径不按版别分叉，`detect_edition` 只用来显示版别。
+  语言包的键是条目 id，英文版与法语版共用同一套 id；法语版多 42 条 `+++EMPTY+++` 空占位、
+  少 19 条，按原样保留。其他未验收版本（零售版、补丁版）仍不在支持范围内，不要在它们上面
+  部署后把“注入不生效”当作本仓库回归。
+- 发行包按语言分组，**一个包同时面向 GOG 与 Steam**：包内恒定带
+  `PR2Localization\host\Ascaron.Logging-2.6.dll` 宿主代理，不带任何 `.ps1`。
+  不需要 Python 或 Rust 工具链。挂载必须先校验原版
   `Ascaron.Logging-2.6.dll` 的 11,776 B / SHA-256，再备份、替换；未知文件不覆盖。
+  替换动作只有一份实现：`src/injector-rs/pr2_common/src/host.rs`，启动器进程内直接调，
+  不再拉 PowerShell，也不受组策略的脚本限制。
+  根目录没有这个 DLL 的版本自动退回注入，理由写进 `PR2Localization\logs\host.log`；
+  不要把这个回退做成静默跳过。
+  还原走 `PR2Localization.exe --restore` 或 GUI 的「还原原版」按钮，两版同一套动作。
+  版本只有一份来源：`release.ps1 -Version` 同时编进 exe（`--version` 与 GUI 副标题）
+  和语言包头 `# pack-meta version=`；不要在任何一处另写版本号。
+  语言包里另有三项由编译期自己算的内容描述（`entries` / `untranslated` / `digest`）
+  和一项键集来源（`scope`）：**不要手写、也不要拿来当版本号**，改译文后重编自然更新。
+  相对上一次发行的「改了多少条」由 `pack_delta.py` 从 `release-v*` tag 现算，
+  写进 `README.txt` 与 `manifest.json`，同样不用人工维护。
+  `packs\overrides\<语言>.txt` 是玩家自己的本机覆盖：不进包、不改包头，发行包里
+  只留一个空的 `overrides\` 目录，里面不要放示例文件。启动器不统计覆盖条数，
+  UI 上的条目数与摘要只反映包本身；只有注入器日志报 `N entries, M overrides`，
+  这是运行时实际加载了什么，不是产品承诺。
   不要把“让每个玩家自行构建”写成默认流程。
 
 ## 当前结构
@@ -27,7 +51,7 @@
 | 路径 | 作用 |
 |---|---|
 | `src/injector-rs/` | Rust workspace：`pr2_common`、`pr2_proxy`、`pr2_text_source`、`pr2_launcher`、`pr2_launcher_gui`、`pr2_host_proxy` |
-| `src/injector-rs/ui/` | GUI 界面翻译 `zh.ini` / `en.ini` / `ja.ini` |
+| `src/injector-rs/ui/` | GUI 界面文案：`ui.<lang>.ini` 九份；**源码没有 `ui.default.ini`**，构建从 `ui.zh.ini` 生成运行时默认，发行包只放分组默认语言一份 |
 | `src/translations/` | 唯一手改译文层：`zh.toml`、`ja.toml` 等 |
 | `src/tools/` | 语言包编译、字体、部署、校验和分析工具 |
 | `build/` | 构建产物；`build/runtime/` 是可整体复制的安装源 |
@@ -39,13 +63,20 @@ Rust 产物：
 - `PR2LocalizationCore.dll`
 - `PR2Localization.exe`
 - `PR2LocalizationGUI.exe`
-- `PR2LocalizationProxy.dll`（旧 `VERSION.dll` 代理构建；Steam 发行包已不再使用）
+- `PR2LocalizationProxy.dll`（旧 `VERSION.dll` 代理构建；发行包已不再使用）
 - `pr2_host_proxy.dll`（日志宿主代理；部署名 `Ascaron.Logging-2.6.dll`）
 
-Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
-`src/tools/install/PR2HostMount.ps1`。代理不是游戏原文件；原版备份为
+发行包使用宿主代理 `Ascaron.Logging-2.6.dll`：
+替换/还原在 `pr2_common::host` 里（`mount_host` / `restore_host`），两版同一条路径。
+部署期 `pr2ctl` **不再实现一套替换算法**：复制完文件后以游戏目录为 cwd 调
+`PR2Localization.exe --mount`，卸载前调 `--restore`。`pr2ctl/steam_host.py` 只保留
+`has_host` / `detect_edition` 两个只读判断；`tests/test_host_constants.py` 仍交叉断言
+Rust 与 Python 的文件名、原版大小与 SHA-256。代理不是游戏原文件；原版备份为
 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\Ascaron.Logging-2.6.dll`，
 不要在未校验原版大小/哈希时覆盖。
+
+部署的顺序是**先复制、最后挂载**：挂载失败时根目录 DLL 未改动，但本地化文件已经落盘；
+文案要如实说明，不要写成“失败就完全没改目录”。
 
 ## 不可破坏的契约
 
@@ -60,6 +91,9 @@ Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
   发行包只带 `font-map.default.ini`，用户可另建 `font-map.ini` 按项覆盖默认映射，解压升级不覆盖它。
   同一安装只放一个语言的字体；映射只接受 `fonts` 目录内的文件，不读系统字体；
 非拉丁系默认使用 Noto 对应字体，只接受静态字重，不使用 `.ttc` 或 `-VF.ttf`。
+- 运行日志一律经 `pr2_common::log_util` 打开：append 类超过 1 MiB 先滚成 `<name>.1`（同目录只留
+  一份），不要新增裸 `OpenOptions::append(true)` 的日志写入；`vtable.log`（槽位扫描）与
+  `resolve.log`（`[R]`/`[RGAP]`）是开发诊断，只在 `PR2_LOG_DEBUG=1` 时写，发行版默认不产生。
 - 译文里的 hash id、`%1` 等占位符、`@D$...$` 脚本变量、`<n>`、`<c>`、`<f:...>` 标签
   都不是可翻译文本；改译文时保持原样。
 - 字体路径、语言包路径和 GUI 文案的详细规则见
@@ -79,11 +113,16 @@ Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
 .\build.ps1 -Target Packs -Lang zh  # 只编中文语言包
 .\build.ps1 -Target Injector        # 只编 Rust 注入器
 
-.\release.ps1 -Version v1.0.0       # 同时生成 gog/steam 两套 zip
-.\release.ps1 -Version v1.0.0 -Edition gog    # 只出 GOG 包
-.\release.ps1 -Version v1.0.0 -Edition steam  # 只出 Steam 包
+.\release.ps1 -Version v1.0.0       # 每个分组一个 zip（GOG/Steam 通用）
+.\release.ps1 -Version v1.0.0 -Bundle zh     # 只出中文分组
+.\release.ps1 -Version v1.0.0 -Bundle latin  # 只出拉丁分组（de+es+fr+it）
+.\release.ps1 -Version v1.0.0 -AllowDirty    # 工作树脏时仍出包；版本头记 dirty
 .\release.ps1 -Version v1.0.0 -Tag -Push  # 出包并创建/推送 release-<版本> tag
 ```
+
+`release.ps1` 默认拒绝脏工作树；`-Tag` 时无条件拒绝，且只允许在 `main` 或 `release/*`
+分支打 tag。每次出包会先删同版本旧 zip，再写 `dist/release.json`（version / commit /
+dirty / pack_mode / languages / 逐包 sha256 与大小）；CI 的 Release 校验依赖它。
 
 日常入口在仓库根目录；`src\build_injector.ps1`、`src\build_translation.ps1`
 仍是低层实现，排查单步问题时才直接调用。
@@ -97,14 +136,21 @@ Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
 归一化 → 校验 → 编译 → 部署 → 核对；默认处理日文和中文，使用上一次游戏目录。
 
 ```powershell
-.\check.ps1
+.\check.ps1                          # 全量：Rust 闸门 + Python 检查 + 单测
+.\check.ps1 -SkipRust                # 只跑 Python 部分
 ```
 
-等价于：
+Rust 闸门按顺序执行，任一失败即停：
 
 ```powershell
-python src\tools\check.py
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+# 再按 cargo metadata 的成员逐个 cargo check --locked -p <member>
 ```
+
+逐个 crate `cargo check` 是为了防止 workspace 特性合并掩盖单个 crate 缺特性；
+找不到 cargo 时 `check.ps1` 会提示用 `-SkipRust`，CI 不允许跳过。
 
 `check.py` 会先跑 `config_check.py` 检查 locale/packs/translations/ui/font-map 的语言配置，再跑译文规范、断行、微调层、**不译清单对账**（`analysis/keep_audit.py`：登记的 id 存在、登记项没被译过、结构性不可译的没占着待译）、文档一致性、**脚本地图**（`tools_check.py`：每个脚本都有 docstring、都登记在 `src/tools/README.md`），最后跑单测。`release.ps1` 在构建前也会跑同一项配置检查；`make_release.py` 直接调用时也会先检查。
 
@@ -132,7 +178,7 @@ git diff --check
 ## 改动流程
 
 1. **先确认状态**：`git status --short`、当前提交、工作树是否已有未提交改动。
-2. **先读契约**：改 GUI/构建/语言包前读 `docs/架构与重构.md`；改译文前读
+2. **先读契约**：改 GUI/构建/语言包前读 `docs/运行契约.md`；改译文前读
    `docs/译文与语言包.md`。
 3. **做最小改动**：不要顺手重写无关模块；不要把历史重构细节重新塞回当前架构文档。
 4. **同步文档**：接口、文件路径、构建命令、支持范围或已知问题变化时，更新中文文档及相关入口。
@@ -160,10 +206,13 @@ git diff --check
 - 现象：完成第一个教程战役后点「退出游戏」，`PR2.exe` 可能不退出，窗口黑屏或白屏残留；
   有时出现 MSVC Runtime Error，Program 指向 `PR2.exe`。
 - 已复现：直接启动原版英文、用 `PR2LocalizationGUI` 启动原版、启动中文版都出现过。
-  单次“原版正常”不能作为根因结论。
-- 当前没有该路径的崩溃 dump，**根因未定位，状态是未修复**。
+- **根因已定位（2026-11-22，32 位只读探针）**：卡住时 `PR2.exe` 停在
+  `igd9trinity32.dll`（Intel 核显 UMD）内部的设备销毁等待，服从 `ddraw.dll` 的全屏
+  设备销毁路径；纯原版英文（目录里没有任何本地化文件）同样复现，GOG 官方支持页
+  也把 Intel HD 全屏退出卡死单列为已知问题。
+- 结论：**属显卡驱动/旧 DDraw 全屏的老问题，本地化侧无法规避**。不要再花时间在这个
+  路径上排查本地化代码，也不要写成「已修复」或「正在修」。
 - GUI 的「结束游戏进程」只是兜底，仅结束 GUI 所在目录的 `PR2.exe`，不是修复。
-  不要把它写成“已解决退出问题”。
 
 ### 排版与 DPI
 
