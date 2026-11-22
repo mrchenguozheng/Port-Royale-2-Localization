@@ -60,7 +60,7 @@ jobs:
       # base python 的绝对路径，runner 镜像换 patch 版本后旧的 venv 就不能用了。
       - name: Restore spacy venv
         id: spacy-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .venv-spacy
           key: spacy-${{ runner.os }}-${{ steps.py.outputs.python-version }}-${{ env.SPACY_VERSION }}-${{ env.SPACY_MODEL }}
@@ -77,12 +77,16 @@ jobs:
       # 失败时 GitHub 只给一行 "process completed with exit code 1"，真正的
       # 失败语言与行号全在 check.log 里。所以落一份日志、失败时把关键行打成
       # ::error:: 注解，再整体传成 artifact。
+      #
+      # 必须用 `pwsh -File` 起子进程：check.ps1 内部是 `exit $exitCode`，
+      # 在当前进程里调它会直接结束整个 step，后面的日志注解一行都跑不到。
       - name: Static checks
         id: check
         shell: pwsh
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'check.log'
-          .\check.ps1 -NoPause -Jobs 4 *>&1 | Tee-Object -FilePath $log
+          & pwsh -NoProfile -NonInteractive -File .\check.ps1 -NoPause -Jobs 4 *>&1 |
+            Tee-Object -FilePath $log
           $code = $LASTEXITCODE
           if ($code -ne 0) {
             foreach ($line in (Get-Content $log -Tail 60)) {
@@ -90,19 +94,45 @@ jobs:
                 "::error::$line"
               }
             }
-            "::error::静态检查失败（exit $code），完整日志见 artifact check-log。"
+            # 有些失败路径的文案不带「失败：」前缀（如 check_skip 参数错），
+            # 注解抓不到，就把尾部原样打到日志里，至少页面上能直接看到。
+            "--- check.log 尾部 ---"
+            Get-Content $log -Tail 15
+            "::error::静态检查失败（exit $code），完整日志见 artifact ci-logs。"
             exit $code
           }
 
-      - name: Upload check log
-        if: failure() && steps.check.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: check-log
-          path: ${{ runner.temp }}/check.log
-          if-no-files-found: warn
-
       - name: Build injector and language packs
+        id: build
         shell: pwsh
         timeout-minutes: 15
-        run: .\build.ps1 -Target All -Lang @('zh','ja') -NoPause
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'build.log'
+          # 关掉 ANSI 色码：日志里的 "warning:" 要能按行首匹配
+          $env:CARGO_TERM_COLOR = 'never'
+          # 用 -Command 而不是 -File：`-Lang zh,ja` 要让内层 pwsh 解析成数组，
+          # 走 -File 时数组参数会被拍平成字符串。
+          & pwsh -NoProfile -NonInteractive -Command '.\build.ps1 -Target All -Lang zh,ja -NoPause' *>&1 |
+            Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            foreach ($line in (Get-Content $log -Tail 60)) {
+              if ($line -match '错误|ERROR|FAIL|error:') { "::error::$line" }
+            }
+            "--- build.log 尾部 ---"
+            Get-Content $log -Tail 20
+            "::error::构建失败（exit $code），完整日志见 artifact ci-logs。"
+            exit $code
+          }
+          # 构建过了但 cargo 有警告：提成注解，别让它埋在几千行日志里
+          Select-String -Path $log -Pattern '^warning: ' -Encoding utf8 |
+            ForEach-Object { "::warning::build: $($_.Line.Trim())" }
+
+      # 放在最后：前面的步骤失败时它才会执行到，日志才可能已经落盘
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-logs
+          path: ${{ runner.temp }}/*.log
+          if-no-files-found: warn

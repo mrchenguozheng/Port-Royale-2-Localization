@@ -53,6 +53,9 @@ const BUILTIN: &[(&str, &str)] = &[
 ];
 
 pub enum Arg {
+    /// `%s` 分支（`tf` 里）已实现，但内置文案目前都只带数字，没人构造它。
+    /// 留着是为了要塞文件名/路径时不必再动枚举；不加 allow 会报 dead_code。
+    #[allow(dead_code)]
     Str(String),
     Num(u32),
 }
