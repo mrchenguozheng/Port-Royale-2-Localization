@@ -23,6 +23,7 @@ src/orig/ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
 """
 
 import argparse
+import hashlib
 import io
 import os
 import re
@@ -237,8 +238,59 @@ def _is_resource_id(s):
     return bool(s) and "_" in s and is_identifier(s)
 
 
+def pack_digest(body_lines):
+    """正文行的内容指纹：sha256 前 12 位（小写十六进制）。
+
+    **只算正文**，不把 ``# pack-meta`` 头算进去 —— 否则版本号一变摘要就跟着
+    变，同一份译文在 v1.0.0 与 v1.1.0 里会报出两个不同的「内容」。
+    指纹用来回答「两份包是不是逐字相同」，回答不了「改了哪几条」。
+    """
+    data = "".join(body_lines).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()[:12]
+
+
+def scope_token(baseline_id):
+    """写进 ``# pack-meta scope=`` 的键集标记。
+
+    GOG / Steam 合包用的是并集键集（``union(...)``），逐版对照是单个基线 id。
+    这个值只用于排错：正文一样但键集不同（并集比单版多出别版独有的键），
+    摘要本来就该不一样。
+    """
+    if baseline_id.startswith("union"):
+        return "union"
+    token = re.sub(r"[^A-Za-z0-9._-]", "", baseline_id)
+    return token or "custom"
+
+
+def _pack_head(lang, pack_version, scope, body_lines, entries, untranslated):
+    """pack 头：alias / min_runtime / version / 统计两行 / scope / digest。
+
+    ``entries`` 是写进包里的数据行总数，``untranslated`` 只数**占位未翻译**
+    的条目 —— 原文本来就空的键（原版就是 ``+++EMPTY+++``）不算欠译，
+    把它们算进去会让所有语言都显示成一堆待翻译。
+    """
+    lines = []
+    meta = load_pack_meta(lang)
+    if pack_version:
+        # build() 入口已经归一过并把非法值挡在外面（return 2）；这里再归一一次，
+        # 是为了让单独调用本函数时也不会写出 `version=v1.0.0` 这种双前缀。
+        normalized = normalize_pack_version(pack_version)
+        if normalized:
+            meta["version"] = normalized
+    for k in ("alias", "min_runtime", "version"):
+        if meta.get(k):
+            val = meta[k].replace("\n", " ").replace("\r", " ")
+            lines.append("# pack-meta %s=%s\n" % (k, val))
+    lines.append("# pack-meta entries=%d\n" % entries)
+    lines.append("# pack-meta untranslated=%d\n" % untranslated)
+    if scope:
+        lines.append("# pack-meta scope=%s\n" % scope)
+    lines.append("# pack-meta digest=%s\n" % pack_digest(body_lines))
+    return lines, meta
+
+
 def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal,
-                pack_version=""):
+                pack_version="", scope=""):
     """按某份基线的键集出行（顺序 = 该版本原文表的顺序）。
 
     【并集与缺行】译文层是 `src\\translations\\<语言>.toml` 一套，键集覆盖基准版
@@ -248,18 +300,13 @@ def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal,
 
     【pack 头】``alias`` / ``min_runtime`` 来自 src\\packs\\<语言>.toml；
     ``version`` 优先取调用方传进来的发行版本（``--version``），没有时用 toml 里的。
-    GUI 靠这三行显示「简体中文 · v1.0.0」，运行时只读取 min_runtime。
+    另外写 ``entries`` / ``untranslated`` / ``scope`` / ``digest`` 四行：
+    GUI 靠它们显示「简体中文 · v1.0.0」和「3590 条 · 未译 0 · 摘要 1a2b3c4d5e6f」。
+    运行时只读 min_runtime，其余是给人看的。
     """
     from text import versions as V
     import translate as T
-    lines = []
-    meta = load_pack_meta(lang)
-    if pack_version:
-        meta["version"] = pack_version
-    for k in ("alias", "min_runtime", "version"):
-        if meta.get(k):
-            val = meta[k].replace("\n", " ").replace("\r", " ")
-            lines.append("# pack-meta %s=%s\n" % (k, val))
+    body = []
     n = n_ph = n_empty = n_ident = 0
 
     for h in b["keys"]:
@@ -267,8 +314,8 @@ def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal,
         orig_s = (orig or "").strip()
         # 原文空（目标版独有的 42 条，全是 +++EMPTY+++）：写回原文值，不用译文。
         if orig_s == V.EMPTY:
-            lines.append("%s = %s\n"
-                         % (h.upper().replace("0X", "0x"), V.EMPTY))
+            body.append("%s = %s\n"
+                        % (h.upper().replace("0X", "0x"), V.EMPTY))
             n_empty += 1
             continue
         # 原文本身是开发残留标识符（`IDM_CONTEST_01_2004_LOG_00_TEXT`）：
@@ -276,8 +323,8 @@ def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal,
         # 英文里看到的也是这串标识；译文层就算写了正文，也不该凭空造出一段
         # 原文处没有的界面文本。要给出正文，得换到有正文的版本（见 versions）。
         if _is_resource_id(orig_s):
-            lines.append("%s = %s\n"
-                         % (h.upper().replace("0X", "0x"), to_engine(orig_s)))
+            body.append("%s = %s\n"
+                        % (h.upper().replace("0X", "0x"), to_engine(orig_s)))
             n_ident += 1
             continue
         txt = engine.get(h)
@@ -310,12 +357,14 @@ def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal,
         # 用户手改过的条目就识别不出来，合并会静默失效（测试 test_patch.js
         # 会抓到）。小写 id 只存在于 src\translations\*.toml 里作为内部键。
         out_txt = add_mark(txt, mk[h]) if marks and h in mk else txt
-        lines.append("%s = %s\n" % (h.upper().replace("0X", "0x"),
-                                    to_engine(out_txt)))
+        body.append("%s = %s\n" % (h.upper().replace("0X", "0x"),
+                                   to_engine(out_txt)))
         n += 1
         if is_placeholder(txt) or ident_ph:
             n_ph += 1
-    return lines, n, n_ph, n_empty, n_ident, meta
+    head, meta = _pack_head(lang, pack_version, scope, body,
+                           n + n_empty + n_ident, n_ph)
+    return head + body, n, n_ph, n_empty, n_ident, meta
 
 
 def union_baseline(bases):
@@ -403,7 +452,7 @@ def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None,
         errors, warnings, fatal = [], [], []
         lines, n, n_ph, n_empty, n_ident, meta = _pack_lines(
             lang, b, engine, by_hash, mk, marks, errors, warnings, fatal,
-            pack_version=pack_version)
+            pack_version=pack_version, scope=scope_token(b["id"]))
         dst_dir = out_dir if b["primary"] else os.path.join(variant_out, b["id"])
         path = os.path.join(dst_dir, "%s.txt" % lang)
         os.makedirs(dst_dir, exist_ok=True)

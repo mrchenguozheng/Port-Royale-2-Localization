@@ -139,8 +139,10 @@ def build_pack(langs, stage, log, default_lang, version=""):
     PR2LocalizationCore.dll）；两条注入路径读的都是 packs\\<lang>.txt，
     所以一个包里放同一份文件，装哪种版本都行。逐版对照在 build\\variants 里。
 
-    每个 pack 头写 ``# pack-meta version=<发行版本>``：同一门语言的不同版本
-    在游戏目录里只靠文件名分不出来，启动器列表要显示成「简体中文 · v1.0.0」。
+    每个 pack 头写 ``# pack-meta version=<发行版本>``，以及 ``entries`` /
+    ``untranslated`` / ``scope`` / ``digest`` 四行：同一门语言的不同版本在游戏
+    目录里只靠文件名分不出来，启动器列表要显示成「简体中文 · v1.0.0」，
+    状态框再显示「3590 条（未译 0）· 摘要 1a2b3c4d5e6f」。
 
     （VERSION.dll 代理是历史路线：GOG 直启 PR2.exe 时它会被解析到 SysWOW64，
     同目录代理进不了进程，发行包也已改用宿主 DLL，两边都不再依赖它。）"""
@@ -320,8 +322,51 @@ def pack_identity(langs):
     return "\n".join(lines)
 
 
+def _delta_note(delta):
+    """一门语言的「相对上一次发行」短句；没有可用基准时说清为什么没有。"""
+    if not delta:
+        return "未统计变化"
+    kind = delta.get("kind")
+    base = delta.get("baseline") or ""
+    if kind == "initial":
+        return "第一次收录（%s 里没有这份译文）" % base
+    if kind == "same":
+        return "与上一次发行（%s）逐条一致" % base
+    if kind == "changed":
+        return "相对 %s 新增 %d 条、修改 %d 条、删除 %d 条" % (
+            base, delta.get("added", 0), delta.get("changed", 0),
+            delta.get("removed", 0))
+    if kind == "none":
+        return "无可比基准（仓库里没有 release-v* 发行 tag）"
+    return "变化统计失败（git 出错，不猜数字）"
+
+
+def _changes_block(langs, stage, deltas):
+    """README 的「语言包变化」段：条目数 + 未译数 + 相对上一次发行改了多少。
+
+    条目数和未译数从**包里的语言包头**读回来，与启动器显示的是同一份数据。
+    """
+    import release_manifest
+    lines = ["语言包变化："]
+    for lang in langs:
+        head = release_manifest._pack_head_info(stage, lang)
+        stat = ""
+        if head.get("entries"):
+            stat = "%d 条" % head["entries"]
+            if "untranslated" in head:
+                stat += "（未译 %d）" % head["untranslated"]
+        note = _delta_note((deltas or {}).get(lang))
+        label = LABELS.get(lang, lang)
+        if stat:
+            lines.append("  %s（%s）：%s；%s" % (lang, label, stat, note))
+        else:
+            lines.append("  %s（%s）：%s" % (lang, label, note))
+    lines.append("  数字按译文条目算：一条译文改了算 1 条，挪换行、改排版不算。")
+    return "\n".join(lines)
+
+
 def write_readme(langs, default_lang, stage, modes, version="",
-                 bundle_label=""):
+                 bundle_label="", deltas=None):
     pkg_mode = package_font_mode(modes)
     labels = "、".join(LABELS.get(lang, lang) for lang in langs)
     if len(langs) > 1:
@@ -462,6 +507,8 @@ def write_readme(langs, default_lang, stage, modes, version="",
 
 %s
 
+%s
+
 安装（解压即用）：
   1. 把本压缩包里的全部文件解压到游戏根目录（和 PR2.exe 同一层）。
 %s
@@ -489,6 +536,7 @@ def write_readme(langs, default_lang, stage, modes, version="",
 
 %s
 """ % (label, edition_label, version, RUNTIME_VERSION, pack_identity(langs),
+       _changes_block(langs, stage, deltas),
        support_line,
        install_step, default_lang, font_help,
        locale_help, uninstall_line, font_line, license_help)
@@ -534,7 +582,8 @@ def make_zip(stage, out_dir):
 
 
 def make_release(langs, version, out_dir, mode, log=None, cache=True,
-                 package_id=None, default_lang=None, bundle_label=""):
+                 package_id=None, default_lang=None, bundle_label="",
+                 baseline_tag=""):
     """出一份发行 zip：langs 里所有语言放进同一个包，共用字体与一份映射。
 
     一个包同时面向 GOG 与 Steam：宿主代理和挂载脚本恒定进包，GOG 侧不执行。
@@ -567,6 +616,13 @@ def make_release(langs, version, out_dir, mode, log=None, cache=True,
         shutil.rmtree(stage)
     os.makedirs(stage)
     build_pack(langs, stage, log, default_lang, version=version)
+    # 相对上一次发行（``release-v*`` 里版本号最大的 tag）的条目变化。
+    # 数字写进 README 与 manifest；基准不可用时只写原因，不猜数字。
+    import pack_delta
+    deltas = {lang: pack_delta.pack_delta(lang, version, tag=baseline_tag)
+              for lang in langs}
+    for lang in langs:
+        log("语言包变化 %s：%s" % (lang, _delta_note(deltas[lang])))
     copy_runtime(stage, log)
     write_runtime_version(stage, log)
     # 优先用运行时构建产物里的 PR2Localization\ui\；没有时回退到 Rust 源码目录。
@@ -581,11 +637,12 @@ def make_release(langs, version, out_dir, mode, log=None, cache=True,
     os.makedirs(os.path.join(stage, DATA_DIR, "logs"), exist_ok=True)
     log("复制 PR2Localization\\ui\\")
     copy_fonts(langs, stage, modes, log, cache=cache)
-    write_readme(langs, default_lang, stage, modes, version, bundle_label)
+    write_readme(langs, default_lang, stage, modes, version, bundle_label,
+                 deltas)
     copy_license(stage, log, pkg_mode)
     import release_manifest
     release_manifest.write_release_manifest(
-        stage, langs, version, pkg_mode, package_id=pkg_id)
+        stage, langs, version, pkg_mode, package_id=pkg_id, deltas=deltas)
     ok, manifest_errors = release_manifest.verify_release_manifest(stage)
     if not ok:
         raise RuntimeError("发布清单校验失败：%s" % "；".join(manifest_errors))
@@ -630,6 +687,9 @@ def main():
                     help="字体模式：auto 按 font-map.ini 该语言的映射自动决定")
     ap.add_argument("--no-font-cache", action="store_true",
                     help="忽略 build/cache/noto 里的 Noto 字体缓存")
+    ap.add_argument("--baseline-tag", default="",
+                    help="变化统计的基准 tag；默认取 release-v* 里版本号最大、"
+                         "且不与本次版本同名的那一个")
     args = ap.parse_args()
 
     if args.list_bundles:
@@ -690,12 +750,13 @@ def main():
             make_release(job["langs"], version, args.out, args.fonts,
                          package_id=job["id"],
                          default_lang=job["default"],
-                         bundle_label=job["label"])
+                         bundle_label=job["label"],
+                         baseline_tag=args.baseline_tag)
             continue
         # 旧行为：每门语言各出一包，文件名沿用语言代码。
         for lang in job["langs"]:
             make_release([lang], version, args.out, args.fonts,
-                         default_lang=lang)
+                         default_lang=lang, baseline_tag=args.baseline_tag)
     return 0
 
 

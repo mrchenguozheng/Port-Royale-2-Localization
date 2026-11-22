@@ -20,7 +20,8 @@
   空值也保留；部署/升级不覆盖，`packs/overrides/` 不删除。
   运行时把空值当「回到内置 `zh`」，不等于原版英文；原版入口是
   `PR2Localization.exe --vanilla` 或 GUI「启动原版」。
-- 语言包元数据：`<语言>.txt` 开头的 `# pack-meta alias=…` / `min_runtime=…`。
+- 语言包元数据：`<语言>.txt` 开头的 `# pack-meta alias=…` / `min_runtime=…`，
+  发行包再加 `version=…` 与编译期算出的 `entries` / `untranslated` / `scope` / `digest`。
 - 字体：实际字体平铺在 `PR2Localization/fonts/`；包内放 `font-map.default.ini`，
   用户 `font-map.ini` 按项覆盖默认；不按语言开子目录，不覆盖根目录原版字体；
   只认 fonts 里的文件，不读系统字体目录。

@@ -23,6 +23,10 @@
   还原走 `PR2Localization.exe --restore` 或 GUI 的「还原 Steam 原版」按钮。
   版本只有一份来源：`release.ps1 -Version` 同时编进 exe（`--version` 与 GUI 副标题）
   和语言包头 `# pack-meta version=`；不要在任何一处另写版本号。
+  语言包里另有三项由编译期自己算的内容描述（`entries` / `untranslated` / `digest`）
+  和一项键集来源（`scope`）：**不要手写、也不要拿来当版本号**，改译文后重编自然更新。
+  相对上一次发行的「改了多少条」由 `pack_delta.py` 从 `release-v*` tag 现算，
+  写进 `README.txt` 与 `manifest.json`，同样不用人工维护。
   不要把“让每个玩家自行构建”写成默认流程。
 
 ## 当前结构

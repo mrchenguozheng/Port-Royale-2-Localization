@@ -53,6 +53,7 @@ src/tools/
 |---|---|
 | `pack/compile_pack.py` | 译文 → 引擎语言包 `packs/<语言>.txt`（含 `--union` 并集基线、`--strict`、`--variant-out`） |
 | `pack/build_artifacts.py` | 构建语言包产物的统一入口（编译 + 字体 + 清单） |
+| `pack/pack_delta.py` | 相对上一次发行（`release-v*`）统计译文条目的增、改、删；出包时给 README 与清单用 |
 | `pack/make_release.py` | 按语言、按 GOG/Steam 入口生成发行 zip（`union=True`，两个 zip 共用同一份并集包） |
 | `pack/release_manifest.py` | 生成并校验发行包根目录的 `manifest.json` |
 | `pack/release_version.py` | 发行版本号与发行语言集的唯一口径 |

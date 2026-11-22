@@ -108,12 +108,20 @@ class TestUiLayout(unittest.TestCase):
         self.assertIn("%s", line_for("subtitle.version"))
         self.assertEqual(line_for("status.count_pack").count("%"), 2,
                          "status.count_pack 要填包数量与当前包名")
+        # 状态框第二行：条目数、未译数、摘要。三条占位符缺一条就会少显示一项。
+        self.assertEqual(line_for("status.pack_stats").count("%"), 2,
+                         "status.pack_stats 要填条目数与未译数")
+        detail = line_for("status.pack_detail")
+        self.assertEqual(detail.count("%"), 3,
+                         "status.pack_detail 要填条目数、未译数与摘要")
+        self.assertIn("%s", detail)
 
         rust = os.path.join(ROOT, "src", "injector-rs", "pr2_launcher_gui",
                             "src", "strings.rs")
         with open(rust, encoding="utf-8") as fh:
             builtin = fh.read()
-        for key in ("subtitle.version", "status.count_pack"):
+        for key in ("subtitle.version", "status.count_pack",
+                    "status.pack_stats", "status.pack_detail"):
             self.assertIn('"%s"' % key, builtin,
                           "strings.rs 的 BUILTIN 缺 %s" % key)
 

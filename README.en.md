@@ -57,6 +57,15 @@ GUI subtitle (`runtime v1 · v1.0.0 (c8aa6e3)`), each language list entry
 (`简体中文 · v1.0.0` — read from the pack's `# pack-meta version=` header), and
 `PR2Localization.exe --version`. Dev builds print `dev (c8aa6e3+dirty)`.
 
+What changed inside the language pack is visible too. The status box has a
+second line with entry count, untranslated count and a content digest
+(`3590 entries · 0 untranslated · digest 9cfa2931c1c2`). The digest covers the
+translated lines only, so re-packing the same text under a new version number
+keeps it unchanged, while editing one line changes it. `README.txt` in the
+package root and `manifest.json` (`translations[].delta`) additionally state
+how many entries were added, changed or removed since the previous
+`release-v*` tag.
+
 ## Documentation
 
 All maintained documentation is in Chinese. This page is the only English

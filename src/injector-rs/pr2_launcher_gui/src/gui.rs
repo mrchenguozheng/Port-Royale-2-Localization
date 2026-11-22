@@ -502,7 +502,7 @@ impl App {
 
     fn update_status(&self) {
         let count = self.packs.len() as u32;
-        let text = if count == 0 {
+        let mut text = if count == 0 {
             self.strings.t("status.none")
         } else if let Some(pack) = self.selected_pack() {
             // 状态框把当前选中包连同版本说出来，和下拉列表里的写法一致。
@@ -513,6 +513,30 @@ impl App {
         } else {
             self.strings.tf("status.count", &[Arg::Num(count)])
         };
+        // 第二行说包里的内容：条目数与未译数回答「翻译到哪了」，
+        // 摘要回答「这份包和手上另一份是不是逐字相同」。
+        // 旧包没有 entries 行，这时不显示第二行，而不是显示成「0 条」。
+        if let Some(pack) = self.selected_pack() {
+            if pack.entries > 0 {
+                let detail = if pack.digest.is_empty() {
+                    self.strings.tf(
+                        "status.pack_stats",
+                        &[Arg::Num(pack.entries), Arg::Num(pack.untranslated)],
+                    )
+                } else {
+                    self.strings.tf(
+                        "status.pack_detail",
+                        &[
+                            Arg::Num(pack.entries),
+                            Arg::Num(pack.untranslated),
+                            Arg::Str(pack.digest.clone()),
+                        ],
+                    )
+                };
+                text.push('\n');
+                text.push_str(&detail);
+            }
+        }
         unsafe {
             SetWindowTextW(self.status, wide(&text).as_ptr());
         }

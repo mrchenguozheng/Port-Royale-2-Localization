@@ -19,6 +19,13 @@ const BUILTIN: &[(&str, &str)] = &[
     ("button.kill", "End game process"),
     ("status.count", "%d language pack(s)"),
     ("status.count_pack", "%d language pack(s) · current %s"),
+    // %d 条目数、%d 未译条目数；没有 digest 的旧包用这一条。
+    ("status.pack_stats", "%d entries · %d untranslated"),
+    // 再加 %s 内容摘要（12 位），用来判断两份包是不是逐字相同。
+    (
+        "status.pack_detail",
+        "%d entries · %d untranslated · digest %s",
+    ),
     ("status.none", "No .txt in PR2Localization\\packs"),
     ("status.launched", "Localized game launched."),
     ("status.vanilla", "Original game launched."),

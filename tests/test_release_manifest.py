@@ -109,6 +109,50 @@ class TestReleaseManifest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertTrue(any("路径越界" in e for e in errors))
 
+    def test_translation_records_pack_head_and_delta(self):
+        """清单里的 pack 段是**从包里读回来的**，与玩家看到的是同一份数据。"""
+        self._write(
+            "PR2Localization/packs/zh.txt",
+            "# pack-meta alias=简体中文\n# pack-meta min_runtime=1\n"
+            "# pack-meta version=1.0.0\n# pack-meta entries=2\n"
+            "# pack-meta untranslated=0\n# pack-meta scope=union\n"
+            "# pack-meta digest=9cfa2931c1c2\n0x1 = 测试\n",
+        )
+        delta = {"baseline": "release-v0.9.1", "kind": "initial"}
+        path = release_manifest.write_release_manifest(
+            self.stage, "zh", "v1.0.0", "noto", deltas={"zh": delta})
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        entry = data["translations"][0]
+        self.assertEqual(entry["lang"], "zh")
+        self.assertEqual(entry["pack"], {
+            "alias": "简体中文",
+            "version": "1.0.0",
+            "entries": 2,
+            "untranslated": 0,
+            "scope": "union",
+            "digest": "9cfa2931c1c2",
+        })
+        self.assertEqual(entry["delta"], delta)
+        # translation 是第一个语言的同一份内容，旧读法不受影响。
+        self.assertEqual(data["translation"]["pack"], entry["pack"])
+
+    def test_broken_digest_is_not_recorded(self):
+        # 头被写坏时宁可不记，也不把 `../../etc` 当成摘要写进清单。
+        self._write(
+            "PR2Localization/packs/zh.txt",
+            "# pack-meta alias=简体中文\n# pack-meta digest=../../etc\n"
+            "# pack-meta entries=abc\n0x1 = 测试\n",
+        )
+        path = release_manifest.write_release_manifest(
+            self.stage, "zh", "v1.0.0", "noto")
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        pack = data["translations"][0]["pack"]
+        self.assertEqual(pack["alias"], "简体中文")
+        self.assertNotIn("digest", pack)
+        self.assertNotIn("entries", pack)
+
 
 if __name__ == "__main__":
     unittest.main()
