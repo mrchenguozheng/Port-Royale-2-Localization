@@ -129,6 +129,12 @@ if (-not (Test-Path -LiteralPath $RootDll -PathType Leaf)) {
 
 $manifest = Read-Manifest $Root
 $proxySha = Get-ProxySha
+if ($proxySha -eq $ExpectedSha) {
+    # 走到这里说明代理位置解析到的是原版本身（典型：部署目录里没有
+    # PR2Localization\host\，脚本回退到根目录同名文件）。此时「挂载」等于
+    # 把原版复制回自己，还会把清单写成 proxy=原版，游戏实际不加载任何本地化。
+    throw "代理源是原版 DLL：$ProxyPath。发行包应在 PR2Localization\host\Ascaron.Logging-2.6.dll 放本地化代理；把原版当代理挂载只会静默失败。"
+}
 $rootSha = Get-FileSha256 $RootDll
 
 if (Test-Original $RootDll) {

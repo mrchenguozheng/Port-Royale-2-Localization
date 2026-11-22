@@ -95,6 +95,19 @@ def deploy_steps(target, langs, edition=None):
     edition = edition_of(target, edition)
     steps = [(n, os.path.join(RUNTIME, n), os.path.join(target, n))
              for n in FLAT_FILES]
+    # 挂载/还原脚本不在 runtime 里，但还原原版只能靠它（启动器调 -Action Restore）。
+    if os.path.isfile(HOST_MOUNT_SRC):
+        steps.append((HOST_MOUNT_SCRIPT, HOST_MOUNT_SRC,
+                      os.path.join(target, HOST_MOUNT_SCRIPT)))
+    # 代理要跟包一起放在 PR2Localization\host\，那是脚本约定的取代理位置
+    # （PR2HostMount.ps1 的默认 -ProxyPath）。这里只负责把文件送到位，
+    # 真正换进根目录仍由 swap_host 在部署末尾做。
+    proxy_src = os.path.join(RUNTIME, steam_host.HOST_DLL)
+    if os.path.isfile(proxy_src):
+        steps.append(("%s\\host\\%s" % (DATA_DIR, steam_host.HOST_DLL),
+                      proxy_src,
+                      os.path.join(target, DATA_DIR, "host",
+                                   steam_host.HOST_DLL)))
 
     # 四个 TTF 平铺在 build\runtime\PR2Localization\fonts\；也兼容旧的语言子目录。
     # 复制到游戏 PR2Localization\fonts\，不覆盖根目录的原版字体。
