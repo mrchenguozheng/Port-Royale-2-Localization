@@ -63,6 +63,10 @@ class TestUniversalLayout(unittest.TestCase):
             self.stage, make_release.DATA_DIR, "fonts", "OFL.txt")))
         self.assertFalse(os.path.exists(os.path.join(self.stage, "OFL.txt")))
 
+    def test_ja_fonts_use_the_verified_ten_percent_squeeze(self):
+        """日文全角在拉丁界面框里只压 10%，这是实机验证过的上限。"""
+        self.assertEqual(make_release.JA_FONT_SQUEEZE, 0.9)
+
     def test_no_version_dll_fallback(self):
         """VERSION.dll 代理是历史路线，GOG 直启时会被解析到 SysWOW64；不进包。"""
         make_release.copy_runtime(self.stage, lambda _m: None)

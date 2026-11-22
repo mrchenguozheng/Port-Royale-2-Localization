@@ -67,6 +67,10 @@ LABELS = {
 }
 DATA_DIR = "PR2Localization"
 UI_DEFAULT_FILE = "ui.default.ini"
+
+# 日文全角 advance 是 1 em，而界面框按拉丁宽度设计；旧版实测只能横向压 10%，
+# 再压字形会明显变形。zh/ko 不压，保持原始 Noto。
+JA_FONT_SQUEEZE = 0.9
 FLAT_COMMON = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
                "PR2LocalizationCore.dll")
 HOST_DLL = "Ascaron.Logging-2.6.dll"
@@ -301,7 +305,15 @@ def copy_fonts(langs, stage, modes, log, cache=True):
                     raise RuntimeError(
                         "组内两份字体同名但内容不同：%s（%s）" % (name, lang))
                 continue
-            shutil.copy2(src, os.path.join(flat, name))
+            dst = os.path.join(flat, name)
+            if lang == "ja":
+                from font import squeeze_fonts
+                if not squeeze_fonts._fonttools():
+                    raise RuntimeError("日文字体压缩需要 fontTools")
+                squeeze_fonts.squeeze(src, dst, JA_FONT_SQUEEZE)
+                log("压缩日文字体 %s（x%.3f）" % (name, JA_FONT_SQUEEZE))
+            else:
+                shutil.copy2(src, dst)
             seen[name] = sha
             n += 1
         # 来源说明移到 PR2Localization\docs\；游戏会扫描 fonts\*.*，字体目录只放
