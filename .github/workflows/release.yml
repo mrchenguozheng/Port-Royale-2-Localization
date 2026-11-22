@@ -28,7 +28,7 @@ env:
 jobs:
   release:
     runs-on: windows-latest
-    # 八门语言全量出包 + 字体生成，给足但别无限等候。
+    # 九门语言全量出包 + 字体生成，给足但别无限等候。
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5

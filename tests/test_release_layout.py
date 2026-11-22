@@ -126,5 +126,39 @@ class TestUiLayout(unittest.TestCase):
                           "strings.rs 的 BUILTIN 缺 %s" % key)
 
 
+class TestBundles(unittest.TestCase):
+    """分组要覆盖全部发行语言，显示名要和 packs/<lang>.toml 的 alias 一致。
+
+    ``LABELS`` 在 make_release.py 里另存一份，与 packs 的 alias 是两份数据：
+    新增语言只改清单和分组、忘了补 ``LABELS``，README 标题就掉成语言代码。
+    """
+
+    def _release_langs(self):
+        path = os.path.join(ROOT, "src", "release-languages.txt")
+        langs = []
+        with open(path, encoding="utf-8") as fh:
+            for raw in fh:
+                for tok in raw.split("#", 1)[0].replace(",", " ").split():
+                    langs.append(tok)
+        return langs
+
+    def test_bundles_cover_every_release_language(self):
+        langs = self._release_langs()
+        bundled = [lang for b in make_release.load_bundles()
+                   for lang in b["langs"]]
+        self.assertEqual(sorted(bundled), sorted(langs))
+        self.assertEqual(len(bundled), len(set(bundled)),
+                         "同一门语言进了两个分组")
+
+    def test_labels_match_pack_alias(self):
+        import tomllib
+        for lang in self._release_langs():
+            path = os.path.join(ROOT, "src", "packs", lang + ".toml")
+            with open(path, "rb") as fh:
+                alias = tomllib.load(fh)["alias"]
+            self.assertEqual(make_release.LABELS.get(lang), alias,
+                             "LABELS 与 %s 的 alias 不一致" % path)
+
+
 if __name__ == "__main__":
     unittest.main()

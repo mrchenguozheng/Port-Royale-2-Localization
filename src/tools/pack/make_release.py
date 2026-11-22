@@ -60,6 +60,7 @@ RUNTIME = os.path.join(BUILD, "runtime")
 LABELS = {
     "zh": "简体中文", "ja": "日本語", "ko": "한국어", "ru": "Русский",
     "de": "Deutsch", "es": "Español", "fr": "Français", "it": "Italiano",
+    "pl": "Polski",
 }
 DATA_DIR = "PR2Localization"
 FLAT_COMMON = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
@@ -82,7 +83,7 @@ def load_bundles():
     """读 src\\release-bundles.toml，返回 [{id, label, langs, default}]。
 
     分组是「共用字体」的判定落点：de/es/fr/it 四项映射全 none，共用同一份空字体集；
-    zh/ja/ko/ru 各带一套文件名不同的字体，各出一包。这里不做推断，只读清单。
+    zh/ja/ko/ru/pl 各带一套文件名不同的字体，各出一包。这里不做推断，只读清单。
     """
     import tomllib
     if not os.path.isfile(BUNDLES_FILE):

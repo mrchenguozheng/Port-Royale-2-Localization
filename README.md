@@ -4,7 +4,7 @@
 
 [English](README.en.md) · [中文文档索引](docs/README.md)
 
-**Supported languages:** Simplified Chinese (`zh`), Japanese (`ja`), Korean (`ko`), Russian (`ru`), German (`de`), Spanish (`es`), French (`fr`), Italian (`it`); English (`en`) is the original game language and fallback. See [README.en.md](README.en.md#supported-languages).
+**Supported languages:** Simplified Chinese (`zh`), Japanese (`ja`), Korean (`ko`), Russian (`ru`), German (`de`), Spanish (`es`), French (`fr`), Italian (`it`), Polish (`pl`); English (`en`) is the original game language and fallback. See [README.en.md](README.en.md#supported-languages).
 
 **译文标记：** 同人制作 · 社区协作 · AI 辅助（预览版）。这批译文不是官方本地化，
 由社区制作、AI 辅助起草并人工审校；旧语言包若改自原版零售文件会单独标 `retail`。
@@ -195,7 +195,7 @@ pr2-localization/
 
 ## 语言完成度
 
-八门语言共用一套 3548 条基准（`en.gog_1.1.2.3`），"有意不译"指按键名、职员表、游戏
+九门语言共用一套 3548 条基准（`en.gog_1.1.2.3`），"有意不译"指按键名、职员表、游戏
 标题、场景文件名模板、纯符号与空占位、以及**原文就是本语言写法**的专名（城镇名、
 海盗与姓氏池）这类按规则保留原文的条目（登记在 `src/data/keep_as_is/`），不计入待译。
 所以「可译 = 3548 − 有意不译」，百分比按 **已译 / 可译** 算。数字会变，取实时值时跑

@@ -13,8 +13,8 @@
 - 发行口径统一在[发行规范](发行规范.md)：版本号 `vMAJOR.MINOR.PATCH[-pre]`，
   语言全集读 `src/release-languages.txt`，打包分组读 `src/release-bundles.toml`
   （同一份字体能共用的语言进一个 zip），`dist/` 只留 zip 与 `SHA256SUMS.txt`。
-- 发行包按 GOG / Steam 分成两个；GOG 不带 `VERSION.dll`。两个 zip 里的
-  `packs/<语言>.txt` 是**同一份并集包**（GOG 由启动器注入、Steam 由宿主 DLL 代理，
+- 发行包按分组各出一个 zip，一个包同时面向 GOG / Steam，GOG 不带 `VERSION.dll`；
+  包里的 `packs/<语言>.txt` 是**同一份并集包**（GOG 由启动器注入、Steam 由宿主 DLL 代理，
   两条路径读同一个文件）。
 - 语言：包内只放 `packs/locale.default.ini`；用户活动 `locale.ini` 存在时优先，
   空值也保留；部署/升级不覆盖，`packs/overrides/` 不删除。

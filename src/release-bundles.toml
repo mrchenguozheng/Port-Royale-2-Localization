@@ -15,9 +15,11 @@
 #   ko                  NotoSansKR-Regular + NotoSerifKR-Black/Bold
 #   ru                  PR2CyrBody-Regular + PR2CyrDisplay-Head/Black/Bold
 #                        （Noto Sans / Noto Serif 按原版度量缩放后的衍生文件）
+#   pl                  PR2PlDisplay-Head/Black/Bold
+#                        （原版标题字体缺 ą ć ę ł ń ś ź ż，只换三个标题槽位；
+#                          正文 ARIAL 1186 码位已覆盖波兰语，不换）
 #
-# zh / ja / ko / ru 各自一套文件名不同的字体，彼此没有共用文件，所以各出一包。
-# pl 有 pack 但不在发行语言集里（见 src\release-languages.txt），不进分组。
+# zh / ja / ko / ru / pl 各自一套文件名不同的字体，彼此没有共用文件，所以各出一包。
 #
 # 字段：
 #   id      包标识，进文件名 dist\PR2-<id>-<version>.zip；单语言时沿用语言代码
@@ -56,3 +58,11 @@ id = "latin"
 label = "Deutsch · Español · Français · Italiano"
 langs = ["de", "es", "fr", "it"]
 default = "de"
+
+# 波兰语单出一包：它带三个标题字体文件，跟 latin 的「零字体」前提不同，
+# 并进去会让 de/es/fr/it 也跟着多下约 1 MB 用不上的字型。
+[[bundle]]
+id = "pl"
+label = "Polski"
+langs = ["pl"]
+default = "pl"

@@ -10,7 +10,9 @@
 #
 # 字体模式不需要在这里标注：release.ps1 默认 -Fonts auto，按 font-map.ini
 # 该语言的四项映射判断——全 none 的是 config（只带映射，用原版字体），
-# 其余是 noto（带实际字体）。de / es / fr / it 属于前者，zh / ja / ko / ru 属于后者。
+# 其余是 noto（带实际字体）。de / es / fr / it 属于前者；zh / ja / ko / ru / pl
+# 属于后者——pl 只换三个标题槽位（原版标题字体缺 ą ć ę ł ń ś ź ż），正文仍用
+# 原版 ARIAL，所以整门语言算 noto、带三个 PR2PlDisplay 文件。
 #
 # fr 的译文是英文原文键位下的法语：3548 条里 3279 条与 GOG 法语版
 # （fr.gog_1.1.2.42）原文逐字相同，其余为补齐与修订；重音字符原版拉丁字体
@@ -32,3 +34,4 @@ de
 es
 fr
 it
+pl
