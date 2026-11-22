@@ -242,6 +242,24 @@ if (-not $SkipInjector) {
 } else {
     Write-Host ''
     Write-Host '[release] 1/2 跳过注入器（使用现有 build\runtime）'
+    # -SkipInjector 不设 PR2_VERSION，exe 里编的还是上一次构建的版本；语言包包头用的是
+    # 本次 -Version。两处版本不一致，玩家就会看到「v1.0.0 的包装着 dev 的运行时」，
+    # 而且没有任何提示。这里拿构建期记录硬比对，不一致直接拒绝出包。
+    $VersionStamp = Join-Path $Repo 'build\injector-version.txt'
+    $builtVersion = if (Test-Path -LiteralPath $VersionStamp -PathType Leaf) {
+        (Get-Content -LiteralPath $VersionStamp -TotalCount 1 -Encoding utf8).Trim()
+    } else { '' }
+    if (-not $builtVersion) {
+        $msg = '-SkipInjector 无法确认现有 exe 的版本：build\injector-version.txt 不存在。' +
+            ' 去掉 -SkipInjector 先构建一次（该文件由 src\build_injector.ps1 写入）。'
+        throw $msg
+    }
+    if ($builtVersion -ne $Version) {
+        $msg = "现有运行时编的是 ${builtVersion}，本次发行版本是 ${Version}。" +
+            ' 去掉 -SkipInjector 重新构建，exe 显示的版本才会与语言包包头一致。'
+        throw $msg
+    }
+    Write-Host "[release] 现有运行时版本：$builtVersion（与本次发行一致）"
 }
 
 Write-Host ''

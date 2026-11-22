@@ -516,6 +516,8 @@ impl App {
         // 第二行说包里的内容：条目数与未译数回答「翻译到哪了」，
         // 摘要回答「这份包和手上另一份是不是逐字相同」。
         // 旧包没有 entries 行，这时不显示第二行，而不是显示成「0 条」。
+        // packs/overrides/ 是玩家自己的本机补丁，不属于发行物，界面不统计它：
+        // 数字一旦出现在这里，就成了「包里有这些条目」的暗示。
         if let Some(pack) = self.selected_pack() {
             if pack.entries > 0 {
                 let detail = if pack.digest.is_empty() {

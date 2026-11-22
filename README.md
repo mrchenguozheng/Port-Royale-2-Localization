@@ -22,7 +22,7 @@
 3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
 4. **两版都双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
    GOG 走注入；Steam 由启动器先挂载宿主 DLL 再直启游戏，不用手工跑脚本，也不用从 Steam 启动；
-5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... overrides`。
+5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... N entries, M overrides`。
 6. 想确认装的是哪一版：GUI 副标题与语言列表都带版本（`简体中文 · v1.0.0`），
    命令行 `PR2Localization.exe --version` 打印同一串；语言包改了什么看状态框第二行
    （`3590 条 · 未译 0 · 摘要 9cfa2931c1c2`）与包根 `README.txt` 的「语言包变化」段。
@@ -140,7 +140,7 @@ pr2-localization/
 |---|---|
 | `PR2Localization.exe` | 启动器。挂起方式启动 `PR2.exe`，注入 DLL 后恢复执行（构建产物） |
 | `PR2LocalizationCore.dll` | 主逻辑。hook 引擎取字的三条路径，把译文替换进去（构建产物） |
-| `PR2Localization\packs\` | 语言包目录。`<语言>.txt` + `locale.default.ini`（发行默认）；用户 `locale.ini` 优先 |
+| `PR2Localization\packs\` | 语言包目录。`<语言>.txt` + `locale.default.ini`（发行默认）；用户 `locale.ini` 优先；`overrides\` 是空的覆盖位，玩家自己往里放补丁 |
 | `PR2Localization\fonts\` | 本地化字体；缺字会显示空白 |
 
 ## 加一种语言

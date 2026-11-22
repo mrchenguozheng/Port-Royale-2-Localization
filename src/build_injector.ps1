@@ -141,6 +141,12 @@ foreach ($srcName in $artifactMap.Keys) {
         -Destination (Join-Path $Runtime $artifactMap[$srcName]) -Force
 }
 
+# 记录这批产物编进去的版本。release.ps1 -SkipInjector 会拿它与要发版的版本比对：
+# 跳过构建时 exe 里还是上一次的版本号，与包版本错位就是玩家看得见的发行事故。
+# 放在 build\ 根而不是 build\runtime\，是为了不进安装目录、也不进发行包。
+$VersionStamp = Join-Path $Repo 'build\injector-version.txt'
+Set-Content -LiteralPath $VersionStamp -Value $ShowVersion -NoNewline -Encoding utf8
+
 $DataOut = Join-Path $Runtime 'PR2Localization'
 New-Item -ItemType Directory -Force -Path $DataOut | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $DataOut 'logs') | Out-Null

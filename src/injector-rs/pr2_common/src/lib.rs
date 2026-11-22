@@ -505,6 +505,29 @@ pub fn valid_lang_code(s: &str) -> bool {
         .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
+/// 语言包一行：`0x1234 = 文本`，也接受 `1234<TAB>文本`。
+///
+/// 注入器读主包和读 `packs/overrides/<lang>.txt` 都用这一份解析，格式只有一处。
+pub fn parse_pack_line(s: &str) -> Option<(u32, &str)> {
+    let s = s.trim_start_matches([' ', '\t']);
+    let hex = s
+        .strip_prefix("0x")
+        .or_else(|| s.strip_prefix("0X"))
+        .unwrap_or(s);
+    let end = hex
+        .find(|c: char| !c.is_ascii_hexdigit())
+        .unwrap_or(hex.len());
+    if end == 0 {
+        return None;
+    }
+    let hash = u32::from_str_radix(&hex[..end], 16).ok()?;
+    let rest = hex[end..].trim_start_matches(' ');
+    let value = rest
+        .strip_prefix('=')
+        .or_else(|| rest.strip_prefix('\t'))?;
+    Some((hash, value.trim_start_matches([' ', '\t'])))
+}
+
 pub fn wide(s: &str) -> Vec<u16> {
     let mut out: Vec<u16> = s.encode_utf16().collect();
     out.push(0);
@@ -519,6 +542,16 @@ pub fn path_string(path: &Path) -> String {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn parses_pack_lines() {
+        assert_eq!(parse_pack_line("0x1A2B = 文本"), Some((0x1A2B, "文本")));
+        assert_eq!(parse_pack_line("  0X1a2b=文本"), Some((0x1A2B, "文本")));
+        // 老格式：十六进制紧接制表符，没有 0x 前缀。
+        assert_eq!(parse_pack_line("1a2b\t文本"), Some((0x1A2B, "文本")));
+        assert_eq!(parse_pack_line("0x = 空键"), None);
+        assert_eq!(parse_pack_line("这不是一行"), None);
+    }
 
     #[test]
     fn build_label_reports_version_and_commit() {

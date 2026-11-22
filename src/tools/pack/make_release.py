@@ -73,6 +73,11 @@ HOST_MOUNT_SCRIPT = "PR2HostMount.ps1"
 HOST_PROXY_REL = os.path.join(DATA_DIR, "host", HOST_DLL)
 FLAT_PACKAGE = FLAT_COMMON + (HOST_MOUNT_SCRIPT,)
 RUNTIME_VERSION = 1  # 与 src/injector-rs/pr2_common/src/lib.rs 的 RUNTIME_VERSION 保持一致
+# 空目录条目没有内容，时间戳固定成 zip 能表示的最早时刻，保证重建逐字节相同。
+DEFAULT_ZIP_DATE = (1980, 1, 1, 0, 0, 0)
+#: 发行包里的占位空目录 —— 玩家自己要往里放东西的位置。显式列出来，
+#: 免得构建目录里别的空目录（如运行留下的 logs\）被顺手塞进包里。
+EMPTY_DIRS = (os.path.join(DATA_DIR, "packs", "overrides"),)
 RUST_RUNTIME_SOURCE = os.path.join(
     SRC, "injector-rs", "pr2_common", "src", "lib.rs")
 #: 发行分组：同一份字体能共用的语言打成一个 zip。见文件内注释。
@@ -158,6 +163,11 @@ def build_pack(langs, stage, log, default_lang, version=""):
     with open(os.path.join(out, "locale.default.ini"), "w",
               encoding="utf-8", newline="\n") as fh:
         fh.write("language=%s\n" % default_lang)
+    # 覆盖目录只放一个空文件夹：它是玩家自己的本机补丁位，不是发行物。
+    # 建出来是为了解压后能直接看见这个通道（否则要自己猜目录名和安全位置）；
+    # 里面不放任何示例文件，免得被当成「包里自带这几条覆盖」。
+    for rel in EMPTY_DIRS:
+        os.makedirs(os.path.join(stage, rel), exist_ok=True)
 
 
 def copy_runtime(stage, log):
@@ -579,6 +589,17 @@ def make_zip(stage, out_dir):
                 info.external_attr = 0o644 << 16
                 with open(full, "rb") as fh:
                     zf.writestr(info, fh.read())
+        # 占位空目录不会出现在 files 里，不显式写条目就会被 zip 丢掉：
+        # packs\overrides\ 就是这样一个空目录，解压后要能看见。
+        for rel in EMPTY_DIRS:
+            if not os.path.isdir(os.path.join(stage, rel)):
+                continue
+            rel_zip = rel.replace(os.sep, "/") + "/"
+            info = zipfile.ZipInfo(
+                rel_zip, date_time=epoch or DEFAULT_ZIP_DATE)
+            # 0x10 置位表示「目录」，解压工具据此建文件夹而不是建空文件。
+            info.external_attr = (0o40755 << 16) | 0x10
+            zf.writestr(info, b"")
     return zip_path
 
 

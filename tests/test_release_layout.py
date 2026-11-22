@@ -115,6 +115,9 @@ class TestUiLayout(unittest.TestCase):
         self.assertEqual(detail.count("%"), 3,
                          "status.pack_detail 要填条目数、未译数与摘要")
         self.assertIn("%s", detail)
+        # overrides\ 是玩家自己的本机补丁，界面不报它的条数：这个 key 不该存在。
+        self.assertNotIn("status.pack_overrides", text,
+                         "状态框不统计覆盖条数，ini 里不该有 status.pack_overrides")
 
         rust = os.path.join(ROOT, "src", "injector-rs", "pr2_launcher_gui",
                             "src", "strings.rs")
@@ -124,6 +127,8 @@ class TestUiLayout(unittest.TestCase):
                     "status.pack_stats", "status.pack_detail"):
             self.assertIn('"%s"' % key, builtin,
                           "strings.rs 的 BUILTIN 缺 %s" % key)
+        self.assertNotIn("status.pack_overrides", builtin,
+                         "启动器不再统计覆盖条数，BUILTIN 里不该留这个 key")
 
 
 class TestBundles(unittest.TestCase):
@@ -158,6 +163,81 @@ class TestBundles(unittest.TestCase):
                 alias = tomllib.load(fh)["alias"]
             self.assertEqual(make_release.LABELS.get(lang), alias,
                              "LABELS 与 %s 的 alias 不一致" % path)
+
+
+class TestPackOverridesDir(unittest.TestCase):
+    """发行包里只放一个空的 ``packs\\overrides\\``。
+
+    它是玩家自己的补丁位，不是发行物：里面不放任何示例文件（否则玩家会以为
+    包里自带这些覆盖），但空目录必须真的进 zip —— 不显式写目录条目，解压后
+    就看不到这个通道。
+    """
+
+    def test_empty_overrides_dir_survives_zip(self):
+        import zipfile
+        stage = tempfile.mkdtemp(prefix="pr2-overrides-stage-")
+        out = tempfile.mkdtemp(prefix="pr2-overrides-out-")
+        try:
+            stage = os.path.join(stage, "PR2-zh-v1.0.0")
+            packs = os.path.join(stage, make_release.DATA_DIR, "packs")
+            os.makedirs(os.path.join(packs, "overrides"))
+            # 构建目录里常有别的空目录（运行留下的 logs\）；只有清单里的
+            # 占位目录该进包，别的不能顺手塞进来。
+            os.makedirs(os.path.join(stage, make_release.DATA_DIR, "logs"))
+            with open(os.path.join(packs, "zh.txt"), "w", encoding="utf-8") as fh:
+                fh.write("0x1 = 甲\n")
+            zip_path = make_release.make_zip(stage, out)
+            with zipfile.ZipFile(zip_path) as zf:
+                names = zf.namelist()
+            entry = "%s/packs/overrides/" % make_release.DATA_DIR
+            self.assertIn(entry, names, "空 overrides\\ 没有写成 zip 目录条目")
+            with zipfile.ZipFile(zip_path) as zf:
+                self.assertTrue(zf.getinfo(entry).is_dir(),
+                                "overrides\\ 条目不是目录")
+            # 空目录里不该凭空多出文件。
+            self.assertEqual(
+                [n for n in names if n.startswith(entry)], [entry])
+            self.assertNotIn("%s/logs/" % make_release.DATA_DIR, names,
+                             "非占位空目录不该进包")
+        finally:
+            shutil.rmtree(os.path.dirname(stage), ignore_errors=True)
+            shutil.rmtree(out, ignore_errors=True)
+
+    def test_build_pack_creates_empty_overrides(self):
+        rel = os.path.join(make_release.DATA_DIR, "packs", "overrides")
+        self.assertIn(rel, make_release.EMPTY_DIRS,
+                      "overrides\\ 不在占位目录清单里")
+        script = os.path.join(ROOT, "src", "tools", "pack", "make_release.py")
+        with open(script, encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertIn("for rel in EMPTY_DIRS:", text)
+
+
+class TestInjectorVersionStamp(unittest.TestCase):
+    """``-SkipInjector`` 出包不许让 exe 版本和包版本悄悄错开。
+
+    跳过构建时不设 ``PR2_VERSION``，exe 里编的还是上一次的版本；语言包包头
+    用的是本次 ``-Version``。两处不一致，玩家看到的是「新版本的包装着旧版
+    运行时」，且没有任何提示，所以出包前必须比对构建期记录。
+    """
+
+    def _read(self, rel):
+        with open(os.path.join(ROOT, rel), encoding="utf-8") as fh:
+            return fh.read()
+
+    def test_build_writes_the_stamp(self):
+        text = self._read(os.path.join("src", "build_injector.ps1"))
+        self.assertIn("build\\injector-version.txt", text)
+        self.assertIn("$ShowVersion", text)
+        # 记录放在 build 根：放进 runtime 会被装进游戏目录、也可能进包。
+        self.assertNotIn("Join-Path $Runtime 'injector-version.txt'", text)
+
+    def test_skip_injector_refuses_a_mismatch(self):
+        text = self._read("release.ps1")
+        self.assertIn("build\\injector-version.txt", text)
+        self.assertIn("$builtVersion", text)
+        self.assertIn("if ($builtVersion -ne $Version)", text)
+        self.assertIn("-SkipInjector 无法确认现有 exe 的版本", text)
 
 
 if __name__ == "__main__":

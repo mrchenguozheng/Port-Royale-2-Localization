@@ -11,8 +11,8 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, AtomicUsize, Ordering}
 use std::sync::{Mutex, OnceLock};
 
 use pr2_common::{
-    bundled_fonts_complete, exe_dir, font_rel_dir, log_dir, pack_dir, override_path,
-    pack_path, read_locale_language, valid_lang_code, FontMap,
+    bundled_fonts_complete, exe_dir, font_rel_dir, log_dir, override_path, pack_dir,
+    pack_path, parse_pack_line, read_locale_language, valid_lang_code, FontMap,
 };
 use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HANDLE, HMODULE};
 use windows_sys::Win32::Storage::FileSystem::{
@@ -74,6 +74,8 @@ struct Pack {
     locale: String,
     dir: String,
     edits: HashMap<u32, Box<[u16]>>,
+    /// `packs/overrides/<locale>.txt` 里定义了多少个键（去重后）。
+    overrides: usize,
 }
 
 type AddFn = unsafe extern "thiscall" fn(*mut c_void, *const c_char, *const c_void, u32);
@@ -117,10 +119,11 @@ unsafe fn install_hook() {
     load_edit_file();
     install_font_log_hooks();
     log_line(&format!(
-        "[text] pack '{}' from {}: {} overrides",
+        "[text] pack '{}' from {}: {} entries, {} overrides",
         pack_locale(),
         pack_dir_name(),
-        pack_count()
+        pack_count(),
+        override_count()
     ));
 
     patch_add_iat();
@@ -804,6 +807,11 @@ fn pack_locale() -> String {
     pack().map(|p| p.locale.clone()).unwrap_or_else(|| "zh".into())
 }
 
+/// 覆盖文件定义了多少条。0 表示没有 `packs/overrides/<locale>.txt`。
+fn override_count() -> usize {
+    pack().map(|p| p.overrides).unwrap_or(0)
+}
+
 fn pack_dir_name() -> String {
     pack().map(|p| p.dir.clone()).unwrap_or_default()
 }
@@ -833,24 +841,31 @@ unsafe fn load_edit_file() {
     let dir = pack_dir(&root);
     let mut edits = HashMap::new();
     load_override_file(&pack_path(&root, &locale), &mut edits);
-    load_override_file(&override_path(&root, &locale), &mut edits);
+    let overrides = load_override_file(&override_path(&root, &locale), &mut edits);
     let _ = PACK.set(Pack {
         locale,
         dir: dir.to_string_lossy().into_owned(),
         edits,
+        overrides,
     });
 }
 
-fn load_override_file(path: &Path, edits: &mut HashMap<u32, Box<[u16]>>) {
+/// 读一份包/覆盖文件，返回这份文件自己定义了多少个键（去重后）。
+///
+/// 主包和覆盖文件共用一个 `edits`：同一个键后读的覆盖前面的，所以最终生效
+/// 的条数是两边的并集。状态框和日志要报的「覆盖了几条」只能是覆盖文件自己
+/// 的那一份，因此这里单独统计，而不是拿 `edits.len()` 充数。
+fn load_override_file(path: &Path, edits: &mut HashMap<u32, Box<[u16]>>) -> usize {
     let data = match std::fs::read(path) {
         Ok(v) => v,
-        Err(_) => return,
+        Err(_) => return 0,
     };
     if data.is_empty() || data.len() > 16 * 1024 * 1024 {
-        return;
+        return 0;
     }
     let data = data.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(&data);
     let text = String::from_utf8_lossy(data);
+    let mut keys: HashSet<u32> = HashSet::new();
     for line in text.split('\n') {
         let line = line.trim_end_matches('\r');
         let s = line.trim_start_matches([' ', '\t']);
@@ -861,32 +876,14 @@ fn load_override_file(path: &Path, edits: &mut HashMap<u32, Box<[u16]>>) {
             Some(v) => v,
             None => continue,
         };
+        keys.insert(hash);
         if edits.len() >= 16384 && !edits.contains_key(&hash) {
             continue;
         }
         let units: Vec<u16> = value.encode_utf16().take(2047).collect();
         edits.insert(hash, units.into_boxed_slice());
     }
-}
-
-fn parse_pack_line(s: &str) -> Option<(u32, &str)> {
-    let s = s.trim_start_matches([' ', '\t']);
-    let hex = s
-        .strip_prefix("0x")
-        .or_else(|| s.strip_prefix("0X"))
-        .unwrap_or(s);
-    let end = hex
-        .find(|c: char| !c.is_ascii_hexdigit())
-        .unwrap_or(hex.len());
-    if end == 0 {
-        return None;
-    }
-    let hash = u32::from_str_radix(&hex[..end], 16).ok()?;
-    let rest = hex[end..].trim_start_matches(' ');
-    let value = rest
-        .strip_prefix('=')
-        .or_else(|| rest.strip_prefix('\t'))?;
-    Some((hash, value.trim_start_matches([' ', '\t'])))
+    keys.len()
 }
 
 unsafe fn readable(p: *const c_void, len: usize) -> bool {
