@@ -42,6 +42,30 @@ jobs:
             requirements-ci.txt
             requirements.txt
 
+      # 字体在所有重活之前确认：runner 上没有 Noto 就退回项目内缓存，缓存里缺的
+      # 按 src/fonts-sources.toml 补齐（下载 + 按字重实例化成静态文件）；两处都
+      # 补不上就当场失败，不再等到 build 阶段才"字体检查跳过"。
+      - name: Restore font cache
+        id: font-cache
+        uses: actions/cache@v5
+        with:
+          path: build/cache/noto-src
+          key: noto-${{ runner.os }}-${{ hashFiles('src/fonts-sources.toml') }}
+
+      - name: Ensure Noto source fonts
+        shell: pwsh
+        run: |
+          # 搜索顺序固定为：assets\fonts\noto → build\cache\noto-src，系统字体靠最后；
+          # --no-system 让这一步只认项目内，避免 runner 镜像自带字体把结果带漂。
+          python -m pip install --disable-pip-version-check fonttools==4.68.0
+          $log = Join-Path $env:RUNNER_TEMP 'fonts.log'
+          & python src\tools\font\fetch_noto_fonts.py --langs zh,ja --fetch --no-system *>&1 |
+            Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            "::error::Noto 源字体缺失，项目内也没能补齐；见上方清单与查过的目录。"
+            exit 1
+          }
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: i686-pc-windows-msvc

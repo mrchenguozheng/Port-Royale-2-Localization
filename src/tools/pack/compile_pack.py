@@ -457,16 +457,17 @@ def main():
     code = build(lang, a.out, a.strict, a.marks, a.baseline, a.variant_out, a.union)
 
     # 编完语言包顺手检查字体：字体只做映射，按 Noto 替换字体生成。
-    # 字体出错不算构建失败 —— 语言包本身没问题。
+    # 字体缺失 = 构建失败（以前这里吞异常打「字体检查跳过」，CI 上等于没有字体判据）。
+    # 确实不要字体时用 --no-fonts 显式跳过。
+    if code == 0 and a.no_fonts:
+        print("字体：跳过（--no-fonts 显式指定）")
     if code == 0 and not a.no_fonts:
-        try:
-            from build_artifacts import build_fonts
-            ok, msg = build_fonts([lang], mode="noto", log=lambda m: print(m))
-            print("字体：" + msg)
-            if not ok:
-                print("（部署时字体不会更新；详见上一行提示）")
-        except Exception as exc:                  # 字体只是附带的，别拖垮构建
-            print("字体检查跳过：%s" % exc)
+        from build_artifacts import build_fonts
+        ok, msg = build_fonts([lang], mode="noto", log=lambda m: print("  " + m))
+        if not ok:
+            print("字体构建失败：\n%s" % msg)
+            return 1
+        print("字体：" + msg)
     return code
 
 

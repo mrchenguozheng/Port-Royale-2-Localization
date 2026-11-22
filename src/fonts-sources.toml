@@ -1,0 +1,103 @@
+# Noto 源字体清单
+#
+# 字体文件本身不入库（约 96MB），只入库这份清单：文件名、下载地址、需要的
+# 字重、最小体积。缺文件时由 src\tools\font\fetch_noto_fonts.py 按这里下载，
+# 下载来的可变字体按 axis 里的 wght 实例化成静态文件，落盘后所有构建脚本
+# 看到的都是静态文件名（与 font-map.ini 里的映射一致）。
+#
+# 落点目录（优先级从高到低，见 src\tools\font\font_sources.py）：
+#   1. PR2_FONT_DIRS（环境变量，设置后只查它，分号分隔）
+#   2. <repo>\assets\fonts\noto      入库目录，允许手工放置，默认空
+#   3. <repo>\build\cache\noto-src   下载缓存，不入库，CI 用 actions/cache 持久
+#   4. %WINDIR%\Fonts
+#   5. %LOCALAPPDATA%\Microsoft\Windows\Fonts
+# 五处都没有对应文件时，构建直接失败，不再"字体检查跳过"。
+version = 1
+
+# ---------- 简体中文 ----------
+[[font]]
+name = "NotoSansSC-Regular.ttf"
+langs = ["zh"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
+axis = { wght = 400 }
+min_bytes = 9000000
+
+[[font]]
+name = "NotoSerifSC-Black.ttf"
+langs = ["zh"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf"
+axis = { wght = 900 }
+min_bytes = 12000000
+
+[[font]]
+name = "NotoSerifSC-Bold.ttf"
+langs = ["zh"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf"
+axis = { wght = 700 }
+min_bytes = 12000000
+
+# ---------- 日文 ----------
+[[font]]
+name = "NotoSansJP-Regular.ttf"
+langs = ["ja"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf"
+axis = { wght = 400 }
+min_bytes = 5000000
+
+[[font]]
+name = "NotoSerifJP-Black.ttf"
+langs = ["ja"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf"
+axis = { wght = 900 }
+min_bytes = 7000000
+
+[[font]]
+name = "NotoSerifJP-Bold.ttf"
+langs = ["ja"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifjp/NotoSerifJP%5Bwght%5D.ttf"
+axis = { wght = 700 }
+min_bytes = 7000000
+
+# ---------- 韩文 ----------
+[[font]]
+name = "NotoSansKR-Regular.ttf"
+langs = ["ko"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf"
+axis = { wght = 400 }
+min_bytes = 5000000
+
+[[font]]
+name = "NotoSerifKR-Black.ttf"
+langs = ["ko"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifkr/NotoSerifKR%5Bwght%5D.ttf"
+axis = { wght = 900 }
+min_bytes = 12000000
+
+[[font]]
+name = "NotoSerifKR-Bold.ttf"
+langs = ["ko"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifkr/NotoSerifKR%5Bwght%5D.ttf"
+axis = { wght = 700 }
+min_bytes = 12000000
+
+# ---------- 俄语（正文 + 标题都用拉丁 Noto 缩放） ----------
+[[font]]
+name = "NotoSans-Regular.ttf"
+langs = ["ru"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans%5Bwdth,wght%5D.ttf"
+axis = { wght = 400 }
+min_bytes = 400000
+
+[[font]]
+name = "NotoSerif-Black.ttf"
+langs = ["ru", "pl"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserif/NotoSerif%5Bwdth,wght%5D.ttf"
+axis = { wght = 900 }
+min_bytes = 500000
+
+[[font]]
+name = "NotoSerif-Bold.ttf"
+langs = ["ru", "pl"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserif/NotoSerif%5Bwdth,wght%5D.ttf"
+axis = { wght = 700 }
+min_bytes = 500000

@@ -40,7 +40,11 @@ TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.dirname(TOOLS)
 ROOT = os.path.dirname(SRC)
 
-NOTO_CACHE = os.path.join(ROOT, "build", "cache", "noto-src")
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import font_sources as FS  # noqa: E402
+
+NOTO_CACHE = FS.CACHE_DIR
 RU_TOML = os.path.join(ROOT, "src", "translations", "ru.toml")
 
 #: Noto Serif 静态字重的 cap height（em）。
@@ -184,6 +188,14 @@ def _charset():
     return chars
 
 
+def resolve_source(name, noto_dir=None):
+    """按 font_sources 的顺序找源字体；noto_dir 显式传入时排在最前。"""
+    dirs = None
+    if noto_dir:
+        dirs = [noto_dir] + [d for d in FS.candidate_dirs() if d != noto_dir]
+    return FS.require(name, dirs, note="俄语/波兰语派生字体")
+
+
 def build(out, noto_dir=None, log=None, charset=None):
     """生成四个俄语字体，返回 (ok, message)。"""
     log = log or (lambda m: None)
@@ -193,7 +205,6 @@ def build(out, noto_dir=None, log=None, charset=None):
 
     out = os.path.abspath(out)
     os.makedirs(out, exist_ok=True)
-    noto_dir = noto_dir or NOTO_CACHE
 
     charset = charset if charset is not None else (_charset() if os.path.isfile(RU_TOML) else set())
 
@@ -201,9 +212,10 @@ def build(out, noto_dir=None, log=None, charset=None):
     # 平均 advance 只差 2%（0.588 vs 0.578），缩放后视觉上与直接换字体几乎无差，
     # 好处是不再依赖系统里的 Liberation Sans——本机和 CI 用同一份 Noto 源，
     # 同 commit 重建能逐字节一致。
-    body_src = os.path.join(noto_dir, "NotoSans-Regular.ttf")
-    if not os.path.isfile(body_src):
-        return False, "缺少 Noto 源文件：%s" % body_src
+    try:
+        body_src = resolve_source("NotoSans-Regular.ttf", noto_dir)
+    except FS.FontMissingError as exc:
+        return False, str(exc)
     noto = TTFont(body_src, lazy=True)
     body_avg = _avg_advance(noto, charset) if charset else 0.0
     noto.close()
@@ -220,9 +232,10 @@ def build(out, noto_dir=None, log=None, charset=None):
     for entry in DISPLAY:
         (src_name, target_avg, target_cap, out_name, weight,
          win_asc, win_desc, ascent, descent) = entry
-        src = os.path.join(noto_dir, src_name)
-        if not os.path.isfile(src):
-            return False, "缺少 Noto 源文件：%s" % src
+        try:
+            src = resolve_source(src_name, noto_dir)
+        except FS.FontMissingError as exc:
+            return False, str(exc)
         noto = TTFont(src, lazy=True)
         avg = _avg_advance(noto, charset) if charset else 0.0
         noto.close()

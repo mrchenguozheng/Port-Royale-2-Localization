@@ -38,7 +38,7 @@ ROOT = os.path.dirname(SRC)
 sys.path.insert(0, HERE)
 import build_cyr_fonts as CYR  # noqa: E402
 
-NOTO_CACHE = os.path.join(ROOT, "build", "cache", "noto-src")
+NOTO_CACHE = CYR.NOTO_CACHE
 NOTO_CAP = 0.714
 
 #: 波兰语字母表（含大写）：即使语料里那一刻没出现，也必须有字形。
@@ -89,7 +89,6 @@ def build(lang, out, noto_dir=None, log=None):
         return False, "需要 fontTools：python -m pip install fonttools"
     from fontTools.ttLib import TTFont
 
-    noto_dir = noto_dir or NOTO_CACHE
     out = os.path.abspath(out)
     os.makedirs(out, exist_ok=True)
     charset = _charset(profile)
@@ -97,9 +96,10 @@ def build(lang, out, noto_dir=None, log=None):
     names = []
     for (slot, src_name, target_avg, target_cap,
          win_asc, win_desc, ascent, descent) in profile["slots"]:
-        src = os.path.join(noto_dir, src_name)
-        if not os.path.isfile(src):
-            return False, "缺少 Noto 源文件：%s" % src
+        try:
+            src = CYR.resolve_source(src_name, noto_dir)
+        except CYR.FS.FontMissingError as exc:
+            return False, str(exc)
         noto = TTFont(src, lazy=True)
         avg = CYR._avg_advance(noto, charset)
         noto.close()

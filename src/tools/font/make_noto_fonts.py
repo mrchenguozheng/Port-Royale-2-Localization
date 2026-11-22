@@ -28,6 +28,10 @@ TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.dirname(TOOLS)
 ROOT = os.path.dirname(SRC)
 
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import font_sources  # noqa: E402
+
 CACHE_VERSION = 1
 DEFAULT_CACHE = os.path.join(ROOT, "build", "cache", "noto")
 
@@ -70,14 +74,16 @@ def _fonttools():
 
 
 def _font_dirs():
-    dirs = [os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts")]
-    local = os.environ.get("LOCALAPPDATA")
-    if local:
-        dirs.append(os.path.join(local, "Microsoft", "Windows", "Fonts"))
-    # 本机没装 Noto Sans/Serif（西里尔）时，允许把静态文件放在 build\cache\noto-src\，
-    # 不要求为了构建去安装系统字体；这个目录本身不进版本库。
-    dirs.append(os.path.join(ROOT, "build", "cache", "noto-src"))
-    return [d for d in dirs if os.path.isdir(d)]
+    """统一走 font_sources：项目内（assets/fonts/noto、build/cache/noto-src）
+    优先，其次系统字体；PR2_FONT_DIRS 可整体覆盖。"""
+    return [d for d in font_sources.candidate_dirs() if os.path.isdir(d)]
+
+
+def _missing_msg(lang, kind, stem):
+    return ("缺少 %s 的 %s（%s-Regular.ttf 或 %s-VF.ttf）\n查过：\n%s\n补法：%s"
+            % (lang, kind, stem, stem,
+               "\n".join("  - %s" % d for d in _font_dirs()),
+               font_sources.FETCH_CMD))
 
 
 def find_font(stem, weight=None):
@@ -174,9 +180,11 @@ def ensure_noto_fonts(lang, out_dir, log=None, cache=True, cache_dir=None):
     sans_path, sans_var = find_font(cfg["sans"][0], cfg["sans"][1])
     serif_path, serif_var = find_font(cfg["serif"][0], cfg["serif"][1][1])
     if not sans_path:
-        raise FileNotFoundError("找不到 %s 的 NotoSans 文件" % lang)
+        raise font_sources.FontMissingError(
+            _missing_msg(lang, "NotoSans", cfg["sans"][0]))
     if not serif_path:
-        raise FileNotFoundError("找不到 %s 的 NotoSerif 文件" % lang)
+        raise font_sources.FontMissingError(
+            _missing_msg(lang, "NotoSerif", cfg["serif"][0]))
 
     os.makedirs(out_dir, exist_ok=True)
     serif_bold, serif_bold_var = find_font(cfg["serif"][0], cfg["serif"][1][0])
