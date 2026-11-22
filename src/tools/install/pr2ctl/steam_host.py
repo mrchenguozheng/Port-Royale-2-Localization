@@ -18,6 +18,8 @@ from .base import *  # noqa: F401,F403
 
 HOST_DLL = "Ascaron.Logging-2.6.dll"
 HOST_ORIG = "Ascaron.Logging-2.6.orig.dll"
+#: 替换用的临时名后缀。先写 `<文件名>.new`、校验通过再换名，避免留下半截 DLL。
+HOST_TMP_SUFFIX = ".new"
 HOST_BACKUP_DIR = os.path.join(DATA_DIR, "host-backup")
 HOST_BACKUP = os.path.join(HOST_BACKUP_DIR, HOST_DLL)
 HOST_MANIFEST = os.path.join(DATA_DIR, "host-mount.json")
@@ -225,17 +227,53 @@ def write_manifest(target, proxy_path=None):
     return info
 
 
-def mount_host(target, proxy_path=None):
-    """验证、备份并覆盖宿主 DLL。"""
+def _replace_atomically(src, dst, expect_sha, what):
+    """先写 <dst>.new 并校验 SHA-256，通过后再 os.replace 换名。
+
+    复制一半就被杀毒/占用打断时，根目录文件仍然是原来那份；
+    失败时清掉临时文件，不留 .new 残骸。
+    """
+    tmp = dst + HOST_TMP_SUFFIX
+    try:
+        shutil.copy2(src, tmp)
+        if _sha256(tmp) != expect_sha:
+            raise HostError("%s 复制后校验失败（临时文件哈希不符）" % what)
+        os.replace(tmp, dst)
+    except OSError as exc:
+        raise HostError("%s 替换失败：%s（游戏或杀毒可能正占用 %s）"
+                        % (what, exc, os.path.basename(dst)))
+    finally:
+        if os.path.isfile(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+    if _sha256(dst) != expect_sha:
+        raise HostError("%s 替换后校验失败" % what)
+
+
+def swap_host(target, proxy_path=None):
+    """Steam 宿主 DLL 的完整替换动作：校验 → 备份 → 替换 → 复验 → 写清单。
+
+    这是唯一允许改写根目录 ``Ascaron.Logging-2.6.dll`` 的入口，安装流程
+    不再用通用复制去覆盖它。失败抛 HostError，且根目录保持原样。
+    """
+    root = os.path.join(target, HOST_DLL)
     info = prepare_mount(target, proxy_path)
-    if info["state"] == "mounted":
+    proxy = _proxy_path(target, proxy_path)
+
+    if os.path.isfile(root) and _sha256(root) == info["proxy_sha256"]:
         _write_manifest(target, info["original_sha256"], info["proxy_sha256"])
-        return info
-    shutil.copy2(_proxy_path(target, proxy_path), os.path.join(target, HOST_DLL))
-    if not _sha256(os.path.join(target, HOST_DLL)) == info["proxy_sha256"]:
-        raise HostError("代理复制后校验失败")
+        return info                              # 已经是同一份代理，不重复改写
+
+    _replace_atomically(proxy, root, info["proxy_sha256"], "Steam 宿主代理")
     _write_manifest(target, info["original_sha256"], info["proxy_sha256"])
     return info
+
+
+def mount_host(target, proxy_path=None):
+    """验证、备份并覆盖宿主 DLL（= swap_host，保留旧名给调用方）。"""
+    return swap_host(target, proxy_path)
 
 
 def restore_host(target, proxy_path=None):
@@ -264,8 +302,7 @@ def restore_host(target, proxy_path=None):
             "根目录 DLL 不是本工具代理；为避免覆盖其他 mod，拒绝还原"
         )
 
-    shutil.copy2(orig, root)
-    if not _is_original(root):
-        raise HostError("还原后校验失败")
+    # 还原同样走临时文件 + 校验，避免写一半留下坏 DLL。
+    _replace_atomically(orig, root, HOST_ORIGINAL_SHA256, "原版宿主")
     _remove_manifest(target)
     return "restored"

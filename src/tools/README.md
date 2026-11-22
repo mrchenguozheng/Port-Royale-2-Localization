@@ -148,6 +148,8 @@ src/tools/
 | 脚本 | 作用 |
 |---|---|
 | `font/make_noto_fonts.py` | 生成 Noto 替换字体（字体只做映射，不做裁剪） |
+| `font/font_sources.py` | 字体来源目录解析：`PR2_FONT_DIRS` → 项目内 → 构建缓存 → 系统字体，缺就抛 `FontMissingError` |
+| `font/fetch_noto_fonts.py` | 按语言清单补齐 Noto 源字体到 `build\cache\noto-src`（Range 续传） |
 | `font/build_cyr_fonts.py` | 俄语四个自建字体（正文 + 标题三档） |
 | `font/build_lat_fonts.py` | 拉丁扩展 A 语言（pl）的三个标题字体：正文原版够用，只换标题槽位 |
 | `font/squeeze_fonts.py` | TrueType（glyf）水平压缩，按原版度量调，供日文等宽字符用 |

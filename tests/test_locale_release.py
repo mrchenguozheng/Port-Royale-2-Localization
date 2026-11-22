@@ -23,7 +23,7 @@ class TestLocalePackaging(unittest.TestCase):
 
     def test_build_pack_ships_default_only(self):
         with mock.patch("build_artifacts.compile_pack", return_value=0):
-            make_release.build_pack("zh", self.stage, lambda _m: None)
+            make_release.build_pack(["zh"], self.stage, lambda _m: None, "zh")
         out = os.path.join(self.stage, "PR2Localization", "packs")
         default_ini = os.path.join(out, "locale.default.ini")
         self.assertTrue(os.path.isfile(default_ini))

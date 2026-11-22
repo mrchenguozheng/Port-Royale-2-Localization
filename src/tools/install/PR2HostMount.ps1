@@ -67,6 +67,28 @@ function Get-ProxySha {
     return $sha
 }
 
+# 替换动作只有这一个实现：先写 <目标>.new，校验 SHA-256 通过后用 Move-Item 换名。
+# 复制到一半被占用/杀毒中断时，根目录还是原来那份 DLL，不会留下半截文件。
+function Copy-DllAtomically([string]$Source, [string]$Dest, [string]$ExpectSha, [string]$What) {
+    $tmp = "$Dest.new"
+    try {
+        Copy-Item -LiteralPath $Source -Destination $tmp -Force
+        if ((Get-FileSha256 $tmp) -ne $ExpectSha) {
+            throw "$What 复制后校验失败（临时文件哈希不符）"
+        }
+        Move-Item -LiteralPath $tmp -Destination $Dest -Force
+    } catch [System.IO.IOException] {
+        throw "$What 替换失败：$($_.Exception.Message)（游戏或杀毒可能正占用 $([IO.Path]::GetFileName($Dest))）"
+    } finally {
+        if (Test-Path -LiteralPath $tmp) {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        }
+    }
+    if ((Get-FileSha256 $Dest) -ne $ExpectSha) {
+        throw "$What 替换后校验失败"
+    }
+}
+
 $Root = [IO.Path]::GetFullPath($Target)
 $RootDll = Join-Path $Root $HostDll
 $Orig = Join-Path $Root $OrigDll
@@ -137,10 +159,8 @@ if ($Action -eq 'Mount') {
     }
 
     if ((Get-FileSha256 $RootDll) -ne $proxySha) {
-        Copy-Item -LiteralPath $ProxyPath -Destination $RootDll -Force
-    }
-    if ((Get-FileSha256 $RootDll) -ne $proxySha) {
-        throw "代理复制后校验失败"
+        Copy-DllAtomically -Source $ProxyPath -Dest $RootDll -ExpectSha $proxySha `
+            -What 'Steam 宿主代理'
     }
     Write-Manifest $Root $proxySha
     Write-Output "已挂载：$RootDll"
@@ -166,10 +186,8 @@ if ($Action -eq 'Restore') {
     if ($rootSha -ne $proxySha -and $rootSha -ne $known) {
         throw "根目录 DLL 不是本工具代理；拒绝覆盖未知文件"
     }
-    Copy-Item -LiteralPath $Orig -Destination $RootDll -Force
-    if (-not (Test-Original $RootDll)) {
-        throw "还原后校验失败"
-    }
+    Copy-DllAtomically -Source $Orig -Dest $RootDll -ExpectSha $ExpectedSha `
+        -What '原版宿主'
     Remove-Item -LiteralPath (Join-Path $Root $ManifestRel) -Force -ErrorAction SilentlyContinue
     Write-Output "已还原：$RootDll"
     return
