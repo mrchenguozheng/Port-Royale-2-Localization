@@ -152,12 +152,15 @@ def deploy_steps(target, langs, edition=None):
 
     ui_src = os.path.join(RUNTIME, UI_DIR)
     if os.path.isdir(ui_src):
-        # 只装默认界面；用户自己的 ui.ini 是覆盖层，升级时不碰。
-        for name in (UI_DEFAULT_FILE,):
-            src = os.path.join(ui_src, name)
-            if os.path.isfile(src):
-                steps.append(("PR2Localization\\ui\\%s" % name, src,
-                              os.path.join(target, UI_DIR, name)))
+        # 界面默认文案跟随这次安装的语言；找不到对应语言就用运行时的默认文件。
+        # 用户自己的 ui.ini 是覆盖层，升级时不碰。
+        ui_name = UI_DEFAULT_FILE
+        if font_lang and os.path.isfile(os.path.join(ui_src, "ui.%s.ini" % font_lang)):
+            ui_name = "ui.%s.ini" % font_lang
+        src = os.path.join(ui_src, ui_name)
+        if os.path.isfile(src):
+            steps.append(("PR2Localization\\ui\\%s" % UI_DEFAULT_FILE, src,
+                          os.path.join(target, UI_DIR, UI_DEFAULT_FILE)))
 
     steps.append(("PR2Localization\\logs\\", None, os.path.join(target, LOG_DIR)))
     steps.append(("%s\\" % PACK_DIR, None, os.path.join(target, PACK_DIR)))

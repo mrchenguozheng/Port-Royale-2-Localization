@@ -90,8 +90,8 @@ impl Strings {
     pub fn load(root: &Path) -> Self {
         let mut values = HashMap::new();
         let dir = ui_dir(root);
-        // 发行包只带 ui.default.ini；用户把要改的项抄进 ui.ini 即可按项覆盖，
-        // 不需要整份替换，升级也不会覆盖用户文件。
+        // 包内只有一份按发包语言选好的 ui.default.ini；用户把要改的项抄进 ui.ini
+        // 即可按项覆盖，不需要整份替换，升级也不会覆盖用户文件。
         let has_default = read_ini(&dir.join(UI_DEFAULT_FILE), &mut values);
         if !has_default {
             // 兼容仍带旧 en.ini 的安装目录；新包不再生成多语言 UI 文件。
@@ -251,7 +251,7 @@ mod tests {
 
     #[test]
     fn default_ui_keeps_restore_format_placeholders() {
-        // 发行包只带 ui.default.ini；还原失败的弹框要把退出码和落盘日志末尾都填进去。
+        // 包内只有按发包语言选好的 ui.default.ini；还原失败的弹框要把退出码和落盘日志末尾都填进去。
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/ui.default.ini");
         let mut values = HashMap::new();
         assert!(read_ini(&path, &mut values), "读不到 {}", path.display());

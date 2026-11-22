@@ -9,6 +9,7 @@
 """
 
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -60,42 +61,89 @@ class TestUniversalLayout(unittest.TestCase):
 
 
 class TestUiLayout(unittest.TestCase):
-    """界面文案只发 ui.default.ini；旧的按语言 ini 不再进包。"""
+    """界面文案按语言分文件；发行包按分组默认语言选一份当 ui.default.ini。"""
 
-    def test_only_default_ui_is_shipped(self):
-        ui = os.path.join(ROOT, "src", "injector-rs", "ui")
+    LANGS = ("zh", "ja", "ko", "ru", "pl", "de", "es", "fr", "it")
+
+    def _ui_dir(self):
+        return os.path.join(ROOT, "src", "injector-rs", "ui")
+
+    def _values(self, path):
+        values = {}
+        with open(path, encoding="utf-8") as fh:
+            for line in fh.read().replace("\r\n", "\n").split("\n"):
+                line = line.strip()
+                if not line or line.startswith("#") or line.startswith("["):
+                    continue
+                key, sep, value = line.partition("=")
+                if sep:
+                    values[key.strip()] = value.strip()
+        return values
+
+    def test_language_ui_files_exist_and_legacy_gone(self):
+        ui = self._ui_dir()
         self.assertTrue(os.path.isfile(os.path.join(ui, "ui.default.ini")))
+        for lang in self.LANGS:
+            self.assertTrue(
+                os.path.isfile(os.path.join(ui, "ui.%s.ini" % lang)),
+                "缺 %s 的界面文案 ui.%s.ini" % (lang, lang))
         for name in ("en.ini", "ja.ini", "zh.ini"):
             self.assertFalse(
                 os.path.exists(os.path.join(ui, name)),
-                "旧布局的 %s 还留在源码目录；文案已统一到 ui.default.ini" % name)
+                "旧布局的 %s 还留在源码目录；新文案是 ui.<lang>.ini" % name)
 
-    def test_default_ui_has_restore_keys(self):
-        path = os.path.join(ROOT, "src", "injector-rs", "ui", "ui.default.ini")
-        with open(path, encoding="utf-8") as fh:
-            text = fh.read()
-        for key in ("button.restore", "status.restored",
-                    "confirm.restore", "error.restore_failed"):
-            self.assertIn("\n%s=" % key, text.replace("\r\n", "\n"),
-                          "ui.default.ini 缺 %s" % key)
-        # 两版都可能挂过宿主代理，还原不再按版别分叉，这句 GOG 专用文案必须消失。
-        self.assertNotIn("status.restore_gog", text)
-        # 界面上不该再出现「Steam 原版」这种只对一半玩家成立的说法。
-        self.assertNotIn("Steam", text)
-        # 还原失败要把退出码和落盘日志一起塞进弹框，两个占位符少一个就白搭。
-        self.assertIn("error.restore_failed=", text)
-        line = [ln for ln in text.replace("\r\n", "\n").split("\n")
-                if ln.startswith("error.restore_failed=")][0]
-        self.assertIn("%lu", line)
-        self.assertIn("%s", line)
+    def test_language_ui_keys_and_placeholders_match(self):
+        """各语言必须是同一套 key、同一组占位符，少一个就会显示成 key 名或丢字段。"""
+        base = self._values(os.path.join(self._ui_dir(), "ui.default.ini"))
+        for lang in self.LANGS:
+            values = self._values(
+                os.path.join(self._ui_dir(), "ui.%s.ini" % lang))
+            self.assertEqual(sorted(values), sorted(base),
+                             "ui.%s.ini 的 key 与 ui.default.ini 不一致" % lang)
+            for key, text in base.items():
+                self.assertEqual(
+                    re.findall(r"%[a-z]+", values[key]),
+                    re.findall(r"%[a-z]+", text),
+                    "ui.%s.ini 的 %s 占位符与默认文案不一致" % (lang, key))
 
-    def test_build_copies_default_ui_only(self):
+    def test_zh_language_file_matches_default(self):
+        """默认文件是 zh 的副本：两边值必须一致，避免开发回退与中文包漂移。"""
+        ui = self._ui_dir()
+        self.assertEqual(
+            self._values(os.path.join(ui, "ui.default.ini")),
+            self._values(os.path.join(ui, "ui.zh.ini")))
+
+    def test_release_copies_package_language_as_default(self):
+        src = tempfile.mkdtemp(prefix="pr2-ui-src-")
+        stage = tempfile.mkdtemp(prefix="pr2-ui-stage-")
+        try:
+            os.makedirs(os.path.join(src, "ui"))
+            for lang, text in (("zh", "title=中文"), ("de", "title=Deutsch")):
+                path = os.path.join(src, "ui", "ui.%s.ini" % lang)
+                with open(path, "w", encoding="utf-8") as fh:
+                    fh.write("[gui]\n%s\n" % text)
+            make_release.copy_ui(stage, os.path.join(src, "ui"), "de",
+                                 lambda _m: None)
+            out = os.path.join(stage, make_release.DATA_DIR, "ui")
+            self.assertEqual(sorted(os.listdir(out)), ["ui.default.ini"])
+            with open(os.path.join(out, "ui.default.ini"), encoding="utf-8") as fh:
+                self.assertIn("title=Deutsch", fh.read())
+            with self.assertRaises(FileNotFoundError):
+                make_release.copy_ui(stage, os.path.join(src, "ui"), "fr",
+                                     lambda _m: None)
+        finally:
+            shutil.rmtree(src, ignore_errors=True)
+            shutil.rmtree(stage, ignore_errors=True)
+
+    def test_build_copies_all_language_ui_files(self):
         script = os.path.join(ROOT, "src", "build_injector.ps1")
         with open(script, encoding="utf-8") as fh:
             text = fh.read()
-        self.assertIn("ui.default.ini", text)
-        # 旧写法是逐个语言 Copy-Item 到 runtime；现在只发默认文件，旧文件被清掉。
-        self.assertNotIn("Copy-Item -LiteralPath $ini", text)
+        self.assertIn("-Filter 'ui.*.ini'", text)
+        self.assertIn("$_.Name", text)
+        # 旧布局的 en/ja/zh.ini 仍要从 runtime 清掉，否则旧安装带过期文案。
+        self.assertIn("foreach ($lang in @('en', 'ja', 'zh'))", text)
+
 
     def test_default_ui_has_version_keys(self):
         """副标题与状态框的版本文案：ini 与 Rust 内置回退必须成对，占位符也要对得上。

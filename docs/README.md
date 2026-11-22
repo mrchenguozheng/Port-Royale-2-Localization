@@ -26,7 +26,7 @@
 - 字体：实际字体平铺在 `PR2Localization/fonts/`；包内放 `font-map.default.ini`，
   用户 `font-map.ini` 按项覆盖默认；不按语言开子目录，不覆盖根目录原版字体；
   只认 fonts 里的文件，不读系统字体目录。
-- 启动器界面：固定 `PR2Localization/ui/ui.default.ini`；用户 `ui.ini` 按项覆盖。
+- 启动器界面：读 `PR2Localization/ui/ui.default.ini`。源文件按语言分 `ui.<lang>.ini`，发行包把分组默认语言那份复制成 `ui.default.ini`；用户 `ui.ini` 按项覆盖。
 - 运行时版本：`src/injector-rs/pr2_common/src/lib.rs`；发行包根目录 `RUNTIME-VERSION`。
 
 旧的 `launcher.ini`、`lang/aliases.ini` 已移除；旧语言包不再兼容。

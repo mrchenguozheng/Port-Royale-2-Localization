@@ -65,6 +65,7 @@ LABELS = {
     "pl": "Polski",
 }
 DATA_DIR = "PR2Localization"
+UI_DEFAULT_FILE = "ui.default.ini"
 FLAT_COMMON = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
                "PR2LocalizationCore.dll")
 HOST_DLL = "Ascaron.Logging-2.6.dll"
@@ -187,6 +188,22 @@ def copy_runtime(stage, log):
     shutil.copy2(src, dst)
     log("复制 %s（宿主代理，挂载时才换进根目录）"
         % HOST_PROXY_REL.replace(os.sep, "\\"))
+
+
+def copy_ui(stage, ui_dir, default_lang, log):
+    """界面默认文案跟随发包语言。
+
+    源目录里有 ``ui.default.ini``（开发回退）和每种语言的 ``ui.<lang>.ini``；
+    包里只放分组默认语言那一份，并统一命名成 ``ui.default.ini``。其他语言
+    文件不进包，避免同一份文案在包里存多份、日后各自漂移。
+    """
+    lang_ui = os.path.join(ui_dir, "ui.%s.ini" % default_lang)
+    if not os.path.isfile(lang_ui):
+        raise FileNotFoundError("缺默认语言界面文案：%s" % lang_ui)
+    ui_stage = os.path.join(stage, DATA_DIR, "ui")
+    os.makedirs(ui_stage, exist_ok=True)
+    shutil.copy2(lang_ui, os.path.join(ui_stage, UI_DEFAULT_FILE))
+    log("复制 PR2Localization\\ui\\（默认界面 %s）" % default_lang)
 
 
 def copy_font_map(stage, log):
@@ -667,10 +684,10 @@ def make_release(langs, version, out_dir, mode, log=None, cache=True,
         ui_dir = os.path.join(ROOT, "src", "injector-rs", "ui")
     if not os.path.isdir(ui_dir):
         raise FileNotFoundError("缺 ui 目录：%s（先构建注入器）" % ui_dir)
-    shutil.copytree(ui_dir, os.path.join(stage, DATA_DIR, "ui"),
-                    dirs_exist_ok=True)
+    # 界面文案跟随发包语言：分组默认语言是哪门，就把哪门的 ui.<lang>.ini
+    # 以 ui.default.ini 的名字放进包；其他语言文件不进包，避免多份文案漂移。
+    copy_ui(stage, ui_dir, default_lang, log)
     os.makedirs(os.path.join(stage, DATA_DIR, "logs"), exist_ok=True)
-    log("复制 PR2Localization\\ui\\")
     copy_fonts(langs, stage, modes, log, cache=cache)
     write_readme(langs, default_lang, stage, modes, version, bundle_label,
                  deltas)
