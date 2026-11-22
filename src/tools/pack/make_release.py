@@ -504,19 +504,31 @@ def write_readme(langs, default_lang, stage, modes, version="",
     else:
         license_help = """字体许可：
   本包不包含字体文件，不附带 OFL.txt。"""
+    # packs\overrides\ 在发行包里固定是空目录：注入器读完语言包后按固定路径
+    # 再读 packs\overrides\<语言>.txt，这个位置必须预先存在玩家才有地方放补丁；
+    # 而补丁是玩家自己的改动，不能随包分发，所以只留空目录、不放示例文件。
+    overrides_help = """packs\\overrides\\ 是留给你自己的本机覆盖目录，包里只放一个空文件夹：
+  为什么有这个空目录：注入器读完语言包后，会再去读 packs\\overrides\\<语言>.txt，
+  那个位置必须预先存在，否则你放了文件也不会被读；文件本身是你的改动，
+  不属于发行内容，所以包里不放，安装/升级也不会删除你放进去的东西。
+  怎么用：新建文本文件，文件名等于 locale.ini 里选的语言，本包默认是
+  packs\\overrides\\%s.txt；每行一条「0xHASH = 译文」，与语言包格式相同，
+  哈希相同的条目会盖掉语言包里那一条，其余照旧；改完重启游戏生效。
+  只改几句、不想动语言包时用这里；要改的条目较多请直接反馈，不要靠覆盖。""" % default_lang
     if len(langs) > 1:
         locale_help = """语言设置：
   本包带 %d 种语言：%s；默认 %s。
   默认语言在 PR2Localization\\packs\\locale.default.ini；
   已有 locale.ini（GUI 选语言时写入）优先，解压升级不会覆盖它。
   切换语言不改字体：同一个包里的语言共用 fonts\\ 目录与一份映射。
-  packs\\overrides\\ 是本机临时译文覆盖目录，安装/升级不会删除。""" % (
-            len(langs), labels, default_lang)
+
+%s""" % (len(langs), labels, default_lang, overrides_help)
     else:
         locale_help = """语言设置：
   默认语言在 PR2Localization\\packs\\locale.default.ini；
   已有 locale.ini（GUI 选语言时写入）优先，解压升级不会覆盖它。
-  packs\\overrides\\ 是本机临时译文覆盖目录，安装/升级不会删除。"""
+
+%s""" % overrides_help
     text = """Port Royale 2 本地化 - %s（%s）
 版本：%s（运行时版本 %d）
 %s
