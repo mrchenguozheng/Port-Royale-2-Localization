@@ -166,6 +166,8 @@ def kind_for(path):
         if path.endswith(".ini"):
             return "locale"
     if path.startswith("PR2Localization/fonts/"):
+        if path.endswith("OFL.txt"):
+            return "doc"
         if path.endswith(".ttf"):
             return "font"
         if path.endswith(".ini"):

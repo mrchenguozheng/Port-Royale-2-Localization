@@ -14,10 +14,10 @@
         packs/locale.default.ini      # 本包的默认语言；用户 locale.ini 优先
         fonts/NotoSansSC-Regular.ttf ...  # 实际字体文件（默认）
         fonts/font-map.default.ini      # 默认逻辑名到实际文件名的映射
+        fonts/OFL.txt                   # 字体许可文本，跟着字体目录走
         ui/ui.default.ini
         logs/
       README.txt
-      OFL.txt
 
 两个版本共用同一个包，本地化入口也相同：GOG 与 Steam 的 PR2.exe 都静态
 导入 Ascaron.Logging-2.6.dll（导入表里只有 Log 一个函数），两版的原版 DLL
@@ -508,12 +508,12 @@ def write_readme(langs, default_lang, stage, modes, version="",
     if pkg_mode == "noto" and "ru" in langs:
         license_help = """字体许可：
   正文 Liberation Sans 与标题所用的 Noto Serif 都是 SIL Open Font License 1.1，
-  详见同目录 OFL.txt 或 https://openfontlicense.org/
+  详见 PR2Localization\\fonts\\OFL.txt 或 https://openfontlicense.org/
   Liberation Sans 为未修改副本；标题字体是 Noto Serif 的压缩衍生版本，
   已改族名（PR2 Cyrillic Display *），不沿用 Noto 的保留字体名。"""
     elif pkg_mode == "noto":
         license_help = """字体许可：
-  Noto 字体使用 SIL Open Font License 1.1，详见同目录 OFL.txt
+  Noto 字体使用 SIL Open Font License 1.1，详见 PR2Localization\\fonts\\OFL.txt
   或 https://openfontlicense.org/"""
     else:
         license_help = """字体许可：
@@ -588,15 +588,22 @@ def write_readme(langs, default_lang, stage, modes, version="",
 
 
 def copy_license(stage, log, mode="noto"):
+    """把 OFL 文本放进字体目录，和实际字体放在一起。
+
+    放在包根也能满足 OFL，但玩家清点字体、替换字体时先看 ``PR2Localization\\fonts\\``；
+    许可文本跟着字体走，删掉字体目录时不会留下一条孤立的根目录声明。
+    """
     if mode != "noto":
         return
+    dst_dir = os.path.join(stage, DATA_DIR, "fonts")
     for rel in (os.path.join("assets", "fonts", "OFL.txt"),
                 "OFL.txt",
                 os.path.join("docs", "OFL.txt")):
         src = os.path.join(ROOT, rel)
         if os.path.isfile(src):
-            shutil.copy2(src, os.path.join(stage, "OFL.txt"))
-            log("复制 OFL.txt")
+            os.makedirs(dst_dir, exist_ok=True)
+            shutil.copy2(src, os.path.join(dst_dir, "OFL.txt"))
+            log("复制 PR2Localization\\fonts\\OFL.txt")
             return
     log("提示：仓库里没有 OFL.txt，发行包只写了许可链接；正式发布前补上")
 

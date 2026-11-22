@@ -53,6 +53,13 @@ class TestUniversalLayout(unittest.TestCase):
             os.path.exists(os.path.join(self.stage, make_release.HOST_DLL)),
             "根目录不能出现与原版同名的 DLL")
 
+    def test_ofl_sits_with_fonts_not_package_root(self):
+        """许可文本跟着字体目录走，包根不再放 OFL.txt。"""
+        make_release.copy_license(self.stage, lambda _m: None)
+        self.assertTrue(os.path.isfile(os.path.join(
+            self.stage, make_release.DATA_DIR, "fonts", "OFL.txt")))
+        self.assertFalse(os.path.exists(os.path.join(self.stage, "OFL.txt")))
+
     def test_no_version_dll_fallback(self):
         """VERSION.dll 代理是历史路线，GOG 直启时会被解析到 SysWOW64；不进包。"""
         make_release.copy_runtime(self.stage, lambda _m: None)
