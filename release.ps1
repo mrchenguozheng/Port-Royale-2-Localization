@@ -15,10 +15,14 @@
 #    - 发行分组由 src\release-bundles.toml 决定：同一份字体能共用的语言进一个 zip。
 #      de/es/fr/it 四项字体映射全是 none，共用一份空字体集，合成 latin 一包；
 #      zh/ja/ko/ru 各自一套字体文件，各出一包。
-#    - 一个分组一个 zip：dist\PR2-<id>-<version>.zip 加 dist\SHA256SUMS.txt。
+#    - 一个分组一个 zip：dist\PR2-<id>-<version>.zip 加 dist\SHA256SUMS.txt
+#      与 dist\release.json（版本、commit、每个包的哈希/默认界面语言）。
 #      包同时面向 GOG 与 Steam（自带宿主代理，挂载由启动器完成），不再按版别分包；
 #      id 是分组 id（单语言分组沿用语言代码）；stage 目录打包后删除。
-#    - tag 名为 release-<version>，annotated；-Tag 要求工作树干净。
+#    - 默认拒绝脏工作树：未提交改动会被编进 exe 版本头，也会让「这个包对应
+#      哪个 commit」说不清。确有需要时显式加 -AllowDirty，release.json 会记下。
+#    - tag 名为 release-<version>，annotated；-Tag 只允许在 main 或 release/*
+#      分支上打，且工作树必须干净。
 #
 #  Default flow:
 #    1. build the injector into build\runtime
@@ -54,6 +58,9 @@ param(
     [switch]$Tag,
 
     [switch]$Push,
+
+    # 默认拒绝脏工作树；只有显式传这个开关才放行（版本头与 release.json 会记 dirty）。
+    [switch]$AllowDirty,
 
     [switch]$NoPause,
 
@@ -92,6 +99,15 @@ function Get-PwshPath {
     if (Test-Path -LiteralPath $local -PathType Leaf) { return $local }
 
     throw '找不到 PowerShell 7（pwsh.exe）。'
+}
+
+function Get-GitPath {
+    $cmd = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue
+    if (-not $cmd) {
+        $cmd = Get-Command git -CommandType Application -ErrorAction SilentlyContinue
+    }
+    if (-not $cmd) { throw '找不到 git，无法确认 commit 与工作树状态。' }
+    return $cmd.Source
 }
 
 function Get-ReleaseLanguages {
@@ -168,6 +184,28 @@ function Get-ReleaseBundles {
 
 $Pwsh = Get-PwshPath
 
+if ($Tag -and $AllowDirty) {
+    throw '-Tag 与 -AllowDirty 不能同时使用：打 tag 必须对应已提交的树。'
+}
+
+# 脏树闸门放在最前面，避免构建六分钟之后才发现版本头要记「未提交改动」。
+# 之前普通出包不检查，第一次发版就把脏树编进了包，只能人工中止。
+$Git = Get-GitPath
+$Commit = (@(& $Git -C $Repo rev-parse --short HEAD) | Select-Object -First 1).Trim()
+$Porcelain = @(& $Git -C $Repo status --porcelain)
+$Dirty = $Porcelain.Count -gt 0
+if ($Dirty) {
+    if ($Tag) {
+        throw ("工作树有未提交改动，不能打 tag：`n" + ($Porcelain -join "`n"))
+    }
+    if (-not $AllowDirty) {
+        throw ("工作树有未提交改动，拒绝出包：`n" + ($Porcelain -join "`n") +
+            "`n先提交，或显式加 -AllowDirty 并在 release.json 里保留 dirty 标记。")
+    }
+    Write-Host '[release] 警告：工作树有未提交改动（-AllowDirty），版本头会标记 dirty。'
+}
+Write-Host "[release] commit：$Commit$(if ($Dirty) { '（dirty）' } else { '' })"
+
 $Python = @(& (Join-Path $Src 'find_python.ps1'))[0]
 if ($LASTEXITCODE -ne 0 -or -not $Python) {
     throw '找不到 Python。先安装 Python 3.11+，或让 python 进入 PATH。'
@@ -211,6 +249,11 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 # 重新出包前清掉，保证 dist 里只有 zip 和校验和。
 foreach ($dir in @(Get-ChildItem -LiteralPath $OutDir -Directory -Filter 'PR2-*-v*' -ErrorAction SilentlyContinue)) {
     Remove-Item -LiteralPath $dir.FullName -Recurse -Force
+}
+# 同版本旧 zip 也清掉：分组改名或删掉后，上一轮的同版本产物还会被
+# SHA256SUMS 和 release.json 收进来，变成没人对应 stage 的幽灵包。
+foreach ($old in @(Get-ChildItem -LiteralPath $OutDir -File -Filter "PR2-*-$Version.zip" -ErrorAction SilentlyContinue)) {
+    Remove-Item -LiteralPath $old.FullName -Force
 }
 
 Write-Host "[release] 版本：$Version"
@@ -311,13 +354,66 @@ if ($zips.Count -eq 0) {
     throw "没有找到生成的 zip：$OutDir\PR2-*-$Version.zip"
 }
 
+$artifacts = @(foreach ($zip in $zips) {
+    [pscustomobject]@{
+        File = $zip.Name
+        Sha256 = (Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash
+        Size = $zip.Length
+    }
+})
+
 # 校验和与产物同目录，格式与 sha256sum 一致：<大写 HEX><两个空格><文件名>。
 $sumsPath = Join-Path $OutDir 'SHA256SUMS.txt'
-$sumLines = foreach ($zip in $zips) {
-    $hash = (Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash
-    '{0}  {1}' -f $hash, $zip.Name
+$sumLines = foreach ($artifact in $artifacts) {
+    '{0}  {1}' -f $artifact.Sha256, $artifact.File
 }
 Set-Content -LiteralPath $sumsPath -Value $sumLines -Encoding utf8NoBOM
+
+# 机器可读的发布元数据：SHA256SUMS 只回答「文件有没有坏」，回答不了
+# 「这个包是哪个 commit、默认界面是哪门语言出的」。CI artifact 与 dist 同带。
+$bundlesMeta = @()
+if ($packMode -eq 'bundle') {
+    foreach ($group in $groups) {
+        $file = "PR2-$($group.Id)-$Version.zip"
+        $artifact = $artifacts | Where-Object { $_.File -eq $file } | Select-Object -First 1
+        if (-not $artifact) { throw "分组 $($group.Id) 没有生成 $file" }
+        $bundlesMeta += [ordered]@{
+            id = $group.Id
+            default = $group.Default
+            langs = @($group.Langs)
+            file = $artifact.File
+            sha256 = $artifact.Sha256
+            size = $artifact.Size
+        }
+    }
+} else {
+    foreach ($lang in $languages) {
+        $file = "PR2-$lang-$Version.zip"
+        $artifact = $artifacts | Where-Object { $_.File -eq $file } | Select-Object -First 1
+        if (-not $artifact) { throw "语言 $lang 没有生成 $file" }
+        $bundlesMeta += [ordered]@{
+            id = $lang
+            default = $lang
+            langs = @($lang)
+            file = $artifact.File
+            sha256 = $artifact.Sha256
+            size = $artifact.Size
+        }
+    }
+}
+$releaseMeta = [ordered]@{
+    version = $Version
+    commit = $Commit
+    dirty = $Dirty
+    pack_mode = $packMode
+    languages = @($languages)
+    bundles = @($bundlesMeta)
+    generated_at = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+}
+$metaPath = Join-Path $OutDir 'release.json'
+$metaJson = $releaseMeta | ConvertTo-Json -Depth 6
+Set-Content -LiteralPath $metaPath -Value $metaJson -Encoding utf8NoBOM
+
 
 Write-Host ''
 Write-Host '[release] 已生成：'
@@ -325,37 +421,39 @@ foreach ($zip in $zips) {
     Write-Host ("  {0}  ({1:N1} MB)" -f $zip.FullName, ($zip.Length / 1MB))
 }
 Write-Host "  $sumsPath"
+Write-Host "  $metaPath"
 
 if ($Tag) {
-    $gitCmd = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue
-    if (-not $gitCmd) {
-        $gitCmd = Get-Command git -CommandType Application -ErrorAction SilentlyContinue
-    }
-    if (-not $gitCmd) {
-        throw '找不到 git，无法创建 tag。'
-    }
-    $git = $gitCmd.Source
     $tagName = "release-$Version"
 
+    # Release workflow 只接受 main 或 release/* 上的 tag；本地先拦住，
+    # 避免打完 tag 推到远端才被拒，或者在 dev 上发出一个「main 还没有」的版本。
+    $branch = (@(& $Git -C $Repo rev-parse --abbrev-ref HEAD) |
+        Select-Object -First 1).Trim()
+    if ($branch -ne 'main' -and $branch -notmatch '^release/') {
+        throw ("当前分支是 $branch；打 tag 只允许在 main 或 release/* 上。" +
+            "先把 dev 合进 main（或建 release 分支）再发。")
+    }
+
     # 脏工作树打 tag 会把未提交的改动留在“已发布”版本里，直接拒绝。
-    $porcelain = @(& $git -C $Repo status --porcelain)
+    $porcelain = @(& $Git -C $Repo status --porcelain)
     if ($porcelain.Count -gt 0) {
         throw ("工作树有未提交改动，先提交再打 tag：`n" + ($porcelain -join "`n"))
     }
 
-    $existing = @(& $git -C $Repo tag -l $tagName)
+    $existing = @(& $Git -C $Repo tag -l $tagName)
     if ($existing.Count -gt 0) {
         throw "tag 已存在：$tagName"
     }
 
-    & $git -C $Repo tag -a $tagName -m "PR2 Localization $Version"
+    & $Git -C $Repo tag -a $tagName -m "PR2 Localization $Version"
     if ($LASTEXITCODE -ne 0) {
         throw "创建 tag 失败：$tagName"
     }
     Write-Host "[release] 已创建 annotated tag：$tagName"
 
     if ($Push) {
-        & $git -C $Repo push origin $tagName
+        & $Git -C $Repo push origin $tagName
         if ($LASTEXITCODE -ne 0) {
             throw "推送 tag 失败：$tagName"
         }

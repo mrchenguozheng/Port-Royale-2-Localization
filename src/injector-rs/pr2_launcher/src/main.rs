@@ -150,7 +150,7 @@ fn run() -> Result<(), i32> {
         restore_original_fonts(&root);
         if mode == LaunchMode::Steam {
             println!("[PR2Loc] 已恢复原版状态，交给 Steam 启动原版游戏");
-            return launch_by_steam(&root, "已恢复原版状态", false);
+            return launch_by_steam(&root, "已恢复原版状态");
         }
         match create_process(&exe_path, &root, 0) {
             Ok(pi) => unsafe {
@@ -207,7 +207,7 @@ fn run() -> Result<(), i32> {
         }
         println!("[PR2Loc] Steam 版交给客户端启动：{}", steam_run_url());
         ensure_host(&root)?;
-        return launch_by_steam(&root, "Steam 版交给客户端启动", true);
+        return launch_by_steam(&root, "Steam 版交给客户端启动");
     }
 
     let font_dir = font_lang
@@ -413,9 +413,12 @@ fn watch_proxy(root: &Path, offset: u64, process: HANDLE) -> bool {
 ///
 /// `Program Files` 下的 `PR2.exe` 直接建进程会拿到错误 740（需要提升权限），
 /// 而 Steam 客户端本来就在自己的环境里启动它，顺便把 DRM 也处理掉。
-fn launch_by_steam(root: &Path, reason: &str, expect_proxy: bool) -> Result<(), i32> {
+///
+/// 这里只确认「已把请求交给 Steam」就返回：Steam 拉起的进程不是本进程的
+/// 子进程，启动器既看不到它的句柄，也无法判断代理有没有加载。等 15 秒去
+/// 轮询 `proxy.log` 只能得到「可能还没起来」的猜测，不能当成验证结果。
+fn launch_by_steam(root: &Path, reason: &str) -> Result<(), i32> {
     let url = steam_run_url();
-    let log_offset = proxy_log_len(root);
     let url_w = pr2_common::wide(&url);
     let open_w = pr2_common::wide("open");
     let shown = unsafe {
@@ -441,32 +444,7 @@ fn launch_by_steam(root: &Path, reason: &str, expect_proxy: bool) -> Result<(), 
     }
     println!("[PR2Loc] 已请求 Steam 启动：{url}");
     host_log_line(root, &format!("{reason}（{url}）"));
-
-    if !expect_proxy {
-        return Ok(());
-    }
-    if watch_proxy_log(root, log_offset, 30) {
-        println!("[PR2Loc] 宿主代理已进入 PR2.exe 进程");
-        host_log_line(root, "宿主代理已进入 PR2.exe 进程");
-    } else {
-        // Steam 是异步拉起的：没看到不等于失败，可能只是还没起到。
-        host_log(
-            root,
-            "15 秒内没看到代理写日志 —— Steam 可能还在启动，稍后看 logs\\proxy.log。",
-        );
-    }
     Ok(())
-}
-
-/// 不看进程句柄的等待：Steam 拉起的进程不是本进程的子进程。
-fn watch_proxy_log(root: &Path, offset: u64, polls: u32) -> bool {
-    for _ in 0..polls {
-        std::thread::sleep(std::time::Duration::from_millis(500));
-        if proxy_loaded_after(root, offset) {
-            return true;
-        }
-    }
-    false
 }
 
 /// 注入路径：挂起进程 → 远程 LoadLibrary → 恢复。只有 `--inject` 和
@@ -620,8 +598,8 @@ fn inject_dll(pi: &PROCESS_INFORMATION, dll: &Path) -> Result<(), i32> {
         });
         return Err(1);
     }
-    let k32 = unsafe { GetModuleHandleA(b"kernel32.dll\0".as_ptr()) };
-    let load_lib = unsafe { GetProcAddress(k32, b"LoadLibraryA\0".as_ptr()) };
+    let k32 = unsafe { GetModuleHandleA(c"kernel32.dll".as_ptr() as *const u8) };
+    let load_lib = unsafe { GetProcAddress(k32, c"LoadLibraryA".as_ptr() as *const u8) };
     let load_lib = match load_lib {
         Some(f) => f,
         None => {

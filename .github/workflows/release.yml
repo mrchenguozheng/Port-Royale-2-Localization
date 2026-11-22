@@ -190,10 +190,12 @@ jobs:
             $expected += "dist/PR2-$id-$env:VERSION.zip"
           }
           $expected += "dist/SHA256SUMS.txt"
+          $expected += "dist/release.json"
           foreach ($path in $expected) {
             if (-not (Test-Path -LiteralPath $path)) { throw "缺少发行产物：$path" }
           }
           Get-Content -LiteralPath "dist/SHA256SUMS.txt" | ForEach-Object { Write-Host $_ }
+          Get-Content -LiteralPath "dist/release.json" | Write-Host
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v7
@@ -202,6 +204,7 @@ jobs:
           path: |
             dist/*.zip
             dist/SHA256SUMS.txt
+            dist/release.json
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -213,3 +216,4 @@ jobs:
           files: |
             dist/*.zip
             dist/SHA256SUMS.txt
+            dist/release.json

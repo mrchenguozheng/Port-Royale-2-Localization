@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
-"""宿主 DLL 常量必须两处一致。
+"""宿主 DLL 的原版哈希只在 Rust 一处硬编码，文档抄的值必须与它一致。
 
-原版 ``Ascaron.Logging-2.6.dll`` 的大小和 SHA-256 同时被两份实现硬编码：
+替换/还原的唯一实现在 ``pr2_common/src/host.rs``；Python 侧
+（``pr2ctl/steam_host.py``）只保留文件名做只读判断，不再保存第二份
+大小/哈希。这里仍有两条连接线：
 
-- Rust 启动器 ``pr2_common/src/host.rs``（运行时挂载/还原的唯一实现）；
-- Python ``pr2ctl/steam_host.py``（部署工具链）。
-
-这两处谁也读不到谁：Rust 编译进 exe，Python 只在开发机上跑。任何一处改错
-都不会有编译错误，只会让某一侧的「是不是原版」判断失真 —— 于是可能把未知
-文件当原版备份，或者拒绝还原一份本来正确的原版。这个测试就是那条唯一的
-连接线：只要有一处落后于另一处，立刻失败。
+- 文档里抄了原版哈希的地方，必须等于 Rust 常量；
+- Python 用来找根目录 DLL 的文件名，必须与 Rust 一致。
 """
 
 import os
@@ -47,32 +44,16 @@ def rust_sha():
                    _read(HOST_RS), HOST_RS, "HOST_ORIGINAL_SHA256")
 
 
-def python_size():
-    return int(_search(r"HOST_ORIGINAL_SIZE\s*=\s*(\d+)",
-                       _read(STEAM_HOST_PY), STEAM_HOST_PY, "HOST_ORIGINAL_SIZE"))
-
-
-def python_sha():
-    return _search(r"HOST_ORIGINAL_SHA256\s*=\s*\(\s*\"(%s)\"\s*\)" % SHA_RE,
-                   _read(STEAM_HOST_PY), STEAM_HOST_PY, "HOST_ORIGINAL_SHA256")
-
-
 class TestHostConstants(unittest.TestCase):
-    def test_size_matches_across_implementations(self):
-        sizes = {"host.rs": rust_size(), "steam_host.py": python_size()}
-        self.assertEqual(len(set(sizes.values())), 1,
-                         "原版宿主 DLL 大小不一致：%s" % sizes)
-        size = next(iter(sizes.values()))
+    def test_size_is_sane(self):
+        size = rust_size()
         self.assertGreater(size, 0)
         self.assertLess(size, 10 * 1024 * 1024, "大小看着不像一个 DLL")
 
-    def test_sha_matches_across_implementations(self):
-        shas = {"host.rs": rust_sha(), "steam_host.py": python_sha()}
-        # 两处统一用大写：Rust 手写大写，Python 也大写。
-        uppercase = {name: value.upper() for name, value in shas.items()}
-        self.assertEqual(len(set(uppercase.values())), 1,
-                         "原版宿主 DLL 的 SHA-256 不一致：%s" % shas)
-        digest = next(iter(uppercase.values()))
+    def test_sha_is_uppercase(self):
+        digest = rust_sha()
+        self.assertEqual(digest, digest.upper(),
+                         "Rust 常量统一用大写，避免与文档比对时大小写漂移")
         self.assertEqual(len(digest), 64)
         self.assertRegex(digest, r"^[0-9A-F]{64}$")
 
@@ -87,11 +68,11 @@ class TestHostConstants(unittest.TestCase):
     def test_host_file_names_match(self):
         """文件名同样两处硬编码；拼错一个就会去校验一个不存在的文件。"""
         dll = "Ascaron.Logging-2.6.dll"
-        orig = "Ascaron.Logging-2.6.orig.dll"
         self.assertIn('HOST_DLL: &str = "%s"' % dll, _read(HOST_RS))
-        self.assertIn('HOST_ORIG: &str = "%s"' % orig, _read(HOST_RS))
         self.assertIn('HOST_DLL = "%s"' % dll, _read(STEAM_HOST_PY))
-        self.assertIn('HOST_ORIG = "%s"' % orig, _read(STEAM_HOST_PY))
+        # Python 只保留根目录文件名；.orig / host-backup 由 Rust 自己算。
+        self.assertNotIn("HOST_ORIG", _read(STEAM_HOST_PY))
+        self.assertNotIn("HOST_ORIGINAL_SHA256", _read(STEAM_HOST_PY))
 
 
 if __name__ == "__main__":

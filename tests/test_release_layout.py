@@ -82,7 +82,10 @@ class TestUiLayout(unittest.TestCase):
 
     def test_language_ui_files_exist_and_legacy_gone(self):
         ui = self._ui_dir()
-        self.assertTrue(os.path.isfile(os.path.join(ui, "ui.default.ini")))
+        # 源码里不再有 ui.default.ini：简体中文就是 ui.zh.ini，运行时默认文件
+        # 由 build_injector.ps1 从它生成，避免同一套中文文案存两份。
+        self.assertFalse(os.path.isfile(os.path.join(ui, "ui.default.ini")),
+                         "源码不该再有 ui.default.ini 副本（默认文件构建时生成）")
         for lang in self.LANGS:
             self.assertTrue(
                 os.path.isfile(os.path.join(ui, "ui.%s.ini" % lang)),
@@ -94,24 +97,26 @@ class TestUiLayout(unittest.TestCase):
 
     def test_language_ui_keys_and_placeholders_match(self):
         """各语言必须是同一套 key、同一组占位符，少一个就会显示成 key 名或丢字段。"""
-        base = self._values(os.path.join(self._ui_dir(), "ui.default.ini"))
+        base = self._values(os.path.join(self._ui_dir(), "ui.zh.ini"))
         for lang in self.LANGS:
             values = self._values(
                 os.path.join(self._ui_dir(), "ui.%s.ini" % lang))
             self.assertEqual(sorted(values), sorted(base),
-                             "ui.%s.ini 的 key 与 ui.default.ini 不一致" % lang)
+                             "ui.%s.ini 的 key 与 ui.zh.ini 不一致" % lang)
             for key, text in base.items():
                 self.assertEqual(
                     re.findall(r"%[a-z]+", values[key]),
                     re.findall(r"%[a-z]+", text),
-                    "ui.%s.ini 的 %s 占位符与默认文案不一致" % (lang, key))
+                    "ui.%s.ini 的 %s 占位符与简体中文不一致" % (lang, key))
 
-    def test_zh_language_file_matches_default(self):
-        """默认文件是 zh 的副本：两边值必须一致，避免开发回退与中文包漂移。"""
-        ui = self._ui_dir()
-        self.assertEqual(
-            self._values(os.path.join(ui, "ui.default.ini")),
-            self._values(os.path.join(ui, "ui.zh.ini")))
+    def test_build_generates_default_from_zh(self):
+        """运行时默认文件必须来自 ui.zh.ini，不能另存一份中文副本。"""
+        script = os.path.join(ROOT, "src", "build_injector.ps1")
+        with open(script, encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertIn("'ui.zh.ini'", text)
+        self.assertIn("'ui.default.ini'", text)
+        self.assertIn("Copy-Item -LiteralPath $Zh", text)
 
     def test_release_copies_package_language_as_default(self):
         src = tempfile.mkdtemp(prefix="pr2-ui-src-")
@@ -151,7 +156,7 @@ class TestUiLayout(unittest.TestCase):
         ini 少一个 key 时旧安装的界面会直接显示 key 名；Rust 少一个时旧包
         （没有新 key 的 ui.default.ini）会显示成 key 名。两边都得有。
         """
-        ini = os.path.join(ROOT, "src", "injector-rs", "ui", "ui.default.ini")
+        ini = os.path.join(ROOT, "src", "injector-rs", "ui", "ui.zh.ini")
         with open(ini, encoding="utf-8") as fh:
             text = fh.read().replace("\r\n", "\n")
 

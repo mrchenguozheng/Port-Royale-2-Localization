@@ -166,7 +166,8 @@ src/tools/
 | `install/pr2ctl/detect.py` | 版本识别、补丁状态、语言包盘点 |
 | `install/pr2ctl/launch.py` | 启动游戏与原版对比 |
 | `install/pr2ctl/settings.py` | 记住游戏目录与上次选择 |
-| `install/pr2ctl/steam_host.py` | Steam 版宿主 DLL 的备份、挂载与还原 |
+| `install/pr2ctl/host_action.py` | 部署末尾调 `PR2Localization.exe --mount`，卸载前调 `--restore`；不实现替换算法 |
+| `install/pr2ctl/steam_host.py` | 只读识别：宿主 DLL 是否存在、GOG/Steam 判版 |
 
 ## 约定
 

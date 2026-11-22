@@ -171,11 +171,7 @@ pub fn local_game_processes(root: &Path) -> Vec<u32> {
         loop {
             if exe_name(&entry).eq_ignore_ascii_case("PR2.exe") {
                 let handle = unsafe {
-                    OpenProcess(
-                        PROCESS_QUERY_LIMITED_INFORMATION,
-                        0,
-                        entry.th32ProcessID,
-                    )
+                    OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, entry.th32ProcessID)
                 };
                 if handle != 0 {
                     let mut buf = [0u16; 512];

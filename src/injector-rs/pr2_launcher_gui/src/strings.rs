@@ -29,7 +29,10 @@ const BUILTIN: &[(&str, &str)] = &[
     ("status.none", "No .txt in PR2Localization\\packs"),
     ("status.launched", "Localized game launched."),
     ("status.vanilla", "Original game launched."),
-    ("status.restored", "Restored the original host DLL and fonts."),
+    (
+        "status.restored",
+        "Restored the original host DLL and fonts.",
+    ),
     ("status.killed", "Ended %d PR2.exe process(es)."),
     (
         "confirm.restore",
@@ -251,8 +254,9 @@ mod tests {
 
     #[test]
     fn default_ui_keeps_restore_format_placeholders() {
-        // 包内只有按发包语言选好的 ui.default.ini；还原失败的弹框要把退出码和落盘日志末尾都填进去。
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/ui.default.ini");
+        // 简体中文是唯一来源（ui.zh.ini）；运行时默认文件由构建脚本从它生成。
+        // 还原失败的弹框要把退出码和落盘日志末尾都填进去。
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/ui.zh.ini");
         let mut values = HashMap::new();
         assert!(read_ini(&path, &mut values), "读不到 {}", path.display());
         let strings = Strings { values };

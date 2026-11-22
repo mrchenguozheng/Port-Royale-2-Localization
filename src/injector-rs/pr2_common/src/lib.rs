@@ -229,7 +229,7 @@ fn expand_env(value: &str) -> String {
 
 fn normalize_font_key(value: &str) -> String {
     let mut name = value.trim();
-    if let Some(pos) = name.rfind(|c| c == '\\' || c == '/') {
+    if let Some(pos) = name.rfind(['\\', '/']) {
         name = &name[pos + 1..];
     }
     name.trim_matches('"').to_ascii_lowercase()
@@ -403,11 +403,7 @@ fn language_line(line: &str) -> Option<Option<String>> {
     if !key.trim().eq_ignore_ascii_case("language") {
         return None;
     }
-    let value = value
-        .split(|c| c == ';' || c == '#')
-        .next()
-        .unwrap_or("")
-        .trim();
+    let value = value.split([';', '#']).next().unwrap_or("").trim();
     if value.is_empty() {
         Some(None)
     } else {
@@ -532,9 +528,7 @@ pub fn parse_pack_line(s: &str) -> Option<(u32, &str)> {
     }
     let hash = u32::from_str_radix(&hex[..end], 16).ok()?;
     let rest = hex[end..].trim_start_matches(' ');
-    let value = rest
-        .strip_prefix('=')
-        .or_else(|| rest.strip_prefix('\t'))?;
+    let value = rest.strip_prefix('=').or_else(|| rest.strip_prefix('\t'))?;
     Some((hash, value.trim_start_matches([' ', '\t'])))
 }
 
@@ -569,7 +563,10 @@ mod tests {
         assert_eq!(format_build_label("", "", ""), "dev");
         assert_eq!(format_build_label("v1.0.0", "", ""), "v1.0.0");
         // 写进 pack 头的是不带 v 的 1.0.0；两处都要显示成 v1.0.0。
-        assert_eq!(format_build_label("1.0.0", "c8aa6e3", ""), "v1.0.0 (c8aa6e3)");
+        assert_eq!(
+            format_build_label("1.0.0", "c8aa6e3", ""),
+            "v1.0.0 (c8aa6e3)"
+        );
         assert_eq!(
             format_build_label("v1.0.0", "c8aa6e3", "1"),
             "v1.0.0 (c8aa6e3+dirty)"
@@ -663,10 +660,7 @@ mod tests {
         fs::write(&path, "language=ja\nlanguage = zh\nother=1\n").unwrap();
 
         assert!(write_locale_language(&root, "ko"));
-        assert_eq!(
-            fs::read_to_string(&path).unwrap(),
-            "language=ko\nother=1\n"
-        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), "language=ko\nother=1\n");
     }
 
     #[test]

@@ -22,8 +22,7 @@ use std::sync::OnceLock;
 use pr2_common::log_dir;
 use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HANDLE, HMODULE};
 use windows_sys::Win32::System::LibraryLoader::{
-    DisableThreadLibraryCalls, GetModuleFileNameW, GetModuleHandleW, GetProcAddress,
-    LoadLibraryW,
+    DisableThreadLibraryCalls, GetModuleFileNameW, GetModuleHandleW, GetProcAddress, LoadLibraryW,
 };
 use windows_sys::Win32::System::Threading::{CreateThread, Sleep};
 
@@ -69,10 +68,9 @@ fn module_dir(hinst: HMODULE) -> PathBuf {
 
 fn log_line(dir: &Path, msg: &str) {
     let logdir = log_dir(dir);
-    if let Some(mut file) = pr2_common::open_append_capped(
-        &logdir.join("proxy.log"),
-        pr2_common::DEFAULT_MAX_BYTES,
-    ) {
+    if let Some(mut file) =
+        pr2_common::open_append_capped(&logdir.join("proxy.log"), pr2_common::DEFAULT_MAX_BYTES)
+    {
         let _ = writeln!(file, "{msg}");
     }
 }
@@ -85,17 +83,23 @@ pub extern "C" fn ensure_original() {
         return;
     }
 
-    let dir = SELF_DIR.get().cloned().unwrap_or_else(|| PathBuf::from("."));
+    let dir = SELF_DIR
+        .get()
+        .cloned()
+        .unwrap_or_else(|| PathBuf::from("."));
     let path = dir.join(HOST_ORIG);
     let h = unsafe { LoadLibraryW(wide(path.to_string_lossy().as_ref()).as_ptr()) };
     if h == 0 {
-        log_line(&dir, &format!("[host] original Log load failed: {}", unsafe {
-            GetLastError()
-        }));
+        log_line(
+            &dir,
+            &format!("[host] original Log load failed: {}", unsafe {
+                GetLastError()
+            }),
+        );
         return;
     }
 
-    match unsafe { GetProcAddress(h, b"Log\0".as_ptr()) } {
+    match unsafe { GetProcAddress(h, c"Log".as_ptr() as *const u8) } {
         Some(f) => {
             ORIGINAL_LOG.store(f as usize, Ordering::Release);
             log_line(&dir, "[host] original Log resolved");

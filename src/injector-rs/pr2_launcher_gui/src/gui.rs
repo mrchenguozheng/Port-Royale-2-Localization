@@ -8,24 +8,24 @@ use pr2_common::{
 };
 use windows_sys::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{
-    CreateFontW, DeleteObject, GetDC, GetDeviceCaps, GetStockObject, HDC, ReleaseDC, SetBkMode,
-    SetTextColor, CLEARTYPE_QUALITY, COLOR_BTNFACE, DEFAULT_CHARSET, DEFAULT_PITCH, FF_DONTCARE,
-    FW_BOLD, FW_NORMAL, HBRUSH, LOGPIXELSX, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, TRANSPARENT,
-    WHITE_BRUSH,
+    CreateFontW, DeleteObject, GetDC, GetDeviceCaps, GetStockObject, ReleaseDC, SetBkMode,
+    SetTextColor, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, COLOR_BTNFACE, DEFAULT_CHARSET,
+    DEFAULT_PITCH, FF_DONTCARE, FW_BOLD, FW_NORMAL, HBRUSH, HDC, LOGPIXELSX, OUT_DEFAULT_PRECIS,
+    TRANSPARENT, WHITE_BRUSH,
 };
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::HiDpi::{
     SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowLongPtrW,
-    LoadCursorW, MessageBoxW, PostQuitMessage, RegisterClassW, SendMessageW, SetWindowLongPtrW,
-    SetWindowTextW, ShowWindow, TranslateMessage, BS_DEFPUSHBUTTON, BS_PUSHBUTTON, CB_ADDSTRING,
-    CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CBS_DROPDOWNLIST, CREATESTRUCTW,
-    CW_USEDEFAULT, GWLP_USERDATA, IDC_ARROW, IDYES, MB_ICONERROR, MB_ICONWARNING, MB_YESNO, MSG,
-    SW_SHOW, WM_COMMAND, WM_CREATE, WM_CTLCOLORSTATIC, WM_DESTROY, WM_NCDESTROY, WM_SETFONT,
-    WS_CAPTION, WS_CHILD, WS_EX_CLIENTEDGE, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP,
-    WS_VISIBLE, WS_VSCROLL, WNDCLASSW,
+    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowLongPtrW, LoadCursorW,
+    MessageBoxW, PostQuitMessage, RegisterClassW, SendMessageW, SetWindowLongPtrW, SetWindowTextW,
+    ShowWindow, TranslateMessage, BS_DEFPUSHBUTTON, BS_PUSHBUTTON, CBS_DROPDOWNLIST, CB_ADDSTRING,
+    CB_GETCURSEL, CB_RESETCONTENT, CB_SETCURSEL, CREATESTRUCTW, CW_USEDEFAULT, GWLP_USERDATA,
+    IDC_ARROW, IDYES, MB_ICONERROR, MB_ICONWARNING, MB_YESNO, MSG, SW_SHOW, WM_COMMAND, WM_CREATE,
+    WM_CTLCOLORSTATIC, WM_DESTROY, WM_NCDESTROY, WM_SETFONT, WNDCLASSW, WS_CAPTION, WS_CHILD,
+    WS_EX_CLIENTEDGE, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+    WS_VSCROLL,
 };
 
 use crate::packs::{self, Pack};
@@ -83,11 +83,7 @@ pub fn run() {
     let dpi = dpi_for_system();
     let root = exe_dir();
     let strings = Strings::load(&root);
-    let init = Box::into_raw(Box::new(AppInit {
-        root,
-        strings,
-        dpi,
-    })) as *const c_void;
+    let init = Box::into_raw(Box::new(AppInit { root, strings, dpi })) as *const c_void;
 
     unsafe {
         let inst = GetModuleHandleW(ptr::null()) as HINSTANCE;
@@ -464,12 +460,7 @@ impl App {
             // 文件名一样，只能靠这里区分。
             let label = wide(&pack.display_label());
             unsafe {
-                SendMessageW(
-                    self.combo,
-                    CB_ADDSTRING,
-                    0,
-                    label.as_ptr() as LPARAM,
-                );
+                SendMessageW(self.combo, CB_ADDSTRING, 0, label.as_ptr() as LPARAM);
             }
         }
 
@@ -570,9 +561,7 @@ impl App {
                 return;
             }
             if !language_fonts_complete(&self.root, code) {
-                let text = self
-                    .strings
-                    .tf("error.font_missing", &[]);
+                let text = self.strings.tf("error.font_missing", &[]);
                 if !self.confirm(&text) {
                     return;
                 }
@@ -613,9 +602,7 @@ impl App {
             LaunchError::NoLauncher => self.show_error("error.no_launcher", &[]),
             LaunchError::NoLanguage => self.show_error("error.no_language", &[]),
             LaunchError::LaunchFailed => self.show_error("error.launch_failed", &[]),
-            LaunchError::ExitCode(code) => {
-                self.show_error("error.exit_code", &[Arg::Num(code)])
-            }
+            LaunchError::ExitCode(code) => self.show_error("error.exit_code", &[Arg::Num(code)]),
         }
     }
 
@@ -630,10 +617,7 @@ impl App {
             Err(code) => {
                 // 控制台被 CREATE_NO_WINDOW 藏起来了，失败原因从落盘日志里取。
                 let detail = process::host_log_tail(&self.root, 10, 900);
-                self.show_error(
-                    "error.restore_failed",
-                    &[Arg::Num(code), Arg::Str(detail)],
-                );
+                self.show_error("error.restore_failed", &[Arg::Num(code), Arg::Str(detail)]);
             }
         }
     }
@@ -664,9 +648,7 @@ impl App {
             self.show_error("error.kill_failed", &[Arg::Num(last_error)]);
             return;
         }
-        let text = self
-            .strings
-            .tf("status.killed", &[Arg::Num(killed)]);
+        let text = self.strings.tf("status.killed", &[Arg::Num(killed)]);
         self.set_status(&text);
     }
 
@@ -680,12 +662,7 @@ impl App {
         let text = self.strings.tf(key, args);
         let title = self.strings.t("title");
         unsafe {
-            MessageBoxW(
-                0,
-                wide(&text).as_ptr(),
-                wide(&title).as_ptr(),
-                MB_ICONERROR,
-            );
+            MessageBoxW(0, wide(&text).as_ptr(), wide(&title).as_ptr(), MB_ICONERROR);
         }
     }
 

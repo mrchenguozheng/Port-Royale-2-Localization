@@ -30,11 +30,7 @@ pub fn debug_log_enabled() -> bool {
 /// 打开一份 append 日志；文件已超过 `max_bytes` 时先滚成 `<name>.1`。
 pub fn open_append_capped(path: &Path, max_bytes: u64) -> Option<File> {
     rotate_if_oversized(path, max_bytes);
-    OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .ok()
+    OpenOptions::new().create(true).append(true).open(path).ok()
 }
 
 /// 打开一份「每次启动重写」的日志；单次内容由调用方自己限额。
@@ -73,10 +69,7 @@ mod tests {
     use std::io::Write;
 
     fn scratch_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "pr2-log-util-{tag}-{}",
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("pr2-log-util-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir

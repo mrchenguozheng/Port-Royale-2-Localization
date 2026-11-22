@@ -11,6 +11,12 @@
 标记写在 `src/packs/<语言>.toml` 的 `tags` 里，词表见
 [`pack_tags.py`](src/tools/pack/pack_tags.py)，出包时进 `README.txt` 与 `manifest.json`。
 
+**界面译文没有母语审校。** 启动器的九种界面文案（`zh/ja/ko/ru/pl/de/es/fr/it`）由 AI
+起草，只做了 key 与占位符的机械一致性校验，**没有经过母语者逐句校对**。这是当前
+已知短板，不是“已修复”。如果你是其中某门语言的母语玩家，愿意帮忙校对，请在项目的
+Issue 区贴出「界面截图 + 现在这行文案 + 建议改法」；游戏内语言包的同类问题也欢迎一并指出。
+支持范围和启动器界面选择见[运行契约](docs/运行契约.md)。
+
 ---
 
 ## 快速开始（玩家）
@@ -20,17 +26,18 @@
 挂载与还原都在启动器进程里完成（`pr2_common` 里的 Rust 实现），不调用 PowerShell，
 也不受「禁止执行脚本」这类组策略影响；失败原因写在 `PR2Localization\logs\host.log`。
 
-1. 确认是 **GOG 英文版 `1.1.2.3`**、Steam 英文版 `1.1.2.3`，或 GOG 法语版 `1.1.2.42`（三者都走宿主 DLL 入口）；
-2. 从 Release 下载对应语言的 zip，例如中文是 `PR2-zh-v1.0.0.zip`——**一个包两种版本都能用**；
-3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
-4. **双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
+1. 确认系统是 **Windows 10 / Windows 11**（不支持 Windows 7）；
+2. 确认是 **GOG 英文版 `1.1.2.3`**、Steam 英文版 `1.1.2.3`，或 GOG 法语版 `1.1.2.42`（三者都走宿主 DLL 入口）；
+3. 从 Release 下载对应语言的 zip，例如中文是 `PR2-zh-v1.0.0.zip`——**一个包两种版本都能用**；
+4. **全部解压到 `PR2.exe` 所在的游戏根目录**；
+5. **双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
    GOG 版由启动器挂载宿主 DLL 后直启游戏；Steam 版挂载后交给 Steam 客户端
    （`steam://rungameid/12470`）拉起，不用你回库里再点一次；
-5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... N entries, M overrides`。
-6. 想确认装的是哪一版：GUI 副标题与语言列表都带版本（`简体中文 · v1.0.0`），
+6. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... N entries, M overrides`。
+7. 想确认装的是哪一版：GUI 副标题与语言列表都带版本（`简体中文 · v1.0.0`），
    命令行 `PR2Localization.exe --version` 打印同一串；语言包改了什么看状态框第二行
    （`3590 条 · 未译 0 · 摘要 9cfa2931c1c2`）与包根 `README.txt` 的「语言包变化」段。
-7. 想回原版：点 GUI 上的「还原原版」，或 `PR2Localization.exe --restore`。
+8. 想回原版：点 GUI 上的「还原原版」，或 `PR2Localization.exe --restore`。
 
 GOG 与 Steam 的 `PR2.exe` 都静态导入同目录的 `Ascaron.Logging-2.6.dll`（导入表里只有 `Log`
 一个函数），两版的原版 DLL 还是同一份字节（`11,776 B` / SHA-256 相同），所以本地化入口
@@ -44,6 +51,10 @@ SHA-256，通过后备份成 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization
 发行包不再带任何 `.ps1`。根目录没有这个 DLL 的版本会退回注入启动，理由也写在这份日志里。
 挂载之后直接双击 `PR2.exe` 同样有效；没挂载时双击就是原版英文，挂载由启动器负责。
 `PR2Localization.exe` / `PR2LocalizationGUI.exe` 是两个版本共用的入口；原版 `PR2.exe` 本身不改。
+
+启动器界面按发包语言选一份：`PR2-zh` 用中文、`PR2-latin` 用德语（组内 de/es/fr/it 共用），
+包内换游戏语言不会换界面；源码九份 `ui.<lang>.ini`，`ui.default.ini` 由构建生成，不另存副本。
+包内布局、挂载语义与支持环境统一见[运行契约](docs/运行契约.md)。
 
 注意：
 
@@ -65,12 +76,14 @@ SHA-256，通过后备份成 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization
 **本项目用于给原版游戏套其他语言包；原版 `PR2.exe` 不改。** 语言包的键是条目 id，
 英文版与 GOG 法语版共用同一套 id，所以同一个包在两版里都能命中。
 
-| 游戏版本 | 状态 |
+| 项目 | 状态 |
 |---|---|
+| **Windows 10 / Windows 11** | ✅ 支持（64 位系统跑 32 位游戏） |
+| Windows 7 | ❌ 不支持，也没有验证过 |
 | **GOG 英文 `1.1.2.3`** | ✅ 已实测（宿主 `Ascaron.Logging-2.6.dll` 代理，中文界面） |
 | **Steam 英文 `1.1.2.3`** | ✅ 已实测（同上，启动交给 Steam 客户端） |
 | **GOG 法语 `1.1.2.42`** | ✅ 已实测（2026-11-22，pl 包；宿主代理生效，游戏内版本号仍是 `1.1.2.42`。该版比英文版多 42 条 `+++EMPTY+++` 空占位、少 19 条，这些条目按原样保留） |
-| 其他版本 | ❌ 不支持（零售版等不在验证范围） |
+| 其他游戏版本 | ❌ 不支持（零售版等不在验证范围） |
 
 两版都不尝试 `VERSION.dll` 自然加载：`PR2.exe` 静态导入
 `Ascaron.Logging-2.6.dll`，本项目的代理接管这个导出，并在工作线程里加载同目录
@@ -104,9 +117,14 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1
 .\release.ps1 -Version v1.0.0       # 每个分组一个 zip（GOG / Steam 通用）
 .\release.ps1 -Version v1.0.0 -Bundle zh     # 只出中文分组
 .\release.ps1 -Version v1.0.0 -Bundle latin  # 只出拉丁分组（de+es+fr+it）
-.\release.ps1 -Version v1.0.0 -Tag  # 额外创建 release-v1.0.0 本地 tag
+.\release.ps1 -Version v1.0.0 -AllowDirty    # 工作树脏时仍出包（版本头记 dirty）
+.\release.ps1 -Version v1.0.0 -Tag  # 额外创建 release-v1.0.0 本地 tag（要求干净树）
 .\release.ps1 -Version v1.0.0 -Tag -Push  # 再推送 tag
 ```
+
+发版默认拒绝脏工作树，`-Tag` 时无条件拒绝；`-Tag` 只允许在当前分支 `main` 或 `release/*`。
+`dist\` 除六个 zip 与 `SHA256SUMS.txt` 外，还会写 `release.json`（版本、提交、是否 dirty、
+分组与逐包 SHA-256），CI 与下游校验以它为准。
 
 低层脚本仍在 `src\build_injector.ps1`、`src\build_translation.ps1`；日常不需要直接调用。
 每个 zip 根目录带 `manifest.json`，记录两个目标 exe（GOG 与 Steam）、参考原文、
@@ -171,6 +189,7 @@ pr2-localization/
 
 | 文档 | 内容 |
 |---|---|
+| [运行契约](docs/运行契约.md) | 支持环境、包内布局、界面语言、宿主挂载的唯一口径 |
 | [玩家指南](docs/玩家指南.md) | 下载 zip、解压、启动、卸载、常见问题 |
 | [构建与安装](docs/构建与安装.md) | 构建/部署/启动、脚本一览 |
 | [译文与语言包](docs/译文与语言包.md) | TOML 格式、校验规则、两版键集与出包取值 |

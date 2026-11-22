@@ -5,7 +5,7 @@ import configparser
 
 from .base import *  # noqa: F401,F403
 from .detect import read_locale_language
-from . import steam_host
+from . import host_action, steam_host
 
 
 def edition_of(target, edition=None):
@@ -188,8 +188,8 @@ def deploy_steps(target, langs, edition=None):
                           os.path.join(target, PACK_DIR, name)))
 
     # 代理文件只在上面送到 PR2Localization\host\；换进根目录不在这里做——
-    # 替换必须校验原版、留备份、写完临时文件再换名，部署期由
-    # steam_host.swap_host 在末尾单独调用（运行时同一套动作在 Rust 启动器里）。
+    # 复制完文件后由 host_action 调 PR2Localization.exe --mount，用的就是
+    # 玩家运行时同一份 Rust 实现（pr2_common::host）。
     return steps
 
 
@@ -262,14 +262,6 @@ def deploy(target, langs=None, edition=None):
         )
     edition = edition_of(target, edition)
     has_host = steam_host.has_host(target)
-    try:
-        if has_host:
-            # 两版都带同名宿主 DLL，挂载不分版别。
-            # 先验证原版并建立 .orig / host-backup 备份；失败就完全不改目录。
-            steam_host.prepare_mount(target)
-    except steam_host.HostError as exc:
-        return False, "宿主 DLL 检查失败，未挂载：\n\n%s" % exc
-
     copied, same, failed = [], [], []
     try:
         for name in prune_stale_pack(target, langs):
@@ -284,12 +276,12 @@ def deploy(target, langs=None, edition=None):
             (copied if r == "copied" else same if r == "same" else failed).append(name)
 
         if has_host and not failed:
-            # 宿主替换是独立动作：校验原版 → 备份 → 写临时文件 → 校验 → 换名 → 再校验。
-            steam_host.swap_host(
-                target, os.path.join(RUNTIME, steam_host.HOST_DLL))
+            # 宿主动作只有一份实现：调用刚复制进去的启动器，与玩家手动
+            # 运行 PR2Localization.exe --mount 完全同一条路径。
+            ok, host_error = host_action.mount(target)
+            if not ok:
+                return False, "宿主 DLL 挂载失败（根目录 DLL 未被改动）：\n\n%s" % host_error
 
-    except steam_host.HostError as exc:
-        return False, "宿主 DLL 替换失败，原文件未改动：\n\n%s" % exc
     except PermissionError:
         return False, "权限不足。请确认游戏已关闭，且该目录允许写入。"
     except OSError as exc:
@@ -300,9 +292,9 @@ def deploy(target, langs=None, edition=None):
     extra = ""
     if has_host:
         extra = (
-            "\n\n宿主 DLL：原版已备份为 %s 和 %s；"
+            "\n\n宿主 DLL：原版已由启动器备份为 Ascaron.Logging-2.6.orig.dll "
+            "和 PR2Localization\\host-backup\\；"
             "还原时点启动器的「还原原版」（或运行 PR2Localization.exe --restore）。"
-            % (steam_host.HOST_ORIG, steam_host.HOST_BACKUP)
         )
     return True, (
         "已复制到：\n%s\n\n"
@@ -328,14 +320,6 @@ def run_deploy(target, langs, events, edition=None):
 
         edition = edition_of(target, edition)
         has_host = steam_host.has_host(target)
-        if has_host:
-            try:
-                steam_host.prepare_mount(target)
-                events.put(("line", "已校验并备份宿主 DLL"))
-            except steam_host.HostError as exc:
-                events.put(("line", "宿主检查失败，未挂载：%s" % exc))
-                events.put(("deploy_failed", ""))
-                return
 
         for name in prune_stale_pack(target, langs):
             events.put(("line", "移除 %s\\%s（本次不装）" % (PACK_DIR, name)))
@@ -359,14 +343,14 @@ def run_deploy(target, langs, events, edition=None):
                 return
 
         if has_host:
-            steam_host.swap_host(
-                target, os.path.join(RUNTIME, steam_host.HOST_DLL))
-            events.put(("line", "已校验原版、建立备份并替换宿主 DLL"))
+            events.put(("line", "调用启动器挂载宿主 DLL（校验原版、建立备份、原子替换）"))
+            ok, detail = host_action.mount(target)
+            if not ok:
+                events.put(("line", "宿主 DLL 挂载失败，根目录 DLL 未被改动：%s" % detail))
+                events.put(("deploy_failed", ""))
+                return
 
         events.put(("deploy_ok", target))
-    except steam_host.HostError as exc:
-        events.put(("line", "宿主 DLL 替换失败，原文件未改动：%s" % exc))
-        events.put(("deploy_failed", ""))
     except Exception as exc:                      # 兜底，别让线程静默死掉
         events.put(("line", "部署出错：%s" % exc))
         events.put(("deploy_failed", ""))

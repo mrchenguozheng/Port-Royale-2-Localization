@@ -15,27 +15,23 @@ use pr2_common::{
     open_truncate, override_path, pack_dir, pack_path, parse_pack_line, read_locale_language,
     valid_lang_code, FontMap, DEFAULT_MAX_BYTES,
 };
-use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HANDLE, HMODULE};
-use windows_sys::Win32::Storage::FileSystem::{
-    GET_FILEEX_INFO_LEVELS, WIN32_FIND_DATAA,
-};
+use windows_sys::Win32::Foundation::{CloseHandle, BOOL, HANDLE, HMODULE};
+use windows_sys::Win32::Storage::FileSystem::{GET_FILEEX_INFO_LEVELS, WIN32_FIND_DATAA};
 use windows_sys::Win32::System::LibraryLoader::{
     DisableThreadLibraryCalls, GetModuleHandleA, GetProcAddress,
 };
 use windows_sys::Win32::System::Memory::{
-    GetProcessHeap, HeapAlloc, MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_EXECUTE_READWRITE,
-    PAGE_GUARD, PAGE_NOACCESS, PAGE_READWRITE, VirtualProtect, VirtualQuery,
+    GetProcessHeap, HeapAlloc, VirtualProtect, VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_COMMIT,
+    PAGE_EXECUTE_READWRITE, PAGE_GUARD, PAGE_NOACCESS, PAGE_READWRITE,
 };
 use windows_sys::Win32::System::ProcessStatus::{EnumProcessModules, GetModuleBaseNameA};
 use windows_sys::Win32::System::Threading::{CreateThread, GetCurrentProcess, Sleep};
 
 const A2DLIB: &[u8] = b"A2dLib-2.20A.dll\0";
-const ADD_EXPORT: &[u8] =
-    b"?Add@CStringManager@NA2dLib@@QAEXPBDPBXI@Z\0";
+const ADD_EXPORT: &[u8] = b"?Add@CStringManager@NA2dLib@@QAEXPBDPBXI@Z\0";
 const LSR_EXPORT: &[u8] = b"?LoadStringRes@CW32StringManager@NA2dLib@@UAE_NIAAV?$basic_string@GV?$char_traits@G@_STL@@V?$allocator@G@2@@_STL@@@Z\0";
 const ADDSTR_EXPORT: &[u8] = b"?AddStringRes@CW32StringManager@NA2dLib@@MAE_NPBDPBXI@Z\0";
-const STRING_MGR_EXPORT: &[u8] =
-    b"?g_pStringMgr@NA2dLib@@3PAVCStringManager@1@A\0";
+const STRING_MGR_EXPORT: &[u8] = b"?g_pStringMgr@NA2dLib@@3PAVCStringManager@1@A\0";
 
 static REAL_ADD: AtomicUsize = AtomicUsize::new(0);
 static REAL_ADDSTR: AtomicUsize = AtomicUsize::new(0);
@@ -187,9 +183,7 @@ unsafe extern "system" fn hook_retry_thread(_: *mut c_void) -> u32 {
                 patch_add_iat();
             }
             install_resolve_hook();
-            if ADD_IAT_DONE.load(Ordering::Acquire)
-                && RESOLVE_HOOKED.load(Ordering::Acquire)
-            {
+            if ADD_IAT_DONE.load(Ordering::Acquire) && RESOLVE_HOOKED.load(Ordering::Acquire) {
                 return 0;
             }
         }
@@ -215,12 +209,7 @@ unsafe extern "thiscall" fn my_add(
     }
     let (payload, payload_len) = prepare_overlay(data, len);
     let real: AddFn = std::mem::transmute(real);
-    real(
-        overlay_manager(this),
-        name,
-        payload,
-        payload_len,
-    );
+    real(overlay_manager(this), name, payload, payload_len);
 }
 
 unsafe extern "thiscall" fn my_add_str(
@@ -239,12 +228,7 @@ unsafe extern "thiscall" fn my_add_str(
     }
     let (payload, payload_len) = prepare_overlay(data, len);
     let real: AddStrFn = std::mem::transmute(real);
-    real(
-        overlay_manager(this),
-        name,
-        payload,
-        payload_len,
-    )
+    real(overlay_manager(this), name, payload, payload_len)
 }
 
 unsafe fn overlay_manager(this: *mut c_void) -> *mut c_void {
@@ -256,10 +240,7 @@ unsafe fn overlay_manager(this: *mut c_void) -> *mut c_void {
     }
 }
 
-unsafe fn prepare_overlay(
-    data: *const c_void,
-    len: u32,
-) -> (*const c_void, u32) {
+unsafe fn prepare_overlay(data: *const c_void, len: u32) -> (*const c_void, u32) {
     if !VT_DONE.swap(true, Ordering::AcqRel) {
         install_vtable_hooks();
     }
@@ -477,13 +458,7 @@ unsafe fn install_resolve_hook() {
     let thunk = (h as *mut u8).wrapping_add(profile.thunk_rva);
     let detour = my_resolve as *const () as usize;
     let mut old = 0u32;
-    if VirtualProtect(
-        thunk as *const c_void,
-        5,
-        PAGE_EXECUTE_READWRITE,
-        &mut old,
-    ) != 0
-    {
+    if VirtualProtect(thunk as *const c_void, 5, PAGE_EXECUTE_READWRITE, &mut old) != 0 {
         let rel = detour as isize - (thunk as isize + 5);
         *thunk = 0xE9;
         ptr::write_unaligned(thunk.add(1) as *mut i32, rel as i32);
@@ -558,10 +533,7 @@ fn resolve_log(line: &str) {
         let path = log_dir(&exe_dir()).join("resolve.log");
         *guard = open_truncate(&path);
         if let Some(f) = guard.as_mut() {
-            let _ = writeln!(
-                f,
-                "=== CScreenStrings::ResolveByHash (menu/UI) gaps ==="
-            );
+            let _ = writeln!(f, "=== CScreenStrings::ResolveByHash (menu/UI) gaps ===");
         }
     }
     if let Some(f) = guard.as_mut() {
@@ -766,7 +738,7 @@ unsafe fn table_valid(d: *const u8, len: usize) -> bool {
     if len < 4 || !readable(d as *const c_void, len) {
         return false;
     }
-        let cnt = read_u32(d) as usize;
+    let cnt = read_u32(d) as usize;
     if cnt == 0 || cnt > 200000 {
         return false;
     }
@@ -804,7 +776,9 @@ fn pack_count() -> usize {
 }
 
 fn pack_locale() -> String {
-    pack().map(|p| p.locale.clone()).unwrap_or_else(|| "zh".into())
+    pack()
+        .map(|p| p.locale.clone())
+        .unwrap_or_else(|| "zh".into())
 }
 
 /// 覆盖文件定义了多少条。0 表示没有 `packs/overrides/<locale>.txt`。
@@ -985,7 +959,11 @@ unsafe fn patch_iat_in(
     }
     let opt = nt.add(24);
     let magic = read_u16(opt);
-    let dd = if magic == 0x10B { opt.add(96) } else { opt.add(112) };
+    let dd = if magic == 0x10B {
+        opt.add(96)
+    } else {
+        opt.add(112)
+    };
     let imp_rva = read_u32(dd.add(8)) as usize;
     if imp_rva == 0 {
         return false;
@@ -1064,7 +1042,7 @@ fn cstr_eq_ignore_ascii_case(p: *const u8, s: &[u8]) -> bool {
     loop {
         let a = unsafe { *p.add(i) };
         let b = if i < s.len() { s[i] } else { 0 };
-        if a.to_ascii_lowercase() != b.to_ascii_lowercase() {
+        if !a.eq_ignore_ascii_case(&b) {
             return false;
         }
         if a == 0 {
@@ -1085,11 +1063,7 @@ type FindFirstFileAFn = unsafe extern "system" fn(*const u8, *mut WIN32_FIND_DAT
 type GetFileAttributesExAFn =
     unsafe extern "system" fn(*const u8, GET_FILEEX_INFO_LEVELS, *mut c_void) -> BOOL;
 
-unsafe fn fopen_impl(
-    path: *const u8,
-    mode: *const u8,
-    real: &AtomicUsize,
-) -> *mut c_void {
+unsafe fn fopen_impl(path: *const u8, mode: *const u8, real: &AtomicUsize) -> *mut c_void {
     let real = real.load(Ordering::Acquire);
     if real == 0 {
         return ptr::null_mut();
@@ -1178,10 +1152,7 @@ unsafe extern "system" fn my_create_file_w(
     }
 }
 
-unsafe extern "system" fn my_find_first(
-    name: *const u8,
-    data: *mut WIN32_FIND_DATAA,
-) -> HANDLE {
+unsafe extern "system" fn my_find_first(name: *const u8, data: *mut WIN32_FIND_DATAA) -> HANDLE {
     let real = REAL_FIND_FIRST.load(Ordering::Acquire);
     if real == 0 {
         return 0;

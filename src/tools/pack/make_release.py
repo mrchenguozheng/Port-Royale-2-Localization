@@ -193,9 +193,10 @@ def copy_runtime(stage, log):
 def copy_ui(stage, ui_dir, default_lang, log):
     """界面默认文案跟随发包语言。
 
-    源目录里有 ``ui.default.ini``（开发回退）和每种语言的 ``ui.<lang>.ini``；
-    包里只放分组默认语言那一份，并统一命名成 ``ui.default.ini``。其他语言
-    文件不进包，避免同一份文案在包里存多份、日后各自漂移。
+    源目录里每种语言只有一份 ``ui.<lang>.ini``（简体中文就是 ``ui.zh.ini``，
+    没有额外的 ``ui.default.ini`` 副本）；包里只放分组默认语言那一份，并
+    统一命名成 ``ui.default.ini``。其他语言文件不进包，避免同一份文案在包里
+    存多份、日后各自漂移。
     """
     lang_ui = os.path.join(ui_dir, "ui.%s.ini" % default_lang)
     if not os.path.isfile(lang_ui):

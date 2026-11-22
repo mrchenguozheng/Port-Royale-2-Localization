@@ -1,39 +1,52 @@
 # Port Royale 2 Localization
 
 An external localization runtime for **Port Royale 2 (GOG English `1.1.2.3`,
-+Steam English `1.1.2.3` and GOG French `1.1.2.42`)**. Language packs replace the
+Steam English `1.1.2.3` and GOG French `1.1.2.42`)**. Language packs replace the
 game's UI text; the original `PR2.exe` is not modified.
 
 ## Supported languages
 
-| Language | In-game pack | Launcher UI |
+| Package | In-game packs | Launcher UI |
 |---|---|---|
-| Simplified Chinese | `zh` | `zh` |
-| Japanese | `ja` | `ja` |
-| Korean | `ko` | `en` |
-| Russian | `ru` | `en` |
-| German | `de` | `en` |
-| Spanish | `es` | `en` |
-| French | `fr` | `en` |
-| Italian | `it` | `en` |
-| Polish | `pl` | `en` |
+| `PR2-zh` | `zh` | `zh` |
+| `PR2-ja` | `ja` | `ja` |
+| `PR2-ko` | `ko` | `ko` |
+| `PR2-ru` | `ru` | `ru` |
+| `PR2-pl` | `pl` | `pl` |
+| `PR2-latin` | `de`, `es`, `fr`, `it` | `de` |
 | English (original) | built-in | `en` |
 
 `zh`, `ja`, `ko`, `ru`, `de`, `es`, `fr`, `it` and `pl` are the shipped
 language packs. English is the original game language and the fallback when a
-pack is missing. The launcher UI is available in `en`, `ja`, and `zh`.
+pack is missing. Each package ships exactly one `ui.default.ini` in its package
+language; switching the game locale inside `PR2-latin` does not switch the
+launcher UI. Source has nine `ui.<lang>.ini` files and `ui.default.ini` is
+generated at build time from `ui.zh.ini`.
 
-**Translation marks: fan-made · community · AI-assisted (preview).** These
-packs are unofficial: produced by the community, drafted with AI assistance and
-human review. Packs adapted from a retail localization are marked `retail`
-instead. Marks live in `src/packs/<lang>.toml` (`tags`), the vocabulary is in
+**Launcher UI has no native-speaker review.** The nine launcher translations
+were drafted with AI and only checked mechanically (same keys, same
+placeholders). They have not been proofread line by line by native speakers.
+If you are a native speaker of one of these languages and want to help, please
+open an issue with a screenshot, the current line and your suggested wording.
+The in-game packs are unofficial too: produced by the community, drafted with
+AI assistance and human review. Packs adapted from a retail localization are
+marked `retail` instead. Marks live in `src/packs/<lang>.toml` (`tags`), the
+vocabulary is in
 [`pack_tags.py`](src/tools/pack/pack_tags.py), and they are copied into the
 package `README.txt` and `manifest.json`.
+
+## Requirements
+
+**Windows 10 or Windows 11 only.** Windows 7 is not supported or tested.
+The game itself is 32-bit; no Python, Rust, PowerShell or script-execution
+policy is required on the player side. Verified game builds are GOG English
+`1.1.2.3`, Steam English `1.1.2.3` and GOG French `1.1.2.42`; other builds are
+out of scope.
 
 The GOG English `1.1.2.3` build is tested through `PR2LocalizationGUI.exe`. The
 Steam English `1.1.2.3` build is tested with the host-DLL proxy and a Chinese UI.
 The GOG French `1.1.2.42` build is tested the same way (Polish pack, host proxy
-active; the game still reports `1.1.2.42`). Other builds are out of scope.
+active; the game still reports `1.1.2.42`).
 
 On GOG, starting `PR2.exe` directly only shows the translation once the host
 proxy has been mounted; the GUI does that before launching. The old
@@ -75,6 +88,7 @@ All maintained documentation is in Chinese. This page is the only English
 entry point; it does not mirror the full documentation set.
 
 - [Documentation index](docs/README.md)
+- [Runtime contract](docs/运行契约.md) — package layout, host mount, UI language
 - [Chinese project README](README.md)
 - [Player guide](docs/玩家指南.md)
 - [Build & install](docs/构建与安装.md)

@@ -154,17 +154,19 @@ New-Item -ItemType Directory -Force -Path (Join-Path $DataOut 'logs') | Out-Null
 if (Test-Path -LiteralPath $UiSrc -PathType Container) {
     $UiOut = Join-Path $DataOut 'ui'
     New-Item -ItemType Directory -Force -Path $UiOut | Out-Null
-    # 界面文案按语言分文件（ui.default.ini + ui.<lang>.ini）。发行包按分组
-    # 默认语言复制一份改名成 ui.default.ini；用户 ui.ini 仍是按项覆盖层。
+    # 界面文案按语言分文件（ui.<lang>.ini），源码里没有 ui.default.ini：
+    # 简体中文就是 ui.zh.ini，这一份是唯一来源。运行时用的默认文件在构建时
+    # 从它复制生成，避免同一套中文文案在仓库里存两份、日后各自漂移。
     # 旧布局的 en/ja/zh.ini 不再被读取，留在 runtime 里会让旧安装带上过期文案。
-    $Default = Join-Path $UiSrc 'ui.default.ini'
-    if (-not (Test-Path -LiteralPath $Default -PathType Leaf)) {
-        Stop-WithError "缺界面默认文件：$Default"
+    $Zh = Join-Path $UiSrc 'ui.zh.ini'
+    if (-not (Test-Path -LiteralPath $Zh -PathType Leaf)) {
+        Stop-WithError "缺简体中文界面文案：$Zh"
     }
     Get-ChildItem -LiteralPath $UiSrc -Filter 'ui.*.ini' -File |
         ForEach-Object {
             Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $UiOut $_.Name) -Force
         }
+    Copy-Item -LiteralPath $Zh -Destination (Join-Path $UiOut 'ui.default.ini') -Force
     foreach ($lang in @('en', 'ja', 'zh')) {
         $stale = Join-Path $UiOut "$lang.ini"
         if (Test-Path -LiteralPath $stale -PathType Leaf) {

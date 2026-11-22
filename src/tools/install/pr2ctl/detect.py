@@ -2,7 +2,7 @@
 """pr2ctl.detect —— 版本识别、补丁状态、语言包盘点。"""
 
 from .base import *  # noqa: F401,F403
-from . import steam_host
+from . import host_action, steam_host
 
 def available_langs():
     r"""src\translations\ 下可编辑的语言代码，供勾选。
@@ -57,10 +57,9 @@ def remove_patch(target, only=None, edition=None):
     """
     del edition                                   # 版别不再决定还原与否
     if steam_host.has_host(target):
-        try:
-            steam_host.restore_host(target)
-        except steam_host.HostError as exc:
-            return False, [], ["宿主还原失败：%s" % exc]
+        ok, detail = host_action.restore(target)
+        if not ok:
+            return False, [], ["宿主还原失败：%s" % detail]
     removed, failed = [], []
     for rel, path, isdir in patch_items(target):
         if only is not None and rel not in only:
@@ -244,7 +243,7 @@ def patch_report(path):
                     "已替换" if replaced else "原版",
                     "含中日文字形的子集" if replaced else "未动"))
     if steam_host.has_host(path):
-        state, note = steam_host.status(path)
-        out.append((steam_host.HOST_DLL, state, note))
+        out.append((steam_host.HOST_DLL, "有",
+                    "挂载/还原由启动器执行；--restore 可换回原版"))
     return out
 

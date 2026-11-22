@@ -1,8 +1,8 @@
 # AGENTS.md — 项目维护指南
 
-> 面向接手本仓库的 agent。先读本页，再读 [文档索引](docs/README.md) 和
-> [当前架构与文件契约](docs/架构与重构.md)。本页只写维护规则和验证入口，不重复全部
-> 玩家文档。
+> 面向接手本仓库的 agent。先读本页，再读 [运行契约](docs/运行契约.md)（包内布局、挂载、
+> 界面语言与支持环境的唯一口径）与 [文档索引](docs/README.md)。本页只写维护规则和验证入口，
+> 不重复全部玩家文档。
 
 ## 项目边界
 
@@ -13,7 +13,12 @@
   挂载之后直接双击 `PR2.exe`（或从 Steam 库里点启动）也是有效路径——代理在工作线程里
   加载 `PR2LocalizationCore.dll`。
   不要再用 `VERSION.dll`：它属于 Windows 的 KnownDLLs，同目录代理永远进不去 `PR2.exe`。
-- **GOG 英文版 `1.1.2.3`、Steam 英文版 `1.1.2.3` 与 GOG 法语版 `1.1.2.42` 都已通过宿主 DLL
+- 支持环境是 **Windows 10 / Windows 11**（64 位系统跑 32 位游戏）；**Windows 7 不在支持范围**，
+  也没有验证过，不要再写「避开 PowerShell 2.0 所以兼容 Win7」这类推导。
+- 启动器界面九种语言（`zh/ja/ko/ru/pl/de/es/fr/it`）是 AI 起草 + 机械一致性校验，
+  **没有母语审校**。文档与 README 必须如实披露并留玩家反馈入口，不能写成“已审校”。
+  反馈方式：Issue 里贴截图、当前文案与建议改法；不要编造不存在的反馈链接。
+- 游戏版本：**GOG 英文版 `1.1.2.3`、Steam 英文版 `1.1.2.3` 与 GOG 法语版 `1.1.2.42` 都已通过宿主 DLL
   代理实测**（2026-11-22）。两个英文版的 `PR2.exe` 导入表逐项一致（21 个 DLL，
   `Ascaron.Logging-2.6.dll` 只导入 `Log`），原版 `Ascaron.Logging-2.6.dll` 也是同一份字节
   （11,776 B / 同一个 SHA-256），所以启动路径不按版别分叉，`detect_edition` 只用来显示版别。
@@ -46,7 +51,7 @@
 | 路径 | 作用 |
 |---|---|
 | `src/injector-rs/` | Rust workspace：`pr2_common`、`pr2_proxy`、`pr2_text_source`、`pr2_launcher`、`pr2_launcher_gui`、`pr2_host_proxy` |
-| `src/injector-rs/ui/` | GUI 界面文案：`ui.<lang>.ini` 按语言一份，`ui.default.ini` 是 zh 副本兼开发回退；打包按分组默认语言选一份 |
+| `src/injector-rs/ui/` | GUI 界面文案：`ui.<lang>.ini` 九份；**源码没有 `ui.default.ini`**，构建从 `ui.zh.ini` 生成运行时默认，发行包只放分组默认语言一份 |
 | `src/translations/` | 唯一手改译文层：`zh.toml`、`ja.toml` 等 |
 | `src/tools/` | 语言包编译、字体、部署、校验和分析工具 |
 | `build/` | 构建产物；`build/runtime/` 是可整体复制的安装源 |
@@ -63,10 +68,15 @@ Rust 产物：
 
 发行包使用宿主代理 `Ascaron.Logging-2.6.dll`：
 替换/还原在 `pr2_common::host` 里（`mount_host` / `restore_host`），两版同一条路径。
-Python 的 `pr2ctl/steam_host.py` 只在部署期用，常量由 `tests/test_host_constants.py`
-与 Rust 交叉断言。代理不是游戏原文件；原版备份为
+部署期 `pr2ctl` **不再实现一套替换算法**：复制完文件后以游戏目录为 cwd 调
+`PR2Localization.exe --mount`，卸载前调 `--restore`。`pr2ctl/steam_host.py` 只保留
+`has_host` / `detect_edition` 两个只读判断；`tests/test_host_constants.py` 仍交叉断言
+Rust 与 Python 的文件名、原版大小与 SHA-256。代理不是游戏原文件；原版备份为
 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\Ascaron.Logging-2.6.dll`，
 不要在未校验原版大小/哈希时覆盖。
+
+部署的顺序是**先复制、最后挂载**：挂载失败时根目录 DLL 未改动，但本地化文件已经落盘；
+文案要如实说明，不要写成“失败就完全没改目录”。
 
 ## 不可破坏的契约
 
@@ -106,8 +116,13 @@ Python 的 `pr2ctl/steam_host.py` 只在部署期用，常量由 `tests/test_hos
 .\release.ps1 -Version v1.0.0       # 每个分组一个 zip（GOG/Steam 通用）
 .\release.ps1 -Version v1.0.0 -Bundle zh     # 只出中文分组
 .\release.ps1 -Version v1.0.0 -Bundle latin  # 只出拉丁分组（de+es+fr+it）
+.\release.ps1 -Version v1.0.0 -AllowDirty    # 工作树脏时仍出包；版本头记 dirty
 .\release.ps1 -Version v1.0.0 -Tag -Push  # 出包并创建/推送 release-<版本> tag
 ```
+
+`release.ps1` 默认拒绝脏工作树；`-Tag` 时无条件拒绝，且只允许在 `main` 或 `release/*`
+分支打 tag。每次出包会先删同版本旧 zip，再写 `dist/release.json`（version / commit /
+dirty / pack_mode / languages / 逐包 sha256 与大小）；CI 的 Release 校验依赖它。
 
 日常入口在仓库根目录；`src\build_injector.ps1`、`src\build_translation.ps1`
 仍是低层实现，排查单步问题时才直接调用。
@@ -121,14 +136,21 @@ Python 的 `pr2ctl/steam_host.py` 只在部署期用，常量由 `tests/test_hos
 归一化 → 校验 → 编译 → 部署 → 核对；默认处理日文和中文，使用上一次游戏目录。
 
 ```powershell
-.\check.ps1
+.\check.ps1                          # 全量：Rust 闸门 + Python 检查 + 单测
+.\check.ps1 -SkipRust                # 只跑 Python 部分
 ```
 
-等价于：
+Rust 闸门按顺序执行，任一失败即停：
 
 ```powershell
-python src\tools\check.py
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+# 再按 cargo metadata 的成员逐个 cargo check --locked -p <member>
 ```
+
+逐个 crate `cargo check` 是为了防止 workspace 特性合并掩盖单个 crate 缺特性；
+找不到 cargo 时 `check.ps1` 会提示用 `-SkipRust`，CI 不允许跳过。
 
 `check.py` 会先跑 `config_check.py` 检查 locale/packs/translations/ui/font-map 的语言配置，再跑译文规范、断行、微调层、**不译清单对账**（`analysis/keep_audit.py`：登记的 id 存在、登记项没被译过、结构性不可译的没占着待译）、文档一致性、**脚本地图**（`tools_check.py`：每个脚本都有 docstring、都登记在 `src/tools/README.md`），最后跑单测。`release.ps1` 在构建前也会跑同一项配置检查；`make_release.py` 直接调用时也会先检查。
 
@@ -156,7 +178,7 @@ git diff --check
 ## 改动流程
 
 1. **先确认状态**：`git status --short`、当前提交、工作树是否已有未提交改动。
-2. **先读契约**：改 GUI/构建/语言包前读 `docs/架构与重构.md`；改译文前读
+2. **先读契约**：改 GUI/构建/语言包前读 `docs/运行契约.md`；改译文前读
    `docs/译文与语言包.md`。
 3. **做最小改动**：不要顺手重写无关模块；不要把历史重构细节重新塞回当前架构文档。
 4. **同步文档**：接口、文件路径、构建命令、支持范围或已知问题变化时，更新中文文档及相关入口。

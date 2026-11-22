@@ -126,9 +126,9 @@ fn read_meta(path: &Path) -> PackMeta {
                 let raw = trim(value);
                 if !raw.is_empty()
                     && raw.len() <= 32
-                    && raw.chars().all(|c| {
-                        c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+' | '_')
-                    })
+                    && raw
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+' | '_'))
                 {
                     meta.version = raw.to_string();
                 }

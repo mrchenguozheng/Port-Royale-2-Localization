@@ -12,6 +12,7 @@ crate-type = ["cdylib"]
 pr2_common = { path = "../pr2_common" }
 windows-sys = { version = "0.52", features = [
     "Win32_Foundation",
+    "Win32_Security",
     "Win32_System_LibraryLoader",
     "Win32_System_SystemInformation",
     "Win32_System_Threading",

@@ -11,9 +11,12 @@
 
 ## 当前契约
 
+**运行包内布局、宿主挂载、界面语言与支持环境以[运行契约](运行契约.md)为唯一口径**；
+下面只是索引摘要，细节不再逐处重复。
+
 - 发行口径统一在[发行规范](发行规范.md)：版本号 `vMAJOR.MINOR.PATCH[-pre]`，
   语言全集读 `src/release-languages.txt`，打包分组读 `src/release-bundles.toml`
-  （同一份字体能共用的语言进一个 zip），`dist/` 只留 zip 与 `SHA256SUMS.txt`。
+  （同一份字体能共用的语言进一个 zip），`dist/` 只留 zip、`SHA256SUMS.txt` 与 `release.json`。
 - 发行包按分组各出一个 zip，一个包同时面向 GOG / Steam，GOG 不带 `VERSION.dll`；
   包里的 `packs/<语言>.txt` 是**同一份并集包**（GOG 由启动器注入、Steam 由宿主 DLL 代理，
   两条路径读同一个文件）。
@@ -26,7 +29,12 @@
 - 字体：实际字体平铺在 `PR2Localization/fonts/`；包内放 `font-map.default.ini`，
   用户 `font-map.ini` 按项覆盖默认；不按语言开子目录，不覆盖根目录原版字体；
   只认 fonts 里的文件，不读系统字体目录。
-- 启动器界面：读 `PR2Localization/ui/ui.default.ini`。源文件按语言分 `ui.<lang>.ini`，发行包把分组默认语言那份复制成 `ui.default.ini`；用户 `ui.ini` 按项覆盖。
+- 启动器界面：源码按语言分 `ui.<lang>.ini` 九份，**没有 `ui.default.ini` 源文件**；
+  构建从 `ui.zh.ini` 生成默认，发行包把分组默认语言那份复制成 `ui.default.ini`；
+  用户 `ui.ini` 按项覆盖。latin 分组默认德语，包内切 es/fr/it 不换界面。
+- 支持环境：**Windows 10 / 11**；不支持 Windows 7。
+- 宿主挂载与还原只有一份实现（`pr2_common::host`），部署期由 `pr2ctl` 调用
+  游戏目录里的 `PR2Localization.exe --mount/--restore`，Python 不再复制替换算法。
 - 运行时版本：`src/injector-rs/pr2_common/src/lib.rs`；发行包根目录 `RUNTIME-VERSION`。
 
 旧的 `launcher.ini`、`lang/aliases.ini` 已移除；旧语言包不再兼容。
@@ -41,6 +49,7 @@
 
 | 文档 | 内容 |
 |---|---|
+| [运行契约](运行契约.md) | **唯一口径**：支持环境、包内布局、界面语言、宿主挂载、locale |
 | [构建与安装](构建与安装.md) | 构建、部署、启动、脚本一览 |
 | [发行规范](发行规范.md) | 版本号、发行语言集、产物与校验和、tag、门禁 |
 | [发行版](发行版.md) | 两个发行包的结构、字体、语言设置、GitHub Actions |
@@ -75,6 +84,7 @@
 | [说话人分级](说话人分级.md) | 角色语气分级 |
 | [语音与映射](语音与映射.md) | 语音文件清单、语音 ↔ hash ↔ NPC 映射 |
 | [待定](待定.md) | 尚未完成或未验证的方向 |
+| [待定：已关闭](待定-已关闭.md) | 已结案问题的结论与证据（只读） |
 | [历史重构记录](历史重构记录.md) | 已完成的阶段重构、旧路由变化和 C++ 迁移对照 |
 | [历史归档](archive/README.md) | 各语言批次审计、一次性报告与已落地计划（只读） |
 
