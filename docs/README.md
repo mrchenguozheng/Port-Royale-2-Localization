@@ -2,9 +2,9 @@
 
 [项目 README](../README.md) · [维护指南](../AGENTS.md) · [English](../README.en.md)
 
-> **GOG 英文版 `1.1.2.3` 已实测；Steam 英文版 `1.1.2.3` 已通过宿主 DLL 代理实测。**
-> GOG 正式入口是 `PR2LocalizationGUI.exe`，不要直接双击 `PR2.exe`；Steam 用
-> `Ascaron.Logging-2.6.dll` + `PR2HostMount.ps1`，不再使用 `VERSION.dll`。
+> **GOG 英文版 `1.1.2.3`、Steam 英文版 `1.1.2.3` 与 GOG 法语版 `1.1.2.42` 都已实测**
+> **（宿主 DLL 代理）。** GOG 正式入口是 `PR2LocalizationGUI.exe`，不要直接双击 `PR2.exe`；
+> Steam 与 GOG 都用 `Ascaron.Logging-2.6.dll` + `PR2HostMount.ps1`，不再使用 `VERSION.dll`。
 
 文档只维护中文一套。英文入口只有根目录 [README.en.md](../README.en.md)，不镜像完整文档。
 

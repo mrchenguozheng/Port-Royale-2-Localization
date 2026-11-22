@@ -17,7 +17,10 @@
 
 不需要安装器、不需要 Python、不需要编译。
 
-1. 确认是 **GOG 英文版 `1.1.2.3`**，或 Steam 英文版 `1.1.2.3`（两者都走宿主 DLL 入口）；
+挂载脚本 `PR2HostMount.ps1` 由系统自带的 Windows PowerShell 执行，不用另装 PowerShell 7；
+PowerShell 被组策略锁死或系统里没有时，挂载会失败，`PR2Localization\logs\host.log` 会记下原因。
+
+1. 确认是 **GOG 英文版 `1.1.2.3`**、Steam 英文版 `1.1.2.3`，或 GOG 法语版 `1.1.2.42`（三者都走宿主 DLL 入口）；
 2. 从 Release 下载对应语言的 zip，例如中文是 `PR2-zh-v1.0.0.zip`——**一个包两种版本都能用**；
 3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
 4. **双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
