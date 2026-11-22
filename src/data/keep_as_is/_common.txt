@@ -1,0 +1,87 @@
+# 有意不译（各语言共用）：一行一条 id<TAB>理由。
+# 各语言的按键名/表头写在 <lang>.txt，本文件只放各语言一致的条目。
+# 理由取值：credit=职员表、save-name=存档文件名模板、id=脚本/资源标识。
+
+# —— 职员表：人名与公司名，译了就是错（ja 曾把 36 个人名音译成片假名，已回退）。
+0x00de9847	credit
+0x022732a3	credit
+0x03b332c8	credit
+0x0bb1e5a2	credit
+0x1e6d4cee	credit
+0x1e6d4cf1	credit
+0x1e6d4cf7	credit
+0x1e6d4d62	credit
+0x1e6d4dcf	credit
+0x1e6d4dd1	credit
+0x1e6d4ddb	credit
+0x1e6d4ddf	credit
+0x1e6d4de4	credit
+0x1e6d4f97	credit
+0x1e6d4f98	credit
+0x1e6d4f99	credit
+0x1e6d5075	credit
+0x1e6d507f	credit
+0x1e6d5089	credit
+0x1e6d5157	credit
+0x1e6d51d1	credit
+0x1e6d51d8	credit
+0x1e6d51e0	credit
+0x1e6d5320	credit
+0x1e6d5474	credit
+0x1e6d547a	credit
+0x1e6d54de	credit
+0x1e6d54df	credit
+0x1e6d5565	credit
+0x1ef2f997	credit
+0x26f8a6cd	credit
+0x2e544e31	credit
+0x32a42f59	credit
+0x32a45e9d	credit
+0x32a7507a	credit
+0x3327e51b	credit
+0xffa196bf	credit
+0xfc512ea5	credit
+
+# —— 场景存档名模板：`scenario00X - @I$Idx$` 写盘成 .pr2 文件名，必须纯 ASCII。
+0x00faaebe	save-name
+0x0f8d30f8	save-name
+0x29afdf82	save-name
+0x31054c65	save-name
+0xdf829351	save-name
+0xf2682c84	save-name
+0x33c2c533	save-name
+0xd0d692a5	save-name
+
+# —— 其他标识。
+0xf43f2856	id
+
+# —— 字体资源名与键名：写进 res 里当标识用，译了引擎找不到文件。
+0x15d892f9	id
+0x0760fe3e	id
+
+# —— 2004 竞赛任务书（版本差）：英文 GOG 基准里 15 个键全是资源标识串
+# （`IDM_CONTEST_01_2004_LOG_00…06_TEXT/HDR`、`POPUP_HDR`），英文/法文两版都
+# 没有正文；正文只在德语零售版里。**不照零售版写正文** —— 这一版原文是标识，
+# 出包也就原样出标识，译文层一律回退成标识串。
+# 详见 docs\译文与语言包.md「有意不译清单」。
+0xfcded04c	id
+0x0204aa22	id
+0x0b715286	id
+0x25940110	id
+0x3426834a	id
+0xc7537475	id
+0xccd432a5	id
+0xd10b5c36	id
+0xdac343f7	id
+0xdb66b4df	id
+0xe47b2bb8	id
+0xee331379	id
+0xf7eafb3a	id
+0xf93656ab	id
+0x0f3a5490	id
+
+# —— 字形覆盖测试串：`"``°§$%&()=?…"²³€` 是拿来验字体缺不缺字的，
+# 改一个符号就失去了用途（ja/de/es/fr 的 ²³€ 缺字形结论也是照原串测的）。
+0x11f0398f	id
+0xd49a1310	id
+0xf562862e	id

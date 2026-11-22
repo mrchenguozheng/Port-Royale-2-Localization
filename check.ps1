@@ -4,7 +4,9 @@
 # ============================================================
 [CmdletBinding()]
 param(
-    [switch]$NoPause
+    [switch]$NoPause,
+    # 临时跳过某门语言（可重复）：.\check.ps1 -SkipLang pl,de
+    [string[]]$SkipLang = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,7 +21,9 @@ if ($LASTEXITCODE -ne 0 -or -not $Python) {
 
 Push-Location $Root
 try {
-    & $Python (Join-Path $Root 'src\tools\check.py')
+    $args = @((Join-Path $Root 'src\tools\check.py'))
+    foreach ($code in $SkipLang) { $args += @('--skip-lang', $code) }
+    & $Python @args
     $code = $LASTEXITCODE
 } finally {
     Pop-Location

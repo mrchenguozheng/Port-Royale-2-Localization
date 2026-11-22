@@ -4,7 +4,7 @@
 
 [English](README.en.md) · [中文文档索引](docs/README.md)
 
-**Supported languages:** Simplified Chinese (`zh`), Japanese (`ja`); English (`en`) is the original game language and fallback. See [README.en.md](README.en.md#supported-languages).
+**Supported languages:** Simplified Chinese (`zh`), Japanese (`ja`), Korean (`ko`), Russian (`ru`), German (`de`), Spanish (`es`), French (`fr`), Italian (`it`); English (`en`) is the original game language and fallback. See [README.en.md](README.en.md#supported-languages).
 
 **译文标记：** 同人制作 · 社区协作 · AI 辅助（预览版）。这批译文不是官方本地化，
 由社区制作、AI 辅助起草并人工审校；旧语言包若改自原版零售文件会单独标 `retail`。
@@ -123,7 +123,9 @@ pr2-localization/
 │     ├─ install/            pr2ctl 构建/部署/启动实现
 │     └─ data/               人名、地名、分词词典
 ├─ assets/fonts/original/    游戏原版拉丁字体（gitignore，需自己导出）
-├─ build/                    产物：runtime/（部署根）、preview/（查看）、cache/（缓存）
+├─ build/                    本地产物（gitignore）：runtime/（部署根）、variants/（逐版包）、
+│                            qa/（报告与一次性脚本）、cache/（字体缓存）、
+│                            notes/（提交草稿、批次映射、改前快照、试验数据）、tools/（清理脚本）
 ├─ docs/                     说明文档
 ├─ glossary/                 术语对照表
 └─ tests/                    规则与 API 单测
@@ -153,22 +155,17 @@ pr2-localization/
 
 ## 文档
 
+完整分类见[文档索引](docs/README.md)，这里只列最常用的几篇：
+
 | 文档 | 内容 |
 |---|---|
-| [文档索引](docs/README.md) | 按“玩家/构建/开发/数据”分类，先查这里 |
 | [玩家指南](docs/玩家指南.md) | 下载 zip、解压、启动、卸载、常见问题 |
 | [构建与安装](docs/构建与安装.md) | 构建/部署/启动、脚本一览 |
-| [新语言](docs/新语言.md) | 从字体准备到翻译、部署、验收、出包 |
-| [发行版](docs/发行版.md) | 按语言出 zip、Noto 字体、GitHub Actions |
-| [字体与分发](docs/字体与分发.md) | 字体映射、Noto 许可、禁止分发 |
-| [注入组件](docs/注入组件.md) | 运行时原理、hook 三条路径、源码职责、编译 |
-| [架构与重构](docs/架构与重构.md) | 分层、文件契约、重构记录、已知边界 |
-| [译文与语言包](docs/译文与语言包.md) | toml 格式、校验规则、加一种语言 |
-| [术语对照](glossary/README.md) | 货物/船只/军衔/城镇等专名的英中对照，可扩展到别的语言 |
+| [译文与语言包](docs/译文与语言包.md) | TOML 格式、校验规则、两版键集与出包取值 |
+| [注入组件](docs/注入组件.md) | 运行时原理、hook 三条路径、源码职责 |
+| [发行规范](docs/发行规范.md) | 版本号、发行语言集、产物与校验和、tag |
 | [待定事项](docs/待定.md) | 尚未完成或未验证的方向 |
-| [说话人分级](docs/说话人分级.md) | 哪些台词能确定说话人、哪些只能猜（附逐条 CSV） |
-| [翻译局限](docs/翻译局限.md) | 哪些问题无法根除、实际验证到几成、要不要 hook |
-| [语体拟改清单](docs/语体拟改清单.md) | 能确定说话人的 41 条 + 待人工的 668 条 |
+| [术语对照](glossary/README.md) | 货物/船只/军衔/城镇等专名的英中对照 |
 
 ---
 
@@ -193,16 +190,30 @@ pr2-localization/
 
 ## 语言完成度
 
-| 语言 | 条目 | 状态 |
-|---|---|---|
-| 中文 `zh` | 3548 | ✅ 全部完成（含排版与占位符校验） |
-| 日语 `ja` | 3548 | ✅ 全部完成（3370 条译文 + 178 条「原样保留」） |
-| 英文/法文 | 3548 | 参照原文（`src/orig/`），不生成语言包 |
+八门语言共用一套 3548 条基准（`en.gog_1.1.2.3`），"有意不译"指按键名、职员表、游戏
+标题、场景文件名模板、纯符号与空占位、以及**原文就是本语言写法**的专名（城镇名、
+海盗与姓氏池）这类按规则保留原文的条目（登记在 `src/data/keep_as_is/`），不计入待译。
+所以「可译 = 3548 − 有意不译」，百分比按 **已译 / 可译** 算。数字会变，取实时值时跑
+`python src\tools\translate.py status --lang <代码>`；清单本身对不对账，
+`python src\tools\analysis\keep_audit.py` 会逐语言点名。
 
-日语里的「原样保留」指本来就不该翻译、与英文原文相同的 178 条：纯符号/数字、
-引擎编号（`IDM_CONTEST_…`）、按键名（`ESC`/`CTRL`/`F10`）、版权声明与制作方名称。
-其中编译时强制写回英文原文的，只有 `compile_pack.py` 的 `KEEP_ORIGINAL` 表
-（目前是版权声明一条）。
+| 语言 | 已译 / 可译 | 待译 | 有意不译 |
+|---|---|---|---|
+| 中文 `zh` | 3428 / 3428（100%） | 0 | 120 |
+| 日语 `ja` | 3451 / 3451（100%） | 0 | 97 |
+| 韩语 `ko` | 3454 / 3454（100%） | 0 | 94 |
+| 俄语 `ru` | 3439 / 3439（100%） | 0 | 109 |
+| 德语 `de` | 3015 / 3015（100%） | 0 | 533 |
+| 西班牙语 `es` | 3099 / 3099（100%） | 0 | 449 |
+| 法语 `fr` | 2988 / 2988（100%） | 0 | 560 |
+| 波兰语 `pl` | 2904 / 2904（100%） | 0 | 644 |
+| 意大利语 `it` | 3007 / 3007（100%） | 0 | 541 |
+| 英文 / 法文原文 | 参照（`src/orig/`） | 不出包 |
+
+「有意不译」多出来的那部分正是各语言自己登记的本语言按键名/表头。日语里的「原样
+保留」指本来就不该翻译、与英文原文相同的条目：纯符号/数字、引擎编号
+（`IDM_CONTEST_…`）、按键名（`ESC`/`CTRL`/`F10`）、版权声明与制作方名称。
+编译时强制写回英文原文的只有 `compile_pack.py` 的 `KEEP_ORIGINAL` 表（目前一条）。
 
 ## 路径约定
 

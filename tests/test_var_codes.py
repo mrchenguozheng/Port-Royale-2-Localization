@@ -33,8 +33,13 @@ class TestVariableCodeTable(unittest.TestCase):
             self.assertGreater(info["refs_en"], 0)
         for name, info in self.vars_.items():
             self.assertTrue(info["meaning"].strip())
-            self.assertTrue(info["codes"])
-            self.assertTrue(info["example"].strip())
+            if info["codes"]:
+                self.assertTrue(info["example"].strip())
+            else:
+                # 语料里一条都不剩的变量名（`PirateGold` 只出现在德语零售版
+                # 任务书里，那批正文不译之后就没了）只保留含义，统计写 0。
+                self.assertEqual(info["refs_all"], 0)
+                self.assertEqual(info["example"], "")
 
     def test_known_pairs(self):
         # 大小写是类型名的一部分：G 货物 / g 金币、N 人名 / n 国家

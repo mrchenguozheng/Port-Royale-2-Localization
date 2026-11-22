@@ -70,5 +70,71 @@ class TestVariableCodeCase(unittest.TestCase):
         self.assertEqual(V.tokens(en), V.tokens(zh))
 
 
+class TestVersionOwnValueWins(unittest.TestCase):
+    """出包按「这一版原文是什么」判：标识串原样、`+++EMPTY+++` 原样。
+
+    两版键集不同（en 3548 / fr 3571 / 并集 3590），各自出包时行必须与**本版**
+    原文对得上：本版是 `IDM_…` 开发标识的条目原样写出（哪怕译文层写了正文），
+    本版是空占位的条目写回 `+++EMPTY+++`。另一版有正文的键才吃译文。
+    """
+
+    def _pack(self, orig, translated):
+        from translate import BASE_LANG
+        h = "0xaaaa1111"
+        b = {"id": "en.test", "keys": [h], "table": {h: orig}, "primary": True}
+        engine = {h: translated}
+        by_hash = {h: {"id": h, BASE_LANG: orig}}
+        errors, warnings, fatal = [], [], []
+        res = C._pack_lines("zh", b, engine, by_hash, set(), False,
+                            errors, warnings, fatal)
+        lines, n, n_ph, n_empty, n_ident, _meta = res
+        return lines, (n, n_ph, n_empty, n_ident), errors, warnings
+
+    def test_identifier_origin_is_written_verbatim(self):
+        lines, counts, errors, warnings = self._pack(
+            "IDM_CONTEST_01_2004_LOG_00_TEXT", "到下面的城市去领取许可证：")
+        self.assertEqual(counts, (0, 0, 0, 1))
+        self.assertIn("IDM_CONTEST_01_2004_LOG_00_TEXT", lines[-1])
+        self.assertEqual(errors, [])
+        self.assertEqual(warnings, [])
+
+    def test_empty_origin_is_written_back(self):
+        lines, counts, errors, _w = self._pack("+++EMPTY+++", "这里有正文")
+        self.assertEqual(counts, (0, 0, 1, 0))
+        self.assertIn("+++EMPTY+++", lines[-1])
+        self.assertEqual(errors, [])
+
+    def test_real_text_origin_uses_translation(self):
+        lines, counts, errors, _w = self._pack("Give me %1 gold.", "给我 %1 枚金币。")
+        self.assertEqual(counts[0], 1)
+        self.assertIn("给我 %1 枚金币。", lines[-1])
+        self.assertEqual(errors, [])
+
+    def test_allcaps_word_is_not_a_resource_id(self):
+        # fr 版 0x274e9455 的原文是 "ATTENTION"：全大写、9 个字母，形状上像标识，
+        # 但没有下划线，是界面词，必须照译。
+        lines, counts, errors, _w = self._pack("ATTENTION", "注意")
+        self.assertEqual(counts[0], 1)
+        self.assertIn("注意", lines[-1])
+        self.assertEqual(errors, [])
+
+
+class TestUnionBaseline(unittest.TestCase):
+    """并集基线：键集取并，重复键只留一份，顺序先主基线再其余独有。"""
+
+    def test_union_merges_keys_without_duplicates(self):
+        b1 = {"id": "en.test", "keys": ["0x1", "0x2"],
+              "table": {"0x1": "A", "0x2": "B"}, "primary": True}
+        b2 = {"id": "fr.test", "keys": ["0x2", "0x3"],
+              "table": {"0x2": "B 的另一版", "0x3": "+++EMPTY+++"}, "primary": False}
+        u = C.union_baseline([b1, b2])
+        self.assertEqual(u["keys"], ["0x1", "0x2", "0x3"])
+        # 重复键取先出现那份的原文（主基线），不制造第二份正文
+        self.assertEqual(u["table"]["0x2"], "B")
+        self.assertEqual(u["table"]["0x3"], "+++EMPTY+++")
+        self.assertTrue(u["primary"])
+        self.assertIn("union", u["id"])
+
+
 if __name__ == "__main__":
     unittest.main()

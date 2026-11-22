@@ -28,7 +28,7 @@ F1 法语分歧      英文有否定而法语没有（或反之）—— 交给�
 ----
     python src\\tools\\analysis\\de_crosscheck.py
     python src\\tools\\analysis\\de_crosscheck.py --json build\\qa\\de_crosscheck.json
-    python src\\tools\\analysis\\de_crosscheck.py --md docs\\德语交叉核对.md
+    python src\\tools\\analysis\\de_crosscheck.py --md docs\\archive\\德语交叉核对.md
     python src\\tools\\analysis\\de_crosscheck.py --only E1,E4
 """
 import argparse

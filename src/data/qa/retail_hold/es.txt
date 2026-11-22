@@ -1,0 +1,29 @@
+# 零售参照里「结构能修、但内容对不上」的行：人工看过，判定保留现译，不导。
+# 一行 `id<TAB>理由`；`#` 开头是注释。改动这里要有对应的说明（见 docs/译文与语言包.md）。
+
+0x010faa75	零售这段是另一套内容（96x64 BMP、Ascaron 默认安装路径），不是基准这段说明；现值已按 en/fr 重译，不导
+0xc77f4d5e	零售把地名写成 Charles Town（少一个 e），en/fr 都是 Charles Towne；现值整行就是 [town:Charles Towne]，不导
+0xd607db6d	零售把 Charles Towne 写成 Charles Town；现值的地名用译名表展开，不导
+0xe6490f96	零售把 Turk Islands 留成英文原名、只提到一次，现值三处都用 [town:Turk Islands]（显示 Islas Turcas），不导
+0xd3ac64cd	零售这行是另一段牙买加摘要（不含 Port Royale），现值忠实基准那句，不导
+0xdaeb0489	零售这行没写 Port Royale（只写「海战视图」），现值忠实基准，不导
+0x2ee8bb91	零售这行是另一套教程文字（没有 Cartagena），现值忠实基准，不导
+0xf725f230	零售这段与基准不是同一段教程，且 Cartagena 出现两次、无法交代现值那处标注，不导
+0x00bff5f3	零售只写一次 Cartagena（建两个织机那句没写），承载不了现值的三处标注，不导
+0x353cae5f	零售只写两处 Port Royale（其中一处是 Port Royale 2），承载不了现值的三处标注，不导
+
+# 第二类：零售的标点/引号不合西语规范，或漏了整句；现值已按 en/fr 精修。
+# 这几行不进 hold 会被下一次 --write 用零售版盖回去（实测盖掉过一轮）。
+0xd07dbe34	零售这行的引号是半角起、弯引号收（“auge”），现值已统一成对弯引号，不导
+0xd4cd0f44	零售这行的引号半角，且 “Trinidad” 后多一个空格；现值已修并补了葡语引语的 ¡，不导
+0xd4cd0fb6	零售这行两处 Bermuda 三角都用半角引号，现值统一弯引号，不导
+0x08e78a8c	零售这行 “Recesión” 是半角起、弯引号收，现值已统一，不导
+0xeb1ce06f	零售这行自加了一句 en 没有的话，creyó 写成 creó、educamente 写成 educadamente；现值已按 en/fr 整句重写，不导
+0xd9720472	零售末句 “Te pagaré @g$Reward$!” 缺 ¡，现值已补，不导
+0xddbd4de4	零售第二句 “La fiesta… empezará hoy mismo!” 缺 ¡，现值已补，不导
+0x03d3dcd8	零售漏了 “Estaba en la cocina en ese momento.” 整句，且引号半角、“¡Lo juro!” 大写；现值已按 en/fr 补句改写，不导
+
+# 第三类：零售与现值同时短一截（en 基准有整段、两边都没有），现值已按 en 补齐。
+0x084340c7	零售与现值都缺 en 的首尾两段（挑战简介、可用选项），现值已按 en 补齐，不导
+0x2efebfe6	零售与现值都缺 en 的「抵达即结束」那句，现值已补，不导
+0xe1cdc367	零售与现值都缺 en 的 “Here's another tip:” 整段与 F1 帮助页说明，现值已补，不导

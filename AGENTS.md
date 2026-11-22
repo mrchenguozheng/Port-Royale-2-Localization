@@ -106,7 +106,7 @@ Steam 发行包额外使用宿主代理 `Ascaron.Logging-2.6.dll` 和
 python src\tools\check.py
 ```
 
-`check.py` 会先跑 `config_check.py` 检查 locale/packs/translations/ui/font-map 的语言配置，再跑单测。`release.ps1` 在构建前也会跑同一项配置检查；`make_release.py` 直接调用时也会先检查。
+`check.py` 会先跑 `config_check.py` 检查 locale/packs/translations/ui/font-map 的语言配置，再跑译文规范、断行、微调层、**不译清单对账**（`analysis/keep_audit.py`：登记的 id 存在、登记项没被译过、结构性不可译的没占着待译）、文档一致性、**脚本地图**（`tools_check.py`：每个脚本都有 docstring、都登记在 `src/tools/README.md`），最后跑单测。`release.ps1` 在构建前也会跑同一项配置检查；`make_release.py` 直接调用时也会先检查。
 
 Rust 构建与测试：
 
@@ -142,6 +142,9 @@ git diff --check
 ## 文档维护规则
 
 - 文档索引只有 `docs/README.md` 一个入口。根目录新增文档必须进入这个索引。
+- 一次性的批次报告、某门语言某一轮的审计、以及已经落地的计划，写进
+  [docs/archive/](docs/archive/README.md) 并在其索引里登记；正式文档只留结论与当前
+  做法，不堆历史过程。归档只读，新结论回写到正式文档。
 - 当前架构写“现在是什么、文件契约、边界、已知问题”；已完成的阶段重构、旧路由变化、
   旧 C++ 文件对照写入 [历史重构记录](docs/历史重构记录.md)。
 - 文档只维护中文一套；唯一英文文件是根目录 `README.en.md`，只写项目入口和支持语言，

@@ -213,9 +213,16 @@ def render_toml(meta, codes, vars_, st):
         L.append("[var.%s]" % name)
         L.append("meaning = %s" % _toml_q(info.get("meaning", "")))
         L.append("codes = [%s]" % ", ".join(_toml_q(c) for c in cs))
-        L.append("refs_en = %d" % sum(st["en_by_name"][name].values()))
-        L.append("refs_all = %d" % sum(st["by_name"][name].values()))
-        ex = st["example"][(cs[0], name)].replace("\r", " ").replace("\n", " ")
+        refs_en = sum(st["en_by_name"][name].values())
+        refs_all = sum(st["by_name"][name].values())
+        L.append("refs_en = %d" % refs_en)
+        L.append("refs_all = %d" % refs_all)
+        refs_en = sum(st["en_by_name"][name].values())
+        refs_all = sum(st["by_name"][name].values())
+        # 变量名可能一条引用都不剩：`@g$PirateGold$` 只出现在零售版任务书里，
+        # 那批正文不译之后全库就没有引用了。表里保留它的含义，统计写 0。
+        ex = st["example"].get((cs[0], name), "") if cs else ""
+        ex = ex.replace("\r", " ").replace("\n", " ")
         L.append("example = %s" % _toml_q(ex[:110]))
         L.append("in_original = %s" % ("true" if name in st["in_orig"] else "false"))
         note = _note(name, cs, st)
@@ -281,7 +288,8 @@ def render_md(meta, codes, vars_, st):
                      % (n, vars_[n].get("meaning", ""), mark,
                         st["en_by_name"][n][code]))
         L.append("")
-        ex = st["example"][(code, sorted(st["by_code"][code])[0])]
+        ex = st["example"].get((code, sorted(st["by_code"][code])[0]), "") \
+            if st["by_code"][code] else ""
         ex = ex.replace("\r", " ").replace("\n", " ")
         L.append("样例：`%s`" % ex[:150].replace("|", "\\|"))
         L.append("")

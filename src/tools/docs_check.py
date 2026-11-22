@@ -26,6 +26,7 @@ INFER_DOC = os.path.join(ROOT, "docs", "界面映射", "09-推断-连续键区.m
 LINT = os.path.join(ROOT, "src", "tools", "analysis", "text_lint.py")
 README = os.path.join(ROOT, "docs", "README.md")
 MAPS_README = os.path.join(ROOT, "docs", "界面映射", "README.md")
+ARCHIVE_README = os.path.join(ROOT, "docs", "archive", "README.md")
 
 
 def _md_files(d):
@@ -162,6 +163,7 @@ def main():
     items = [
         ("docs 索引", lambda: check_index(README, "docs/README.md")),
         ("界面映射索引", lambda: check_index(MAPS_README, "界面映射/README.md")),
+        ("归档索引", lambda: check_index(ARCHIVE_README, "docs/archive/README.md")),
         ("界面映射编号", lambda: check_numbering(os.path.join(ROOT, "docs", "界面映射"),
                                               "界面映射")),
         ("码表与语料", check_drift),

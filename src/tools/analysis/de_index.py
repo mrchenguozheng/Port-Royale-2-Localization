@@ -21,7 +21,7 @@
 输出
     build/qa/de_index.json   机读全量
     build/qa/de_index.csv    表格（Excel 可直开）
-    docs/德语条目索引.md      摘要：分组、同文簇、改动清单
+    docs/archive/德语条目索引.md      摘要：分组、同文簇、改动清单
 """
 
 import argparse
@@ -174,9 +174,9 @@ def write(rows, dup_groups, de, base, base_rev):
            "| `dup` | 同文簇号（德语正文完全相同） |",
            "| `terms` | 基线定案术语的命中次数 |", ""]
 
-    io.open("docs/德语条目索引.md", "w", encoding="utf-8", newline="\n").write("\n".join(md))
+    io.open("docs/archive/德语条目索引.md", "w", encoding="utf-8", newline="\n").write("\n".join(md))
     print("条目 %d 条；同文簇 %d 组；改写 %d 条" % (len(rows), len(dup), len(changed)))
-    print("写出 build\\qa\\de_index.json / build\\qa\\de_index.csv / docs\\德语条目索引.md")
+    print("写出 build\\qa\\de_index.json / build\\qa\\de_index.csv / docs\\archive\\德语条目索引.md")
 
 
 def main():

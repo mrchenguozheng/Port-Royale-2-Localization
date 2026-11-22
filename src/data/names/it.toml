@@ -1,0 +1,146 @@
+# 译名表骨架：键与 src/data/names/entities.toml 一致，由 table_sync 生成。
+# 值空 = 待译；值写成原文本身 = 决定不译（例如厂商名）。
+
+# ["Port Royale"] town：加勒比海城镇；自由模式可自选母港，不是固定母港
+["Port Royale"]
+default = "Port Royale"
+
+# ["Charleston"] town：地图上在 Fort Caroline 东北方，不能与 Charles Towne 合并
+["Charleston"]
+default = "Charleston"
+
+# ["Charles Towne"] town：地图上在 Cat Island 与 Turk Islands 之间
+["Charles Towne"]
+default = "Charles Towne"
+
+# ["Tortuga"] town：剧本 8「托尔图加的麻烦」即此城
+["Tortuga"]
+default = "Tortuga"
+
+# ["Cartagena"] town
+["Cartagena"]
+default = "Cartagena"
+
+# ["Havana"] town
+["Havana"]
+default = "L'Avana"
+
+# ["Margarita"] town
+["Margarita"]
+default = "Margarita"
+
+# ["Miles Sound System"] vendor：版权声明，不译；compile_pack 的 KEEP_ORIGINAL 也会强制保留
+["Miles Sound System"]
+default = "Miles Sound System"
+
+# ["Port Royal"] place：牙买加旧首府（1661—1692 为英属牙买加首都），与游戏城镇 Port Royale 同名不同实体；中文都作「皇家港」，标注用来固定来源
+["Port Royal"]
+default = "Port Royal"
+
+# ["Guadeloupe"] town：城镇；竞赛模式任务的城市列名之一
+["Guadeloupe"]
+default = "Guadalupa"
+
+# ["Biloxi"] town：城镇；副王驻地，与皇家港同列
+["Biloxi"]
+default = "Biloxi"
+
+# ["St. Augustine"] town：城镇；竞赛模式任务的城市列名之一
+["St. Augustine"]
+default = "St. Augustine"
+
+# ["Grand Bahama"] town：城镇；海盗落脚点叙述里出现
+["Grand Bahama"]
+default = "Grand Bahama"
+
+# ["Turk Islands"] town：城镇；既是群岛也是城镇名，译文统一
+["Turk Islands"]
+default = "Isole Turks"
+
+# ["Corpus Christi"] town：诗谜谜底；登记来给 [riddle:] 用
+["Corpus Christi"]
+default = "Corpus Christi"
+
+# ["New Orleans"] town：诗谜谜底；登记来给 [riddle:] 用
+["New Orleans"]
+default = "Nuova Orleans"
+
+# ["Pensacola"] town：诗谜谜底；登记来给 [riddle:] 用
+["Pensacola"]
+default = "Pensacola"
+
+# ["Fort Caroline"] town：诗谜谜底；登记来给 [riddle:] 用
+["Fort Caroline"]
+default = "Fort Caroline"
+
+# ["Cancun"] town：诗谜谜底；登记来给 [riddle:] 用
+["Cancun"]
+default = "Cancún"
+
+# ["Gibara"] town：诗谜谜底；登记来给 [riddle:] 用
+["Gibara"]
+default = "Gibara"
+
+# ["San Juan"] town：城镇；诗谜谜底，也出现在竞赛模式任务的城市列名里。德语零售版把其中三条列名写作 St. Juan（六份基线里只有德语如此），按同一城镇处理，不再单列实体
+["San Juan"]
+default = "San Juan"
+
+# ["Vera Cruz"] town：诗谜谜底；登记来给 [riddle:] 用
+["Vera Cruz"]
+default = "Veracruz"
+
+# ["Roatán"] town：诗谜谜底；登记来给 [riddle:] 用
+["Roatán"]
+default = "Roatán"
+
+# ["Cayman"] town：诗谜谜底；登记来给 [riddle:] 用
+["Cayman"]
+default = "Isole Cayman"
+
+# ["Santo Domingo"] town：诗谜谜底；登记来给 [riddle:] 用
+["Santo Domingo"]
+default = "Santo Domingo"
+
+# ["Providence"] town：诗谜谜底；登记来给 [riddle:] 用
+["Providence"]
+default = "Providence"
+
+# ["Santa Marta"] town：诗谜谜底；登记来给 [riddle:] 用
+["Santa Marta"]
+default = "Santa Marta"
+
+# ["Maracaibo"] town：诗谜谜底；登记来给 [riddle:] 用
+["Maracaibo"]
+default = "Maracaibo"
+
+# ["Caracas"] town：诗谜谜底；登记来给 [riddle:] 用
+["Caracas"]
+default = "Caracas"
+
+# ["Port of Spain"] town：诗谜谜底；登记来给 [riddle:] 用
+["Port of Spain"]
+default = "Port of Spain"
+
+# ["Gibraltar"] town：诗谜谜底；登记来给 [riddle:] 用
+["Gibraltar"]
+default = "Gibilterra"
+
+# ["San Thoma"] town：诗谜谜底；登记来给 [riddle:] 用
+["San Thoma"]
+default = "San Thoma"
+
+# ["Martinique"] town：诗谜谜底；登记来给 [riddle:] 用
+["Martinique"]
+default = "Martinica"
+
+# ["Tampa"] town：诗谜谜底；登记来给 [riddle:] 用
+["Tampa"]
+default = "Tampa"
+
+# ["Eleuthera"] town：诗谜谜底；登记来给 [riddle:] 用
+["Eleuthera"]
+default = "Eleuthera"
+
+# ["Tampico"] town：诗谜谜底；登记来给 [riddle:] 用
+["Tampico"]
+default = "Tampico"

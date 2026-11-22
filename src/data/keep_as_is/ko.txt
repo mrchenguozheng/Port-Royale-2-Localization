@@ -1,0 +1,34 @@
+# 有意不译：这些条目的正确译法就是保持英文原样，算进度时不计入待译。
+# 一行一条：id<TAB>理由。理由取值：key=按键名、label=界面键名、
+# id=脚本/资源标识、credit=职员表。
+#
+# 加进来的前提是「译了反而错」。text_lint 会核对名单内的值仍等于英文：
+# 一旦有人把它们译了，报「名单内但已改动」，免得 ESC 变成 「이스케이프」。
+0x3a9ca757	key
+0x3a9ca758	key
+0x3a9ca759	key
+0x3a9ca75a	key
+0x3a9ca75b	key
+0x3a9ca75c	key
+0x3a9ca75d	key
+0x3a9ca75e	key
+0x3a9ca75f	key
+0xdf25dd97	key
+0xdf25dd98	key
+0xdf25dd99	key
+0xfe7b3bb8	key
+0x0660b7fc	key
+0x0778871e	key
+0x0827193c	key
+0x26c7c8f3	key
+0xf7a07dad	key
+0xcc84b185	label
+0xee28f112	label
+0xe20f846a	label
+0xe547bff1	label
+0x384261bc	id
+0x0b319f8c	credit
+0x2e351896	credit
+0x32a6539f	credit
+0x1e6d5402	credit
+# 各语言共用的条目（职员表、场景存档名、存档名模板）在 _common.txt，本文件只写本语言独有的。

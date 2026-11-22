@@ -31,11 +31,77 @@ def make_fmt(sets):
     return fmt, punct
 
 
+#: 汉字口径（CJK 统一表意文字 + 扩展 A）。分类、标点、排版都问这个正则。
+CJK_RX = re.compile(r"[\u4e00-\u9fff\u3400-\u4dbf]")
+
 _ASCII_CACHE = {}
+
+#: 半角记号内部允许出现的字符：字母数字与 `., : / \ - _ +`。
+#: 中文句子里夹着的 `Port Royale 2`、`22.8MB`、`12:30`、`14x14aaFHk.res`
+#: 都是「一个整体记号」，里面的半角标点不能当句子标点处理。
+ASCII_TOKEN_CHARS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                             "abcdefghijklmnopqrstuvwxyz"
+                             "0123456789.,:/-\\_+")
+
+#: 半角标点所处的语境。`CTX_CJK` 才是「中文句子里的标点」，其余都保留半角。
+CTX_CJK = "cjk"        # 中文语境（「你好, 世界」里的逗号）
+CTX_WORD = "word"      # 纯字母词：Port、Royale
+CTX_NUM = "number"     # 纯数字与小数点：22.8
+CTX_TIME = "time"      # 数字:数字，如 12:30
+CTX_IDENT = "ident"    # 混合标识：1.0.0、14x14aaFHk.res、rc.1
+
+
+def ascii_token(text, i):
+    """切出 `text[i]` 所在的半角记号，返回 (start, end)。
+
+    `i` 不在记号内部时返回 (i, i+1)。`ASCII_TOKEN_CHARS` 是唯一的判定口径：
+    标点要不要全角化、断点能不能落在这里，都问它，避免各处各写一套。
+    """
+    if not (0 <= i < len(text)) or text[i] not in ASCII_TOKEN_CHARS:
+        return i, min(len(text), i + 1)
+    lo = i
+    while lo > 0 and text[lo - 1] in ASCII_TOKEN_CHARS:
+        lo -= 1
+    hi = i + 1
+    while hi < len(text) and text[hi] in ASCII_TOKEN_CHARS:
+        hi += 1
+    return lo, hi
+
+
+def is_ascii_ch(ch):
+    """这个字符是不是「可见的半角字符」（空格与空串不算）。
+
+    `zh_space` 判断「断点是不是落在半角记号内部」也问这个函数：口径只有一份。
+    """
+    return bool(ch) and ch.isascii() and not ch.isspace()
+
+
+def punct_context(text, i):
+    """`text[i]` 这个半角标点处在什么语境里，供全角化判断。"""
+    if not (0 <= i < len(text)) or text[i] not in ASCII_TOKEN_CHARS:
+        return CTX_CJK
+    lo, hi = ascii_token(text, i)
+    tok = text[lo:hi]
+    if len(tok) <= 1:
+        return CTX_CJK
+    if tok.replace(":", "").isdigit() and ":" in tok:
+        return CTX_TIME
+    if tok.replace(".", "").isdigit():
+        return CTX_NUM
+    if any(ch.isdigit() for ch in tok):
+        return CTX_IDENT
+    if tok.replace(".", "").replace("'", "").isalpha():
+        return CTX_WORD
+    return CTX_IDENT
 
 
 def fix_ascii_punct(text, table, cjk_rx):
-    """把 CJK 文本里的半角标点换成全角；不动纯 ASCII 的格式串。"""
+    """把 CJK 文本里的半角标点换成全角；不动纯 ASCII 的记号。
+
+    豁免不再靠「左右相邻都是字母数字」这种临时判断，而是问 `punct_context()`：
+    只要这个标点落在某个半角记号内部（词、数字、时间、标识），就原样保留。
+    别的模块要判断「这是不是记号内部」时用同一个函数，口径只有一份。
+    """
     if not cjk_rx.search(text):
         return text
     key = tuple(sorted(table))
@@ -46,12 +112,7 @@ def fix_ascii_punct(text, table, cjk_rx):
 
     def repl(m):
         ch = m.group(0)
-        i = m.start()
-        prev = text[i - 1] if i else ""
-        nxt = text[i + 1] if i + 1 < len(text) else ""
-        if ch == ":" and prev.isdigit() and nxt.isdigit():
-            return ch
-        if prev.isascii() and prev.isalnum() and nxt.isascii() and nxt.isalnum():
+        if punct_context(text, m.start()) != CTX_CJK:
             return ch
         return table[ch]
 

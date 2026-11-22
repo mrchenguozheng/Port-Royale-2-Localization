@@ -16,7 +16,9 @@ r"""engine_text.py —— 译文层 → 引擎层（构建期的唯一入口）�
     spec = lang_rules.get_spec(lang)   # 标点 / 分词器 / 补空格，见 lang_rules/spec.py
     zh     标点全角化 + 连词/人名 + 按词补空格（Spacing mode=group）
     ja     助词后空格 + 标点规范化（Spacing mode=particle）
-    其他   原样返回（Spacing mode=none，用空格分词的语言不需要加工）
+    fr     显式透传：不补空格、不引入 NBSP，法语标点间距保留作者写的普通空格
+    de/es/ru/ko  显式透传：模块存在、`SKIP` 里写明理由，`spec()` 不加工
+    en/其他 未登记语言同样原样返回
 
 新语言只写一个 lang_rules/<代码>.py 声明 spec()，本模块不需要改。
 
@@ -42,7 +44,7 @@ sys.path.insert(0, HERE)
 ROOT = os.path.dirname(os.path.dirname(TOOLS))
 OUT_DIR = os.path.join(ROOT, "build", "preview", "engine_text")
 
-from text import lang_rules, marks, toml_io  # noqa: E402
+from text import entries, lang_rules, marks, toml_io  # noqa: E402
 from text.lang_rules import spec as specs  # noqa: E402
 
 def header(lang):
@@ -70,6 +72,8 @@ def build_full(lang, doc, order=None):
     marks_n = sum(1 for h in order if plain.get(h) != doc.get(h))
     out, stats, seg = specs.build_texts(lang_rules.get_spec(lang), plain, order)
     stats["marks"] = marks_n
+    stats["kinds"] = entries.tally([(h, plain[h]) for h in order if plain.get(h)],
+                                   entries.verse_ids())
     return out, stats, seg
 
 
@@ -112,6 +116,13 @@ def main():
               "分词器 %s" % (
                   len(order), stats.get("marks", 0), stats["punct"], stats["conj"],
                   stats["name"], stats["space"], seg or "无（机械兜底）"))
+        kinds = stats.get("kinds") or {}
+        if kinds:
+            print("分类：" + "｜".join("%s %d" % (k, n) for k, n in kinds.items()))
+        if "break" in stats:
+            print("断行：机械改动 %d 条｜手工断点 %d 条｜切不动 %d 条" % (
+                stats["break"], stats.get("break_manual", 0),
+                stats.get("break_unresolved", 0)))
 
     if a.check:
         old = toml_io.read_doc_loose(out_path(a.lang))

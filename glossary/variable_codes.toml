@@ -10,7 +10,7 @@
 [meta]
 title = "PR2 文本变量码表"
 references_en = 770
-references_all = 5388
+references_all = 5382
 names = 67
 codes = 19
 confidence_legend = "confirmed / inferred / unknown"
@@ -150,8 +150,8 @@ display = "数值，按货币格式排版（是否带千分位/货币符未实�
 conf = "inferred"
 evidence = "85 处，只配 Gold/Price/Reward/StartGold/TotalPrice 等金钱类变量"
 refs_en = 85
-refs_all = 601
-names = ["FullPrice", "Gold", "GoldGoal", "GoldPerBarrel", "GoldReward", "PirateGold", "Price", "PriceBuy", "PriceSell", "Reward", "StartGold", "TotalPrice", "Wealth"]
+refs_all = 595
+names = ["FullPrice", "Gold", "GoldGoal", "GoldPerBarrel", "GoldReward", "Price", "PriceBuy", "PriceSell", "Reward", "StartGold", "TotalPrice", "Wealth"]
 
 [code.l]
 meaning = "位置（可嵌句）"
@@ -194,7 +194,7 @@ meaning = "数量（桶/件）"
 codes = ["A", "a"]
 refs_en = 56
 refs_all = 392
-example = "很高兴见到你，@A$USER$。你有一支大型贸易船队吧？是这样，我要把@A$Amount$的@G$Goods$运出去。<n>你付给我@g$PriceBuy$作为押金，把货物运到@T$Town$，到那里就能按@g$Pric"
+example = "很高兴见到你，@A$USER$。你有一支大型贸易船队吧？是这样，我要把@A$Amount$桶@G$Goods$运出去。<n>你付给我@g$PriceBuy$作为押金，把货物运到@T$Town$，到那里就能按@g$Pric"
 in_original = true
 note = "同一变量名出现多种码：A×1 / a×55（原文次数）；其中 @A$Amount$ 那处是已知例外（0xca4930dc），见 --check 的提示"
 
@@ -259,7 +259,7 @@ meaning = "日期"
 codes = ["D"]
 refs_en = 16
 refs_all = 112
-example = "就这么办。把@a$Amount$单位送到@T$DestTown$。工具必须在@D$Date$前送到。"
+example = "就这么办。把@a$Amount$桶送到@T$DestTown$。工具必须在@D$Date$前送到。"
 in_original = true
 
 [var.Days]
@@ -291,7 +291,7 @@ meaning = "目的地的人名"
 codes = ["N"]
 refs_en = 1
 refs_all = 7
-example = "你可真帮了我大忙。一切都办妥了，你已经付清@g$PriceBuy$。到市场来找我，我会交给你@a$Amount$的@G$Goods$。然后在@D$EndDate$之前把这些货物运到@T$Town$，交给@N$DestNa"
+example = "你可真帮了我大忙。一切都办妥了，你已经付清@g$PriceBuy$。到市场来找我，我会交给你@a$Amount$桶@G$Goods$。然后在@D$EndDate$之前把这些货物运到@T$Town$，交给@N$DestNa"
 in_original = true
 
 [var.DestNation]
@@ -363,7 +363,7 @@ meaning = "每桶价格（金币）"
 codes = ["g"]
 refs_en = 10
 refs_all = 70
-example = "太好了。请把@a$Amount$单位送到市场。在那里，每交付一<gs:TEXTFLUSS_KEINEHOEHE><g:INTEXT_FASS_800x600.screen>就能拿到@g$GoldPerBarrel$，一直"
+example = "太好了。请把@a$Amount$桶送到市场。在那里，每交付一<gs:TEXTFLUSS_KEINEHOEHE><g:INTEXT_FASS_800x600.screen>就能拿到@g$GoldPerBarrel$，一直到"
 in_original = true
 
 [var.GoldReward]
@@ -379,7 +379,7 @@ meaning = "货物名"
 codes = ["G"]
 refs_en = 48
 refs_all = 336
-example = "从法国商人那里劫得@a$Amount$的@G$Goods$。"
+example = "从法国商人那里劫得@a$Amount$桶@G$Goods$。"
 in_original = true
 
 [var.HostileNation]
@@ -504,10 +504,10 @@ in_original = true
 
 [var.PirateGold]
 meaning = "海盗那边的金币（战利品分成）"
-codes = ["g"]
+codes = []
 refs_en = 0
-refs_all = 6
-example = "让一名拥有 20艘以上船只的海盗听你调遣，并且他至少要交给你 @g$PirateGold$ 的战利品分成。<n>不过要完成这项任务，你得先把其它任务全部完成。"
+refs_all = 0
+example = ""
 in_original = false
 note = "英文原文里没有这个引用，译自标识符行的补译（2004 竞赛文本）"
 
@@ -557,7 +557,7 @@ meaning = "买价（金币）"
 codes = ["g"]
 refs_en = 4
 refs_all = 28
-example = "你可真帮了我大忙。一切都办妥了，你已经付清@g$PriceBuy$。到市场来找我，我会交给你@a$Amount$的@G$Goods$。然后在@D$EndDate$之前把这些货物运到@T$Town$，交给@N$DestNa"
+example = "你可真帮了我大忙。一切都办妥了，你已经付清@g$PriceBuy$。到市场来找我，我会交给你@a$Amount$桶@G$Goods$。然后在@D$EndDate$之前把这些货物运到@T$Town$，交给@N$DestNa"
 in_original = true
 
 [var.PriceSell]
@@ -565,7 +565,7 @@ meaning = "卖价（金币）"
 codes = ["g"]
 refs_en = 3
 refs_all = 21
-example = "很高兴见到你，@A$USER$。你有一支大型贸易船队吧？是这样，我要把@A$Amount$的@G$Goods$运出去。<n>你付给我@g$PriceBuy$作为押金，把货物运到@T$Town$，到那里就能按@g$Pric"
+example = "很高兴见到你，@A$USER$。你有一支大型贸易船队吧？是这样，我要把@A$Amount$桶@G$Goods$运出去。<n>你付给我@g$PriceBuy$作为押金，把货物运到@T$Town$，到那里就能按@g$Pric"
 in_original = true
 
 [var.RandLName]
@@ -677,7 +677,7 @@ meaning = "师父所在位置"
 codes = ["l"]
 refs_en = 6
 refs_all = 42
-example = "派一支船队去找老师的藏身处。@l$TeacherPos$船上必须装载@a$Amount$单位的食物。"
+example = "派一支船队去找老师的藏身处。@l$TeacherPos$船上必须装载@a$Amount$桶食物。"
 in_original = true
 
 [var.TotalPrice]

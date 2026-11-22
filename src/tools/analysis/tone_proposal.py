@@ -7,7 +7,7 @@
   src/translations/ja.toml
 
 输出：
-  docs/语体拟改清单.md
+  docs/archive/语体拟改清单.md
   docs/csv/analysis/tone-proposal.csv
 """
 
@@ -202,7 +202,7 @@ def main():
           "1. 先确认 `0x03fb5c6a` 的落款格式要不要改（只此一条）；",
           "2. 海盗/酒馆里 **person=第1人称** 的条目逐条确认说话人，确认是海盗/醉汉本人的再改常体；",
           "3. 其余保持现状——在拿不到引擎对话结构的前提下，按话题猜语气只会越改越乱。", ""]
-    md = os.path.join(DOCS, "语体拟改清单.md")
+    md = os.path.join(DOCS, "archive", "语体拟改清单.md")
     io.open(md, "w", encoding="utf-8", newline="\n").write("\n".join(L))
     print("写出 %s（%d 行）与 %s" % (out, len(rows), md))
     print("A 确定 %d｜副王语音 %d｜B 抽样 %d｜族 %d（混杂 %d）" % (

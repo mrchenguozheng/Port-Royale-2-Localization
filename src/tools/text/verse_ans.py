@@ -22,7 +22,8 @@
     方位包括正向（north/east/southeast…）与否定（-north/-southeast…，减号表示
     「不是那边」）。这两类不登记实体、不查译名；
   · 六语线索都不能空，只收英文逗号，每条线索都要出现在该语言自己的谜面正文里；
-  · 已经标成同值的组直接跳开（可重复跑），标成别的值则报错，不覆盖；
+  · 已经标成同值的组直接跳开（可重复跑），标成别的值则报错，不覆盖；没标注的键不算
+    冲突，按待写补上（新接入一门语言时，它的谜面还没有 `[riddle:]` 头就属于这种）；
   · 诗谜副本（整行 `[riddle:copy=键]`）与不含谜的同文引用（整行 `[ref:键]`）都没有自己的
     谜面，一律跳过：标注只落在带文本的那条上，副本靠目标键继承（见 09 卷第一百一十六节）；
   · 队列只生成 answer/town/direction/group/clue 五个字段；`certainty` / `source`
@@ -46,7 +47,7 @@ EN_PATH = os.path.join(ROOT, "src", "orig", "en.gog_1.1.2.3.toml")
 ENTITIES = os.path.join(ROOT, "src", "data", "names", "entities.toml")
 NAMES_DIR = os.path.join(ROOT, "src", "data", "names")
 TRANS = os.path.join(ROOT, "src", "translations")
-LANGS = ("zh", "de", "es", "fr", "ja", "ru")
+LANGS = ("zh", "de", "es", "fr", "ja", "ru", "it")
 #: 城镇名在英文表里分 8 段，段间留空，合起来 76 条 = staedte.ini 的段数。
 #: 早先只认了第一段（50 镇），Maracaibo / Caracas / Gibraltar / Port of Spain 这些
 #: 落在后面的段里，查不到就等于「不在城镇表」。
@@ -406,18 +407,31 @@ def cmd_apply():
         want_mark = {lk: ANS_MARK.match(wanted[lk]).group(0) for lk in order}
         # 尾字段（certainty / source）不在队列里，重写时原样接回去，不能抹掉。
         new_mark = {lk: with_tail(want_mark[lk], already[lk]) for lk in order}
-        same_key = [mark_key(already[lk], ent_index) == mark_key(want_mark[lk], ent_index)
-                    for lk in order]
+        # 只有「已经有标注」的键才谈得上冲突：没标注的键是要补写（比如刚接入一门
+        # 新语言），mark_key 对它返回 None，不能拿 None 跟队列值比，否则每次加语言
+        # 都会在第一组就报「已有标注与队列填的不同」，而打印的又是按 order 排在最
+        # 前面的 zh 那条（本身完全正确）。
+        conflict = []
+        same_key = []
+        for lk in order:
+            mk = mark_key(already[lk], ent_index)
+            if mk is None:
+                same_key.append(False)          # 待写，不是冲突
+                continue
+            same = mk == mark_key(want_mark[lk], ent_index)
+            same_key.append(same)
+            if not same:
+                conflict.append(lk)
         same_text = [(ANS_MARK.match(already[lk]).group(0) if ANS_MARK.match(already[lk])
                       else None) == new_mark[lk] for lk in order]
         if all(same_key) and all(same_text):
             skipped += 1
             continue
-        present = [ANS_MARK.match(already[lk]).group(0) for lk in order
-                   if ANS_MARK.match(already[lk])]
-        if present and not all(same_key):
-            raise SystemExit("%s 已有标注 %s，与队列填的不同；先人工核对"
-                             % (ids, present[0]))
+        if conflict:
+            lk = conflict[0]
+            raise SystemExit("%s 里 %s 的 %s 已有标注 %s，与队列填的不同；先人工核对"
+                             % (ids, lk[0], lk[1], ANS_MARK.match(already[lk]).group(0)))
+
 
         for lang in LANGS:
             path = os.path.join(TRANS, "%s.toml" % lang)

@@ -1,0 +1,62 @@
+# 有意不译：正确译法就是保持英文原样（或至少纯 ASCII），算进度时不计入待译。
+# 一行一条：id<TAB>理由。理由取值：key=按键名、label=界面键名、
+# id=脚本/资源标识、credit=职员表、save-name=存档文件名（必须纯 ASCII）。
+#
+# save-name 的判据与其余不同：值不必等于英文，但不许出现非 ASCII 字符 ——
+# PR2.exe 只导入 ANSI 版文件 API，非 ASCII 文件名写出去就是乱码，读回来弹「存档无效」。
+# 各语言共用的条目（职员表、场景存档名、存档名模板）在 _common.txt，本文件只写本语言独有的。
+
+# 按键名 / 职员表 / 标题 / 场景文件名模板：值只能是英文原样，由 keep_audit 指出后一次补齐
+0xc844ad97	credit
+0xdaeb9147	credit
+0xe08489dc	credit
+0xee28f112	credit
+0x0769a667	credit
+0x0b319f8c	credit
+0x1e6d4c84	credit
+0x1e6d4c91	credit
+0x1e6d50f7	credit
+0x1e6d51d9	credit
+0x1e6d523e	credit
+0x1e6d5402	credit
+0x1e6d540d	credit
+0x1e6d540e	credit
+0x1e6d54ed	credit
+0x20abe2eb	credit
+0x2e351896	credit
+0x32a6539f	credit
+0xdb5dde0a	id
+0x0c1fabf7	id
+0x3912d74a	id
+0x3912d74b	id
+0x3912d74c	id
+0x3912d74d	id
+0x3912d74e	id
+0x3912d74f	id
+0x3912d750	id
+0x3912d751	id
+0x3912d7b9	id
+0xdf25dd97	key
+0xdf25dd98	key
+0xdf25dd99	key
+0xf7a07dad	key
+0xfe7b3bb8	key
+0x0660b7fc	key
+0x0778871e	key
+0x0827193c	key
+0x082c5133	key
+0x26c7c8f3	key
+0x31713947	key
+0x3526e1e7	key
+0x3a9ca757	key
+0x3a9ca758	key
+0x3a9ca759	key
+0x3a9ca75a	key
+0x3a9ca75b	key
+0x3a9ca75c	key
+0x3a9ca75d	key
+0x3a9ca75e	key
+0x3a9ca75f	key
+0xdccfd889	label
+0x2dae44b4	label
+0xd0f01117	save-name

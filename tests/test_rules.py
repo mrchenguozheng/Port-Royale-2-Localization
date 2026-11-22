@@ -33,6 +33,37 @@ class TestZhText(unittest.TestCase):
         zh = lang_rules.get("zh")
         self.assertEqual(zh.normalize("你好,世界!"), "你好，世界！")
 
+    def test_ascii_token_kept(self):
+        """半角记号内部的标点不转全角：版本号、时间、文件名、英文词。"""
+        zh = lang_rules.get("zh")
+        for src, want in (
+            ("版本 1.0.0 已发布", "版本 1.0.0 已发布"),
+            ("每天 12:30 开市", "每天 12:30 开市"),
+            ("缺少 14x14aaFHk.res 文件", "缺少 14x14aaFHk.res 文件"),
+            ("Port Royale 2!", "Port Royale 2!"),
+            ("你好,世界!", "你好，世界！"),
+        ):
+            self.assertEqual(zh.normalize(src), want)
+
+    def test_punct_context(self):
+        from text.lang_rules import base
+        t = "版本 1.0.0 已发布, 端口 Port Royale 2 在 12:30 开市"
+        self.assertEqual(base.punct_context(t, t.index(", ")), base.CTX_CJK)
+        self.assertEqual(base.punct_context(t, t.index("1.0.0") + 1), base.CTX_NUM)
+        self.assertEqual(base.punct_context(t, t.index("12:30") + 2), base.CTX_TIME)
+        lo, hi = base.ascii_token(t, t.index("Royale"))
+        self.assertEqual(t[lo:hi], "Royale")
+
+    def test_non_cjk_entry_untouched(self):
+        """整条没有汉字就不是中文正文：算式、字体名、英文人名一个空格都别动。"""
+        spec = lang_rules.get_spec("zh").spacing
+        for src in (
+            "%1 %2  +  %3 %4  +  %5 %6  =  %7",
+            "Tiepolo_black14x14aaFHk.res",
+            "Dirk Niestadtkötter",
+        ):
+            self.assertEqual(spec.apply(src, {}), src)
+
     def test_placeholder_kept(self):
         zh = lang_rules.get("zh")
         out = zh.normalize("支付 @g$TotalPrice$ 元")
@@ -90,7 +121,12 @@ class TestZhSpace(unittest.TestCase):
     def test_collect_runs(self):
         runs = zh_space.collect_runs(["短句", "这是一个足够长的中文句子用来收集并测试断行"])
         self.assertEqual(runs, ["这是一个足够长的中文句子用来收集并测试断行"])
-        self.assertEqual(zh_space.collect_runs(["胡安·德·塞普尔维达到来这里看看"]), [])
+        # 阈值 = MIN_RUN（6）：断点按词挑，短片段也会被断，所以也得进分词器；
+        # 低于阈值的仍不送出去，免得拖慢分词。
+        self.assertEqual(zh_space.collect_runs(["短句"]), [])
+        self.assertEqual(zh_space.collect_runs(["六个字的句子"]), ["六个字的句子"])
+        self.assertEqual(zh_space.collect_runs(["胡安·德·塞普尔维达到来这里看看"]),
+                         ["胡安·德·塞普尔维达到来这里看看"])
 
     def test_fallback_wrap(self):
         t = "这是一个非常长的没有空格的中文句子用来测试自动断行"
@@ -100,19 +136,166 @@ class TestZhSpace(unittest.TestCase):
         self.assertEqual(zh_space.fallback_wrap("短句"), "短句")
 
     def test_compact_leaves_short_text_alone(self):
-        """紧凑排版：不到预算就一个字都不动，标点旁也不插空格。"""
+        """紧凑排版：不到预算、也没有句中标点就一个字都不动。"""
         whole = lambda run: [run]
-        self.assertEqual(zh_space.compact("我刚听说，一艘船沉了。", whole),
-                         "我刚听说，一艘船沉了。")
+        self.assertEqual(zh_space.compact("我刚听说。", whole), "我刚听说。")
+        self.assertEqual(zh_space.compact("我刚听说，一艘船沉了。", whole, 20),
+                         "我刚听说， 一艘船沉了。")
+
+    def test_compact_breaks_after_punct_always(self):
+        """句中标点后一律断一刀：行只会更短，不会更长。
+
+        早先只在超预算时才在标点落刀，逗号会被并进下一条预算。行数多不是
+        约束（实机窄框只关心一行放不放得下），所以改成逢标点必断。
+        """
+        whole = lambda run: [run]
+        self.assertEqual(zh_space.compact("我刚听说，一艘船沉了", whole, 99),
+                         "我刚听说， 一艘船沉了")
+        self.assertEqual(zh_space.compact("第一句；第二句！第三句？", whole, 99),
+                         "第一句； 第二句！ 第三句？")
+
+    def test_compact_keeps_closing_punct_on_same_line(self):
+        """`」` `』` 这类收尾符号不能起头：标点后那刀要让位，不能把符号顶到行首。"""
+        whole = lambda run: [run]
+        self.assertEqual(zh_space.compact("他说「走」然后离开了。", whole, 99),
+                         "他说「走」 然后离开了。")
+        self.assertNotIn(" 」", zh_space.compact("他说「走」然后离开了。", whole, 99))
+
+    def test_compact_keeps_dot_at_line_end(self):
+        """间隔号黏左：`·` 只能断在它后面，不能起头；姓氏后面再断一刀。
+
+        消息模板是 `%1 %2·%3到…` 这种变量拼出来的，名字整体保护（`NAME`）
+        管不到，早先 DP 会把刀落在 `%2 / ·%3`，实机行首就是孤零零一个「·」。
+        """
+        whole = lambda run: list(run)
+        out = zh_space.compact("%1 %2·%3到西班牙城镇%4碰碰运气。", whole, 13)
+        self.assertNotIn(" ·", out)
+        self.assertIn("· ", out)
+        # `·` 后一刀、姓氏那一件之后再来一刀：姓名整体独占两行
+        self.assertIn("%2· %3 ", out)
+
+    def test_bind_merges_quantity_phrase(self):
+        """数量/指示短语粘右：「好几」「件事」不能留成两个可断点。"""
+        self.assertEqual(zh_space.bind(["好几", "件事", "让"]), ["好几件事", "让"])
+        self.assertEqual(zh_space.bind(["好几件", "事"]), ["好几件事"])
+
+    def test_bind_merges_quantifier_and_noun(self):
+        """量词 + 双字名词粘住：「一座 城镇」实机拆过。"""
+        self.assertEqual(zh_space.bind(["一座", "城镇", "派往"]), ["一座城镇", "派往"])
+
+    def test_bind_merges_postposition(self):
+        """后置方位词粘左：实机出过「在这些城镇 之间运输」这种拆法。"""
+        self.assertEqual(zh_space.bind(["这些", "城镇", "之间", "运输"]),
+                         ["这些城镇之间", "运输"])
+        self.assertEqual(zh_space.bind(["%1", "之间", "运输"]), ["%1", "之间", "运输"])
+
+    def test_bind_merges_direction_phrase(self):
+        """方位短语合成一件：实机出过「点击贸易窗口右 / 下角那个……」。"""
+        self.assertEqual(zh_space.bind(["窗口", "右", "下角", "那个"]),
+                         ["窗口", "右下角", "那个"])
+        self.assertEqual(zh_space.bind(["窗口", "右下", "角", "那个"]),
+                         ["窗口", "右下角", "那个"])
+
+    def test_compact_keeps_short_name_template(self):
+        """`%1·%2` 这种只有三件的姓名模板放得下就不断，别再插空格。"""
+        whole = lambda run: list(run)
+        self.assertEqual(zh_space.compact("%1·%2", whole, 13), "%1·%2")
 
     def test_compact_breaks_on_particle_not_mid_word(self):
         """超预算时才断，且断点落在停顿字「的」后面，不切「英格兰/船」。"""
         lookup = lambda run: ["一艘", "满载", "移民", "的",
                               "英格兰", "船", "沉了"]
         out = zh_space.compact("我刚听说，一艘满载移民的英格兰船沉了。", lookup, 10)
-        self.assertTrue(out.startswith("我刚听说，"))
+        self.assertTrue(out.startswith("我刚听说， "))
         self.assertIn(" ", out)
         self.assertNotIn("英格兰 船", out)
+
+    def test_compact_budget_runs_across_punctuation(self):
+        """多短句段落：预算按「距上一个空格」算，每句都短也要断，否则整段空白。"""
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        t = "你可以在市场买货，也可以去酒馆打听消息，还可以去码头找船长领任务。"
+        out = zh_space.compact(t, lookup, 8)
+        self.assertIn(" ", out)
+        for tok in out.split(" "):
+            han = sum(1 for c in tok if "\u4e00" <= c <= "\u9fff")
+            self.assertLessEqual(han, 8, tok)
+
+    def test_compact_budget_runs_across_vars(self):
+        """`%1` 这类行内变量不能把预算清零，否则「9 字 + %1 + 16 字」仍是超长 token。"""
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        t = "那个恶名昭著的海盗%1所在的藏身处如今已不是什么秘密了。"
+        out = zh_space.compact(t, lookup, 10)
+        self.assertIn(" ", out)
+
+    def test_compact_keeps_name_intact(self):
+        """带间隔号的人名整体不被切开，也不能把整句吞成一个「人名」。"""
+        words = ["当时", "的", "捕海盗人", "罗伯特·梅纳德", "追踪", "到", "了",
+                 "他", "的", "单桅帆船"]
+        lookup = lambda run: words if run == "当时的捕海盗人罗伯特·梅纳德追踪到了他的单桅帆船" else list(run)
+        t = "当时的捕海盗人罗伯特·梅纳德追踪到了他的单桅帆船。"
+        out = zh_space.compact(t, lookup, 10)
+        self.assertIn("罗伯特·梅纳德", out)
+        for tok in out.split(" "):
+            han = sum(1 for c in tok if "\u4e00" <= c <= "\u9fff")
+            self.assertLessEqual(han, 10, tok)
+
+    def test_compact_never_breaks_after_lead_char(self):
+        """断点不能落在「从/在/也/和」这类往后粘的字后面，否则前半截成了残句。"""
+        words = ["你的目标", "是", "从", "一个", "默默无闻", "的", "商人"]
+        lookup = lambda run: words if run == "你的目标是从一个默默无闻的商人" else list(run)
+        out = zh_space.compact("你的目标是从一个默默无闻的商人。", lookup, 9)
+        for prefix in ("从 ", "在 ", "也 ", "和 ", "与 ", "把 ", "被 ", "将 "):
+            self.assertNotIn(prefix, out)
+
+    def test_compact_treats_parameterized_break_as_hard(self):
+        """`<n:25>` 也算换行：预算要在它那里清零，不能把两段粘成一条超长 token。"""
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        t = "第一段话就在这里结束。<n:25>第二段话从这里重新开始算预算，不要接着上一段累加。"
+        out = zh_space.compact(t, lookup, 9)
+        self.assertIn("<n:25>", out)
+        head, tail = out.split("<n:25>")
+        self.assertTrue(tail)
+        for tok in tail.split(" "):
+            self.assertLessEqual(len(tok), 12, tok)
+
+    def test_compact_breaks_after_var_not_before(self):
+        """断点紧邻变量时优先落在变量**之后**：数字后面起行是自然断法。
+
+        实测背景：`你还需要%1才能升到下一级`（重量 4+3+7=14）只差一点就得断一刀，
+        旧 DP 把这一刀切在 `%1` 之前，剩下 `%1才能升到下一级` 连成 9 字，窄提示条
+        放不下、整行被引擎丢掉。切在 `%1` 之后是 7 / 7，两行都放得下。
+        """
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        out = zh_space.compact("你还需要%1才能升到下一级", lookup, 13)
+        self.assertIn("%1 ", out)
+        self.assertNotIn(" %1", out)
+
+    def test_cut_cost_around_var(self):
+        """变量之后的断点免单，但变量之前不免费；下一件是粘连字/连词时也不免单。
+
+        直接钉在 `_cut_cost()` 上，避免靠一句人造文本间接验证（人造文本里
+        两侧代价可能打平，断点落在哪里取决于 DP 的扫描顺序）。
+        """
+        block = [("你还需要", 4, False), ("%1", 3, False), ("才能升到下一级", 7, False)]
+        n = len(block)
+        self.assertEqual(zh_space._cut_cost(block, 1, 2, n), 0)   # 变量之后：免单
+        self.assertEqual(zh_space._cut_cost(block, 0, 1, n), 2)   # 变量之前：原价
+
+        blocked = [("他提到了", 4, False), ("%1", 3, False), ("和奥格斯堡", 5, False)]
+        self.assertEqual(zh_space._cut_cost(blocked, 1, 2, len(blocked)), 10)
+
+        particle = [("这艘船", 3, False), ("%1", 3, False), ("的船队", 4, False)]
+        self.assertEqual(zh_space._cut_cost(particle, 1, 2, len(particle)), 10)
+
+    def test_compact_no_run_longer_than_budget(self):
+        """连续 15 个字之内必须有一个断点：没有任何标点的长句也得被切开。"""
+        lookup = lambda run: [run[i:i + 2] for i in range(0, len(run), 2)]
+        t = "他沿着海岸线一路向北航行经过无数个无名小岛最后抵达了那片传说中的海域"
+        out = zh_space.compact(t, lookup, 15)
+        for tok in out.split(" "):
+            han = sum(1 for c in tok if "\u4e00" <= c <= "\u9fff")
+            self.assertLessEqual(han, 15, tok)
+        self.assertGreaterEqual(out.count(" "), 2)
 
 
 class TestSpecInterface(unittest.TestCase):
@@ -138,6 +321,31 @@ class TestSpecInterface(unittest.TestCase):
         doc = {"0x1": "Hello  world"}
         out, _stats, _seg = specs.build_texts(sp, doc, ["0x1"])
         self.assertEqual(out, doc)
+
+    def test_fr_spec_parts(self):
+        """法语：构建期不加工——空格保持作者写的普通空格，不引入 NBSP。"""
+        sp = lang_rules.get_spec("fr")
+        self.assertEqual((sp.code, sp.spacing.mode), ("fr", "none"))
+        self.assertIsNone(sp.punct)
+        self.assertIsNone(sp.segmenter.tag("x"))
+        doc = {"0x1": "Vraiment ? Or : 100", "0x2": "%1:%2:%3"}
+        out, _stats, _seg = specs.build_texts(sp, doc, ["0x1", "0x2"])
+        self.assertEqual(out, doc)
+        self.assertFalse(any("\u00a0" in v for v in out.values()))
+
+    def test_skip_languages_are_declared(self):
+        """de/es/ru/ko/fr 不加工，但必须是「显式声明」：模块在、理由在、行为确定。"""
+        for lang in ("de", "es", "ru", "ko", "fr"):
+            mod = lang_rules.get(lang)
+            self.assertIsNotNone(mod, lang)
+            self.assertTrue(getattr(mod, "SKIP", "").strip(), lang)
+            sp = lang_rules.get_spec(lang)
+            self.assertEqual(sp.code, lang)
+            self.assertIsNone(sp.punct)
+            self.assertEqual(sp.spacing.mode, "none")
+            doc = {"0x1": "Fass 10? x: 1"}
+            out, _stats, _seg = specs.build_texts(sp, doc, ["0x1"])
+            self.assertEqual(out, doc)
 
     def test_build_texts_matches_engine_text(self):
         doc = {"0x1": "你好,世界。"}

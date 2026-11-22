@@ -12,7 +12,7 @@ r"""src/tools/pack/compile_pack.py — 把 src\translations\<语言>.toml 编译
 写到 build\preview\engine_text\<语言>.toml 供人查看。译文层（src\translations\）是
 唯一手改层，引擎文本是构建产物，不进仓库。
 
-src\orig\ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
+src/orig/ 下的 en / fr 是校对译文的依据，但不做防篡改校验：
 合并层（translate.load_toml）本身就是从这两个文件读出 en / fr 的，
 拿它们校验自己永远相等，报不出任何东西。
 
@@ -211,6 +211,17 @@ def _version_bases(baseline):
     return want
 
 
+def _is_resource_id(s):
+    """原文是不是「开发残留的资源标识」而不是界面文本。
+
+    `validate.is_identifier` 只按形状判（`^[A-Z][A-Z0-9_]{7,}$`），会把
+    `ATTENTION` 这种全大写单字界面词（fr 版 `0x274e9455`）也当标识 —— 实测
+    三份原文表里，真正的资源标识 15 条全部带下划线，唯一无下划线的命中的就是
+    `ATTENTION`。所以这里再加一条：必须含下划线。
+    """
+    return bool(s) and "_" in s and is_identifier(s)
+
+
 def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal):
     """按某份基线的键集出行（顺序 = 该版本原文表的顺序）。
 
@@ -227,19 +238,30 @@ def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal):
         if meta.get(k):
             val = meta[k].replace("\n", " ").replace("\r", " ")
             lines.append("# pack-meta %s=%s\n" % (k, val))
-    n = n_ph = n_empty = 0
+    n = n_ph = n_empty = n_ident = 0
 
     for h in b["keys"]:
-        txt = engine.get(h)
-        if not txt:
-            orig = b["table"][h]
-            if orig.strip() != V.EMPTY:
-                errors.append("%s 缺译文：%s 里这条是正文（%r）"
-                              % (h, b["id"], orig[:40]))
-                continue
+        orig = b["table"][h]
+        orig_s = (orig or "").strip()
+        # 原文空（目标版独有的 42 条，全是 +++EMPTY+++）：写回原文值，不用译文。
+        if orig_s == V.EMPTY:
             lines.append("%s = %s\n"
                          % (h.upper().replace("0X", "0x"), V.EMPTY))
             n_empty += 1
+            continue
+        # 原文本身是开发残留标识符（`IDM_CONTEST_01_2004_LOG_00_TEXT`）：
+        # **原样保留**，不用译文覆盖。这一版里它本来就不是句子，玩家在原版
+        # 英文里看到的也是这串标识；译文层就算写了正文，也不该凭空造出一段
+        # 原文处没有的界面文本。要给出正文，得换到有正文的版本（见 versions）。
+        if _is_resource_id(orig_s):
+            lines.append("%s = %s\n"
+                         % (h.upper().replace("0X", "0x"), to_engine(orig_s)))
+            n_ident += 1
+            continue
+        txt = engine.get(h)
+        if not txt:
+            errors.append("%s 缺译文：%s 里这条是正文（%r）"
+                          % (h, b["id"], orig[:40]))
             continue
         s = by_hash.get(h, {})
         if h in KEEP_ORIGINAL:
@@ -250,19 +272,12 @@ def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal):
             txt = eng
         # 占位译文跳过校验：它只有前 10 个字符，占位符必然不全。
         # 这不是放水 —— 它本来就没翻译，翻译后自然会进入校验。
-        # 开发标识符占位（译文 = 英文的 `IDM_...` 串）同理：原文不是句子，
-        # 没有比对基准，但它**必须报错**（玩家会直接看到这串标识符）。
+        # 原文是句子、译文却原样照抄英文的 `IDM_...` 串：那是没翻，报错。
+        # （原文本身是标识符的情况在上面就原样写回、不进这里了。）
         en_ref = s.get(T.BASE_LANG, "") or ""
         ident_ph = is_identifier(txt) and txt.strip() == en_ref.strip()
-        # 原文侧本来就是开发标识符（1.1.2.3 的 IDM_CONTEST_01_2004_* 十五条）：
-        # 这类键没有可比对的句子，只能继承原版缺陷。原样保留给警告，
-        # 译文写了别的标识符串、或原文是句子而译文仍是标识符，才算没译。
         if ident_ph:
-            if is_identifier(en_ref):
-                warnings.append("%s 原文即开发标识符，继承原版（%s）" % (h, txt))
-                ident_ph = False
-            else:
-                errors.append("%s 仍是开发标识符占位（%s），没有翻译" % (h, txt))
+            errors.append("%s 仍是开发标识符占位（%s），没有翻译" % (h, txt))
         if not is_placeholder(txt) and not ident_ph:
             check_placeholders(h, en_ref, txt, errors, warnings)
         if has_bare_pipe(txt):
@@ -278,10 +293,29 @@ def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal):
         n += 1
         if is_placeholder(txt) or ident_ph:
             n_ph += 1
-    return lines, n, n_ph, n_empty, meta
+    return lines, n, n_ph, n_empty, n_ident, meta
 
 
-def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None):
+def union_baseline(bases):
+    """把多份基线合成一份「并集」基线：键集是各行键集的并集，取值按**各自版本**的原文。
+
+    同一键在多份基线里都出现时只留一份（取先出现的那份的原文）—— 实测
+    en 1.1.2.3 与 fr 1.1.2.42 共有的 3529 条在两份原文表里正文一致，版本差只
+    体现在键集。顺序：先主基线的顺序，再把其余基线独有的键按各自的表顺序接在后面。
+    """
+    keys, table = [], {}
+    for b in bases:
+        for k in b["keys"]:
+            if k in table:
+                continue
+            keys.append(k)
+            table[k] = b["table"][k]
+    return {"id": "union(%s)" % "+".join(b["id"] for b in bases),
+            "keys": keys, "table": table, "primary": True}
+
+
+def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None,
+          union=False):
     # 参考原文**不参与编译**：生成 en.txt / fr.txt 交给引擎等于用「原始英文」
     # 覆盖游戏，等于没汉化。所以直接拒绝，而不是打个警告继续跑。
     # 名单问 translate —— 那里是唯一一份（src\orig\en.gog_1.1.2.3 之类）。
@@ -317,6 +351,8 @@ def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None):
             by_hash[s["id"].lower()] = s
 
     bases = _version_bases(baseline)
+    if union:
+        bases = [union_baseline(bases)]
     variant_out = variant_out or DEFAULT_VARIANT_OUT
     mk = mark_map(list(by_hash)) if marks else {}
 
@@ -333,7 +369,7 @@ def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None):
     codes, made = [], []
     for b in bases:
         errors, warnings, fatal = [], [], []
-        lines, n, n_ph, n_empty, meta = _pack_lines(
+        lines, n, n_ph, n_empty, n_ident, meta = _pack_lines(
             lang, b, engine, by_hash, mk, marks, errors, warnings, fatal)
         dst_dir = out_dir if b["primary"] else os.path.join(variant_out, b["id"])
         path = os.path.join(dst_dir, "%s.txt" % lang)
@@ -353,7 +389,7 @@ def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None):
         # 装进游戏目录等于没汉化，而调用方只看「文件在不在」。
         # 成因通常是 src\translations\<语言>.toml 压根不存在 ——
         # 合并层只为实际存在的语言建字段。
-        if n == 0 and n_empty == 0:
+        if n == 0 and n_empty == 0 and n_ident == 0:
             print("错误：没有编出任何条目，未生成 %s（%s）" % (path, b["id"]))
             print("      找不到 %s\\%s.toml，或它里面没有条目。"
                   % (os.path.join(SRC, "translations"), lang))
@@ -366,9 +402,11 @@ def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None):
             f.write("".join(lines))
 
         print("\n已生成 %s（%s，键集 %d 条）" % (path, b["id"], len(b["keys"])))
-        print("  条目 %d 条，其中占位未翻译 %d 条、原文空占位 %d 条%s"
-              % (n + n_empty, n_ph, n_empty, "，已加排查标记" if marks else ""))
-        made.append((b["id"], path, n + n_empty, n_empty))
+        print("  条目 %d 条，其中占位未翻译 %d 条、原文空占位 %d 条、"
+              "原文即标识原样 %d 条%s"
+              % (n + n_empty + n_ident, n_ph, n_empty, n_ident,
+                 "，已加排查标记" if marks else ""))
+        made.append((b["id"], path, n + n_empty + n_ident, n_empty, n_ident))
         if warnings:
             print("\n警告 %d 条：" % len(warnings))
             for w in warnings[:20]:
@@ -388,8 +426,9 @@ def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None):
 
     if len(made) > 1:
         print("\n本次共出 %d 份：" % len(made))
-        for vid, path, total, n_empty in made:
-            print("  %-18s %5d 条（空占位 %d）  %s" % (vid, total, n_empty, path))
+        for vid, path, total, n_empty, n_ident in made:
+            print("  %-18s %5d 条（空占位 %d，原样 %d）  %s"
+                  % (vid, total, n_empty, n_ident, path))
     return max(codes) if codes else 0
 
 
@@ -408,11 +447,14 @@ def main():
                          " build\\variants\\<id>\\")
     ap.add_argument("--variant-out", default=DEFAULT_VARIANT_OUT,
                     help="非 primary 基线的输出根目录（默认 build\\variants）")
+    ap.add_argument("--union", action="store_true",
+                    help="只出一份并集包（所有基线的键集合并，写在 --out 的 <语言>.txt）。"
+                         "GOG 与 Steam 两个发行包共用这一份；逐版对照仍用默认模式。")
     a = ap.parse_args()
     lang = a.lang
     if not lang:
         lang = _default_lang()
-    code = build(lang, a.out, a.strict, a.marks, a.baseline, a.variant_out)
+    code = build(lang, a.out, a.strict, a.marks, a.baseline, a.variant_out, a.union)
 
     # 编完语言包顺手检查字体：字体只做映射，按 Noto 替换字体生成。
     # 字体出错不算构建失败 —— 语言包本身没问题。

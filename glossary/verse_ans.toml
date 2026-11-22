@@ -69,183 +69,183 @@
 # 01  The town that you seek is a desolate place, far flung from a
 ids = ["0x35f48f6c", "0x35f48f74", "0x35f48f75"]
 ans = "Corpus Christi"
-clues = {zh = "荒凉,遗弃", de = "verlassen,öde", es = "desolado,abandonado", fr = "désolé,disgrâce", ja = "荒れ果てた,見捨てられた", ru = "отвергнут,забыт"}
+clues = {zh = "荒凉,遗弃", de = "verlassen,öde", es = "desolado,abandonado", fr = "désolé,disgrâce", ja = "荒れ果てた,見捨てられた", ru = "отвергнут,забыт", it = "luogo desolato,abbandonato"}
 
 [[group]]
 # 02  A river from the wilds at the headland divides There lies a 
 ids = ["0x35f48f6d"]
 ans = "New Orleans"
-clues = {zh = "河流,海角", de = "Fluss,Vorgebirge", es = "río,cabo", fr = "fleuve,continent", ja = "川,岬", ru = "речка,утесу"}
+clues = {zh = "河流,海角", de = "Fluss,Vorgebirge", es = "río,cabo", fr = "fleuve,continent", ja = "川,岬", ru = "речка,утесу", it = "fiume selvaggio,capo divide"}
 
 [[group]]
 # 03  Four towns sit on the bay together. Sail to the east, in the
 ids = ["0x35f48f6e"]
 ans = "Pensacola"
-clues = {zh = "四座,第三座,东", de = "Vier,dritte,Osten", es = "Cuatro,tercera,este", fr = "Quatre,troisième,l'est", ja = "四つ,三つ目,東", ru = "Четыре,третий,восток"}
+clues = {zh = "四座,第三座,东", de = "Vier,dritte,Osten", es = "Cuatro,tercera,este", fr = "Quatre,troisième,l'est", ja = "四つ,三つ目,東", ru = "Четыре,третий,восток", it = "Quattro città,baia,terza"}
 
 [[group]]
 # 04  Not the most northerly town can it be, but further north onl
 ids = ["0x35f48f6f", "0x35f48f71"]
 ans = "Fort Caroline"
-clues = {zh = "北", de = "Nördlich", es = "norte", fr = "nord", ja = "北", ru = "север"}
+clues = {zh = "北", de = "Nördlich", es = "norte", fr = "nord", ja = "北", ru = "север", it = "più a nord,un'altra"}
 
 [[group]]
 # 05  Holy August is now northward bound, very soon in the town is
 ids = ["0x35f48f70", "0x35f48f72", "0x35f48f73"]
 ans = "St. Augustine"
-clues = {zh = "圣奥古斯丁,北", de = "August,Norden", es = "Agustín,norte", fr = "Augustin,nord", ja = "オーガスティン,北", ru = "Август,север"}
+clues = {zh = "圣奥古斯丁,北", de = "August,Norden", es = "Agustín,norte", fr = "Augustin,nord", ja = "オーガスティン,北", ru = "Август,север", it = "Sant'Agostino,nord"}
 kinds = {zh = ["pun", ""], de = ["pun", ""], es = ["pun", ""], fr = ["pun", ""], ja = ["pun", ""], ru = ["pun", ""]}
 
 [[group]]
 # 06  Once long ago did other people here live, with their great t
 ids = ["0x35f48fe4"]
 ans = "Cancun"
-clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
+clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток", it = "templi imponenti,angolo"}
 
 [[group]]
 # 07  Once long ago did other people here live, with their great t
 #     Selket 表只有东南版（H2，谜底 Cancun）；西南版不在表里，保留否定谜底
 ids = ["0x35f48fe5"]
 ans = "-southwest"
-clues = {zh = "西南", de = "Südwesten", es = "suroeste", fr = "sud-ouest", ja = "南西", ru = "юго-запад"}
+clues = {zh = "西南", de = "Südwesten", es = "suroeste", fr = "sud-ouest", ja = "南西", ru = "юго-запад", it = "sud-ovest,angolo"}
 
 [[group]]
 # 08  The distance from X to Nombre is not far, you have plenty of
 ids = ["0x35f48fe6"]
 ans = "Havana"
-clues = {zh = "朗姆酒,雪茄", de = "Rum,Zigarre", es = "ron,cigarro", fr = "rhum,cigares", ja = "ラム酒,葉巻", ru = "Сигары,ром"}
+clues = {zh = "朗姆酒,雪茄", de = "Rum,Zigarre", es = "ron,cigarro", fr = "rhum,cigares", ja = "ラム酒,葉巻", ru = "Сигары,ром", it = "rum,sigaro"}
 
 [[group]]
 # 09  If off the cliffs to the north you should teeter, then in X 
 ids = ["0x35f4904e"]
 ans = "Gibara"
-clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "север"}
+clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "север", it = "scogliere,molto meglio"}
 
 [[group]]
 # 10  Three little islands this area surround, but only on one are
 ids = ["0x35f4904f"]
 ans = "Turk Islands"
-clues = {zh = "三座小岛,缆绳", de = "Drei kleine Inseln,Seile", es = "Tres pequeñas islas,cuerdas", fr = "Trois petites îles,cordes", ja = "三つの小島,ロープ", ru = "Три острова,канаты"}
+clues = {zh = "三座小岛,缆绳", de = "Drei kleine Inseln,Seile", es = "Tres pequeñas islas,cuerdas", fr = "Trois petites îles,cordes", ja = "三つの小島,ロープ", ru = "Три острова,канаты", it = "isolette,corda"}
 
 [[group]]
 # 11  X lies on the island, it’s really quite small. But look to t
 #     Selket 表 H1 给两个候选：San Juan 或 St. Thome；两个都保留（either）
 ids = ["0x35f49050", "0x35f490bf"]
 ans = "San Juan|San Thoma"
-clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
+clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток", it = "isola,sud-est"}
 
 [[group]]
 # 12  Here in the island chain, you’ll see a break. To the west th
 #     不在 Selket 的 27 条里；谜面只排除北边，保留否定谜底
 ids = ["0x35f49051"]
 ans = "-north"
-clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "север"}
+clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "север", it = "frattura,fumo"}
 
 [[group]]
 # 13  In a large bay lie some towns, there are three. X refers to 
 ids = ["0x35f49052", "0x35f490c1", "0x35f490c2", "0x35f49130"]
 ans = "Vera Cruz"
-clues = {zh = "三座,西", de = "drei,westlichste", es = "tres,occidental", fr = "trois,ouest", ja = "三つ,西", ru = "три,западн"}
+clues = {zh = "三座,西", de = "drei,westlichste", es = "tres,occidental", fr = "trois,ouest", ja = "三つ,西", ru = "три,западн", it = "grande baia,più a ovest"}
 
 [[group]]
 # 14  In a large bay lie some towns, there are three. X refers to 
 ids = ["0x35f49053"]
 ans = "Roatán"
-clues = {zh = "三座,南", de = "drei,südlichste", es = "tres,meridional", fr = "trois,sud", ja = "三つ,南", ru = "три,юге"}
+clues = {zh = "三座,南", de = "drei,südlichste", es = "tres,meridional", fr = "trois,sud", ja = "三つ,南", ru = "три,юге", it = "più a sud"}
 
 [[group]]
 # 15  A bay holds two islands, one large and one small. The town o
 ids = ["0x35f49054"]
 ans = "Roatán"
-clues = {zh = "两个岛,较大", de = "zwei Inseln,großen", es = "dos islas,más grande", fr = "deux îles,plus grande", ja = "二つの島,大きい方", ru = "Два острова,большом"}
+clues = {zh = "两个岛,较大", de = "zwei Inseln,großen", es = "dos islas,más grande", fr = "deux îles,plus grande", ja = "二つの島,大きい方", ru = "Два острова,большом", it = "due isole,maggiore"}
 
 [[group]]
 # 16  An island far off, small and remote. There is nowhere else f
 ids = ["0x35f49055"]
 ans = "Cayman"
-clues = {zh = "遥远,又小又偏", de = "weit draußen,allein", es = "lejana,remota", fr = "éloignée,lointaine", ja = "はるか遠く,孤島", ru = "далеко,маленький"}
+clues = {zh = "遥远,又小又偏", de = "weit draußen,allein", es = "lejana,remota", fr = "éloignée,lointaine", ja = "はるか遠く,孤島", ru = "далеко,маленький", it = "isola remota,lontana"}
 
 [[group]]
 # 17  X is a town that has streets paved with gold. Its majestic h
 ids = ["0x35f49056"]
 ans = "Port Royale"
-clues = {zh = "黄金,港口", de = "Straßen aus Gold,Hafen", es = "pavimentadas de oro,puerto", fr = "pavées d'or,port", ja = "黄金,港", ru = "златом,гавань"}
+clues = {zh = "黄金,港口", de = "Straßen aus Gold,Hafen", es = "pavimentadas de oro,puerto", fr = "pavées d'or,port", ja = "黄金,港", ru = "златом,гавань", it = "strade lastricate d'oro,porto maestoso"}
 
 [[group]]
 # 18  Four towns are situated around a volcano. The town in the so
 ids = ["0x35f49057"]
 ans = "Santo Domingo"
-clues = {zh = "四座,火山,东南", de = "Vier,Vulkan,Südosten", es = "Cuatro,volcán,sureste", fr = "Quatre,volcan,sud-est", ja = "四つ,火山,南東", ru = "Четыре,вулкан,юго-восток"}
+clues = {zh = "四座,火山,东南", de = "Vier,Vulkan,Südosten", es = "Cuatro,volcán,sureste", fr = "Quatre,volcan,sud-est", ja = "四つ,火山,南東", ru = "Четыре,вулкан,юго-восток", it = "vulcano,sud-est"}
 
 [[group]]
 # 19  On its sands, the sea is home to towns for which no one care
 #     Selket 表 H18 给两个候选：Guadeloupe 或 Martinique；两个都保留（either）
 ids = ["0x35f490c0"]
 ans = "Guadeloupe|Martinique"
-clues = {zh = "无人关心,精良的货品", de = "niemand kümmert,feine Waren", es = "a nadie le importa,mercancías selectas", fr = "n'intéressent personne,biens de qualité", ja = "誰も顧みない,良い品", ru = "Забытый город,прекрасные товары"}
+clues = {zh = "无人关心,精良的货品", de = "niemand kümmert,feine Waren", es = "a nadie le importa,mercancías selectas", fr = "n'intéressent personne,biens de qualité", ja = "誰も顧みない,良い品", ru = "Забытый город,прекрасные товары", it = "sabbie,merci di gran valore"}
 
 [[group]]
 # 20  An island lies here, as though in a cradle. A peninsula from
 #     Selket 表 H10 未给解法；同文的 H10a（陆地自北伸来）给 Providence
 ids = ["0x35f490c3", "0x35f490c4"]
 ans = "Providence"
-clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "северн"}
+clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "северн", it = "culla,penisola"}
 
 [[group]]
 # 21  White strand beside the jungle, a little river known to none
 ids = ["0x35f490c5"]
 ans = "Santa Marta"
-clues = {zh = "白沙,丛林,只有阳光", de = "Weißer Strand,Dschungel,nur die Sonne", es = "Blanca orilla,selva,solo ve el sol", fr = "Plage blanche,jungle,que le soleil", ja = "白い砂浜,ジャングル,太陽だけ", ru = "джунглей,солнце,Белый песок"}
+clues = {zh = "白沙,丛林,只有阳光", de = "Weißer Strand,Dschungel,nur die Sonne", es = "Blanca orilla,selva,solo ve el sol", fr = "Plage blanche,jungle,que le soleil", ja = "白い砂浜,ジャングル,太陽だけ", ru = "джунглей,солнце,Белый песок", it = "Spiaggia bianca,giungla,sole"}
 
 [[group]]
 # 22  Here lies the town, overlooking the sound. It guards the bay
 ids = ["0x35f490c6"]
 ans = "Maracaibo"
-clues = {zh = "海峡,海湾,船", de = "Sund,Bucht,Schiffen", es = "estrecho,bahía,barcos", fr = "détroit,baie,navires", ja = "海峡,湾,船", ru = "пролив,бухте,кораблей"}
+clues = {zh = "海峡,海湾,船", de = "Sund,Bucht,Schiffen", es = "estrecho,bahía,barcos", fr = "détroit,baie,navires", ja = "海峡,湾,船", ru = "пролив,бухте,кораблей", it = "stretto,vascelli"}
 
 [[group]]
 # 23  Not far from the town, at the bottom of a cliff, lie the bat
 ids = ["0x35f490c7", "0x35f49136"]
 ans = "Caracas"
-clues = {zh = "沉船,崖底", de = "Schiffswracks,Klippe", es = "naufragado,acantilado", fr = "épave,falaise", ja = "難破船,崖の下", ru = "корабль разбитый,скал"}
+clues = {zh = "沉船,崖底", de = "Schiffswracks,Klippe", es = "naufragado,acantilado", fr = "épave,falaise", ja = "難破船,崖の下", ru = "корабль разбитый,скал", it = "scogliera,vascello naufragato"}
 
 [[group]]
 # 24  Spain set up a harbor here once. You will find wood and bric
 ids = ["0x35f490c8"]
 ans = "Port of Spain"
-clues = {zh = "西班牙,木料,砖石,小麦", de = "Spanien,Holz,Ziegel,Weizen", es = "España,madera,ladrillos,trigo", fr = "L'Espagne,bois,briques,blé", ja = "スペイン,木材,レンガ,小麦", ru = "Испанцы,кирпичи,древесина,пшеницы"}
+clues = {zh = "西班牙,木料,砖石,小麦", de = "Spanien,Holz,Ziegel,Weizen", es = "España,madera,ladrillos,trigo", fr = "L'Espagne,bois,briques,blé", ja = "スペイン,木材,レンガ,小麦", ru = "Испанцы,кирпичи,древесина,пшеницы", it = "Spagna,legname,grano"}
 
 [[group]]
 # 25  In a large bay lie some towns, there are three. X refers to 
 #     Selket 表只有「最西」版（H27，Vera Cruz）；最东版不在表里，保留方位
 ids = ["0x35f49131"]
 ans = "east"
-clues = {zh = "三座,东", de = "drei,östlichste", es = "tres,oriental", fr = "trois,l'est", ja = "三つ,東", ru = "три,восток"}
+clues = {zh = "三座,东", de = "drei,östlichste", es = "tres,oriental", fr = "trois,l'est", ja = "三つ,東", ru = "три,восток", it = "più a est"}
 
 [[group]]
 # 26  An island lies here, as though in a cradle. The land from th
 ids = ["0x35f49132", "0x35f49133"]
 ans = "Providence"
-clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "северн"}
+clues = {zh = "北", de = "Norden", es = "norte", fr = "nord", ja = "北", ru = "северн", it = "culla,la terra da nord"}
 
 [[group]]
 # 27  You come from the west, the bridge you cross over. The town 
 ids = ["0x35f49134"]
 ans = "Cartagena"
-clues = {zh = "西", de = "Westen", es = "oeste", fr = "ouest", ja = "西", ru = "запад"}
+clues = {zh = "西", de = "Westen", es = "oeste", fr = "ouest", ja = "西", ru = "запад", it = "ponte,poco più avanti"}
 
 [[group]]
 # 28  Oh what a wondrous place. Nestled in a bay. Protected by tow
 ids = ["0x35f49135"]
 ans = "Gibraltar"
-clues = {zh = "海湾,峭壁", de = "Bucht,Klippen", es = "bahía,acantilados", fr = "baie,falaises", ja = "湾,崖", ru = "залив,скалы"}
+clues = {zh = "海湾,峭壁", de = "Bucht,Klippen", es = "bahía,acantilados", fr = "baie,falaises", ja = "湾,崖", ru = "залив,скалы", it = "meraviglioso,scogliere imponenti"}
 
 [[group]]
 # 29  Powerful river flowing so deep, on towards the east and into
 #     不在 Selket 的 27 条里；保留方位谜底
 ids = ["0x35f49137"]
 ans = "southeast"
-clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток"}
+clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "南東", ru = "юго-восток", it = "palude,terraferma"}
 
 [[group]]
 # HT11  A lonely town lies in the west of the headland.
@@ -253,7 +253,7 @@ clues = {zh = "东南", de = "Südosten", es = "sureste", fr = "sud-est", ja = "
 #       第三方韩文表也写作「Grand Bahama – Tampa 近处」，两个名字并列，故两个候选都留。
 ids = ["0x35f48fdd", "0x35f48fde"]
 ans = "Grand Bahama|Tampa"
-clues = {zh = "海角,孤零零", de = "Vorgebirges,einsame,Westen", es = "cabo,solitaria,oeste", fr = "continent,solitaire,ouest", ja = "岬,寂れた,西", ru = "мыса,одинокий,западу"}
+clues = {zh = "海角,孤零零", de = "Vorgebirges,einsame,Westen", es = "cabo,solitaria,oeste", fr = "continent,solitaire,ouest", ja = "岬,寂れた,西", ru = "мыса,одинокий,западу", it = "solitaria,promontorio"}
 
 [[group]]
 # HT26* Here, you should go, if you would like to bake colorful, sweet corn fields
@@ -261,11 +261,11 @@ clues = {zh = "海角,孤零零", de = "Vorgebirges,einsame,Westen", es = "cabo,
 #       四槽逐字同文，只留 hash 最小的 0x35f48fdf 带文本，其余写 [riddle:copy=0x35f48fdf]。
 ids = ["0x35f48fdf", "0x35f48fe0", "0x35f48fe1", "0x35f48fe2"]
 ans = "Eleuthera"
-clues = {zh = "黏土炉,甜玉米面包,水果", de = "Tonofen,Süßmaisbrot,Früchten", es = "horno de barro,pan de maíz dulce,fruta", fr = "four d'argile,pain de maïs,fruits", ja = "粘土窯,スイートコーンパン,果物", ru = "глиняной печи,сладкий хлеб,фруктами"}
+clues = {zh = "黏土炉,甜玉米面包,水果", de = "Tonofen,Süßmaisbrot,Früchten", es = "horno de barro,pan de maíz dulce,fruta", fr = "four d'argile,pain de maïs,fruits", ja = "粘土窯,スイートコーンパン,果物", ru = "глиняной печи,сладкий хлеб,фруктами", it = "forno di argilla,pane di mais"}
 
 [[group]]
 # HT3*  It is the most western town in the region.（原帖 Hunt Text 3*，Solution 写 Tampico）
 #       原帖把这条记成「无诗谜」，实际诗就在，只是抄录时漏了。
 ids = ["0x35f48fe3"]
 ans = "Tampico"
-clues = {zh = "最西边,地区", de = "westlichste,Region", es = "occidental,región", fr = "ouest,région", ja = "最も西,地域", ru = "самом западе,город"}
+clues = {zh = "最西边,地区", de = "westlichste,Region", es = "occidental,región", fr = "ouest,région", ja = "最も西,地域", ru = "самом западе,город", it = "più occidentale,regione"}
