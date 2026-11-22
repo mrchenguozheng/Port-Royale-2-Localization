@@ -52,7 +52,8 @@ try {
     if (-not $SkipRust) {
         $Cargo = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe'
         if (-not (Test-Path -LiteralPath $Cargo -PathType Leaf)) {
-            $cmd = Get-Command cargo.exe -CommandType Application -ErrorAction SilentlyContinue
+            $cmd = Get-Command cargo.exe -CommandType Application -ErrorAction SilentlyContinue |
+                Select-Object -First 1
             if ($cmd) { $Cargo = $cmd.Source }
         }
         if (-not $Cargo -or -not (Test-Path -LiteralPath $Cargo -PathType Leaf)) {

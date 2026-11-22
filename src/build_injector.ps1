@@ -67,7 +67,8 @@ if (-not (Test-Path -LiteralPath $Runtime)) {
 
 $Cargo = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe'
 if (-not (Test-Path -LiteralPath $Cargo -PathType Leaf)) {
-    $cmd = Get-Command cargo.exe -CommandType Application -ErrorAction SilentlyContinue
+    $cmd = Get-Command cargo.exe -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
     if ($cmd) { $Cargo = $cmd.Source } else { $Cargo = $null }
 }
 
@@ -91,8 +92,14 @@ Write-Host '[build] cargo build --release'
 #   - PR2_VERSION 由 release.ps1 从 -Version 传进来；直接构建时取当前 tag
 #     （release-v1.0.0 → v1.0.0），不在 tag 上就留空，显示成 dev。
 #   - commit / dirty 只有拿不到环境变量时才自己算，CI 可以覆盖。
-$GitCmd = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue
-if (-not $GitCmd) { $GitCmd = Get-Command git -CommandType Application -ErrorAction SilentlyContinue }
+# GitHub Windows runner 的 PATH 同时挂了 Git\bin、Git\cmd、Git\ucrt64\bin 三个
+# git.exe，Get-Command 会返回数组；不取第一个时 .Source 会被拼成一整串路径。
+$GitCmd = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+if (-not $GitCmd) {
+    $GitCmd = Get-Command git -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+}
 if (-not $env:PR2_VERSION -and $GitCmd) {
     $tag = @(& $GitCmd.Source -C $Repo describe --tags --exact-match 2>$null)
     if ($tag.Count -gt 0 -and $tag[0]) {

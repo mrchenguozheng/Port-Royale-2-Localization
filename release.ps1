@@ -102,9 +102,13 @@ function Get-PwshPath {
 }
 
 function Get-GitPath {
-    $cmd = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue
+    # GitHub Windows runner 会同时找到 Git\bin、Git\cmd、Git\ucrt64\bin 三个
+    # git.exe；Get-Command 返回数组时 .Source 会拼成一整串，必须只取第一个。
+    $cmd = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
     if (-not $cmd) {
-        $cmd = Get-Command git -CommandType Application -ErrorAction SilentlyContinue
+        $cmd = Get-Command git -CommandType Application -ErrorAction SilentlyContinue |
+            Select-Object -First 1
     }
     if (-not $cmd) { throw '找不到 git，无法确认 commit 与工作树状态。' }
     return $cmd.Source
