@@ -2,6 +2,7 @@
 name = "pr2_common"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
 
 [dependencies]
 windows-sys = { version = "0.52", features = [
