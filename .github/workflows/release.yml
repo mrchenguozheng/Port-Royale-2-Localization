@@ -95,9 +95,11 @@ jobs:
           }
           throw "tag 提交不在 origin/main 或 origin/release/* 上：$sha；请在 main 上打 tag"
 
-      - name: Read release languages
+      - name: Read release languages and bundles
         shell: pwsh
         run: |
+          # 语言全集：字体准备按它下载（--langs）。分组只认 src\release-bundles.toml，
+          # 由 make_release.py 读出来，PowerShell 不在这一步重复实现解析。
           $list = Join-Path "src" "release-languages.txt"
           $names = @()
           foreach ($raw in Get-Content -LiteralPath $list -Encoding utf8) {
@@ -109,6 +111,14 @@ jobs:
           if ($names.Count -eq 0) { throw "发行语言清单为空：$list" }
           "LANGS=$($names -join ',')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "LANGS=$($names -join ',')"
+
+          $raw = @(& python src\tools\pack\make_release.py --list-bundles)
+          if ($LASTEXITCODE -ne 0) { throw "读不到发行分组：src\release-bundles.toml" }
+          $ids = @($raw | Where-Object { $_ -match '\|' } |
+            ForEach-Object { ($_ -split '\|')[0] } | Where-Object { $_ })
+          if ($ids.Count -eq 0) { throw "发行分组清单为空：src\release-bundles.toml" }
+          "BUNDLES=$($ids -join ',')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "BUNDLES=$($ids -join ',')"
 
       # 字体与 CI 走同一套：项目内缓存优先，缓存里缺的按清单下载并实例化成
       # 静态文件；系统字体不参与，同一 tag 重建出的包才逐字节一致。
@@ -146,7 +156,7 @@ jobs:
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'release-build.log'
           $env:CARGO_TERM_COLOR = 'never'
-          & pwsh -NoProfile -NonInteractive -Command '$l = $env:LANGS -split ","; .\release.ps1 -Version $env:VERSION -Edition all -Lang $l -NoPause' *>&1 |
+          & pwsh -NoProfile -NonInteractive -Command '$b = $env:BUNDLES -split ","; .\release.ps1 -Version $env:VERSION -Edition all -Bundle $b -NoPause' *>&1 |
             Tee-Object -FilePath $log
           $code = $LASTEXITCODE
           if ($code -ne 0) {
@@ -172,11 +182,13 @@ jobs:
       - name: Verify release assets
         shell: pwsh
         run: |
-          $langs = $env:LANGS -split ','
+          # 产物按**分组**出：latin 一个 zip 顶 de/es/fr/it 四份，
+          # 文件名用分组 id，不是语言代码。
+          $ids = $env:BUNDLES -split ','
           $expected = @()
-          foreach ($lang in $langs) {
-            $expected += "dist/PR2-$lang-gog-$env:VERSION.zip"
-            $expected += "dist/PR2-$lang-steam-$env:VERSION.zip"
+          foreach ($id in $ids) {
+            $expected += "dist/PR2-$id-gog-$env:VERSION.zip"
+            $expected += "dist/PR2-$id-steam-$env:VERSION.zip"
           }
           $expected += "dist/SHA256SUMS.txt"
           foreach ($path in $expected) {

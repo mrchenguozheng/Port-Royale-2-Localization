@@ -1,0 +1,58 @@
+# 发行分组 —— 「能共用同一份字体文件」的语言打成一个 zip。
+#
+# 运行时没有变化：语言包仍是 PR2Localization\packs\<语言>.txt，一门一个文件；
+# 启动器扫 packs 目录列出全部分组内的语言，玩家在 GUI 里切换。合的是**发行包**
+# 这一层：一个 zip 里放几门语言的包、共用一份 font-map.default.ini、共用一处字体
+# 目录，少下几个压缩包，也不会因为各自带一份同样的字体把体积翻倍。
+#
+# 分组依据是 src\font-map.ini 里各语言节的四个逻辑名（ARIAL.TTF / ELGRECO_.TTF /
+# Tiepolo_black.ttf / Tiepolo_bold.ttf）指向哪些实际字体文件：
+#
+#   de / es / fr / it   四项全是 none —— 原版拉丁字体已覆盖，构不打包任何字体
+#                        → 字体集为空，四门共用同一份空字体集与同一份映射
+#   zh                  NotoSansSC-Regular + NotoSerifSC-Black/Bold
+#   ja                  NotoSansJP-Regular + NotoSerifJP-Black/Bold
+#   ko                  NotoSansKR-Regular + NotoSerifKR-Black/Bold
+#   ru                  PR2CyrBody-Regular + PR2CyrDisplay-Head/Black/Bold
+#                        （Noto Sans / Noto Serif 按原版度量缩放后的衍生文件）
+#
+# zh / ja / ko / ru 各自一套文件名不同的字体，彼此没有共用文件，所以各出一包。
+# pl 有 pack 但不在发行语言集里（见 src\release-languages.txt），不进分组。
+#
+# 字段：
+#   id      包标识，进文件名 dist\PR2-<id>-<edition>-<version>.zip；单语言时沿用语言代码
+#   label   给人看的语言名，写进 README
+#   langs   包内语言代码，顺序即 packs 目录里的顺序
+#   default 包内默认语言（locale.default.ini），必须是 langs 之一
+
+[[bundle]]
+id = "zh"
+label = "简体中文"
+langs = ["zh"]
+default = "zh"
+
+[[bundle]]
+id = "ja"
+label = "日本語"
+langs = ["ja"]
+default = "ja"
+
+[[bundle]]
+id = "ko"
+label = "한국어"
+langs = ["ko"]
+default = "ko"
+
+[[bundle]]
+id = "ru"
+label = "Русский"
+langs = ["ru"]
+default = "ru"
+
+# 西语 / 德 / 法 / 意：四门都不带字体，原版拉丁字体已经覆盖各自的重音与变音，
+# 标题栏目的缺口也一样（只有 ²³€，与原版一致），所以合成一份发行包。
+[[bundle]]
+id = "latin"
+label = "Deutsch · Español · Français · Italiano"
+langs = ["de", "es", "fr", "it"]
+default = "de"

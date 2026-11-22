@@ -2,9 +2,10 @@
 # ============================================================
 #  PR2 Localization - one-command release entry
 #
-#    .\release.ps1 -Version v1.0.0
-#    .\release.ps1 -Version 1.0.0            # 自动归一化成 v1.0.0
-#    .\release.ps1 -Version v1.0.0 -Lang zh
+#    .\release.ps1 -Version v1.0.0                 # 按分组：zh / ja / ko / ru 各一包，
+#                                                  #   再加一个 latin（de+es+fr+it）
+#    .\release.ps1 -Version v1.0.0 -Bundle latin   # 只出 latin 分组
+#    .\release.ps1 -Version v1.0.0 -Lang zh        # 旧口径：一门语言一包
 #    .\release.ps1 -Version v1.0.0 -Edition gog
 #    .\release.ps1 -Version v1.0.0 -Edition steam
 #    .\release.ps1 -Version v1.0.0 -Tag
@@ -13,16 +14,18 @@
 #  规范见 docs\发行规范.md，要点：
 #    - 版本号只接受 vMAJOR.MINOR.PATCH[-prerelease]；不带 v 会自动补上，
 #      文件名、manifest、README、tag 都用归一化后的同一串。
-#    - 发行语言由 src\release-languages.txt 决定，不再自动扫翻译目录。
-#    - 产物是 dist\PR2-<lang>-<edition>-<version>.zip 加 dist\SHA256SUMS.txt；
-#      stage 目录打包后删除。
+#    - 发行分组由 src\release-bundles.toml 决定：同一份字体能共用的语言进一个 zip。
+#      de/es/fr/it 四项字体映射全是 none，共用一份空字体集，合成 latin 一包；
+#      zh/ja/ko/ru 各自一套字体文件，各出一包。
+#    - 产物是 dist\PR2-<id>-<edition>-<version>.zip 加 dist\SHA256SUMS.txt；
+#      id 是分组 id（单语言分组沿用语言代码）；stage 目录打包后删除。
 #    - tag 名为 release-<version>，annotated；-Tag 要求工作树干净。
 #
 #  Default flow:
 #    1. build the injector into build\runtime
-#    2. compile each language and assemble
-#       dist\PR2-<lang>-gog-<version>.zip and
-#       dist\PR2-<lang>-steam-<version>.zip
+#    2. compile every language of every bundle and assemble one zip per bundle
+#       dist\PR2-<id>-gog-<version>.zip and
+#       dist\PR2-<id>-steam-<version>.zip
 #    3. write dist\SHA256SUMS.txt
 #    4. (optional) create release-<version> tag; -Push also pushes it
 #
@@ -39,6 +42,10 @@ param(
     [string]$Edition = 'all',
 
     [string[]]$Lang = @(),
+
+    # 分组 id（可重复）：按 src\release-bundles.toml 出包，同组语言进一个 zip。
+    # 不给时默认出全部分组。与 -Lang 互斥。
+    [string[]]$Bundle = @(),
 
     [string]$Out = 'dist',
 
@@ -136,17 +143,67 @@ function Assert-ReleaseLanguages {
     }
 }
 
-$Pwsh = Get-PwshPath
-$languages = @(Get-ReleaseLanguages)
-if ($languages.Count -eq 0) {
-    throw '没有发行语言：src\release-languages.txt 为空，且没有显式给 -Lang。'
+# 分组清单的唯一来源是 src\release-bundles.toml（由 make_release.py 读），
+# PowerShell 不重复实现一遍解析，也不在这里推断「哪几门能共用字体」。
+function Get-ReleaseBundles {
+    param([string[]]$Ids = @(), [string]$PythonExe)
+    $raw = @(& $PythonExe (Join-Path $Src 'tools\pack\make_release.py') --list-bundles)
+    if ($LASTEXITCODE -ne 0) {
+        throw '读不到发行分组清单：src\release-bundles.toml'
+    }
+    $all = @($raw | Where-Object { $_ -match '\|' } | ForEach-Object {
+        $parts = $_ -split '\|'
+        [pscustomobject]@{
+            Id = $parts[0]
+            Default = $parts[1]
+            Langs = @($parts[2] -split ',' | Where-Object { $_ })
+        }
+    })
+    if ($all.Count -eq 0) { throw '发行分组清单为空：src\release-bundles.toml' }
+    if ($Ids.Count -eq 0) { return $all }
+
+    $want = @($Ids | ForEach-Object { $_ -split ',' } |
+        ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $missing = @($want | Where-Object { ($all | ForEach-Object { $_.Id }) -notcontains $_ })
+    if ($missing.Count -gt 0) {
+        throw ("没有这个分组：" + ($missing -join '、'))
+    }
+    return @($all | Where-Object { $want -contains $_.Id })
 }
-Assert-ReleaseLanguages -Names $languages
+
+$Pwsh = Get-PwshPath
 
 $Python = @(& (Join-Path $Src 'find_python.ps1'))[0]
 if ($LASTEXITCODE -ne 0 -or -not $Python) {
     throw '找不到 Python。先安装 Python 3.11+，或让 python 进入 PATH。'
 }
+
+# 两种出包口径：
+#   -Lang   → 每门语言各出一个 zip（旧行为，文件名是语言代码）
+#   -Bundle / 缺省 → 按分组出包，同组语言进一个 zip（如 latin = de+es+fr+it）
+$packMode = if ($Lang.Count -gt 0) { 'lang' } else { 'bundle' }
+if ($packMode -eq 'lang' -and $Bundle.Count -gt 0) {
+    throw '-Lang 与 -Bundle 只能给一个。'
+}
+
+if ($packMode -eq 'lang') {
+    $groups = @()
+    $languages = @(Get-ReleaseLanguages)
+} else {
+    # 变量名不能叫 $bundles：PowerShell 变量不分大小写，会覆盖 -Bundle 参数。
+    $groups = @(Get-ReleaseBundles -Ids $Bundle -PythonExe $Python)
+    $languages = @($groups | ForEach-Object { $_.Langs } | Select-Object -Unique)
+    # 分组只允许从发行语言集里挑，防止在 bundles 里塞一门没验收的语言。
+    $declared = @(Get-ReleaseLanguages)
+    $outside = @($languages | Where-Object { $declared -notcontains $_ })
+    if ($outside.Count -gt 0) {
+        throw ("分组里有语言不在 src\release-languages.txt：" + ($outside -join '、'))
+    }
+}
+if ($languages.Count -eq 0) {
+    throw '没有发行语言：src\release-languages.txt 或 src\release-bundles.toml 为空。'
+}
+Assert-ReleaseLanguages -Names $languages
 
 $OutDir = if ([System.IO.Path]::IsPathRooted($Out)) {
     $Out
@@ -165,6 +222,9 @@ foreach ($dir in @(Get-ChildItem -LiteralPath $OutDir -Directory -Filter 'PR2-*-
 
 Write-Host "[release] 版本：$Version"
 Write-Host "[release] 语言：$($languages -join ', ')"
+if ($packMode -eq 'bundle') {
+    Write-Host "[release] 分组：$((@($groups | ForEach-Object { "$($_.Id)($($_.Langs -join '+'))" }) -join ' '))"
+}
 Write-Host "[release] 入口：$($editions -join ', ')"
 Write-Host "[release] 输出：$OutDir"
 Write-Host "[release] 字体：$Fonts"
@@ -193,6 +253,30 @@ Write-Host '[release] 2/2 组装发行包'
 foreach ($edition in $editions) {
     Write-Host ''
     Write-Host "[release] 入口：$edition"
+
+    # 分组出包：一个分组一个 zip，组内语言共用字体与一份 font-map。
+    if ($packMode -eq 'bundle') {
+        foreach ($group in $groups) {
+            $releaseArgs = @(
+                $ReleaseScript,
+                '--version', $Version,
+                '--out', $OutDir,
+                '--fonts', $Fonts,
+                '--edition', $edition,
+                '--bundle', $group.Id
+            )
+            if ($NoFontCache) { $releaseArgs += '--no-font-cache' }
+            Write-Host ''
+            Write-Host ("[release] 分组 {0}：{1}" -f $group.Id, ($group.Langs -join ', '))
+            & $Python @releaseArgs
+            if ($LASTEXITCODE -ne 0) {
+                throw "生成 $($group.Id) 发行包失败（退出码 $LASTEXITCODE）。"
+            }
+        }
+        continue
+    }
+
+    # 旧口径：每门语言各出一个包。
     $releaseArgs = @(
         $ReleaseScript,
         '--version', $Version,

@@ -1,6 +1,10 @@
 # 发行语言清单（src/release-languages.txt）
 #
 # 一行一个语言代码；`#` 起为注释，逗号或空格分隔同样有效。
+# 这里定义的是**语言全集**（CI 按它准备字体）。打包成几个 zip 由
+# src/release-bundles.toml 决定：同一份字体能共用的语言进一个包，
+# de / es / fr / it 合成 latin，其余各出一包。分组里的语言必须都在本清单里。
+#
 # 只有列在这里、并且 src/packs/<lang>.toml、src/translations/<lang>.toml、
 # src/font-map.ini [<lang>] 三样齐全的语言，才会进 release.ps1 与 CI 的发行包。
 #

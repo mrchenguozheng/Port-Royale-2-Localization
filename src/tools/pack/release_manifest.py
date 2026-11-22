@@ -164,10 +164,17 @@ def _build_info():
     }
 
 
+def _as_langs(lang):
+    """接受单个语言代码或语言列表；合包里是列表。"""
+    return [lang] if isinstance(lang, str) else list(lang)
+
+
 def build_manifest(stage, lang, version, edition, font_mode, package_id=None):
     stage = os.path.abspath(stage)
     package_id = package_id or os.path.basename(os.path.normpath(stage))
-    translation = _translation(lang)
+    langs = _as_langs(lang)
+    primary = langs[0]
+    translation = _translation(primary)
     files = []
     for rel, full in iter_release_files(stage):
         files.append({
@@ -180,7 +187,9 @@ def build_manifest(stage, lang, version, edition, font_mode, package_id=None):
     return {
         "schema": SCHEMA_VERSION,
         "package_id": package_id,
-        "lang": lang,
+        # lang 保留为默认语言（兼容旧读法）；合包里的全量在 langs / translations。
+        "lang": primary,
+        "langs": langs,
         "edition": edition,
         "version": version,
         "runtime_version": _runtime_version(stage),
@@ -188,6 +197,7 @@ def build_manifest(stage, lang, version, edition, font_mode, package_id=None):
         "build": _build_info(),
         "target": _target(edition),
         "translation": translation,
+        "translations": [_translation(lang) for lang in langs],
         "source": _source(translation["source_lang"]),
         "counts": {
             "files": len(files),
