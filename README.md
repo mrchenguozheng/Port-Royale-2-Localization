@@ -39,22 +39,15 @@ Issue 区贴出「界面截图 + 现在这行文案 + 建议改法」；游戏�
    （`3590 条 · 未译 0 · 摘要 9cfa2931c1c2`）与包根 `README.txt` 的「语言包变化」段。
 8. 想回原版：点 GUI 上的「还原原版」，或 `PR2Localization.exe --restore`。
 
-GOG 与 Steam 的 `PR2.exe` 都静态导入同目录的 `Ascaron.Logging-2.6.dll`（导入表里只有 `Log`
-一个函数），两版的原版 DLL 还是同一份字节（`11,776 B` / SHA-256 相同），所以本地化入口
-是同一条；差别只在谁来拉起进程：GOG 版启动器直启 `PR2.exe`，Steam 版交给客户端
-（`steam://rungameid/12470`）——装在 `Program Files` 下的 `PR2.exe` 直接建进程会拿到错误 740。包里不带 `VERSION.dll`（那是历史路线）。包内恒定带 `Ascaron.Logging-2.6.dll`
-宿主代理（放在 `PR2Localization\host\`，解压不会覆盖根目录原版）：
-启动前由启动器校验原版 `Ascaron.Logging-2.6.dll` 的 `11,776 B` /
-SHA-256，通过后备份成 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\`，
-再原子换入代理；原版大小或哈希不对时启动器停止，不强行覆盖。宿主动作每一步都写
-`PR2Localization\logs\host.log`，GUI 的还原失败对话框显示的就是它的末尾几行。
-发行包不再带任何 `.ps1`。根目录没有这个 DLL 的版本会退回注入启动，理由也写在这份日志里。
-挂载之后直接双击 `PR2.exe` 同样有效；没挂载时双击就是原版英文，挂载由启动器负责。
-`PR2Localization.exe` / `PR2LocalizationGUI.exe` 是两个版本共用的入口；原版 `PR2.exe` 本身不改。
+GOG 与 Steam 的 `PR2.exe` 静态导入同一份 `Ascaron.Logging-2.6.dll`，所以本地化入口只有一条；
+差别只是 GOG 由启动器直启、Steam 交给客户端。包内代理放在 `PR2Localization\host\`，
+启动前由启动器校验原版、备份后换入，失败即停并写 `PR2Localization\logs\host.log`；
+发行包不带任何 `.ps1`。挂载后直接双击 `PR2.exe` 也有效，没挂载时双击就是原版英文。
+完整校验与备份规则见[运行契约](docs/运行契约.md)。
 
 启动器界面按发包语言选一份：`PR2-zh` 用中文、`PR2-latin` 用德语（组内 de/es/fr/it 共用），
-包内换游戏语言不会换界面；源码九份 `ui.<lang>.ini`，`ui.default.ini` 由构建生成，不另存副本。
-包内布局、挂载语义与支持环境统一见[运行契约](docs/运行契约.md)。
+包内换游戏语言不会换界面。源码九份 `ui.<lang>.ini`，`ui.default.ini` 由构建从 `ui.zh.ini` 生成。
+包内布局、挂载语义与支持环境见[运行契约](docs/运行契约.md)。
 
 注意：
 
