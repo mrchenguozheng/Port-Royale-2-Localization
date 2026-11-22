@@ -35,24 +35,25 @@ Steam English `1.1.2.3` build is tested with the host-DLL proxy and a Chinese UI
 The GOG French `1.1.2.42` build is tested the same way (Polish pack, host proxy
 active; the game still reports `1.1.2.42`). Other builds are out of scope.
 
-On GOG, do **not** start `PR2.exe` directly: the loader resolves `VERSION.dll`
-from `C:\Windows\SysWOW64`, so the local proxy is bypassed and the game starts
-in English. Use `PR2LocalizationGUI.exe` and choose a language.
+On GOG, starting `PR2.exe` directly only shows the translation once the host
+proxy has been mounted; the GUI does that before launching. The old
+`VERSION.dll` route is gone (Windows resolves that name from `SysWOW64`).
 
 Steam does not use `VERSION.dll`. `PR2.exe` statically imports
 `Ascaron.Logging-2.6.dll`; the package ships a proxy with that name under
-`PR2Localization\host\` plus `PR2HostMount.ps1`. The launcher mounts it
-automatically before starting the game: it verifies the original DLL
-(`11,776 B`, SHA-256 `0568EC...`) and backs it up as
-`Ascaron.Logging-2.6.orig.dll` and `PR2Localization\host-backup\`, then replaces
-it. If the size or hash does not match, it stops without overwriting anything.
-Run `PR2HostMount.ps1 -Action Mount` / `-Action Restore` manually if you prefer;
-`PR2Localization.exe --restore` (or the GUI button) puts the original DLL back.
+`PR2Localization\host\`. The launcher mounts it automatically before starting
+the game, in-process: it verifies the original DLL (`11,776 B`, SHA-256
+`0568EC...`), backs it up as `Ascaron.Logging-2.6.orig.dll` and
+`PR2Localization\host-backup\`, then replaces it atomically. If the size or
+hash does not match, it stops without overwriting anything. No PowerShell or
+script execution is involved, so policy-locked machines work too.
+`PR2Localization.exe --restore` (or the GUI button) puts the original DLL back;
+`--mount` only mounts without starting the game.
 
 Release packages are not split by entry point: one zip
 (`PR2-<lang>-<version>.zip`) works for both GOG and Steam. It always carries
-the host-DLL proxy and mount script — GOG never executes them — and the
-launcher detects the edition from the game directory.
+the host-DLL proxy — GOG never needs a separate script — and the launcher
+detects the edition from the game directory.
 
 Versions are visible in three places, all from the same `-Version` value: the
 GUI subtitle (`runtime v1 · v1.0.0 (c8aa6e3)`), each language list entry

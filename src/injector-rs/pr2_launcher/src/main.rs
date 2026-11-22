@@ -1,35 +1,29 @@
 use std::ffi::c_void;
 use std::fs;
-use std::os::windows::process::CommandExt;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::Path;
 use std::ptr;
 
 use pr2_common::{
-    bundled_fonts_complete, detect_edition, exe_dir, fonts_dir, has_host_dll,
-    host_script_path, host_state, launch_mode, log_dir, pack_runtime_ok,
-    proxy_loaded_after, proxy_log_len, read_locale_language, steam_run_url,
-    valid_lang_code, Edition, HostState, LaunchMode, LaunchModeError, FONT_NAMES,
-    HOST_DLL, HOST_MOUNT_SCRIPT, HOST_ORIG, RUNTIME_VERSION,
+    bundled_fonts_complete, detect_edition, exe_dir, fonts_dir, has_host_dll, host_state,
+    launch_mode, log_dir, mount_host, pack_runtime_ok, proxy_loaded_after, proxy_log_len,
+    read_locale_language, restore_host as restore_host_dll, steam_run_url, valid_lang_code,
+    Edition, HostState, LaunchMode, LaunchModeError, FONT_NAMES, HOST_DLL, HOST_ORIG,
+    RUNTIME_VERSION,
 };
 use sha2::{Digest, Sha256};
 use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, HANDLE};
 use windows_sys::Win32::System::Console::{SetConsoleCP, SetConsoleOutputCP};
 use windows_sys::Win32::System::Diagnostics::Debug::WriteProcessMemory;
-use windows_sys::Win32::System::LibraryLoader::{
-    GetModuleHandleA, GetProcAddress,
-};
-use windows_sys::Win32::System::Memory::{
-    VirtualAllocEx, MEM_COMMIT, PAGE_READWRITE,
-};
+use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
+use windows_sys::Win32::System::Memory::{VirtualAllocEx, MEM_COMMIT, PAGE_READWRITE};
 use windows_sys::Win32::System::Threading::{
     CreateProcessA, CreateRemoteThread, GetExitCodeThread, ResumeThread, WaitForSingleObject,
-    CREATE_NO_WINDOW, CREATE_SUSPENDED, INFINITE, LPTHREAD_START_ROUTINE, PROCESS_INFORMATION,
-    STARTUPINFOA,
+    CREATE_SUSPENDED, INFINITE, LPTHREAD_START_ROUTINE, PROCESS_INFORMATION, STARTUPINFOA,
 };
 use windows_sys::Win32::UI::Shell::ShellExecuteW;
 
-const ORIG_FONT_SIZES: [u64; 4] = [296712, 65680, 52876, 53120];const ORIG_FONT_HASHES: [&str; 4] = [
+const ORIG_FONT_SIZES: [u64; 4] = [296712, 65680, 52876, 53120];
+const ORIG_FONT_HASHES: [&str; 4] = [
     "1906a771ed879a5de75a3ff552fbad533827fe7b39e18319ce9d9ae134c346c7",
     "f3715e59051796963fc6569d85c16b9abfd6eaf949bcc8a9578c1fe0a423acf9",
     "267f1a2de1c1e738202ca31008c587e045d25268c93662d8fd80b79615d314e7",
@@ -54,6 +48,7 @@ fn run() -> Result<(), i32> {
     let mut lang: Option<String> = None;
     let mut vanilla = false;
     let mut restore = false;
+    let mut mount_only = false;
     let mut force_inject = false;
 
     for arg in std::env::args().skip(1) {
@@ -63,6 +58,8 @@ fn run() -> Result<(), i32> {
             vanilla = true;
         } else if arg == "--restore" {
             restore = true;
+        } else if arg == "--mount" {
+            mount_only = true;
         } else if arg == "--inject" {
             force_inject = true;
         } else if arg == "--version" {
@@ -75,16 +72,25 @@ fn run() -> Result<(), i32> {
             );
             return Ok(());
         } else if arg == "--help" || arg == "-h" {
-            println!("[PR2Loc] 用法: PR2Localization.exe [--lang=<代码>] [--vanilla] [--restore] [--inject]");
+            println!("[PR2Loc] 用法: PR2Localization.exe [--lang=<代码>] [--vanilla] [--restore] [--mount] [--inject]");
             println!("[PR2Loc]   不给参数时先挂载宿主代理，再由对应版本的方式拉起游戏：");
-            println!("[PR2Loc]   GOG 版直启 PR2.exe；Steam 版交给客户端（steam://rungameid/12470）。");
+            println!(
+                "[PR2Loc]   GOG 版直启 PR2.exe；Steam 版交给客户端（steam://rungameid/12470）。"
+            );
             println!("[PR2Loc]   --lang     这一次启动用哪个语言包，");
             println!("[PR2Loc]              优先于 PR2Localization\\packs\\locale.ini 的 language=，不写文件。");
             println!("[PR2Loc]              只有 GOG 版支持：Steam 拉起的进程不是本进程的子进程，");
             println!("[PR2Loc]              环境变量传不过去，换语言要改 locale.ini。");
-            println!("[PR2Loc]   --vanilla  先还原宿主 DLL 与原版字体，再以对应版本的方式启动原版游戏。");
+            println!(
+                "[PR2Loc]   --vanilla  先还原宿主 DLL 与原版字体，再以对应版本的方式启动原版游戏。"
+            );
             println!("[PR2Loc]   --restore  只还原：把 Ascaron.Logging-2.6.dll 换回原版，恢复原版字体，不启动游戏。");
-            println!("[PR2Loc]   --inject   不挂载宿主，退回远程注入启动（只给排查用，需管理员权限）。");
+            println!(
+                "[PR2Loc]   --mount    只挂载：校验原版、建立两份备份、换入代理，不启动游戏。"
+            );
+            println!(
+                "[PR2Loc]   --inject   不挂载宿主，退回远程注入启动（只给排查用，需管理员权限）。"
+            );
             println!("[PR2Loc]   --version  打印发行版本、构建 commit 与运行时版本，不启动游戏。");
             return Ok(());
         }
@@ -92,12 +98,18 @@ fn run() -> Result<(), i32> {
     if let Some(code) = &lang {
         if !valid_lang_code(code) {
             eprintln!("[PR2Loc] --lang 的值不合法: {code}");
-            eprintln!("[PR2Loc] 只允许字母、数字、连字符和下划线，例如 --lang=zh 或 --lang=zh-TW。");
+            eprintln!(
+                "[PR2Loc] 只允许字母、数字、连字符和下划线，例如 --lang=zh 或 --lang=zh-TW。"
+            );
             return Err(1);
         }
     }
     if restore && vanilla {
         eprintln!("[PR2Loc] --restore 与 --vanilla 不能同时使用。");
+        return Err(1);
+    }
+    if mount_only && (restore || vanilla) {
+        eprintln!("[PR2Loc] --mount 不能与 --restore / --vanilla 同时使用。");
         return Err(1);
     }
 
@@ -110,9 +122,16 @@ fn run() -> Result<(), i32> {
     if restore {
         return restore_all(&root);
     }
+    if mount_only {
+        return mount_host_only(&root);
+    }
 
     let edition = detect_edition(&root);
-    let edition_label = if edition == Edition::Steam { "Steam" } else { "GOG" };
+    let edition_label = if edition == Edition::Steam {
+        "Steam"
+    } else {
+        "GOG"
+    };
     let mode = match launch_mode(edition, lang.is_some(), force_inject) {
         Ok(mode) => mode,
         Err(LaunchModeError::SteamLangUnsupported) => {
@@ -134,17 +153,14 @@ fn run() -> Result<(), i32> {
             return launch_by_steam(&root, "已恢复原版状态", false);
         }
         match create_process(&exe_path, &root, 0) {
-            Ok(pi) => {
-                unsafe {
-                    CloseHandle(pi.hThread);
-                    CloseHandle(pi.hProcess);
-                }
-            }
+            Ok(pi) => unsafe {
+                CloseHandle(pi.hThread);
+                CloseHandle(pi.hProcess);
+            },
             Err(_) => {
-                eprintln!(
-                    "[PR2Loc] 启动原版 PR2.exe 失败 (错误 {})",
-                    unsafe { GetLastError() }
-                );
+                eprintln!("[PR2Loc] 启动原版 PR2.exe 失败 (错误 {})", unsafe {
+                    GetLastError()
+                });
                 return Err(1);
             }
         }
@@ -206,12 +222,12 @@ fn run() -> Result<(), i32> {
         });
 
     if let Some(code) = font_lang.as_ref() {
-        if valid_lang_code(code) && fonts_dir(&root).is_dir() && font_dir.is_none()
+        if valid_lang_code(code)
+            && fonts_dir(&root).is_dir()
+            && font_dir.is_none()
             && !pr2_common::language_fonts_complete(&root, code)
         {
-            eprintln!(
-                "[PR2Loc] PR2Localization\\fonts 字体不完整，回退到原版根目录字体"
-            );
+            eprintln!("[PR2Loc] PR2Localization\\fonts 字体不完整，回退到原版根目录字体");
         }
     }
 
@@ -252,7 +268,9 @@ fn run() -> Result<(), i32> {
     launch_by_host(&root, &exe_path)
 }
 
-/// 两版共用的挂载入口：原版就调脚本挂载，已挂载就跳过。
+/// 两版共用的挂载入口：原版就挂载，已挂载就跳过。
+///
+/// 替换动作在 `pr2_common::host` 里，进程内直接做，不再拉 PowerShell。
 fn ensure_host(root: &Path) -> Result<(), i32> {
     match host_state(root) {
         HostState::Mounted => {
@@ -263,7 +281,10 @@ fn ensure_host(root: &Path) -> Result<(), i32> {
         HostState::Original => {
             println!("[PR2Loc] 校验原版宿主 DLL、建立备份并挂载代理…");
             host_log_line(root, "校验原版宿主 DLL、建立备份并挂载代理");
-            run_host_script(root, "Mount").map(|_| ())
+            mount_host(root).map_err(|e| {
+                host_log(root, &format!("挂载失败：{e}"));
+                1
+            })
         }
         HostState::Missing => {
             // 调用方已经用 has_host_dll 判过一遍，走到这里说明文件在检查之后消失。
@@ -303,7 +324,10 @@ fn ensure_host(root: &Path) -> Result<(), i32> {
 fn restore_host(root: &Path) -> Result<(), i32> {
     match host_state(root) {
         HostState::Original => Ok(()),
-        HostState::Mounted => run_host_script(root, "Restore").map(|_| ()),
+        HostState::Mounted => restore_host_dll(root).map_err(|e| {
+            host_log(root, &format!("还原失败：{e}"));
+            1
+        }),
         // 没有这个文件就没有可还原的东西：GOG 某些版本不带宿主 DLL，不该判失败。
         HostState::Missing => {
             println!("[PR2Loc] 同目录下没有 {HOST_DLL}，不需要还原");
@@ -313,7 +337,9 @@ fn restore_host(root: &Path) -> Result<(), i32> {
         HostState::ProxyNoBackup => {
             host_log(
                 root,
-                &format!("根目录 {HOST_DLL} 是本地化代理，但原版备份缺失或不可验证；没有可还原的文件。"),
+                &format!(
+                    "根目录 {HOST_DLL} 是本地化代理，但原版备份缺失或不可验证；没有可还原的文件。"
+                ),
             );
             host_log(
                 root,
@@ -338,10 +364,9 @@ fn launch_by_host(root: &Path, exe_path: &Path) -> Result<(), i32> {
     let pi = match create_process(exe_path, root, 0) {
         Ok(v) => v,
         Err(_) => {
-            eprintln!(
-                "[PR2Loc] 启动 PR2.exe 失败 (错误 {})",
-                unsafe { GetLastError() }
-            );
+            eprintln!("[PR2Loc] 启动 PR2.exe 失败 (错误 {})", unsafe {
+                GetLastError()
+            });
             return Err(1);
         }
     };
@@ -450,10 +475,9 @@ fn launch_by_inject(root: &Path, exe_path: &Path, dll: &Path) -> Result<(), i32>
     let pi = match create_process(exe_path, root, CREATE_SUSPENDED) {
         Ok(v) => v,
         Err(_) => {
-            eprintln!(
-                "[PR2Loc] 启动 PR2.exe 失败 (错误 {})",
-                unsafe { GetLastError() }
-            );
+            eprintln!("[PR2Loc] 启动 PR2.exe 失败 (错误 {})", unsafe {
+                GetLastError()
+            });
             return Err(1);
         }
     };
@@ -470,6 +494,26 @@ fn launch_by_inject(root: &Path, exe_path: &Path, dll: &Path) -> Result<(), i32>
             Ok(())
         }
         Err(code) => Err(code),
+    }
+}
+
+/// `--mount`：只挂载宿主代理，不启动游戏。部署与排查用。
+fn mount_host_only(root: &Path) -> Result<(), i32> {
+    clear_host_log(root);
+    mount_host(root).map_err(|e| {
+        host_log(root, &format!("挂载失败：{e}"));
+        1
+    })?;
+    match host_state(root) {
+        HostState::Mounted => {
+            println!("[PR2Loc] 宿主代理已挂载（{HOST_DLL} 已换成本地化代理）");
+            host_log_line(root, "宿主代理已挂载");
+            Ok(())
+        }
+        other => {
+            host_log(root, &format!("挂载后状态异常：{other:?}"));
+            Err(1)
+        }
     }
 }
 
@@ -523,82 +567,6 @@ fn clear_host_log(root: &Path) {
     let _ = fs::write(log_dir(root).join(HOST_LOG_FILE), "");
 }
 
-/// 调发行包里的 PR2HostMount.ps1。替换动作只有那一份实现，这里只管传参。
-fn run_host_script(root: &Path, action: &str) -> Result<String, i32> {
-    let script = host_script_path(root);
-    if !script.is_file() {
-        host_log(
-            root,
-            &format!("同目录下找不到 {HOST_MOUNT_SCRIPT}，无法挂载宿主 DLL。"),
-        );
-        return Err(1);
-    }
-    let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into());
-    let powershell = PathBuf::from(&system_root)
-        .join("System32")
-        .join("WindowsPowerShell")
-        .join("v1.0")
-        .join("powershell.exe");
-    let program = if powershell.is_file() {
-        powershell.into_os_string()
-    } else {
-        "powershell.exe".into()
-    };
-
-    // 用 -Command 而不是 -File：脚本要在子进程里先把输出编码设成 UTF-8，
-    // 否则 Windows PowerShell 5.1 用 OEM 代码页写 stdout，读回来是乱码。
-    let quote = |s: &str| format!("'{}'", s.replace('\'', "''"));
-    let command = format!(
-        "try {{ [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 }} catch {{}}; & {} -Action {} -Target {}",
-        quote(&script.to_string_lossy()),
-        quote(action),
-        quote(&root.to_string_lossy())
-    );
-
-    let output = Command::new(program)
-        .arg("-NoProfile")
-        .arg("-ExecutionPolicy")
-        .arg("Bypass")
-        .arg("-Command")
-        .arg(&command)
-        .current_dir(root)
-        // 从 PowerShell 7 的终端启动时，继承来的 PSModulePath 会让 5.1 找不到
-        // 自己的模块（Get-FileHash、Copy-Item 都会报未知命令），这里清掉。
-        .env_remove("PSModulePath")
-        .creation_flags(CREATE_NO_WINDOW)
-        .output()
-        .map_err(|exc| {
-            host_log(root, &format!("调用 PowerShell 失败：{exc}"));
-            1
-        })?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-    if !output.status.success() {
-        let code = output
-            .status
-            .code()
-            .map(|c| c.to_string())
-            .unwrap_or_else(|| "未知".into());
-        host_log(root, &format!("{action} 失败（脚本退出码 {code}）："));
-        for line in stderr.lines().chain(stdout.lines()) {
-            let line = line.trim();
-            if !line.is_empty() {
-                host_log(root, line);
-            }
-        }
-        return Err(2);
-    }
-    for line in stdout.lines() {
-        let line = line.trim();
-        if !line.is_empty() {
-            println!("[PR2Loc] {line}");
-            host_log_line(root, line);
-        }
-    }
-    Ok(stdout)
-}
-
 fn create_process(exe: &Path, root: &Path, flags: u32) -> Result<PROCESS_INFORMATION, ()> {
     let exe_c = path_cstr(exe);
     let root_c = path_cstr(root);
@@ -629,20 +597,12 @@ fn create_process(exe: &Path, root: &Path, flags: u32) -> Result<PROCESS_INFORMA
 fn inject_dll(pi: &PROCESS_INFORMATION, dll: &Path) -> Result<(), i32> {
     let bytes = path_cstr(dll);
     let size = bytes.len();
-    let remote = unsafe {
-        VirtualAllocEx(
-            pi.hProcess,
-            ptr::null(),
-            size,
-            MEM_COMMIT,
-            PAGE_READWRITE,
-        )
-    };
+    let remote =
+        unsafe { VirtualAllocEx(pi.hProcess, ptr::null(), size, MEM_COMMIT, PAGE_READWRITE) };
     if remote.is_null() {
-        eprintln!(
-            "[PR2Loc] VirtualAllocEx 失败 {}",
-            unsafe { GetLastError() }
-        );
+        eprintln!("[PR2Loc] VirtualAllocEx 失败 {}", unsafe {
+            GetLastError()
+        });
         return Err(1);
     }
     let wrote = unsafe {
@@ -655,10 +615,9 @@ fn inject_dll(pi: &PROCESS_INFORMATION, dll: &Path) -> Result<(), i32> {
         )
     };
     if wrote == 0 {
-        eprintln!(
-            "[PR2Loc] WriteProcessMemory 失败 {}",
-            unsafe { GetLastError() }
-        );
+        eprintln!("[PR2Loc] WriteProcessMemory 失败 {}", unsafe {
+            GetLastError()
+        });
         return Err(1);
     }
     let k32 = unsafe { GetModuleHandleA(b"kernel32.dll\0".as_ptr()) };
@@ -683,10 +642,9 @@ fn inject_dll(pi: &PROCESS_INFORMATION, dll: &Path) -> Result<(), i32> {
         )
     };
     if th == 0 {
-        eprintln!(
-            "[PR2Loc] CreateRemoteThread 失败 {}",
-            unsafe { GetLastError() }
-        );
+        eprintln!("[PR2Loc] CreateRemoteThread 失败 {}", unsafe {
+            GetLastError()
+        });
         return Err(1);
     }
     unsafe {

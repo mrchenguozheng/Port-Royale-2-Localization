@@ -16,7 +16,7 @@
 #      de/es/fr/it 四项字体映射全是 none，共用一份空字体集，合成 latin 一包；
 #      zh/ja/ko/ru 各自一套字体文件，各出一包。
 #    - 一个分组一个 zip：dist\PR2-<id>-<version>.zip 加 dist\SHA256SUMS.txt。
-#      包同时面向 GOG 与 Steam（自带宿主代理与挂载脚本），不再按版别分包；
+#      包同时面向 GOG 与 Steam（自带宿主代理，挂载由启动器完成），不再按版别分包；
 #      id 是分组 id（单语言分组沿用语言代码）；stage 目录打包后删除。
 #    - tag 名为 release-<version>，annotated；-Tag 要求工作树干净。
 #

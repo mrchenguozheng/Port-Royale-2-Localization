@@ -5,7 +5,7 @@
 原版就没有了 —— 既不能校验，也没有可回滚的备份。所以代理必须落在
 ``PR2Localization\\host\\``，由挂载动作在确认原版之后换进根目录。
 
-合并包以后 GOG 也会带着代理和脚本；判版走标记文件，GOG 侧从不执行它们。
+合并包以后 GOG 也会带着代理；判版走标记文件，GOG 侧从不执行注入。
 """
 
 import os
@@ -42,8 +42,12 @@ class TestUniversalLayout(unittest.TestCase):
         make_release.copy_runtime(self.stage, lambda _m: None)
         proxy = os.path.join(self.stage, make_release.HOST_PROXY_REL)
         self.assertTrue(os.path.isfile(proxy), "代理应落在 PR2Localization\\host")
-        self.assertTrue(os.path.isfile(
-            os.path.join(self.stage, make_release.HOST_MOUNT_SCRIPT)))
+        self.assertFalse(
+            os.path.exists(os.path.join(self.stage, "PR2HostMount.ps1")),
+            "发行包不再带挂载脚本：挂载已收进启动器")
+        self.assertFalse(
+            [n for n in make_release.FLAT_PACKAGE if n.lower().endswith(".ps1")],
+            "运行期不再依赖任何 PowerShell 脚本")
         self.assertFalse(
             os.path.exists(os.path.join(self.stage, make_release.HOST_DLL)),
             "根目录不能出现与原版同名的 DLL")

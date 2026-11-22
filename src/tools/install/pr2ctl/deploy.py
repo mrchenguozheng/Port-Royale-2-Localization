@@ -95,13 +95,8 @@ def deploy_steps(target, langs, edition=None):
     edition = edition_of(target, edition)
     steps = [(n, os.path.join(RUNTIME, n), os.path.join(target, n))
              for n in FLAT_FILES]
-    # 挂载/还原脚本不在 runtime 里，但还原原版只能靠它（启动器调 -Action Restore）。
-    if os.path.isfile(HOST_MOUNT_SRC):
-        steps.append((HOST_MOUNT_SCRIPT, HOST_MOUNT_SRC,
-                      os.path.join(target, HOST_MOUNT_SCRIPT)))
-    # 代理要跟包一起放在 PR2Localization\host\，那是脚本约定的取代理位置
-    # （PR2HostMount.ps1 的默认 -ProxyPath）。这里只负责把文件送到位，
-    # 真正换进根目录仍由 swap_host 在部署末尾做。
+    # 代理要跟包一起放在 PR2Localization\host\，那是启动器取代理的位置。
+    # 这里只负责把文件送到位，真正换进根目录仍由 swap_host 在部署末尾做。
     proxy_src = os.path.join(RUNTIME, steam_host.HOST_DLL)
     if os.path.isfile(proxy_src):
         steps.append(("%s\\host\\%s" % (DATA_DIR, steam_host.HOST_DLL),
@@ -189,8 +184,9 @@ def deploy_steps(target, langs, edition=None):
             steps.append(("%s\\%s" % (PACK_DIR, name), src,
                           os.path.join(target, PACK_DIR, name)))
 
-    # 宿主代理不在这里复制：替换必须校验原版、留备份、写完临时文件再换名，
-    # 这件事只在 steam_host.swap_host 里做（部署末尾单独调用）。
+    # 代理文件只在上面送到 PR2Localization\host\；换进根目录不在这里做——
+    # 替换必须校验原版、留备份、写完临时文件再换名，部署期由
+    # steam_host.swap_host 在末尾单独调用（运行时同一套动作在 Rust 启动器里）。
     return steps
 
 
@@ -302,9 +298,8 @@ def deploy(target, langs=None, edition=None):
     if has_host:
         extra = (
             "\n\n宿主 DLL：原版已备份为 %s 和 %s；"
-            "还原时运行 PR2HostMount.ps1 -Action Restore（或删掉根目录的代理后把 .orig.dll 改名回 %s）。"
-            % (steam_host.HOST_ORIG, steam_host.HOST_BACKUP,
-               steam_host.HOST_DLL)
+            "还原时点启动器的「还原原版」（或运行 PR2Localization.exe --restore）。"
+            % (steam_host.HOST_ORIG, steam_host.HOST_BACKUP)
         )
     return True, (
         "已复制到：\n%s\n\n"

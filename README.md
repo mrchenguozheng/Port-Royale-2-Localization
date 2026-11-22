@@ -17,8 +17,8 @@
 
 不需要安装器、不需要 Python、不需要编译。
 
-挂载脚本 `PR2HostMount.ps1` 由系统自带的 Windows PowerShell 执行，不用另装 PowerShell 7；
-PowerShell 被组策略锁死或系统里没有时，挂载会失败，`PR2Localization\logs\host.log` 会记下原因。
+挂载与还原都在启动器进程里完成（`pr2_common` 里的 Rust 实现），不调用 PowerShell，
+也不受「禁止执行脚本」这类组策略影响；失败原因写在 `PR2Localization\logs\host.log`。
 
 1. 确认是 **GOG 英文版 `1.1.2.3`**、Steam 英文版 `1.1.2.3`，或 GOG 法语版 `1.1.2.42`（三者都走宿主 DLL 入口）；
 2. 从 Release 下载对应语言的 zip，例如中文是 `PR2-zh-v1.0.0.zip`——**一个包两种版本都能用**；
@@ -36,12 +36,12 @@ GOG 与 Steam 的 `PR2.exe` 都静态导入同目录的 `Ascaron.Logging-2.6.dll
 一个函数），两版的原版 DLL 还是同一份字节（`11,776 B` / SHA-256 相同），所以本地化入口
 是同一条；差别只在谁来拉起进程：GOG 版启动器直启 `PR2.exe`，Steam 版交给客户端
 （`steam://rungameid/12470`）——装在 `Program Files` 下的 `PR2.exe` 直接建进程会拿到错误 740。包里不带 `VERSION.dll`（那是历史路线）。包内恒定带 `Ascaron.Logging-2.6.dll`
-宿主代理（放在 `PR2Localization\host\`，解压不会覆盖根目录原版）和 `PR2HostMount.ps1`：
-启动前由脚本校验原版 `Ascaron.Logging-2.6.dll` 的 `11,776 B` /
+宿主代理（放在 `PR2Localization\host\`，解压不会覆盖根目录原版）：
+启动前由启动器校验原版 `Ascaron.Logging-2.6.dll` 的 `11,776 B` /
 SHA-256，通过后备份成 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\`，
-再换代理；原版大小或哈希不对时脚本停止，不强行覆盖。宿主动作每一步都写
+再原子换入代理；原版大小或哈希不对时启动器停止，不强行覆盖。宿主动作每一步都写
 `PR2Localization\logs\host.log`，GUI 的还原失败对话框显示的就是它的末尾几行。
-根目录没有这个 DLL 的版本会退回注入启动，理由也写在这份日志里。
+发行包不再带任何 `.ps1`。根目录没有这个 DLL 的版本会退回注入启动，理由也写在这份日志里。
 挂载之后直接双击 `PR2.exe` 同样有效；没挂载时双击就是原版英文，挂载由启动器负责。
 `PR2Localization.exe` / `PR2LocalizationGUI.exe` 是两个版本共用的入口；原版 `PR2.exe` 本身不改。
 
@@ -145,7 +145,7 @@ pr2-localization/
 
 | 文件 | 角色 |
 |---|---|
-| `PR2Localization.exe` | 启动器。挂起方式启动 `PR2.exe`，注入 DLL 后恢复执行（构建产物） |
+| `PR2Localization.exe` | 启动器。先校验/挂载宿主代理，GOG 版直启 `PR2.exe`，Steam 版交给客户端（构建产物） |
 | `PR2LocalizationCore.dll` | 主逻辑。hook 引擎取字的三条路径，把译文替换进去（构建产物） |
 | `PR2Localization\packs\` | 语言包目录。`<语言>.txt` + `locale.default.ini`（发行默认）；用户 `locale.ini` 优先；`overrides\` 是空的覆盖位，玩家自己往里放补丁 |
 | `PR2Localization\fonts\` | 本地化字体；缺字会显示空白 |

@@ -1,4 +1,4 @@
-//! 宿主 DLL：版别判断、状态查询与挂载脚本位置。
+//! 宿主 DLL：版别判断、状态查询与挂载/还原。
 //!
 //! GOG 与 Steam 的 `PR2.exe` 都静态导入同目录的 `Ascaron.Logging-2.6.dll`
 //! （导入表里只有 `Log` 一个函数），两版的原版 DLL 也是同一份字节。所以两版
@@ -6,9 +6,9 @@
 //! GOG 版由启动器直启 `PR2.exe`；Steam 版交给客户端（`steam://rungameid/12470`），
 //! 装在 `Program Files` 下的 `PR2.exe` 直接 CreateProcess 会拿到错误 740。
 //!
-//! 替换动作本身只有一份实现 —— 发行包里的 `PR2HostMount.ps1`（先校验原版
-//! 大小/SHA-256、建两份备份、写 `.new` 校验后换名）。启动器和 GUI 只判断
-//! 需不需要挂载，需要时去调那个脚本，不在这里重复实现一遍替换。
+//! 替换动作只有一份实现，就在本模块：先校验原版大小/SHA-256、建两份备份、
+//! 写 `.new` 校验后换名，最后写挂载清单。启动器直接调用，运行期不依赖
+//! PowerShell，也不受组策略的脚本限制。
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,10 +19,8 @@ pub const HOST_DLL: &str = "Ascaron.Logging-2.6.dll";
 pub const HOST_ORIG: &str = "Ascaron.Logging-2.6.orig.dll";
 /// 发行包里的代理位置。不能放根目录，否则解压就覆盖掉游戏原版。
 pub const HOST_PROXY_REL: &str = "PR2Localization/host/Ascaron.Logging-2.6.dll";
-pub const HOST_BACKUP_REL: &str =
-    "PR2Localization/host-backup/Ascaron.Logging-2.6.dll";
+pub const HOST_BACKUP_REL: &str = "PR2Localization/host-backup/Ascaron.Logging-2.6.dll";
 pub const HOST_MANIFEST_REL: &str = "PR2Localization/host-mount.json";
-pub const HOST_MOUNT_SCRIPT: &str = "PR2HostMount.ps1";
 
 /// 原版 `Ascaron.Logging-2.6.dll`，必须大小和哈希同时对上。
 ///
@@ -104,16 +102,20 @@ pub enum HostState {
     Missing,
 }
 
-pub fn is_original_host(path: &Path) -> bool {
+fn is_original_like(path: &Path, size: u64, sha: &str) -> bool {
     let Ok(meta) = fs::metadata(path) else {
         return false;
     };
-    if !meta.is_file() || meta.len() != HOST_ORIGINAL_SIZE {
+    if !meta.is_file() || meta.len() != size {
         return false;
     }
     file_sha256_upper(path)
-        .map(|sha| sha == HOST_ORIGINAL_SHA256)
+        .map(|actual| actual == sha)
         .unwrap_or(false)
+}
+
+pub fn is_original_host(path: &Path) -> bool {
+    is_original_like(path, HOST_ORIGINAL_SIZE, HOST_ORIGINAL_SHA256)
 }
 
 fn file_sha256_upper(path: &Path) -> Option<String> {
@@ -145,7 +147,7 @@ pub fn proxy_sha256(root: &Path) -> Option<String> {
 
 /// 挂载清单里记录的代理 SHA-256（`PR2Localization\host-mount.json`）。
 ///
-/// 只取这一个字段，不引 JSON 解析：清单由挂载脚本写、格式固定，读坏了返回 None。
+/// 只取这一个字段，不引 JSON 解析：清单由本模块写、格式固定，读坏了返回 None。
 pub fn manifest_proxy_sha(root: &Path) -> Option<String> {
     let text = fs::read_to_string(root.join(HOST_MANIFEST_REL)).ok()?;
     let key = "\"proxy_sha256\"";
@@ -165,10 +167,15 @@ fn is_agent_proxy(root: &Path, root_dll: &Path) -> bool {
     let Some(root_sha) = file_sha256_upper(root_dll) else {
         return false;
     };
-    if proxy_sha256(root).map(|sha| sha == root_sha).unwrap_or(false) {
+    if proxy_sha256(root)
+        .map(|sha| sha == root_sha)
+        .unwrap_or(false)
+    {
         return true;
     }
-    manifest_proxy_sha(root).map(|sha| sha == root_sha).unwrap_or(false)
+    manifest_proxy_sha(root)
+        .map(|sha| sha == root_sha)
+        .unwrap_or(false)
 }
 
 /// 非原版的两个维度：有没有可验证的原版备份、根目录是不是本工具代理。
@@ -234,18 +241,12 @@ fn has_gog_marker(root: &Path) -> bool {
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().to_lowercase();
         if name.starts_with("goggame-")
-            && (name.ends_with(".info") || name.ends_with(".id")
-                || name.ends_with(".script"))
+            && (name.ends_with(".info") || name.ends_with(".id") || name.ends_with(".script"))
         {
             return true;
         }
     }
     false
-}
-
-/// 发行包里的挂载脚本。放在游戏根目录。
-pub fn host_script_path(root: &Path) -> PathBuf {
-    root.join(HOST_MOUNT_SCRIPT)
 }
 
 /// 根目录有没有宿主 DLL。有就能挂载直启；没有只能退回注入。
@@ -310,16 +311,249 @@ pub fn steam_app_id(root: &Path) -> Option<String> {
     Some(id.to_string())
 }
 
+// ---------------------------------------------------------------------------
+// 挂载与还原：这里就是唯一实现，启动器直接调用，不再拉起 PowerShell。
+// ---------------------------------------------------------------------------
+
+/// 挂载/还原失败的原因。文案直接写进 `host.log`，玩家在 GUI 里能看到。
+#[derive(Debug, Clone)]
+pub struct HostActionError(pub String);
+
+impl std::fmt::Display for HostActionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+fn err(message: String) -> HostActionError {
+    HostActionError(message)
+}
+
+/// 解析代理源：只认 `PR2Localization\host\`，旧包才回退到根目录。
+///
+/// 回退本身是兼容旧包的行为，所以调用方必须再校验「代理不等于原版」：
+/// 部署目录缺 `host\` 时回退到根目录同名文件，那就是原版自己。
+fn resolve_proxy(root: &Path) -> Result<(PathBuf, String), HostActionError> {
+    let path = host_proxy_path(root);
+    if !path.is_file() {
+        return Err(err(format!("找不到代理：{}", path.display())));
+    }
+    let sha =
+        file_sha256_upper(&path).ok_or_else(|| err(format!("代理不可读：{}", path.display())))?;
+    Ok((path, sha))
+}
+
+fn write_manifest(root: &Path, proxy_sha: &str, original_sha: &str) -> Result<(), HostActionError> {
+    let path = root.join(HOST_MANIFEST_REL);
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| err(format!("建目录失败 {}：{e}", dir.display())))?;
+    }
+    // 字段与顺序与旧脚本写的一致，读端（manifest_proxy_sha、pr2ctl）不用改。
+    let text = format!(
+        "{{\n  \"host\": \"{HOST_DLL}\",\n  \"original_sha256\": \"{original_sha}\",\n  \"proxy_sha256\": \"{proxy_sha}\",\n  \"backup\": \"{}\"\n}}\n",
+        HOST_BACKUP_REL
+    );
+    fs::write(&path, text).map_err(|e| err(format!("写挂载清单失败 {}：{e}", path.display())))
+}
+
+fn remove_manifest(root: &Path) {
+    let path = root.join(HOST_MANIFEST_REL);
+    if path.is_file() {
+        let _ = fs::remove_file(&path);
+    }
+}
+
+/// 先写 `<目标>.new`、校验 SHA-256，通过后再换名。
+///
+/// 复制一半被杀毒或占用打断时，根目录还是原来那份 DLL，不会留下半截文件。
+/// Windows 上 `fs::rename` 走 `MoveFileExW(REPLACE_EXISTING)`，换名是原子的。
+fn copy_atomically(
+    source: &Path,
+    dest: &Path,
+    expect_sha: &str,
+    what: &str,
+) -> Result<(), HostActionError> {
+    let mut tmp_name = dest.as_os_str().to_owned();
+    tmp_name.push(".new");
+    let tmp = PathBuf::from(tmp_name);
+    let _ = fs::remove_file(&tmp);
+
+    let result = (|| {
+        fs::copy(source, &tmp).map_err(|e| err(format!("{what} 复制失败：{e}")))?;
+        if file_sha256_upper(&tmp).as_deref() != Some(expect_sha) {
+            return Err(err(format!("{what} 复制后校验失败（临时文件哈希不符）")));
+        }
+        fs::rename(&tmp, dest).map_err(|e| {
+            err(format!(
+                "{what} 替换失败：{e}（游戏或杀毒可能正占用 {}）",
+                dest.file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default()
+            ))
+        })?;
+        Ok(())
+    })();
+
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp);
+        return result;
+    }
+    if file_sha256_upper(dest).as_deref() != Some(expect_sha) {
+        return Err(err(format!("{what} 替换后校验失败")));
+    }
+    Ok(())
+}
+
+/// 保证 `.orig.dll` 与 `host-backup\` 两份备份都是可验证的原版。
+///
+/// `from_root` 只在根目录确认是原版时为真：这时可以直接把根目录文件复制成
+/// 第一份备份。根目录已经是代理时，只能从已有的备份反推，绝不能拿代理当备份。
+fn ensure_backups(
+    root: &Path,
+    original_size: u64,
+    original_sha: &str,
+    from_root: bool,
+) -> Result<(), HostActionError> {
+    let root_dll = root.join(HOST_DLL);
+    let orig = root.join(HOST_ORIG);
+    let backup = root.join(HOST_BACKUP_REL);
+
+    if orig.is_file() {
+        if !is_original_like(&orig, original_size, original_sha) {
+            return Err(err(".orig.dll 不是已知原版，拒绝覆盖".to_string()));
+        }
+    } else if from_root && is_original_like(&root_dll, original_size, original_sha) {
+        fs::copy(&root_dll, &orig).map_err(|e| err(format!("备份 .orig.dll 失败：{e}")))?;
+    } else if is_original_like(&backup, original_size, original_sha) {
+        // 只剩 host-backup 一份时先把它补回 .orig.dll，还原路径才有得用。
+        if let Some(dir) = orig.parent() {
+            fs::create_dir_all(dir).ok();
+        }
+        fs::copy(&backup, &orig).map_err(|e| err(format!("补回 .orig.dll 失败：{e}")))?;
+    } else {
+        return Err(err(
+            "没有可验证的 .orig.dll 或 host-backup，拒绝继续".to_string()
+        ));
+    }
+
+    if let Some(dir) = backup.parent() {
+        fs::create_dir_all(dir)
+            .map_err(|e| err(format!("建备份目录失败 {}：{e}", dir.display())))?;
+    }
+    if !is_original_like(&backup, original_size, original_sha) {
+        fs::copy(&orig, &backup).map_err(|e| err(format!("备份 host-backup 失败：{e}")))?;
+        if !is_original_like(&backup, original_size, original_sha) {
+            return Err(err("第二份备份写入后校验失败".to_string()));
+        }
+    }
+    Ok(())
+}
+
+/// 把根目录宿主 DLL 换成代理：校验 → 建两份备份 → 原子替换 → 写清单。
+///
+/// 只接受「根目录是已知原版」或「根目录是本工具代理且备份可验证」两种状态；
+/// 其余一律拒绝，避免覆盖别的 mod 或未知文件。
+pub fn mount_host(root: &Path) -> Result<(), HostActionError> {
+    mount_host_with(root, HOST_ORIGINAL_SIZE, HOST_ORIGINAL_SHA256)
+}
+
+fn mount_host_with(
+    root: &Path,
+    original_size: u64,
+    original_sha: &str,
+) -> Result<(), HostActionError> {
+    if !root.join("PR2.exe").is_file() {
+        return Err(err(format!("目标目录没有 PR2.exe：{}", root.display())));
+    }
+    let root_dll = root.join(HOST_DLL);
+    if !root_dll.is_file() {
+        return Err(err(format!("目标目录没有 {HOST_DLL}，不能挂载宿主代理")));
+    }
+
+    let (proxy, proxy_sha) = resolve_proxy(root)?;
+    if proxy_sha == original_sha {
+        return Err(err(format!(
+            "代理源是原版 DLL：{}。发行包应在 {HOST_PROXY_REL} 放本地化代理；把原版当代理挂载只会静默失败。",
+            proxy.display()
+        )));
+    }
+
+    let root_sha = file_sha256_upper(&root_dll);
+    if is_original_like(&root_dll, original_size, original_sha) {
+        ensure_backups(root, original_size, original_sha, true)?;
+    } else {
+        let orig = root.join(HOST_ORIG);
+        let backup = root.join(HOST_BACKUP_REL);
+        let has_backup = is_original_like(&orig, original_size, original_sha)
+            || is_original_like(&backup, original_size, original_sha);
+        let is_proxy = root_sha.as_deref() == Some(proxy_sha.as_str())
+            || manifest_proxy_sha(root).as_deref() == root_sha.as_deref();
+        if !has_backup || !is_proxy {
+            return Err(err(
+                "根目录 DLL 不是已知原版，也不是本工具代理；拒绝挂载".to_string()
+            ));
+        }
+        ensure_backups(root, original_size, original_sha, false)?;
+    }
+
+    if root_sha.as_deref() != Some(proxy_sha.as_str()) {
+        copy_atomically(&proxy, &root_dll, &proxy_sha, "宿主代理")?;
+    }
+    write_manifest(root, &proxy_sha, original_sha)?;
+    Ok(())
+}
+
+/// 把根目录宿主 DLL 换回原版。只接受本工具代理，不覆盖未知文件。
+pub fn restore_host(root: &Path) -> Result<(), HostActionError> {
+    restore_host_with(root, HOST_ORIGINAL_SIZE, HOST_ORIGINAL_SHA256)
+}
+
+fn restore_host_with(
+    root: &Path,
+    original_size: u64,
+    original_sha: &str,
+) -> Result<(), HostActionError> {
+    let root_dll = root.join(HOST_DLL);
+    if !root_dll.is_file() {
+        return Err(err(format!("找不到 {HOST_DLL}，无法还原")));
+    }
+    if is_original_like(&root_dll, original_size, original_sha) {
+        remove_manifest(root);
+        return Ok(());
+    }
+
+    let orig = root.join(HOST_ORIG);
+    let backup = root.join(HOST_BACKUP_REL);
+    if !is_original_like(&orig, original_size, original_sha) {
+        if is_original_like(&backup, original_size, original_sha) {
+            fs::copy(&backup, &orig).map_err(|e| err(format!("补回 .orig.dll 失败：{e}")))?;
+        } else {
+            return Err(err(
+                "没有可验证的 .orig.dll 或 host-backup，拒绝还原".to_string()
+            ));
+        }
+    }
+
+    let root_sha = file_sha256_upper(&root_dll).unwrap_or_default();
+    let proxy_sha = file_sha256_upper(&host_proxy_path(root)).unwrap_or_default();
+    let known = manifest_proxy_sha(root).unwrap_or_default();
+    if root_sha != proxy_sha && root_sha != known {
+        return Err(err(
+            "根目录 DLL 不是本工具代理；拒绝覆盖未知文件".to_string()
+        ));
+    }
+
+    copy_atomically(&orig, &root_dll, original_sha, "原版宿主")?;
+    remove_manifest(root);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn tmp(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "pr2-host-rs-{}-{}",
-            tag,
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("pr2-host-rs-{}-{}", tag, std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -347,11 +581,11 @@ mod tests {
     fn detects_steam_by_library_path() {
         // Steam 安装本身不写 steam_appid.txt（那是给非 Steam 启动用的），
         // 所以库路径也得能单独认出来。
-        let root = PathBuf::from(
-            r"C:\Program Files (x86)\Steam\steamapps\common\Port Royale 2",
-        );
+        let root = PathBuf::from(r"C:\Program Files (x86)\Steam\steamapps\common\Port Royale 2");
         assert!(in_steam_library(&root));
-        assert!(!in_steam_library(Path::new(r"C:\My\Games\Port Royale 2 GOG EN")));
+        assert!(!in_steam_library(Path::new(
+            r"C:\My\Games\Port Royale 2 GOG EN"
+        )));
         assert!(!in_steam_library(Path::new(r"D:\Games\Port Royale 2")));
     }
 
@@ -442,8 +676,11 @@ mod tests {
         fs::create_dir_all(dir.join("PR2Localization/host")).unwrap();
         fs::write(dir.join(HOST_PROXY_REL), b"new proxy build").unwrap();
         let sha = file_sha256_upper(&dir.join(HOST_DLL)).unwrap();
-        fs::write(dir.join(HOST_MANIFEST_REL),
-                  format!("{{\n  \"proxy_sha256\": \"{sha}\"\n}}\n")).unwrap();
+        fs::write(
+            dir.join(HOST_MANIFEST_REL),
+            format!("{{\n  \"proxy_sha256\": \"{sha}\"\n}}\n"),
+        )
+        .unwrap();
         assert_eq!(host_state(&dir), HostState::ProxyNoBackup);
         let _ = fs::remove_dir_all(&dir);
     }
@@ -454,8 +691,11 @@ mod tests {
         fs::create_dir_all(dir.join("PR2Localization")).unwrap();
         fs::write(dir.join(HOST_MANIFEST_REL), b"not json").unwrap();
         assert_eq!(manifest_proxy_sha(&dir), None);
-        fs::write(dir.join(HOST_MANIFEST_REL),
-                  b"{\"proxy_sha256\": \"short\"}").unwrap();
+        fs::write(
+            dir.join(HOST_MANIFEST_REL),
+            b"{\"proxy_sha256\": \"short\"}",
+        )
+        .unwrap();
         assert_eq!(manifest_proxy_sha(&dir), None);
         let _ = fs::remove_dir_all(&dir);
     }
@@ -500,5 +740,123 @@ mod tests {
         assert_eq!(proxy_log_len(&dir), 0);
         assert!(!proxy_loaded_after(&dir, 0));
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// 用假的原版字节跑挂载/还原：真实原版是 11776 B 的二进制，不便入库。
+    /// 大小与 SHA 由 `*_with` 参数传入，判定逻辑与真实常量完全同一套代码。
+    struct Fixture {
+        dir: PathBuf,
+        size: u64,
+        sha: String,
+    }
+
+    fn fixture(tag: &str) -> Fixture {
+        let dir = tmp(tag);
+        let original = b"fake original host dll".to_vec();
+        fs::write(dir.join("PR2.exe"), b"stub").unwrap();
+        fs::write(dir.join(HOST_DLL), &original).unwrap();
+        fs::create_dir_all(dir.join("PR2Localization/host")).unwrap();
+        fs::write(dir.join(HOST_PROXY_REL), b"fake localization proxy").unwrap();
+        let sha = file_sha256_upper(&dir.join(HOST_DLL)).unwrap();
+        Fixture {
+            dir,
+            size: original.len() as u64,
+            sha,
+        }
+    }
+
+    #[test]
+    fn mount_backs_up_twice_and_swaps_in_proxy() {
+        let f = fixture("mount-ok");
+        mount_host_with(&f.dir, f.size, &f.sha).unwrap();
+
+        let root = fs::read(f.dir.join(HOST_DLL)).unwrap();
+        assert_eq!(root, b"fake localization proxy");
+        assert_eq!(
+            fs::read(f.dir.join(HOST_ORIG)).unwrap(),
+            b"fake original host dll"
+        );
+        assert_eq!(
+            fs::read(f.dir.join(HOST_BACKUP_REL)).unwrap(),
+            b"fake original host dll"
+        );
+        assert_eq!(
+            manifest_proxy_sha(&f.dir),
+            file_sha256_upper(&f.dir.join(HOST_DLL))
+        );
+        assert!(!f
+            .dir
+            .join("PR2Localization/host/Ascaron.Logging-2.6.dll.new")
+            .exists());
+
+        // 已经挂载时再跑一次：不重复改写，也不破坏备份。
+        mount_host_with(&f.dir, f.size, &f.sha).unwrap();
+        assert_eq!(
+            fs::read(f.dir.join(HOST_DLL)).unwrap(),
+            b"fake localization proxy"
+        );
+        let _ = fs::remove_dir_all(&f.dir);
+    }
+
+    #[test]
+    fn restore_puts_the_original_back_and_drops_manifest() {
+        let f = fixture("restore-ok");
+        mount_host_with(&f.dir, f.size, &f.sha).unwrap();
+        restore_host_with(&f.dir, f.size, &f.sha).unwrap();
+
+        assert_eq!(
+            fs::read(f.dir.join(HOST_DLL)).unwrap(),
+            b"fake original host dll"
+        );
+        assert!(!f.dir.join(HOST_MANIFEST_REL).exists());
+        // 还原后再还原一次是幂等的。
+        restore_host_with(&f.dir, f.size, &f.sha).unwrap();
+        let _ = fs::remove_dir_all(&f.dir);
+    }
+
+    #[test]
+    fn restore_recovers_from_host_backup_when_orig_is_gone() {
+        let f = fixture("restore-backup");
+        mount_host_with(&f.dir, f.size, &f.sha).unwrap();
+        fs::remove_file(f.dir.join(HOST_ORIG)).unwrap();
+        restore_host_with(&f.dir, f.size, &f.sha).unwrap();
+        assert_eq!(
+            fs::read(f.dir.join(HOST_DLL)).unwrap(),
+            b"fake original host dll"
+        );
+        assert!(f.dir.join(HOST_ORIG).is_file());
+        let _ = fs::remove_dir_all(&f.dir);
+    }
+
+    #[test]
+    fn mount_refuses_unknown_root_dll() {
+        let f = fixture("mount-unknown");
+        fs::write(f.dir.join(HOST_DLL), b"some other mod").unwrap();
+        let err = mount_host_with(&f.dir, f.size, &f.sha).unwrap_err();
+        assert!(err.0.contains("拒绝挂载"), "{}", err.0);
+        assert_eq!(fs::read(f.dir.join(HOST_DLL)).unwrap(), b"some other mod");
+        let _ = fs::remove_dir_all(&f.dir);
+    }
+
+    #[test]
+    fn mount_refuses_proxy_that_is_the_original() {
+        let f = fixture("mount-proxy-original");
+        fs::write(f.dir.join(HOST_PROXY_REL), b"fake original host dll").unwrap();
+        let err = mount_host_with(&f.dir, f.size, &f.sha).unwrap_err();
+        assert!(err.0.contains("代理源是原版 DLL"), "{}", err.0);
+        let _ = fs::remove_dir_all(&f.dir);
+    }
+
+    #[test]
+    fn mount_refuses_corrupt_orig_backup() {
+        let f = fixture("mount-corrupt-orig");
+        fs::write(f.dir.join(HOST_ORIG), b"not an original").unwrap();
+        let err = mount_host_with(&f.dir, f.size, &f.sha).unwrap_err();
+        assert!(err.0.contains(".orig.dll 不是已知原版"), "{}", err.0);
+        assert_eq!(
+            fs::read(f.dir.join(HOST_DLL)).unwrap(),
+            b"fake original host dll"
+        );
+        let _ = fs::remove_dir_all(&f.dir);
     }
 }

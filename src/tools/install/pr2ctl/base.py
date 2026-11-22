@@ -41,11 +41,8 @@ FLAT_FILES = (
     "PR2LocalizationGUI.exe",
     "PR2LocalizationCore.dll",
 )
-#: 宿主挂载/还原脚本。它在 src\tools\install\ 下，不在 build\runtime\；
-#: 启动器的 --vanilla 与「还原原版」都要调它，部署必须一并复制，
-#: 否则还原那一步会直接报「找不到 PR2HostMount.ps1」。
-HOST_MOUNT_SCRIPT = "PR2HostMount.ps1"
-HOST_MOUNT_SRC = os.path.join(SRC, "tools", "install", HOST_MOUNT_SCRIPT)
+#: 宿主 DLL 的挂载/还原已收进启动器（pr2_common::host），发行包不再带脚本。
+#: 部署只负责把代理送到 PR2Localization\host\，再在末尾换进根目录。
 # 运行时数据目录；语言包、字体、UI、日志都放在它下面。
 DATA_DIR = "PR2Localization"
 PACK_DIR = os.path.join(DATA_DIR, "packs")

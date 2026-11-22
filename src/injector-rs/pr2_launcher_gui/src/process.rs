@@ -142,7 +142,7 @@ pub fn restore(root: &Path) -> Result<(), u32> {
     }
     let mut code = 0u32;
     unsafe {
-        // 还原要走一次 PowerShell 脚本，给到 30 秒；超时按失败处理。
+        // 还原/挂载都由启动器子进程在内部完成，给到 30 秒；超时按失败处理。
         if WaitForSingleObject(pi.hProcess, 30000) != 0 {
             code = 1;
         } else {

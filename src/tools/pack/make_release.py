@@ -8,7 +8,6 @@
       PR2Localization.exe
       PR2LocalizationGUI.exe
       PR2LocalizationCore.dll
-      PR2HostMount.ps1                 # 两版共用的宿主挂载/还原
       PR2Localization/
         host/Ascaron.Logging-2.6.dll   # 宿主代理，挂载时才换进根目录
         packs/zh.txt
@@ -25,9 +24,9 @@
 还是同一份字节。所以启动器先确保宿主代理挂载，再按版别拉起游戏：GOG 直启
 PR2.exe，Steam 交给客户端（steam://rungameid/12470）；
 根目录没有这个 DLL 的版本才退回注入。宿主代理放在 PR2Localization\\host\\，
-不占根目录原名，解压不会覆盖游戏原版。PR2HostMount.ps1 负责校验原版大小/
-哈希、备份成 Ascaron.Logging-2.6.orig.dll、原子换进根目录和还原；启动器
-PR2Localization.exe 会自动调它，玩家不需要手动运行脚本。
+不占根目录原名，解压不会覆盖游戏原版。启动器在自己进程里校验原版大小/
+哈希、备份成 Ascaron.Logging-2.6.orig.dll、原子换进根目录和还原，运行期
+不调用 PowerShell，也不受组策略的脚本限制。
 发行包不包含游戏本体。字体只做映射：默认 ``noto``（静态 Noto 替换字体 +
 ``font-map.default.ini``）；``config`` 只带默认映射；用户可另建 font-map.ini
 按项覆盖它，解压升级不会覆盖这个文件。``none`` 不带字体。
@@ -69,12 +68,11 @@ DATA_DIR = "PR2Localization"
 FLAT_COMMON = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
                "PR2LocalizationCore.dll")
 HOST_DLL = "Ascaron.Logging-2.6.dll"
-HOST_MOUNT_SCRIPT = "PR2HostMount.ps1"
 #: 宿主代理放在数据目录里，不能放在根目录：根目录的同名文件是游戏原版，
 #: 解压时覆盖它就没有原版可校验、可备份、可还原了。挂载动作再把代理换进根目录。
 #: 两版都带同名原版 DLL、都静态导入它，所以这两份文件两版都用得上。
 HOST_PROXY_REL = os.path.join(DATA_DIR, "host", HOST_DLL)
-FLAT_PACKAGE = FLAT_COMMON + (HOST_MOUNT_SCRIPT,)
+FLAT_PACKAGE = FLAT_COMMON
 RUNTIME_VERSION = 2  # 与 src/injector-rs/pr2_common/src/lib.rs 的 RUNTIME_VERSION 保持一致
 # 空目录条目没有内容，时间戳固定成 zip 能表示的最早时刻，保证重建逐字节相同。
 DEFAULT_ZIP_DATE = (1980, 1, 1, 0, 0, 0)
@@ -142,7 +140,7 @@ def check_runtime_version(log=print):
 
 
 def build_pack(langs, stage, log, default_lang, version=""):
-    """发行包里的语言包恒为**并集**：两版都走宿主代理，PR2HostMount.ps1 把
+    """发行包里的语言包恒为**并集**：两版都走宿主代理，启动器把
     Ascaron.Logging-2.6.dll 换成代理，代理再加载同一个
     PR2LocalizationCore.dll；两条路径读的都是 packs\\<lang>.txt，
     所以一个包里放同一份文件，装哪种版本都行。逐版对照在 build\\variants 里。
@@ -174,12 +172,9 @@ def build_pack(langs, stage, log, default_lang, version=""):
 
 
 def copy_runtime(stage, log):
-    """平铺运行时常量和宿主挂载脚本，代理单独落 ``PR2Localization\\host\\``。"""
+    """平铺运行时文件，代理单独落 ``PR2Localization\\host\\``。"""
     for name in FLAT_PACKAGE:
-        if name == HOST_MOUNT_SCRIPT:
-            src = os.path.join(TOOLS, "install", name)
-        else:
-            src = os.path.join(RUNTIME, name)
+        src = os.path.join(RUNTIME, name)
         if not os.path.isfile(src):
             raise FileNotFoundError("缺 %s，先构建注入器" % src)
         shutil.copy2(src, os.path.join(stage, name))
@@ -417,15 +412,15 @@ def write_readme(langs, default_lang, stage, modes, version="",
      习惯命令行的可以在游戏根目录运行（--lang 只对 GOG 版有效，
      Steam 版会直接报错退出）：
        PR2Localization.exe --lang=<代码>
-       powershell -ExecutionPolicy Bypass -File .\\PR2HostMount.ps1 -Action Mount
+       PR2Localization.exe --mount          （只挂载，不启动）
   3. 还原原版：在启动器里点「还原原版」，或运行
        PR2Localization.exe --restore
-     等价写法：powershell -ExecutionPolicy Bypass -File .\\PR2HostMount.ps1 -Action Restore
+     等价写法：PR2Localization.exe --restore（再次运行不会重复改动）
      会把 Ascaron.Logging-2.6.dll 换回原版并恢复原版字体。
      还原过程写在 PR2Localization\\logs\\host.log，失败时 GUI 对话框会带上它的末尾几行。"""
     uninstall_line = """  先点启动器的「还原」（会换回原版宿主 DLL），或运行
   PR2Localization.exe --restore；再删除 PR2Localization.exe、
-  PR2LocalizationGUI.exe、PR2LocalizationCore.dll、PR2HostMount.ps1
+  PR2LocalizationGUI.exe、PR2LocalizationCore.dll
   和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。
   如果保留过 PR2Localization\\packs\\overrides\\，卸载前先复制出来。"""
     support_line = ("支持游戏版本：GOG 英文 1.1.2.3、Steam 英文 1.1.2.3 与 GOG 法语 1.1.2.42 "
@@ -626,7 +621,7 @@ def make_release(langs, version, out_dir, mode, log=None, cache=True,
                  baseline_tag=""):
     """出一份发行 zip：langs 里所有语言放进同一个包，共用字体与一份映射。
 
-    一个包同时面向 GOG 与 Steam：宿主代理和挂载脚本恒定进包，两版都先挂载；
+    一个包同时面向 GOG 与 Steam：宿主代理恒定进包，两版都由启动器先挂载；
     之后由谁来拉起进程按版别决定。包名不含版别，`PR2-<pkg_id>-<version>.zip`。
 
     package_id 为空时按第一个语言命名（单语言包，与旧行为一致）；

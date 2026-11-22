@@ -21,9 +21,11 @@
   少 19 条，按原样保留。其他未验收版本（零售版、补丁版）仍不在支持范围内，不要在它们上面
   部署后把“注入不生效”当作本仓库回归。
 - 发行包按语言分组，**一个包同时面向 GOG 与 Steam**：包内恒定带
-  `PR2HostMount.ps1` 和 `PR2Localization\host\Ascaron.Logging-2.6.dll`。
+  `PR2Localization\host\Ascaron.Logging-2.6.dll` 宿主代理，不带任何 `.ps1`。
   不需要 Python 或 Rust 工具链。挂载必须先校验原版
   `Ascaron.Logging-2.6.dll` 的 11,776 B / SHA-256，再备份、替换；未知文件不覆盖。
+  替换动作只有一份实现：`src/injector-rs/pr2_common/src/host.rs`，启动器进程内直接调，
+  不再拉 PowerShell，也不受组策略的脚本限制。
   根目录没有这个 DLL 的版本自动退回注入，理由写进 `PR2Localization\logs\host.log`；
   不要把这个回退做成静默跳过。
   还原走 `PR2Localization.exe --restore` 或 GUI 的「还原原版」按钮，两版同一套动作。
@@ -59,8 +61,10 @@ Rust 产物：
 - `PR2LocalizationProxy.dll`（旧 `VERSION.dll` 代理构建；发行包已不再使用）
 - `pr2_host_proxy.dll`（日志宿主代理；部署名 `Ascaron.Logging-2.6.dll`）
 
-发行包使用宿主代理 `Ascaron.Logging-2.6.dll` 和
-`src/tools/install/PR2HostMount.ps1`，两版同一条路径。代理不是游戏原文件；原版备份为
+发行包使用宿主代理 `Ascaron.Logging-2.6.dll`：
+替换/还原在 `pr2_common::host` 里（`mount_host` / `restore_host`），两版同一条路径。
+Python 的 `pr2ctl/steam_host.py` 只在部署期用，常量由 `tests/test_host_constants.py`
+与 Rust 交叉断言。代理不是游戏原文件；原版备份为
 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\Ascaron.Logging-2.6.dll`，
 不要在未校验原版大小/哈希时覆盖。
 

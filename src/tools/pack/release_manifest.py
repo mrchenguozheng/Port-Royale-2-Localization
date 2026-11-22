@@ -158,8 +158,6 @@ def kind_for(path):
         return "runtime-version"
     if path in ("README.txt", "OFL.txt", "NOTO-SOURCES.txt"):
         return "doc"
-    if path == "PR2HostMount.ps1":
-        return "script"
     if path.startswith("PR2Localization/host/"):
         return "host-proxy"
     if path.startswith("PR2Localization/packs/"):
