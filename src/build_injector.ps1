@@ -85,6 +85,33 @@ if (-not $Cargo -or -not (Test-Path -LiteralPath $Cargo -PathType Leaf)) {
 }
 
 Write-Host '[build] cargo build --release'
+
+# 版本注入：pr2_common\build.rs 把这三个值编进 exe，启动器用它显示
+# 「本地化运行时 v1 · v1.0.0 (c8aa6e3)」与 --version。
+#   - PR2_VERSION 由 release.ps1 从 -Version 传进来；直接构建时取当前 tag
+#     （release-v1.0.0 → v1.0.0），不在 tag 上就留空，显示成 dev。
+#   - commit / dirty 只有拿不到环境变量时才自己算，CI 可以覆盖。
+$GitCmd = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue
+if (-not $GitCmd) { $GitCmd = Get-Command git -CommandType Application -ErrorAction SilentlyContinue }
+if (-not $env:PR2_VERSION -and $GitCmd) {
+    $tag = @(& $GitCmd.Source -C $Repo describe --tags --exact-match 2>$null)
+    if ($tag.Count -gt 0 -and $tag[0]) {
+        $env:PR2_VERSION = ($tag[0] -replace '^release-', '')
+    }
+}
+if (-not $env:PR2_COMMIT -and $GitCmd) {
+    $commit = @(& $GitCmd.Source -C $Repo rev-parse --short HEAD 2>$null)
+    if ($commit.Count -gt 0 -and $commit[0]) { $env:PR2_COMMIT = $commit[0] }
+}
+if (-not $env:PR2_DIRTY -and $GitCmd) {
+    $porcelain = @(& $GitCmd.Source -C $Repo status --porcelain 2>$null)
+    $env:PR2_DIRTY = if ($porcelain.Count -gt 0) { '1' } else { '0' }
+}
+$ShowVersion = if ($env:PR2_VERSION) { $env:PR2_VERSION } else { 'dev' }
+$ShowCommit = if ($env:PR2_COMMIT) { $env:PR2_COMMIT } else { 'unknown' }
+$ShowDirty = if ($env:PR2_DIRTY -eq '1') { ' (未提交改动)' } else { '' }
+Write-Host ("[build] 版本：{0} · commit {1}{2}" -f $ShowVersion, $ShowCommit, $ShowDirty)
+
 Push-Location $RustDir
 try {
     & $Cargo build --release --locked

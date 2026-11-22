@@ -89,6 +89,34 @@ class TestUiLayout(unittest.TestCase):
         # 旧写法是逐个语言 Copy-Item 到 runtime；现在只发默认文件，旧文件被清掉。
         self.assertNotIn("Copy-Item -LiteralPath $ini", text)
 
+    def test_default_ui_has_version_keys(self):
+        """副标题与状态框的版本文案：ini 与 Rust 内置回退必须成对，占位符也要对得上。
+
+        ini 少一个 key 时旧安装的界面会直接显示 key 名；Rust 少一个时旧包
+        （没有新 key 的 ui.default.ini）会显示成 key 名。两边都得有。
+        """
+        ini = os.path.join(ROOT, "src", "injector-rs", "ui", "ui.default.ini")
+        with open(ini, encoding="utf-8") as fh:
+            text = fh.read().replace("\r\n", "\n")
+
+        def line_for(key):
+            return [ln for ln in text.split("\n") if ln.startswith(key + "=")][0]
+
+        self.assertEqual(line_for("subtitle.version").count("%"), 2,
+                         "subtitle.version 要同时填运行时版本与发行版本")
+        self.assertIn("%d", line_for("subtitle.version"))
+        self.assertIn("%s", line_for("subtitle.version"))
+        self.assertEqual(line_for("status.count_pack").count("%"), 2,
+                         "status.count_pack 要填包数量与当前包名")
+
+        rust = os.path.join(ROOT, "src", "injector-rs", "pr2_launcher_gui",
+                            "src", "strings.rs")
+        with open(rust, encoding="utf-8") as fh:
+            builtin = fh.read()
+        for key in ("subtitle.version", "status.count_pack"):
+            self.assertIn('"%s"' % key, builtin,
+                          "strings.rs 的 BUILTIN 缺 %s" % key)
+
 
 if __name__ == "__main__":
     unittest.main()

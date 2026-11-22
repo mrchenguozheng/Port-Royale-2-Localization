@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::ptr;
 
 use pr2_common::{
-    detect_edition, exe_dir, language_fonts_complete, read_locale_language,
+    build_label, detect_edition, exe_dir, language_fonts_complete, read_locale_language,
     write_locale_language, Edition, RUNTIME_VERSION,
 };
 use windows_sys::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
@@ -242,10 +242,16 @@ impl App {
                 0,
                 ptr::null(),
             );
+            // 副标题带两件版本：运行时契约（v1）与本 exe 的发行版本，
+            // 出问题时玩家截图就能说清装的是哪一版。
+            let subtitle = self.strings.tf(
+                "subtitle.version",
+                &[Arg::Num(RUNTIME_VERSION), Arg::Str(build_label())],
+            );
             self.subtitle = CreateWindowExW(
                 0,
                 wide("STATIC").as_ptr(),
-                wide(&self.strings.t("subtitle")).as_ptr(),
+                wide(&subtitle).as_ptr(),
                 WS_CHILD | WS_VISIBLE | ST_LEFT | ST_NOPREFIX,
                 px(24),
                 px(54),
@@ -454,7 +460,9 @@ impl App {
             SendMessageW(self.combo, CB_RESETCONTENT, 0, 0);
         }
         for pack in &self.packs {
-            let label = wide(&pack.label);
+            // 列表项带 pack 头里的版本：同一门语言的 v1.0.0 与 v1.1.0 在目录里
+            // 文件名一样，只能靠这里区分。
+            let label = wide(&pack.display_label());
             unsafe {
                 SendMessageW(
                     self.combo,
@@ -494,10 +502,16 @@ impl App {
 
     fn update_status(&self) {
         let count = self.packs.len() as u32;
-        let text = if count > 0 {
-            self.strings.tf("status.count", &[Arg::Num(count)])
-        } else {
+        let text = if count == 0 {
             self.strings.t("status.none")
+        } else if let Some(pack) = self.selected_pack() {
+            // 状态框把当前选中包连同版本说出来，和下拉列表里的写法一致。
+            self.strings.tf(
+                "status.count_pack",
+                &[Arg::Num(count), Arg::Str(pack.display_label())],
+            )
+        } else {
+            self.strings.tf("status.count", &[Arg::Num(count)])
         };
         unsafe {
             SetWindowTextW(self.status, wide(&text).as_ptr());

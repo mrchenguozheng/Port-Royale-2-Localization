@@ -52,6 +52,11 @@ Release packages are not split by entry point: one zip
 the host-DLL proxy and mount script — GOG never executes them — and the
 launcher detects the edition from the game directory.
 
+Versions are visible in three places, all from the same `-Version` value: the
+GUI subtitle (`runtime v1 · v1.0.0 (c8aa6e3)`), each language list entry
+(`简体中文 · v1.0.0` — read from the pack's `# pack-meta version=` header), and
+`PR2Localization.exe --version`. Dev builds print `dev (c8aa6e3+dirty)`.
+
 ## Documentation
 
 All maintained documentation is in Chinese. This page is the only English

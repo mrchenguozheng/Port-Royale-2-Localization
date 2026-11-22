@@ -154,7 +154,10 @@ def _default_lang():
 
 
 def load_pack_meta(lang):
-    """读取 src/packs/<语言>.toml 的 alias/min_runtime；这是写进语言包的元数据。"""
+    """读取 src/packs/<语言>.toml 的 alias/min_runtime/version；这是写进语言包的元数据。
+
+    ``version`` 可选：开发构建不写，发行时由 ``--version`` 注入（出包版本号）。
+    """
     p = os.path.join(SRC, "packs", lang + ".toml")
     if not os.path.isfile(p):
         return {}
@@ -162,8 +165,20 @@ def load_pack_meta(lang):
         doc = tomllib.load(open(p, "rb"))
     except Exception:
         return {}
-    return {k: str(doc[k]) for k in ("alias", "min_runtime")
+    return {k: str(doc[k]) for k in ("alias", "min_runtime", "version")
             if doc.get(k)}
+
+
+#: 写进 ``# pack-meta version=`` 的值：vMAJOR.MINOR.PATCH[-prerelease]，不带前缀 v。
+PACK_VERSION_RE = re.compile(r"^v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?)$")
+
+
+def normalize_pack_version(value):
+    """把发行版本号归一成 pack 头里的写法（去掉 ``v``）；不合规返回空串。"""
+    if not value:
+        return ""
+    match = PACK_VERSION_RE.match(str(value).strip())
+    return match.group(1) if match else ""
 
 
 LEAD_TAGS = re.compile(r"(?:<[^>]*>)*")
@@ -222,19 +237,26 @@ def _is_resource_id(s):
     return bool(s) and "_" in s and is_identifier(s)
 
 
-def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal):
+def _pack_lines(lang, b, engine, by_hash, mk, marks, errors, warnings, fatal,
+                pack_version=""):
     """按某份基线的键集出行（顺序 = 该版本原文表的顺序）。
 
     【并集与缺行】译文层是 `src\\translations\\<语言>.toml` 一套，键集覆盖基准版
     全部条目；个别版本独有的键（fr.gog_1.1.2.42 多出 42 条）在任何语版里都是
     `+++EMPTY+++`，译文层不为它们建行 —— 这里从原文表复制该值，既是「原文空」
     也是「不用翻」，不是漏译。原文非空却没有译文行，才是漏译，报错误。
+
+    【pack 头】``alias`` / ``min_runtime`` 来自 src\\packs\\<语言>.toml；
+    ``version`` 优先取调用方传进来的发行版本（``--version``），没有时用 toml 里的。
+    GUI 靠这三行显示「简体中文 · v1.0.0」，运行时只读取 min_runtime。
     """
     from text import versions as V
     import translate as T
     lines = []
     meta = load_pack_meta(lang)
-    for k in ("alias", "min_runtime"):
+    if pack_version:
+        meta["version"] = pack_version
+    for k in ("alias", "min_runtime", "version"):
         if meta.get(k):
             val = meta[k].replace("\n", " ").replace("\r", " ")
             lines.append("# pack-meta %s=%s\n" % (k, val))
@@ -315,7 +337,7 @@ def union_baseline(bases):
 
 
 def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None,
-          union=False):
+          union=False, pack_version=""):
     # 参考原文**不参与编译**：生成 en.txt / fr.txt 交给引擎等于用「原始英文」
     # 覆盖游戏，等于没汉化。所以直接拒绝，而不是打个警告继续跑。
     # 名单问 translate —— 那里是唯一一份（src\orig\en.gog_1.1.2.3 之类）。
@@ -327,6 +349,16 @@ def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None,
               % (lang, "/".join(T.REFERENCE_LANGS)))
         print("      英文/法文只用于校对译文与 id 顺序对照。")
         return 2
+
+    # 版本号写进 pack 头之前先归一：不合规就停，不要出一个版本号写成
+    # 半截的包（GUI 只能把那段字符串原样显示）。
+    if pack_version:
+        normalized = normalize_pack_version(pack_version)
+        if not normalized:
+            print("拒绝：语言包版本号不合法：%s（只接受 vMAJOR.MINOR.PATCH[-prerelease]）"
+                  % pack_version)
+            return 2
+        pack_version = normalized
 
     # 合并层的字段名就是语言代码本身（文件名即语言名，不做映射）。
     field = lang
@@ -370,7 +402,8 @@ def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None,
     for b in bases:
         errors, warnings, fatal = [], [], []
         lines, n, n_ph, n_empty, n_ident, meta = _pack_lines(
-            lang, b, engine, by_hash, mk, marks, errors, warnings, fatal)
+            lang, b, engine, by_hash, mk, marks, errors, warnings, fatal,
+            pack_version=pack_version)
         dst_dir = out_dir if b["primary"] else os.path.join(variant_out, b["id"])
         path = os.path.join(dst_dir, "%s.txt" % lang)
         os.makedirs(dst_dir, exist_ok=True)
@@ -450,11 +483,15 @@ def main():
     ap.add_argument("--union", action="store_true",
                     help="只出一份并集包（所有基线的键集合并，写在 --out 的 <语言>.txt）。"
                          "GOG 与 Steam 两个发行包共用这一份；逐版对照仍用默认模式。")
+    ap.add_argument("--version", default="",
+                    help="写进 pack 头的发行版本号（如 v1.0.0），启动器用它显示"
+                         "「简体中文 · v1.0.0」；不给时不写这一行")
     a = ap.parse_args()
     lang = a.lang
     if not lang:
         lang = _default_lang()
-    code = build(lang, a.out, a.strict, a.marks, a.baseline, a.variant_out, a.union)
+    code = build(lang, a.out, a.strict, a.marks, a.baseline, a.variant_out,
+                 a.union, pack_version=a.version)
 
     # 编完语言包顺手检查字体：字体只做映射，按 Noto 替换字体生成。
     # 字体缺失 = 构建失败（以前这里吞异常打「字体检查跳过」，CI 上等于没有字体判据）。

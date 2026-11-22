@@ -10,6 +10,41 @@ mod host;
 pub use host::*;
 
 pub const RUNTIME_VERSION: u32 = 1;
+
+/// 发行版本号（如 `v1.0.0`），由构建脚本通过 `PR2_VERSION` 注入；开发构建为空串。
+/// 语言包里的 `# pack-meta version=` 与它同源，都由 `release.ps1 -Version` 给。
+pub const BUILD_VERSION: &str = env!("PR2_BUILD_VERSION");
+/// 构建对应的短 commit；取不到时为空串。
+pub const BUILD_COMMIT: &str = env!("PR2_BUILD_COMMIT");
+/// `1` 表示构建时工作树有未提交改动。
+pub const BUILD_DIRTY: &str = env!("PR2_BUILD_DIRTY");
+
+/// 拼给玩家/排障看的版本标签：`v1.0.0 (c8aa6e3)`、`v1.0.0 (c8aa6e3+dirty)`、`dev`。
+///
+/// 纯函数，便于单测；真正的值从 [`BUILD_VERSION`] 等常量来。
+pub fn format_build_label(version: &str, commit: &str, dirty: &str) -> String {
+    let mut out = if version.is_empty() {
+        "dev".to_string()
+    } else if version.starts_with('v') {
+        version.to_string()
+    } else {
+        format!("v{version}")
+    };
+    if !commit.is_empty() {
+        let suffix = if dirty.is_empty() || dirty == "0" {
+            commit.to_string()
+        } else {
+            format!("{commit}+dirty")
+        };
+        out.push_str(&format!(" ({suffix})"));
+    }
+    out
+}
+
+/// 当前进程的版本标签，GUI 副标题与 `--version` 共用。
+pub fn build_label() -> String {
+    format_build_label(BUILD_VERSION, BUILD_COMMIT, BUILD_DIRTY)
+}
 pub const DATA_DIR: &str = "PR2Localization";
 pub const FONT_NAMES: [&str; 4] = [
     "ARIAL.TTF",
@@ -484,6 +519,20 @@ pub fn path_string(path: &Path) -> String {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn build_label_reports_version_and_commit() {
+        // 开发构建：没有注入版本时显示 dev，而不是一个看起来像发行版的假版本号。
+        assert_eq!(format_build_label("", "", ""), "dev");
+        assert_eq!(format_build_label("v1.0.0", "", ""), "v1.0.0");
+        // 写进 pack 头的是不带 v 的 1.0.0；两处都要显示成 v1.0.0。
+        assert_eq!(format_build_label("1.0.0", "c8aa6e3", ""), "v1.0.0 (c8aa6e3)");
+        assert_eq!(
+            format_build_label("v1.0.0", "c8aa6e3", "1"),
+            "v1.0.0 (c8aa6e3+dirty)"
+        );
+        assert_eq!(format_build_label("", "c8aa6e3", "0"), "dev (c8aa6e3)");
+    }
 
     fn temp_root() -> PathBuf {
         let stamp = SystemTime::now()

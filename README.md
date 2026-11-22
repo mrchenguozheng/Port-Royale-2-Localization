@@ -23,7 +23,9 @@
 4. **两版都双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
    GOG 走注入；Steam 由启动器先挂载宿主 DLL 再直启游戏，不用手工跑脚本，也不用从 Steam 启动；
 5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... overrides`。
-6. Steam 想回原版：点 GUI 上的「还原 Steam 原版」，或 `PR2Localization.exe --restore`。
+6. 想确认装的是哪一版：GUI 副标题与语言列表都带版本（`简体中文 · v1.0.0`），
+   命令行 `PR2Localization.exe --version` 打印同一串。
+7. Steam 想回原版：点 GUI 上的「还原 Steam 原版」，或 `PR2Localization.exe --restore`。
 
 包里不带 `VERSION.dll`（那是历史路线）。包内恒定带 `Ascaron.Logging-2.6.dll` 宿主代理
 （放在 `PR2Localization\host\`，解压不会覆盖根目录原版）和 `PR2HostMount.ps1`，GOG 侧从不执行它们：

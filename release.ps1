@@ -231,6 +231,10 @@ if ($LASTEXITCODE -ne 0) {
 if (-not $SkipInjector) {
     Write-Host ''
     Write-Host '[release] 1/2 构建注入器'
+    # 把发行版本编进 exe：GUI 副标题与 `PR2Localization.exe --version` 显示它。
+    # 语言包头的 # pack-meta version= 用同一个值，两边不会各写各的。
+    $env:PR2_VERSION = $Version
+    Write-Host "[release] 注入版本：$Version"
     & $Pwsh -NoProfile -ExecutionPolicy Bypass -File $BuildScript -Target Injector -NoPause
     if ($LASTEXITCODE -ne 0) {
         throw "构建注入器失败（退出码 $LASTEXITCODE）。"

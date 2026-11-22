@@ -59,6 +59,15 @@ fn run() -> Result<(), i32> {
             vanilla = true;
         } else if arg == "--restore" {
             restore = true;
+        } else if arg == "--version" {
+            // 发行版本与 commit 由构建脚本注入（src\build_injector.ps1）；
+            // 开发构建显示 dev，不谎报一个发行版本号。
+            println!(
+                "[PR2Loc] PR2Localization {} · 运行时 v{}",
+                pr2_common::build_label(),
+                RUNTIME_VERSION
+            );
+            return Ok(());
         } else if arg == "--help" || arg == "-h" {
             println!("[PR2Loc] 用法: PR2Localization.exe [--lang=<代码>] [--vanilla] [--restore]");
             println!("[PR2Loc]   不给参数时按版本自动选路：GOG 注入启动，Steam 先挂载宿主 DLL 再启动。");
@@ -66,6 +75,7 @@ fn run() -> Result<(), i32> {
             println!("[PR2Loc]              优先于 PR2Localization\\packs\\locale.ini（或 locale.default.ini）的 language=，不写文件。");
             println!("[PR2Loc]   --vanilla  恢复原版字体（Steam 还会先还原宿主 DLL），启动 PR2.exe，不注入。");
             println!("[PR2Loc]   --restore  只还原：Steam 还原 Ascaron.Logging-2.6.dll，两版都恢复原版字体，不启动游戏。");
+            println!("[PR2Loc]   --version  打印发行版本、构建 commit 与运行时版本，不启动游戏。");
             return Ok(());
         }
     }

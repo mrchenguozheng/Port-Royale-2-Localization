@@ -21,6 +21,8 @@
   不需要 Python 或 Rust 工具链。Steam 挂载必须先校验原版
   `Ascaron.Logging-2.6.dll` 的 11,776 B / SHA-256，再备份、替换；未知文件不覆盖。
   还原走 `PR2Localization.exe --restore` 或 GUI 的「还原 Steam 原版」按钮。
+  版本只有一份来源：`release.ps1 -Version` 同时编进 exe（`--version` 与 GUI 副标题）
+  和语言包头 `# pack-meta version=`；不要在任何一处另写版本号。
   不要把“让每个玩家自行构建”写成默认流程。
 
 ## 当前结构

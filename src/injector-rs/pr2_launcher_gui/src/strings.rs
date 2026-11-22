@@ -6,6 +6,11 @@ use std::path::Path;
 const BUILTIN: &[(&str, &str)] = &[
     ("title", "Port Royale 2 Localization"),
     ("subtitle", "Port Royale 2 localization runtime"),
+    // %d 运行时版本、%s 发行版本标签（v1.0.0 (c8aa6e3) 或 dev）。
+    (
+        "subtitle.version",
+        "Port Royale 2 localization runtime v%d · %s",
+    ),
     ("label.language", "Language pack:"),
     ("button.launch", "Launch localized"),
     ("button.vanilla", "Launch original"),
@@ -13,6 +18,7 @@ const BUILTIN: &[(&str, &str)] = &[
     ("button.refresh", "Refresh"),
     ("button.kill", "End game process"),
     ("status.count", "%d language pack(s)"),
+    ("status.count_pack", "%d language pack(s) · current %s"),
     ("status.none", "No .txt in PR2Localization\\packs"),
     ("status.launched", "Localized game launched."),
     ("status.vanilla", "Original game launched."),

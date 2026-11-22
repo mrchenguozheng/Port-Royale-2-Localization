@@ -132,21 +132,25 @@ def check_runtime_version(log=print):
 
 
 
-def build_pack(langs, stage, log, default_lang):
+def build_pack(langs, stage, log, default_lang, version=""):
     """发行包里的语言包恒为**并集**：GOG 由启动器 PR2LocalizationGUI.exe /
     PR2Localization.exe 挂起启动后远程注入 PR2LocalizationCore.dll，Steam 由
     PR2HostMount.ps1 替换宿主 Ascaron.Logging-2.6.dll（代理再加载同一个
     PR2LocalizationCore.dll）；两条注入路径读的都是 packs\\<lang>.txt，
-    所以两个 zip 里放同一个文件，装哪种版本都行。逐版对照在 build\\variants 里。
+    所以一个包里放同一份文件，装哪种版本都行。逐版对照在 build\\variants 里。
+
+    每个 pack 头写 ``# pack-meta version=<发行版本>``：同一门语言的不同版本
+    在游戏目录里只靠文件名分不出来，启动器列表要显示成「简体中文 · v1.0.0」。
 
     （VERSION.dll 代理是历史路线：GOG 直启 PR2.exe 时它会被解析到 SysWOW64，
-    同目录代理进不了进程，Steam 发行包也已改用宿主 DLL，两边都不再依赖它。）"""
+    同目录代理进不了进程，发行包也已改用宿主 DLL，两边都不再依赖它。）"""
     out = os.path.join(stage, DATA_DIR, "packs")
     os.makedirs(out, exist_ok=True)
     from build_artifacts import compile_pack
     for lang in langs:
-        log("编译语言包 %s（并集）…" % lang)
-        if compile_pack(lang, out, no_fonts=True, on_line=log, union=True) != 0:
+        log("编译语言包 %s（并集，版本 %s）…" % (lang, version or "未标注"))
+        if compile_pack(lang, out, no_fonts=True, on_line=log, union=True,
+                        version=version) != 0:
             raise RuntimeError("语言包编译失败：%s" % lang)
     with open(os.path.join(out, "locale.default.ini"), "w",
               encoding="utf-8", newline="\n") as fh:
@@ -562,7 +566,7 @@ def make_release(langs, version, out_dir, mode, log=None, cache=True,
     if os.path.isdir(stage):
         shutil.rmtree(stage)
     os.makedirs(stage)
-    build_pack(langs, stage, log, default_lang)
+    build_pack(langs, stage, log, default_lang, version=version)
     copy_runtime(stage, log)
     write_runtime_version(stage, log)
     # 优先用运行时构建产物里的 PR2Localization\ui\；没有时回退到 Rust 源码目录。
