@@ -68,18 +68,17 @@ LABELS = {
 DATA_DIR = "PR2Localization"
 UI_DEFAULT_FILE = "ui.default.ini"
 
-# 日文全角 advance 是 1 em，而界面框按拉丁宽度设计。正文只压 10%（旧版
-# 实机验证的可接受上限）；标题槽位另有一套更窄的字框，10% 仍会把首尾字切掉，
-# 所以标题字重单独压到 0.78。zh/ko 不压，保持原始 Noto。
-JA_BODY_FONT_SQUEEZE = 0.9
+# 日文标题槽位比正文更窄，0.9 仍会把「知られている海賊」首尾字切掉，所以
+# 只对标题字重压到 0.78；正文 NotoSansJP-Regular 原样进包，不做横向压缩。
+# zh/ko 同样不压，保持原始 Noto。
 JA_TITLE_FONT_SQUEEZE = 0.78
 JA_TITLE_FONTS = ("NotoSerifJP-Black.ttf", "NotoSerifJP-Bold.ttf")
 
 
 def ja_font_squeeze_scale(name):
-    """日文字体按槽位取压缩系数：标题字重 0.78，正文字重 0.9。"""
+    """日文只压标题字重；返回 None 表示该字体原样复制。"""
     return (JA_TITLE_FONT_SQUEEZE if name in JA_TITLE_FONTS
-            else JA_BODY_FONT_SQUEEZE)
+            else None)
 FLAT_COMMON = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
                "PR2LocalizationCore.dll")
 HOST_DLL = "Ascaron.Logging-2.6.dll"
@@ -315,16 +314,17 @@ def copy_fonts(langs, stage, modes, log, cache=True):
                         "组内两份字体同名但内容不同：%s（%s）" % (name, lang))
                 continue
             dst = os.path.join(flat, name)
-            if lang == "ja":
+            scale = ja_font_squeeze_scale(name) if lang == "ja" else None
+            if scale is not None:
                 from font import squeeze_fonts
                 if not squeeze_fonts._fonttools():
                     raise RuntimeError("日文字体压缩需要 fontTools")
-                scale = ja_font_squeeze_scale(name)
                 squeeze_fonts.squeeze(src, dst, scale)
-                role = "标题" if name in JA_TITLE_FONTS else "正文"
-                log("压缩日文%s字体 %s（x%.3f）" % (role, name, scale))
+                log("压缩日文标题字体 %s（x%.3f）" % (name, scale))
             else:
                 shutil.copy2(src, dst)
+                if lang == "ja":
+                    log("日文正文字体原样复制 %s" % name)
             seen[name] = sha
             n += 1
         # 来源说明移到 PR2Localization\docs\；游戏会扫描 fonts\*.*，字体目录只放

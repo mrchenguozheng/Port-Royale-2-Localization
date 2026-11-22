@@ -63,16 +63,15 @@ class TestUniversalLayout(unittest.TestCase):
             self.stage, make_release.DATA_DIR, "fonts", "OFL.txt")))
         self.assertFalse(os.path.exists(os.path.join(self.stage, "OFL.txt")))
 
-    def test_ja_fonts_split_title_and_body_squeeze(self):
-        """日文标题和正文用不同压缩系数：标题 0.78，正文 0.9。"""
-        self.assertEqual(make_release.JA_BODY_FONT_SQUEEZE, 0.9)
+    def test_ja_only_title_fonts_are_squeezed(self):
+        """日文只压标题字重到 0.78；正文原样复制，不做压缩。"""
         self.assertEqual(make_release.JA_TITLE_FONT_SQUEEZE, 0.78)
-        self.assertEqual(make_release.ja_font_squeeze_scale(
-            "NotoSansJP-Regular.ttf"), 0.9)
         self.assertEqual(make_release.ja_font_squeeze_scale(
             "NotoSerifJP-Black.ttf"), 0.78)
         self.assertEqual(make_release.ja_font_squeeze_scale(
             "NotoSerifJP-Bold.ttf"), 0.78)
+        self.assertIsNone(make_release.ja_font_squeeze_scale(
+            "NotoSansJP-Regular.ttf"))
 
     def test_no_version_dll_fallback(self):
         """VERSION.dll 代理是历史路线，GOG 直启时会被解析到 SysWOW64；不进包。"""
