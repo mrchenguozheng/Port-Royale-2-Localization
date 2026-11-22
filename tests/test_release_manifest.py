@@ -41,6 +41,18 @@ class TestReleaseManifest(unittest.TestCase):
             with open(path, "w", encoding="utf-8", newline="\n") as fh:
                 fh.write(content)
 
+    def test_docs_folder_is_classified_as_doc(self):
+        self._write("PR2Localization/docs/OFL.txt", "license\n")
+        self._write("PR2Localization/docs/NOTO-SOURCES.txt", "sources\n")
+        path = release_manifest.write_release_manifest(
+            self.stage, "zh", "v1.0.0", "noto")
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        kinds = {item["path"]: item["kind"] for item in data["files"]}
+        self.assertEqual(kinds["PR2Localization/docs/OFL.txt"], "doc")
+        self.assertEqual(
+            kinds["PR2Localization/docs/NOTO-SOURCES.txt"], "doc")
+
     def test_manifest_hashes_targets_source_and_provenance(self):
         path = release_manifest.write_release_manifest(
             self.stage, "zh", "v1.0.0", "noto")

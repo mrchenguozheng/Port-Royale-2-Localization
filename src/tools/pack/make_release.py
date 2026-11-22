@@ -14,7 +14,8 @@
         packs/locale.default.ini      # 本包的默认语言；用户 locale.ini 优先
         fonts/NotoSansSC-Regular.ttf ...  # 实际字体文件（默认）
         fonts/font-map.default.ini      # 默认逻辑名到实际文件名的映射
-        fonts/OFL.txt                   # 字体许可文本，跟着字体目录走
+        docs/OFL.txt                    # 字体许可文本
+        docs/NOTO-SOURCES.txt           # 字体来源说明
         ui/ui.default.ini
         logs/
       README.txt
@@ -303,7 +304,8 @@ def copy_fonts(langs, stage, modes, log, cache=True):
             shutil.copy2(src, os.path.join(flat, name))
             seen[name] = sha
             n += 1
-        # 来源说明移到包根；游戏会扫描 fonts\*.*，不应看到无关文本。
+        # 来源说明移到 PR2Localization\docs\；游戏会扫描 fonts\*.*，字体目录只放
+        # TTF 与映射，不放说明文本。
         notice = os.path.join(sub, "NOTO-SOURCES.txt")
         if os.path.isfile(notice):
             with open(notice, "r", encoding="utf-8") as fh:
@@ -316,7 +318,9 @@ def copy_fonts(langs, stage, modes, log, cache=True):
             for line in block.splitlines():
                 if line not in lines:
                     lines.append(line)
-        with open(os.path.join(stage, "NOTO-SOURCES.txt"), "w",
+        docs_dir = os.path.join(stage, DATA_DIR, "docs")
+        os.makedirs(docs_dir, exist_ok=True)
+        with open(os.path.join(docs_dir, "NOTO-SOURCES.txt"), "w",
                   encoding="utf-8", newline="\n") as fh:
             fh.write("\n".join(lines) + "\n")
     log("平铺字体 %d 个文件到 PR2Localization\\fonts\\（%s）"
@@ -508,12 +512,14 @@ def write_readme(langs, default_lang, stage, modes, version="",
     if pkg_mode == "noto" and "ru" in langs:
         license_help = """字体许可：
   正文 Liberation Sans 与标题所用的 Noto Serif 都是 SIL Open Font License 1.1，
-  详见 PR2Localization\\fonts\\OFL.txt 或 https://openfontlicense.org/
+  详见 PR2Localization\\docs\\OFL.txt 或 https://openfontlicense.org/
+  字体来源清单：PR2Localization\\docs\\NOTO-SOURCES.txt
   Liberation Sans 为未修改副本；标题字体是 Noto Serif 的压缩衍生版本，
   已改族名（PR2 Cyrillic Display *），不沿用 Noto 的保留字体名。"""
     elif pkg_mode == "noto":
         license_help = """字体许可：
-  Noto 字体使用 SIL Open Font License 1.1，详见 PR2Localization\\fonts\\OFL.txt
+  Noto 字体使用 SIL Open Font License 1.1，详见 PR2Localization\\docs\\OFL.txt
+  字体来源清单：PR2Localization\\docs\\NOTO-SOURCES.txt
   或 https://openfontlicense.org/"""
     else:
         license_help = """字体许可：
@@ -588,14 +594,13 @@ def write_readme(langs, default_lang, stage, modes, version="",
 
 
 def copy_license(stage, log, mode="noto"):
-    """把 OFL 文本放进字体目录，和实际字体放在一起。
+    """把 OFL 文本放进 PR2Localization\\docs\\，与字体来源说明放在一起。
 
-    放在包根也能满足 OFL，但玩家清点字体、替换字体时先看 ``PR2Localization\\fonts\\``；
-    许可文本跟着字体走，删掉字体目录时不会留下一条孤立的根目录声明。
+    不能放进 fonts\\：游戏会按 ``fonts\\*.*`` 枚举字体文件，说明文本不应混进去。
     """
     if mode != "noto":
         return
-    dst_dir = os.path.join(stage, DATA_DIR, "fonts")
+    dst_dir = os.path.join(stage, DATA_DIR, "docs")
     for rel in (os.path.join("assets", "fonts", "OFL.txt"),
                 "OFL.txt",
                 os.path.join("docs", "OFL.txt")):
@@ -603,7 +608,7 @@ def copy_license(stage, log, mode="noto"):
         if os.path.isfile(src):
             os.makedirs(dst_dir, exist_ok=True)
             shutil.copy2(src, os.path.join(dst_dir, "OFL.txt"))
-            log("复制 PR2Localization\\fonts\\OFL.txt")
+            log("复制 PR2Localization\\docs\\OFL.txt")
             return
     log("提示：仓库里没有 OFL.txt，发行包只写了许可链接；正式发布前补上")
 

@@ -53,10 +53,13 @@ class TestUniversalLayout(unittest.TestCase):
             os.path.exists(os.path.join(self.stage, make_release.HOST_DLL)),
             "根目录不能出现与原版同名的 DLL")
 
-    def test_ofl_sits_with_fonts_not_package_root(self):
-        """许可文本跟着字体目录走，包根不再放 OFL.txt。"""
+    def test_license_sits_in_docs_not_fonts_or_root(self):
+        """许可文本放 PR2Localization\\docs\\：字体目录会被游戏按 *.* 扫描。"""
         make_release.copy_license(self.stage, lambda _m: None)
-        self.assertTrue(os.path.isfile(os.path.join(
+        docs_ofl = os.path.join(
+            self.stage, make_release.DATA_DIR, "docs", "OFL.txt")
+        self.assertTrue(os.path.isfile(docs_ofl))
+        self.assertFalse(os.path.exists(os.path.join(
             self.stage, make_release.DATA_DIR, "fonts", "OFL.txt")))
         self.assertFalse(os.path.exists(os.path.join(self.stage, "OFL.txt")))
 
