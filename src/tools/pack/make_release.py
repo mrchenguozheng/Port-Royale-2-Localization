@@ -428,8 +428,9 @@ def write_readme(langs, default_lang, stage, modes, version="",
   PR2LocalizationGUI.exe、PR2LocalizationCore.dll、PR2HostMount.ps1
   和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。
   如果保留过 PR2Localization\\packs\\overrides\\，卸载前先复制出来。"""
-    support_line = ("支持游戏版本：GOG 英文 1.1.2.3 与 Steam 英文 1.1.2.3 都已实测"
-                    "（同一个包；GOG 版直启，Steam 版交给客户端启动）。")
+    support_line = ("支持游戏版本：GOG 英文 1.1.2.3、Steam 英文 1.1.2.3 与 GOG 法语 1.1.2.42 "
+                    "都已实测（同一个包；GOG 版直启，Steam 版交给客户端启动；"
+                    "法语版多 42 条 +++EMPTY+++ 空占位、少 19 条，按原样保留）。")
     if pkg_mode == "config":
         font_help = """字体：
   本包不含字体文件。

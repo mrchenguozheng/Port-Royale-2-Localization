@@ -13,12 +13,13 @@
   挂载之后直接双击 `PR2.exe`（或从 Steam 库里点启动）也是有效路径——代理在工作线程里
   加载 `PR2LocalizationCore.dll`。
   不要再用 `VERSION.dll`：它属于 Windows 的 KnownDLLs，同目录代理永远进不去 `PR2.exe`。
-- **GOG 英文版 `1.1.2.3` 与 Steam 英文版 `1.1.2.3` 都已通过宿主 DLL 代理实测（中文界面）**。
-  两版的 `PR2.exe` 导入表逐项一致（21 个 DLL，`Ascaron.Logging-2.6.dll` 只导入 `Log`），
-  原版 `Ascaron.Logging-2.6.dll` 也是同一份字节（11,776 B / 同一个 SHA-256），
-  所以启动路径不按版别分叉，`detect_edition` 只用来显示版别。
-  GOG 法语版和其他版本不在支持范围内；不要在未支持版本上部署后把“注入不生效”
-  当作本仓库回归。
+- **GOG 英文版 `1.1.2.3`、Steam 英文版 `1.1.2.3` 与 GOG 法语版 `1.1.2.42` 都已通过宿主 DLL
+  代理实测**（2026-11-22）。两个英文版的 `PR2.exe` 导入表逐项一致（21 个 DLL，
+  `Ascaron.Logging-2.6.dll` 只导入 `Log`），原版 `Ascaron.Logging-2.6.dll` 也是同一份字节
+  （11,776 B / 同一个 SHA-256），所以启动路径不按版别分叉，`detect_edition` 只用来显示版别。
+  语言包的键是条目 id，英文版与法语版共用同一套 id；法语版多 42 条 `+++EMPTY+++` 空占位、
+  少 19 条，按原样保留。其他未验收版本（零售版、补丁版）仍不在支持范围内，不要在它们上面
+  部署后把“注入不生效”当作本仓库回归。
 - 发行包按语言分组，**一个包同时面向 GOG 与 Steam**：包内恒定带
   `PR2HostMount.ps1` 和 `PR2Localization\host\Ascaron.Logging-2.6.dll`。
   不需要 Python 或 Rust 工具链。挂载必须先校验原版
