@@ -12,7 +12,7 @@
       PR2Localization/
         host/Ascaron.Logging-2.6.dll   # 宿主代理，挂载时才换进根目录
         packs/zh.txt
-        packs/locale.default.ini      # 默认语言；用户 locale.ini 优先
+        packs/locale.default.ini      # 本包的默认语言；用户 locale.ini 优先
         fonts/NotoSansSC-Regular.ttf ...  # 实际字体文件（默认）
         fonts/font-map.default.ini      # 默认逻辑名到实际文件名的映射
         ui/ui.default.ini
@@ -162,6 +162,7 @@ def build_pack(langs, stage, log, default_lang, version=""):
         if compile_pack(lang, out, no_fonts=True, on_line=log, union=True,
                         version=version) != 0:
             raise RuntimeError("语言包编译失败：%s" % lang)
+    # 发行包只带默认文件：活动 locale.ini 是玩家自己的选择，解压不该覆盖它。
     with open(os.path.join(out, "locale.default.ini"), "w",
               encoding="utf-8", newline="\n") as fh:
         fh.write("language=%s\n" % default_lang)

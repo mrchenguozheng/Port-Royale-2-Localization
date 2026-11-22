@@ -23,6 +23,37 @@ def _font_lang(target, langs):
     return langs[0]
 
 
+class Generated:
+    """部署时要现写内容的文件，不是从构建目录复制来的。
+
+    locale.ini / locale.default.ini 用它：两者的语言都该跟这次安装的包走，
+    而构建目录里的活动 locale.ini 只是上一次编译的状态（可能还是 pl）。
+    """
+
+    __slots__ = ("text",)
+
+    def __init__(self, text):
+        self.text = text
+
+
+def _write_text(text, dst):
+    """把 text 写成 dst（内容相同就不动）。返回 "copied" / "same" / "failed"。"""
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    try:
+        if os.path.isfile(dst):
+            with open(dst, encoding="utf-8-sig") as fh:
+                if fh.read() == text:
+                    return "same"
+    except OSError:
+        return "failed"
+    try:
+        with open(dst, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
+        return "copied"
+    except OSError:
+        return "failed"
+
+
 def _mapped_font_names(cfg, lang):
     """映射文件里某个语言节实际引用的字体文件名（按 basename，去重）。
 
@@ -123,13 +154,22 @@ def deploy_steps(target, langs, edition=None):
     steps.append(("PR2Localization\\logs\\", None, os.path.join(target, LOG_DIR)))
     steps.append(("%s\\" % PACK_DIR, None, os.path.join(target, PACK_DIR)))
     # locale.ini 是用户可写设置：只复制默认文件，已有 locale.ini 保持不动。
-    locale_src = os.path.join(PACK_OUT, LOCALE_DEFAULT_FILE)
-    if not os.path.isfile(locale_src):
-        # 兼容旧构建目录：旧 locale.ini 只能作为默认值复制。
-        locale_src = os.path.join(PACK_OUT, LOCALE_FILE)
-    if os.path.isfile(locale_src):
-        steps.append(("%s\\%s" % (PACK_DIR, LOCALE_DEFAULT_FILE), locale_src,
+    # locale.default.ini 跟这次安装的语言走（游戏已选的语言在本次包里就保留，
+    # 否则回落到第一个语言，与 make_release 的 default_lang 同口径）。
+    # 不搬构建目录里上一次编译留下的活动 locale.ini —— 那份可能还是 pl。
+    # 活动 locale.ini 是玩家自己的选择：不生成、不覆盖。
+    if langs:
+        steps.append(("%s\\%s" % (PACK_DIR, LOCALE_DEFAULT_FILE),
+                      Generated("language=%s\n" % font_lang),
                       os.path.join(target, PACK_DIR, LOCALE_DEFAULT_FILE)))
+    else:
+        # 整目录复制（打包/排查）：沿用构建目录里的默认文件。
+        locale_src = os.path.join(PACK_OUT, LOCALE_DEFAULT_FILE)
+        if not os.path.isfile(locale_src):
+            locale_src = os.path.join(PACK_OUT, LOCALE_FILE)
+        if os.path.isfile(locale_src):
+            steps.append(("%s\\%s" % (PACK_DIR, LOCALE_DEFAULT_FILE), locale_src,
+                          os.path.join(target, PACK_DIR, LOCALE_DEFAULT_FILE)))
     for name in (["%s.txt" % c for c in langs] if langs else []):
         src = os.path.join(PACK_OUT, name)
         if os.path.isfile(src):
@@ -146,8 +186,10 @@ def copy_if_different(src, dst):
 
     已经一致就不动目标文件：反复点复制时 DLL 与启动器不会被
     反复改写，而正在运行的游戏加载着旧 DLL，跳过也能避免
-    撞上文件占用。
+    撞上文件占用。src 是 Generated 时直接按内容写。
     """
+    if isinstance(src, Generated):
+        return _write_text(src.text, dst)
     if os.path.isfile(dst) and same_content(src, dst):
         return "same"
     os.makedirs(os.path.dirname(dst), exist_ok=True)

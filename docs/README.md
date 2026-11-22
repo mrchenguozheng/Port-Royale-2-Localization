@@ -16,8 +16,8 @@
 - 发行包按分组各出一个 zip，一个包同时面向 GOG / Steam，GOG 不带 `VERSION.dll`；
   包里的 `packs/<语言>.txt` 是**同一份并集包**（GOG 由启动器注入、Steam 由宿主 DLL 代理，
   两条路径读同一个文件）。
-- 语言：包内只放 `packs/locale.default.ini`；用户活动 `locale.ini` 存在时优先，
-  空值也保留；部署/升级不覆盖，`packs/overrides/` 不删除。
+- 语言：包内只放 `packs/locale.default.ini`，写本包的主语言；用户活动 `locale.ini`
+  存在时优先，空值也保留；部署/升级不覆盖它，`packs/overrides/` 不删除。
   运行时把空值当「回到内置 `zh`」，不等于原版英文；原版入口是
   `PR2Localization.exe --vanilla` 或 GUI「启动原版」。
 - 语言包元数据：`<语言>.txt` 开头的 `# pack-meta alias=…` / `min_runtime=…`，

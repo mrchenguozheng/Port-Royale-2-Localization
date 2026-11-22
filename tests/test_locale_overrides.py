@@ -60,7 +60,7 @@ class TestLocaleAndOverrides(unittest.TestCase):
             (deploy.RUNTIME, deploy.FLAT_FILES, deploy.PACK_OUT,
              deploy.PACK_DIR) = old
 
-    def test_deploy_only_writes_default_locale(self):
+    def test_deploy_writes_default_locale_for_installed_language(self):
         def run():
             return deploy.deploy_steps(self.target, ["zh"], edition="gog")
         steps = self._with_runtime(run)
@@ -71,10 +71,28 @@ class TestLocaleAndOverrides(unittest.TestCase):
             os.path.normcase(d).endswith("locale.ini")
             and not os.path.normcase(d).endswith("locale.default.ini")
             for d in dests))
+        default_steps = [(src, dst) for _label, src, dst in steps
+                         if dst and os.path.normcase(dst).endswith(
+                             "locale.default.ini")]
+        self.assertEqual(len(default_steps), 1)
+        self.assertIsInstance(default_steps[0][0], deploy.Generated)
+        self.assertEqual(default_steps[0][0].text, "language=zh\n")
         with open(self.user_ini, encoding="utf-8") as fh:
             self.assertEqual(fh.read(), "language=ja\n")
 
-    def test_deploy_falls_back_to_old_active_as_default(self):
+    def test_generated_default_locale_overwrites_stale_value(self):
+        default_ini = os.path.join(self.pack, "locale.default.ini")
+        with open(default_ini, "w", encoding="utf-8") as fh:
+            fh.write("language=pl\n")
+        r = deploy.copy_if_different(
+            deploy.Generated("language=zh\n"), default_ini)
+        self.assertEqual(r, "copied")
+        with open(default_ini, encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), "language=zh\n")
+        self.assertEqual(deploy.copy_if_different(
+            deploy.Generated("language=zh\n"), default_ini), "same")
+
+    def test_deploy_without_langs_still_ships_building_default(self):
         os.remove(os.path.join(
             self.runtime, "PR2Localization", "packs",
             "locale.default.ini"))
@@ -82,7 +100,7 @@ class TestLocaleAndOverrides(unittest.TestCase):
             self.runtime, "PR2Localization", "packs", "locale.ini"))
 
         def run():
-            return deploy.deploy_steps(self.target, ["zh"], edition="gog")
+            return deploy.deploy_steps(self.target, [], edition="gog")
         steps = self._with_runtime(run)
         default_steps = [
             (src, dst) for _label, src, dst in steps
