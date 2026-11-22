@@ -17,8 +17,9 @@ ELGRECO_ / Tiepolo_black / Tiepolo_bold 缺 ą ć ę ł ń ś ź ż 与它们的
     Tiepolo_bold.ttf   avg 0.496  cap 0.614
 
 俄语当初在 Tiepolo 两档上额外压了 12%（西里尔串比英文长，会撑出木板）。
-波兰语不压：波兰语串长与英文、德文同量级，按原版宽度即可；
-实在放不下时改文案或补空格，不动字体。
+波兰语三个标题槽统一额外横压 7%（`PL_DISPLAY_SQUEEZE = 0.93`）：
+实机「你的产业」页标题 `Twoje przedsiębiorstwo` 在 Head 槽末尾被裁掉一个 `o`，
+实测差 5.1%，压 7% 留出约 2% 余量；不按单条文案改短，避免同类长标题逐条救火。
 
     python src\\tools\\font\\build_lat_fonts.py --lang pl --out build\\runtime\\PR2Localization\\fonts
 
@@ -40,6 +41,10 @@ import build_cyr_fonts as CYR  # noqa: E402
 
 NOTO_CACHE = CYR.NOTO_CACHE
 NOTO_CAP = 0.714
+
+#: 波兰语三个标题槽在「原版 avg」之上再横压 7%。
+#: 依据是实机页标题末尾少一个 o，字面差 5.1%；压 0.93 留出余量。
+PL_DISPLAY_SQUEEZE = 0.93
 
 #: 波兰语字母表（含大写）：即使语料里那一刻没出现，也必须有字形。
 PL_ALPHABET = "ąćęłńóśźżĄĆĘŁŃÓŚŹŻ"
@@ -105,15 +110,15 @@ def build(lang, out, noto_dir=None, log=None):
         noto.close()
         if not avg:
             return False, "无法测量 %s 的平均 advance（用字表为空）" % src_name
-        sx, sy = target_avg / avg, target_cap / NOTO_CAP
+        sx, sy = target_avg / avg * PL_DISPLAY_SQUEEZE, target_cap / NOTO_CAP
         out_name = "%s-%s.ttf" % (profile["prefix"], slot)
         CYR._scale_font(src, os.path.join(out, out_name), sx, sy,
                         "PR2 %s Display %s" % (lang.upper(), slot),
                         charset=charset, win_asc=win_asc, win_desc=win_desc,
                         ascent=ascent, descent=descent)
         names.append(out_name)
-        log("%s ← %s  sx=%.3f sy=%.3f（目标 avg %.3f cap %.3f）"
-            % (out_name, src_name, sx, sy, target_avg, target_cap))
+        log("%s ← %s  sx=%.3f（额外横压 %.2f） sy=%.3f（目标 avg %.3f cap %.3f）"
+            % (out_name, src_name, sx, PL_DISPLAY_SQUEEZE, sy, target_avg, target_cap))
 
     missing_total = 0
     for name in names:
