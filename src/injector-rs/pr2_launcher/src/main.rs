@@ -251,10 +251,21 @@ fn ensure_steam_host(root: &Path) -> Result<(), i32> {
             );
             Err(1)
         }
+        HostState::ProxyNoBackup => {
+            host_log(
+                root,
+                &format!("根目录 {HOST_DLL} 已是本地化代理，但找不到有效的原版备份（{HOST_ORIG} / PR2Localization\\host-backup）。"),
+            );
+            host_log(
+                root,
+                "没有原版就无法回滚；请用 Steam 的「验证游戏文件完整性」把原版 DLL 恢复，再重新启动。",
+            );
+            Err(1)
+        }
         HostState::Unknown => {
             host_log(
                 root,
-                &format!("根目录 {HOST_DLL} 不是已知原版，也没有可验证的 {HOST_ORIG}。"),
+                &format!("根目录 {HOST_DLL} 不是已知原版，也不是本工具挂上去的代理。"),
             );
             host_log(root, "为避免覆盖其他 mod 或损坏的文件，已停止。");
             host_log(
@@ -273,6 +284,17 @@ fn restore_steam_host(root: &Path) -> Result<(), i32> {
         HostState::Mounted => run_host_script(root, "Restore").map(|_| ()),
         HostState::Missing => {
             host_log(root, &format!("同目录下找不到 {HOST_DLL}，不需要还原。"));
+            Err(1)
+        }
+        HostState::ProxyNoBackup => {
+            host_log(
+                root,
+                &format!("根目录 {HOST_DLL} 是本地化代理，但原版备份缺失或不可验证；没有可还原的文件。"),
+            );
+            host_log(
+                root,
+                "请用 Steam 的「验证游戏文件完整性」把原版 DLL 恢复（这会把该 DLL 换回官方版本）。",
+            );
             Err(1)
         }
         HostState::Unknown => {

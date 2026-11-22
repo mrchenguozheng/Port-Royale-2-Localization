@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""make_release.py —— 生成按语言、按发行入口分发的发行包。
+"""make_release.py —— 生成发行包（一个包同时面向 GOG 与 Steam）。
 
-一个语言、一个入口一个 zip，解压到游戏根目录即可：
+一个分组一个 zip，解压到游戏根目录即可：
 
-    PR2-zh-gog-v1.0.0/
+    PR2-zh-v1.0.0/
       PR2Localization.exe
       PR2LocalizationGUI.exe
       PR2LocalizationCore.dll
+      PR2HostMount.ps1                 # Steam 侧挂载/还原，GOG 侧不执行
       PR2Localization/
+        host/Ascaron.Logging-2.6.dll   # Steam 宿主代理，挂载时才换进根目录
         packs/zh.txt
         packs/locale.default.ini      # 默认语言；用户 locale.ini 优先
         fonts/NotoSansSC-Regular.ttf ...  # 实际字体文件（默认）
@@ -18,7 +20,8 @@
       README.txt
       OFL.txt
 
-GOG 版不带宿主 DLL；Steam 版的宿主代理放在 PR2Localization\\host\\ 里，
+两个版本共用同一个包：启动器按游戏目录里的标记文件判断版本，GOG 走注入，
+Steam 先确保宿主代理挂载再直启 PR2.exe。宿主代理放在 PR2Localization\\host\\，
 不占根目录原名，解压不会覆盖游戏原版。PR2HostMount.ps1 负责校验原版大小/
 哈希、备份成 Ascaron.Logging-2.6.orig.dll、原子换进根目录和还原；启动器
 PR2Localization.exe 会自动调它，玩家不需要手动运行脚本。
@@ -26,8 +29,8 @@ PR2Localization.exe 会自动调它，玩家不需要手动运行脚本。
 ``font-map.default.ini``）；``config`` 只带默认映射；用户可另建 font-map.ini
 按项覆盖它，解压升级不会覆盖这个文件。``none`` 不带字体。
 
-    python src\\tools\\pack\\make_release.py --lang zh --edition gog --version v1.0.0
-    python src\\tools\\pack\\make_release.py --lang zh --edition steam --version v1.0.0
+    python src\\tools\\pack\\make_release.py --lang zh --version v1.0.0
+    python src\\tools\\pack\\make_release.py --bundle latin --version v1.0.0
 """
 
 import argparse
@@ -65,8 +68,9 @@ HOST_DLL = "Ascaron.Logging-2.6.dll"
 HOST_MOUNT_SCRIPT = "PR2HostMount.ps1"
 #: Steam 代理放在数据目录里，不能放在根目录：根目录的同名文件是游戏原版，
 #: 解压时覆盖它就没有原版可校验、可备份、可还原了。挂载动作再把代理换进根目录。
+#: 合并包让 GOG 也带着这两个文件——判版走标记文件，GOG 侧根本不会碰它们。
 HOST_PROXY_REL = os.path.join(DATA_DIR, "host", HOST_DLL)
-FLAT_STEAM = FLAT_COMMON + (HOST_MOUNT_SCRIPT,)
+FLAT_PACKAGE = FLAT_COMMON + (HOST_MOUNT_SCRIPT,)
 RUNTIME_VERSION = 1  # 与 src/injector-rs/pr2_common/src/lib.rs 的 RUNTIME_VERSION 保持一致
 RUST_RUNTIME_SOURCE = os.path.join(
     SRC, "injector-rs", "pr2_common", "src", "lib.rs")
@@ -149,9 +153,9 @@ def build_pack(langs, stage, log, default_lang):
         fh.write("language=%s\n" % default_lang)
 
 
-def copy_runtime(stage, edition, log):
-    flat = FLAT_STEAM if edition == "steam" else FLAT_COMMON
-    for name in flat:
+def copy_runtime(stage, log):
+    """平铺运行时常量和 Steam 宿主脚本，代理单独落 ``PR2Localization\\host\\``。"""
+    for name in FLAT_PACKAGE:
         if name == HOST_MOUNT_SCRIPT:
             src = os.path.join(TOOLS, "install", name)
         else:
@@ -160,15 +164,14 @@ def copy_runtime(stage, edition, log):
             raise FileNotFoundError("缺 %s，先构建注入器" % src)
         shutil.copy2(src, os.path.join(stage, name))
         log("复制 %s" % name)
-    if edition == "steam":
-        src = os.path.join(RUNTIME, HOST_DLL)
-        if not os.path.isfile(src):
-            raise FileNotFoundError("缺 %s，先构建注入器" % src)
-        dst = os.path.join(stage, HOST_PROXY_REL)
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.copy2(src, dst)
-        log("复制 %s（宿主代理，挂载时才换进根目录）"
-            % HOST_PROXY_REL.replace(os.sep, "\\"))
+    src = os.path.join(RUNTIME, HOST_DLL)
+    if not os.path.isfile(src):
+        raise FileNotFoundError("缺 %s，先构建注入器" % src)
+    dst = os.path.join(stage, HOST_PROXY_REL)
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    shutil.copy2(src, dst)
+    log("复制 %s（宿主代理，挂载时才换进根目录）"
+        % HOST_PROXY_REL.replace(os.sep, "\\"))
 
 
 def copy_font_map(stage, log):
@@ -313,7 +316,7 @@ def pack_identity(langs):
     return "\n".join(lines)
 
 
-def write_readme(langs, default_lang, stage, modes, edition, version="",
+def write_readme(langs, default_lang, stage, modes, version="",
                  bundle_label=""):
     pkg_mode = package_font_mode(modes)
     labels = "、".join(LABELS.get(lang, lang) for lang in langs)
@@ -322,7 +325,7 @@ def write_readme(langs, default_lang, stage, modes, edition, version="",
             bundle_label or "多语言包", len(langs), labels)
     else:
         label = LABELS.get(langs[0], langs[0])
-    edition_label = "GOG 版" if edition == "gog" else "Steam 版"
+    edition_label = "GOG / Steam 通用"
     font_line = {
         "noto": "字体：Noto Sans / Noto Serif 原始文件名（SIL OFL 1.1），完整静态字体；font-map.default.ini 负责映射四个逻辑名。",
         "none": "字体：本包不含字体，也无法通过映射读取系统字体。",
@@ -334,31 +337,34 @@ def write_readme(langs, default_lang, stage, modes, edition, version="",
         font_line = ("字体：正文 PR2CyrBody-Regular.ttf（Liberation Sans 未修改副本），"
                      "标题 PR2CyrDisplay-Head / -Black / -Bold.ttf（由 Noto Serif 按原版度量"
                      "压缩并改名）；均为 SIL OFL 1.1，font-map.default.ini 映射四个逻辑名。")
-    if edition == "gog":
-        install_step = """  2. 双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
-     本包是 GOG 版，刻意不包含 VERSION.dll；不要直接双击 PR2.exe。
-     如果从旧包升级，根目录残留的 VERSION.dll 可以删除，GOG 不加载它。"""
-    else:
-        install_step = """  2. 双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
-     启动器会先校验原版 Ascaron.Logging-2.6.dll 的 11,776 B / SHA-256，
-     通过后备份为 Ascaron.Logging-2.6.orig.dll 和
-     PR2Localization\\host-backup\\Ascaron.Logging-2.6.dll，再把代理换进根目录，
-     最后拉起 PR2.exe。校验不对或文件被占用时它会停止，不会覆盖未知文件。
+    install_step = """  2. 双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
+     启动器按游戏目录自动判版，两版用同一个入口：
+       GOG  —— 挂起 PR2.exe 后注入 PR2LocalizationCore.dll。
+       Steam —— 先校验原版 Ascaron.Logging-2.6.dll 的 11,776 B / SHA-256，
+                备份成 Ascaron.Logging-2.6.orig.dll 和
+                PR2Localization\\host-backup\\Ascaron.Logging-2.6.dll，
+                再把代理换进根目录，最后拉起 PR2.exe（不注入）。
+     校验不对或文件被占用时它会停止，不会覆盖未知文件。
      代理本身在 PR2Localization\\host\\Ascaron.Logging-2.6.dll，解压不会覆盖原版。
-     习惯命令行的也可以在游戏根目录运行：
+     GOG 不要直接双击 PR2.exe：加载器会把 VERSION.dll 解析到
+     C:\\Windows\\SysWOW64\\VERSION.dll，同目录代理进不了游戏进程。
+     习惯命令行的可以在游戏根目录运行：
+       PR2Localization.exe --lang=<代码>
        powershell -ExecutionPolicy Bypass -File .\\PR2HostMount.ps1 -Action Mount
   3. 还原原版：在启动器里点「还原 Steam 原版」，或运行
        PR2Localization.exe --restore
      等价写法：powershell -ExecutionPolicy Bypass -File .\\PR2HostMount.ps1 -Action Restore
+     Steam 版会把 Ascaron.Logging-2.6.dll 换回原版并恢复原版字体；
+     GOG 版没有宿主 DLL，这一步只恢复原版字体。
      还原过程写在 PR2Localization\\logs\\host.log，失败时 GUI 对话框会带上它的末尾几行。"""
-    if edition == "gog":
-        uninstall_line = "  删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll\n  和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。\n  如果保留过 PR2Localization\\packs\\overrides\\，卸载前先复制出来。"
-    else:
-        uninstall_line = "  先点启动器的「还原 Steam 原版」（或跑 PR2Localization.exe --restore），\n  再删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll、\n  PR2HostMount.ps1 和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。\n  如果保留过 PR2Localization\\packs\\overrides\\，卸载前先复制出来。"
-    if edition == "gog":
-        support_line = "支持游戏版本：GOG 英文 1.1.2.3 已实测。本包只用于 GOG；Steam 请下载 Steam 版。"
-    else:
-        support_line = "支持游戏版本：Steam 英文 1.1.2.3 已实测（宿主 DLL 代理，中文界面）；GOG 请下载 GOG 版。"
+    uninstall_line = """  先点启动器的「还原」（Steam 版会换回原版宿主 DLL），或运行
+  PR2Localization.exe --restore；再删除 PR2Localization.exe、
+  PR2LocalizationGUI.exe、PR2LocalizationCore.dll、PR2HostMount.ps1
+  和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。
+  GOG 版不需要删宿主的步骤，可直接删这些文件。
+  如果保留过 PR2Localization\\packs\\overrides\\，卸载前先复制出来。"""
+    support_line = ("支持游戏版本：GOG 英文 1.1.2.3 与 Steam 英文 1.1.2.3 都已实测"
+                    "（同一个包，启动器按目录判版）。")
     if pkg_mode == "config":
         font_help = """字体：
   本包不含字体文件。
@@ -523,9 +529,12 @@ def make_zip(stage, out_dir):
     return zip_path
 
 
-def make_release(langs, version, out_dir, mode, edition, log=None, cache=True,
+def make_release(langs, version, out_dir, mode, log=None, cache=True,
                  package_id=None, default_lang=None, bundle_label=""):
     """出一份发行 zip：langs 里所有语言放进同一个包，共用字体与一份映射。
+
+    一个包同时面向 GOG 与 Steam：宿主代理和挂载脚本恒定进包，GOG 侧不执行。
+    包名不含版别，`PR2-<pkg_id>-<version>.zip`。
 
     package_id 为空时按第一个语言命名（单语言包，与旧行为一致）；
     合包时由 src\\release-bundles.toml 给 id（如 latin）。
@@ -549,12 +558,12 @@ def make_release(langs, version, out_dir, mode, edition, log=None, cache=True,
             % "、".join("%s=%s" % (k, v) for k, v in modes.items()))
     version = release_version.normalize(version)
     pkg_id = package_id or langs[0]
-    stage = os.path.join(out_dir, "PR2-%s-%s-%s" % (pkg_id, edition, version))
+    stage = os.path.join(out_dir, "PR2-%s-%s" % (pkg_id, version))
     if os.path.isdir(stage):
         shutil.rmtree(stage)
     os.makedirs(stage)
     build_pack(langs, stage, log, default_lang)
-    copy_runtime(stage, edition, log)
+    copy_runtime(stage, log)
     write_runtime_version(stage, log)
     # 优先用运行时构建产物里的 PR2Localization\ui\；没有时回退到 Rust 源码目录。
     # 旧路径 src/injector/ui 不存在，静默跳过会让发行包缺 ui/*.ini。
@@ -568,11 +577,11 @@ def make_release(langs, version, out_dir, mode, edition, log=None, cache=True,
     os.makedirs(os.path.join(stage, DATA_DIR, "logs"), exist_ok=True)
     log("复制 PR2Localization\\ui\\")
     copy_fonts(langs, stage, modes, log, cache=cache)
-    write_readme(langs, default_lang, stage, modes, edition, version, bundle_label)
+    write_readme(langs, default_lang, stage, modes, version, bundle_label)
     copy_license(stage, log, pkg_mode)
     import release_manifest
     release_manifest.write_release_manifest(
-        stage, langs, version, edition, pkg_mode, package_id=pkg_id)
+        stage, langs, version, pkg_mode, package_id=pkg_id)
     ok, manifest_errors = release_manifest.verify_release_manifest(stage)
     if not ok:
         raise RuntimeError("发布清单校验失败：%s" % "；".join(manifest_errors))
@@ -597,7 +606,7 @@ def main():
         print("拒绝出包：语言配置检查失败。")
         return 1
 
-    ap = argparse.ArgumentParser(description="生成按语言、按入口分发的 PR2 本地化发行包")
+    ap = argparse.ArgumentParser(description="生成 PR2 本地化发行包（GOG / Steam 通用）")
     ap.add_argument("--lang", action="append", default=[],
                     help="语言代码，可重复；不给 --package-id 时每门语言各出一包")
     ap.add_argument("--bundle", action="append", default=[],
@@ -609,8 +618,6 @@ def main():
                     help="合成包里的默认语言（locale.default.ini）；默认取第一个")
     ap.add_argument("--list-bundles", action="store_true",
                     help="只打印分组清单，每行 id|default|langs")
-    ap.add_argument("--edition", choices=("gog", "steam"),
-                    help="发行入口：gog 不带宿主 DLL；steam 带宿主 DLL 和挂载脚本")
     ap.add_argument("--version",
                     help="发行版本号，规范形式 vMAJOR.MINOR.PATCH[-prerelease]")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
@@ -630,8 +637,8 @@ def main():
         ap.error("要么给 --bundle，要么给 --lang")
     if args.bundle and args.lang:
         ap.error("--bundle 与 --lang 只能给一个")
-    if not args.edition or not args.version:
-        ap.error("出包需要 --edition 与 --version")
+    if not args.version:
+        ap.error("出包需要 --version")
 
     try:
         version = release_version.normalize(args.version)
@@ -677,14 +684,14 @@ def main():
         if job.get("merge"):
             # 显式 --package-id：多门语言进一个包。
             make_release(job["langs"], version, args.out, args.fonts,
-                         args.edition, package_id=job["id"],
+                         package_id=job["id"],
                          default_lang=job["default"],
                          bundle_label=job["label"])
             continue
         # 旧行为：每门语言各出一包，文件名沿用语言代码。
         for lang in job["langs"]:
             make_release([lang], version, args.out, args.fonts,
-                         args.edition, default_lang=lang)
+                         default_lang=lang)
     return 0
 
 

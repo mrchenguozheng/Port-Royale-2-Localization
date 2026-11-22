@@ -20,7 +20,7 @@
 # pl 有 pack 但不在发行语言集里（见 src\release-languages.txt），不进分组。
 #
 # 字段：
-#   id      包标识，进文件名 dist\PR2-<id>-<edition>-<version>.zip；单语言时沿用语言代码
+#   id      包标识，进文件名 dist\PR2-<id>-<version>.zip；单语言时沿用语言代码
 #   label   给人看的语言名，写进 README
 #   langs   包内语言代码，顺序即 packs 目录里的顺序
 #   default 包内默认语言（locale.default.ini），必须是 langs 之一

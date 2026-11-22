@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""发行包布局：Steam 代理不能占根目录原名。
+"""发行包布局：一个包同时面向 GOG 与 Steam，Steam 代理不能占根目录原名。
 
 根目录的 ``Ascaron.Logging-2.6.dll`` 是游戏原版。包里的代理一旦同名解压，
 原版就没有了 —— 既不能校验，也没有可回滚的备份。所以代理必须落在
 ``PR2Localization\\host\\``，由挂载动作在确认原版之后换进根目录。
+
+合并包以后 GOG 也会带着代理和脚本；判版走标记文件，GOG 侧从不执行它们。
 """
 
 import os
@@ -19,12 +21,13 @@ sys.path.insert(0, os.path.join(ROOT, "src", "tools", "pack"))
 import make_release  # noqa: E402
 
 
-class TestSteamLayout(unittest.TestCase):
+class TestUniversalLayout(unittest.TestCase):
     def setUp(self):
         self.stage = tempfile.mkdtemp(prefix="pr2-layout-stage-")
         self.runtime = tempfile.mkdtemp(prefix="pr2-layout-runtime-")
         for name in ("PR2Localization.exe", "PR2LocalizationGUI.exe",
-                     "PR2LocalizationCore.dll", make_release.HOST_DLL):
+                     "PR2LocalizationCore.dll", make_release.HOST_DLL,
+                     "VERSION.dll"):
             with open(os.path.join(self.runtime, name), "wb") as fh:
                 fh.write(b"MZ fake " + name.encode("ascii"))
         self._old_runtime = make_release.RUNTIME
@@ -35,22 +38,21 @@ class TestSteamLayout(unittest.TestCase):
         shutil.rmtree(self.stage, ignore_errors=True)
         shutil.rmtree(self.runtime, ignore_errors=True)
 
-    def test_steam_proxy_is_not_at_root(self):
-        make_release.copy_runtime(self.stage, "steam", lambda _m: None)
+    def test_pack_has_both_editions_but_no_root_dll(self):
+        make_release.copy_runtime(self.stage, lambda _m: None)
         proxy = os.path.join(self.stage, make_release.HOST_PROXY_REL)
         self.assertTrue(os.path.isfile(proxy), "代理应落在 PR2Localization\\host")
+        self.assertTrue(os.path.isfile(
+            os.path.join(self.stage, make_release.HOST_MOUNT_SCRIPT)))
         self.assertFalse(
             os.path.exists(os.path.join(self.stage, make_release.HOST_DLL)),
             "根目录不能出现与原版同名的 DLL")
-        self.assertTrue(os.path.isfile(
-            os.path.join(self.stage, make_release.HOST_MOUNT_SCRIPT)))
 
-    def test_gog_pack_has_neither_proxy_nor_script(self):
-        make_release.copy_runtime(self.stage, "gog", lambda _m: None)
-        self.assertFalse(os.path.exists(
-            os.path.join(self.stage, make_release.HOST_PROXY_REL)))
-        self.assertFalse(os.path.exists(
-            os.path.join(self.stage, make_release.HOST_MOUNT_SCRIPT)))
+    def test_no_version_dll_fallback(self):
+        """VERSION.dll 代理是历史路线，GOG 直启时会被解析到 SysWOW64；不进包。"""
+        make_release.copy_runtime(self.stage, lambda _m: None)
+        self.assertNotIn("VERSION.dll", make_release.FLAT_PACKAGE)
+        self.assertFalse(os.path.exists(os.path.join(self.stage, "VERSION.dll")))
 
 
 class TestUiLayout(unittest.TestCase):

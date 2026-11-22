@@ -32,11 +32,10 @@ if INSTALL not in sys.path:
 from pr2ctl.base import KNOWN_BUILDS  # noqa: E402
 
 MANIFEST_NAME = "manifest.json"
-SCHEMA_VERSION = 1
-TARGET_BUILD_BY_EDITION = {
-    "gog": "gog-en-1.1.2.3",
-    "steam": "steam-en-1.1.2.3",
-}
+SCHEMA_VERSION = 2
+#: 合并包同时面向两个版本，清单里把两个目标都列出来（schema 2 起是 targets 列表）。
+TARGET_BUILDS = ("gog-en-1.1.2.3", "steam-en-1.1.2.3")
+TARGET_EDITION = "universal"
 DEFAULT_SOURCE_LANG = "en.gog_1.1.2.3"
 
 
@@ -57,18 +56,22 @@ def _pack_doc(lang):
         return {}
 
 
-def _target(edition):
-    build_id = TARGET_BUILD_BY_EDITION.get(edition)
-    if not build_id:
-        raise ValueError("未知发行入口：%s" % edition)
-    for build in KNOWN_BUILDS:
-        if build["id"] == build_id:
-            return {
-                "build": build["id"],
-                "label": build["label"],
-                "exe_sha256": build["sha256"].upper(),
-            }
-    raise ValueError("KNOWN_BUILDS 里没有目标版本：%s" % build_id)
+def _targets():
+    """合并包要同时声明 GOG 与 Steam 两个已知构建。"""
+    found = []
+    for build_id in TARGET_BUILDS:
+        for build in KNOWN_BUILDS:
+            if build["id"] == build_id:
+                found.append({
+                    "build": build["id"],
+                    "label": build["label"],
+                    "edition": "gog" if build["id"].startswith("gog") else "steam",
+                    "exe_sha256": build["sha256"].upper(),
+                })
+                break
+        else:
+            raise ValueError("KNOWN_BUILDS 里没有目标版本：%s" % build_id)
+    return found
 
 
 def _source(source_lang):
@@ -171,7 +174,7 @@ def _as_langs(lang):
     return [lang] if isinstance(lang, str) else list(lang)
 
 
-def build_manifest(stage, lang, version, edition, font_mode, package_id=None):
+def build_manifest(stage, lang, version, font_mode, package_id=None):
     stage = os.path.abspath(stage)
     package_id = package_id or os.path.basename(os.path.normpath(stage))
     langs = _as_langs(lang)
@@ -192,12 +195,12 @@ def build_manifest(stage, lang, version, edition, font_mode, package_id=None):
         # lang 保留为默认语言（兼容旧读法）；合包里的全量在 langs / translations。
         "lang": primary,
         "langs": langs,
-        "edition": edition,
+        "edition": TARGET_EDITION,
         "version": version,
         "runtime_version": _runtime_version(stage),
         "font_mode": font_mode,
         "build": _build_info(),
-        "target": _target(edition),
+        "targets": _targets(),
         "translation": translation,
         "translations": [_translation(lang) for lang in langs],
         "source": _source(translation["source_lang"]),
@@ -218,9 +221,9 @@ def _runtime_version(stage):
         return None
 
 
-def write_release_manifest(stage, lang, version, edition, font_mode, package_id=None):
+def write_release_manifest(stage, lang, version, font_mode, package_id=None):
     path = os.path.join(stage, MANIFEST_NAME)
-    data = build_manifest(stage, lang, version, edition, font_mode,
+    data = build_manifest(stage, lang, version, font_mode,
                           package_id=package_id)
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")

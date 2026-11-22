@@ -6,8 +6,6 @@
 #                                                  #   再加一个 latin（de+es+fr+it）
 #    .\release.ps1 -Version v1.0.0 -Bundle latin   # 只出 latin 分组
 #    .\release.ps1 -Version v1.0.0 -Lang zh        # 旧口径：一门语言一包
-#    .\release.ps1 -Version v1.0.0 -Edition gog
-#    .\release.ps1 -Version v1.0.0 -Edition steam
 #    .\release.ps1 -Version v1.0.0 -Tag
 #    .\release.ps1 -Version v1.0.0 -Tag -Push
 #
@@ -17,15 +15,15 @@
 #    - 发行分组由 src\release-bundles.toml 决定：同一份字体能共用的语言进一个 zip。
 #      de/es/fr/it 四项字体映射全是 none，共用一份空字体集，合成 latin 一包；
 #      zh/ja/ko/ru 各自一套字体文件，各出一包。
-#    - 产物是 dist\PR2-<id>-<edition>-<version>.zip 加 dist\SHA256SUMS.txt；
+#    - 一个分组一个 zip：dist\PR2-<id>-<version>.zip 加 dist\SHA256SUMS.txt。
+#      包同时面向 GOG 与 Steam（自带宿主代理与挂载脚本），不再按版别分包；
 #      id 是分组 id（单语言分组沿用语言代码）；stage 目录打包后删除。
 #    - tag 名为 release-<version>，annotated；-Tag 要求工作树干净。
 #
 #  Default flow:
 #    1. build the injector into build\runtime
 #    2. compile every language of every bundle and assemble one zip per bundle
-#       dist\PR2-<id>-gog-<version>.zip and
-#       dist\PR2-<id>-steam-<version>.zip
+#       dist\PR2-<id>-<version>.zip
 #    3. write dist\SHA256SUMS.txt
 #    4. (optional) create release-<version> tag; -Push also pushes it
 #
@@ -37,9 +35,6 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$Version,
-
-    [ValidateSet('all', 'gog', 'steam')]
-    [string]$Edition = 'all',
 
     [string[]]$Lang = @(),
 
@@ -212,9 +207,7 @@ $OutDir = if ([System.IO.Path]::IsPathRooted($Out)) {
 }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
-$editions = if ($Edition -eq 'all') { @('gog', 'steam') } else { @($Edition) }
-
-# 上一次中断留下的 stage 目录（PR2-<lang>-<edition>-<version>\）不属于发行产物，
+# 上一次中断留下的 stage 目录（PR2-<id>-<version>\）不属于发行产物，
 # 重新出包前清掉，保证 dist 里只有 zip 和校验和。
 foreach ($dir in @(Get-ChildItem -LiteralPath $OutDir -Directory -Filter 'PR2-*-v*' -ErrorAction SilentlyContinue)) {
     Remove-Item -LiteralPath $dir.FullName -Recurse -Force
@@ -225,7 +218,6 @@ Write-Host "[release] 语言：$($languages -join ', ')"
 if ($packMode -eq 'bundle') {
     Write-Host "[release] 分组：$((@($groups | ForEach-Object { "$($_.Id)($($_.Langs -join '+'))" }) -join ' '))"
 }
-Write-Host "[release] 入口：$($editions -join ', ')"
 Write-Host "[release] 输出：$OutDir"
 Write-Host "[release] 字体：$Fonts"
 
@@ -250,39 +242,33 @@ if (-not $SkipInjector) {
 
 Write-Host ''
 Write-Host '[release] 2/2 组装发行包'
-foreach ($edition in $editions) {
-    Write-Host ''
-    Write-Host "[release] 入口：$edition"
 
-    # 分组出包：一个分组一个 zip，组内语言共用字体与一份 font-map。
-    if ($packMode -eq 'bundle') {
-        foreach ($group in $groups) {
-            $releaseArgs = @(
-                $ReleaseScript,
-                '--version', $Version,
-                '--out', $OutDir,
-                '--fonts', $Fonts,
-                '--edition', $edition,
-                '--bundle', $group.Id
-            )
-            if ($NoFontCache) { $releaseArgs += '--no-font-cache' }
-            Write-Host ''
-            Write-Host ("[release] 分组 {0}：{1}" -f $group.Id, ($group.Langs -join ', '))
-            & $Python @releaseArgs
-            if ($LASTEXITCODE -ne 0) {
-                throw "生成 $($group.Id) 发行包失败（退出码 $LASTEXITCODE）。"
-            }
+# 分组出包：一个分组一个 zip，组内语言共用字体与一份 font-map。
+# 包同时面向 GOG 与 Steam，不再按版别出两份。
+if ($packMode -eq 'bundle') {
+    foreach ($group in $groups) {
+        $releaseArgs = @(
+            $ReleaseScript,
+            '--version', $Version,
+            '--out', $OutDir,
+            '--fonts', $Fonts,
+            '--bundle', $group.Id
+        )
+        if ($NoFontCache) { $releaseArgs += '--no-font-cache' }
+        Write-Host ''
+        Write-Host ("[release] 分组 {0}：{1}" -f $group.Id, ($group.Langs -join ', '))
+        & $Python @releaseArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "生成 $($group.Id) 发行包失败（退出码 $LASTEXITCODE）。"
         }
-        continue
     }
-
+} else {
     # 旧口径：每门语言各出一个包。
     $releaseArgs = @(
         $ReleaseScript,
         '--version', $Version,
         '--out', $OutDir,
-        '--fonts', $Fonts,
-        '--edition', $edition
+        '--fonts', $Fonts
     )
     foreach ($lang in $languages) {
         $releaseArgs += @('--lang', $lang)
@@ -293,7 +279,7 @@ foreach ($edition in $editions) {
 
     & $Python @releaseArgs
     if ($LASTEXITCODE -ne 0) {
-        throw "生成 $edition 发行包失败（退出码 $LASTEXITCODE）。"
+        throw "生成发行包失败（退出码 $LASTEXITCODE）。"
     }
 }
 

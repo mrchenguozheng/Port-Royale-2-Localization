@@ -18,19 +18,18 @@
 不需要安装器、不需要 Python、不需要编译。
 
 1. 确认是 **GOG 英文版 `1.1.2.3`**，或 Steam 英文版 `1.1.2.3`（宿主 DLL 入口）；
-2. 从 Release 下载对应语言和入口的 zip：GOG 版是 `PR2-zh-gog-v1.0.0.zip`，
-   Steam 版是 `PR2-zh-steam-v1.0.0.zip`；
+2. 从 Release 下载对应语言的 zip，例如中文是 `PR2-zh-v1.0.0.zip`——**一个包两种版本都能用**；
 3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
 4. **两版都双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
    GOG 走注入；Steam 由启动器先挂载宿主 DLL 再直启游戏，不用手工跑脚本，也不用从 Steam 启动；
 5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... overrides`。
 6. Steam 想回原版：点 GUI 上的「还原 Steam 原版」，或 `PR2Localization.exe --restore`。
 
-GOG 包刻意不含 `VERSION.dll`。两个包都不带 `VERSION.dll`；Steam 包带
-`Ascaron.Logging-2.6.dll` 宿主代理（放在 `PR2Localization\host\`，解压不会覆盖根目录原版）
-和 `PR2HostMount.ps1`：启动前由脚本校验原版 `Ascaron.Logging-2.6.dll` 的 `11,776 B` /
+包里不带 `VERSION.dll`（那是历史路线）。包内恒定带 `Ascaron.Logging-2.6.dll` 宿主代理
+（放在 `PR2Localization\host\`，解压不会覆盖根目录原版）和 `PR2HostMount.ps1`，GOG 侧从不执行它们：
+Steam 启动前由脚本校验原版 `Ascaron.Logging-2.6.dll` 的 `11,776 B` /
 SHA-256，通过后备份成 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\`，
-再换代理；原版大小或哈希不对时脚本停止，不强行覆盖。Steam 版的每一步都写
+再换代理；原版大小或哈希不对时脚本停止，不强行覆盖。宿主动作每一步都写
 `PR2Localization\logs\host.log`，GUI 的还原失败对话框显示的就是它的末尾几行。
 GOG 从旧包升级时，根目录残留的 `VERSION.dll` 可以删除，GOG 不加载它。
 GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析到
@@ -92,15 +91,16 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1
 .\build.ps1 -Target Packs -Lang zh  # 只编中文语言包
 .\build.ps1 -Target Injector        # 只编 Rust 注入器
 
-.\release.ps1 -Version v1.0.0       # 同时生成 gog 和 steam 两套 zip
-.\release.ps1 -Version v1.0.0 -Edition gog    # 只出 GOG 包
-.\release.ps1 -Version v1.0.0 -Edition steam  # 只出 Steam 包
+.\release.ps1 -Version v1.0.0       # 每个分组一个 zip（GOG / Steam 通用）
+.\release.ps1 -Version v1.0.0 -Bundle zh     # 只出中文分组
+.\release.ps1 -Version v1.0.0 -Bundle latin  # 只出拉丁分组（de+es+fr+it）
 .\release.ps1 -Version v1.0.0 -Tag  # 额外创建 release-v1.0.0 本地 tag
 .\release.ps1 -Version v1.0.0 -Tag -Push  # 再推送 tag
 ```
 
 低层脚本仍在 `src\build_injector.ps1`、`src\build_translation.ps1`；日常不需要直接调用。
-每个 zip 根目录带 `manifest.json`，记录目标 exe、参考原文、翻译来源/AI 标记和逐文件
+每个 zip 根目录带 `manifest.json`，记录两个目标 exe（GOG 与 Steam）、参考原文、
+翻译来源/AI 标记和逐文件
 SHA-256；出包前自校验，失败不出包。
 脚本位置和参数见[构建与安装](docs/构建与安装.md#脚本位置)。
 

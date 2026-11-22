@@ -156,7 +156,7 @@ jobs:
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'release-build.log'
           $env:CARGO_TERM_COLOR = 'never'
-          & pwsh -NoProfile -NonInteractive -Command '$b = $env:BUNDLES -split ","; .\release.ps1 -Version $env:VERSION -Edition all -Bundle $b -NoPause' *>&1 |
+          & pwsh -NoProfile -NonInteractive -Command '$b = $env:BUNDLES -split ","; .\release.ps1 -Version $env:VERSION -Bundle $b -NoPause' *>&1 |
             Tee-Object -FilePath $log
           $code = $LASTEXITCODE
           if ($code -ne 0) {
@@ -183,12 +183,11 @@ jobs:
         shell: pwsh
         run: |
           # 产物按**分组**出：latin 一个 zip 顶 de/es/fr/it 四份，
-          # 文件名用分组 id，不是语言代码。
+          # 文件名用分组 id，不是语言代码；一个包同时面向 GOG 与 Steam。
           $ids = $env:BUNDLES -split ','
           $expected = @()
           foreach ($id in $ids) {
-            $expected += "dist/PR2-$id-gog-$env:VERSION.zip"
-            $expected += "dist/PR2-$id-steam-$env:VERSION.zip"
+            $expected += "dist/PR2-$id-$env:VERSION.zip"
           }
           $expected += "dist/SHA256SUMS.txt"
           foreach ($path in $expected) {

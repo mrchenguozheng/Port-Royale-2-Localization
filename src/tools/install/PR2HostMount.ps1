@@ -131,8 +131,11 @@ $rootSha = Get-FileSha256 $RootDll
 
 if (Test-Original $RootDll) {
     $state = 'original'
-} elseif (Test-Original $Orig) {
-    if ($rootSha -eq $proxySha -or ($manifest -and $rootSha -eq $manifest.proxy_sha256)) {
+} elseif ((Test-Original $Orig) -or (Test-Original $Backup)) {
+    # 备份可能只剩 host-backup 那一份（.orig.dll 被删或被杀毒隔离）；只要还有
+    # 一份可验证的原版就算可还原，与启动器的 host_state 保持同一口径。
+    $recorded = if ($manifest) { ([string]$manifest.proxy_sha256).ToUpperInvariant() } else { '' }
+    if ($rootSha -eq $proxySha -or ($recorded -and $rootSha -eq $recorded)) {
         $state = 'mounted'
     } else {
         $state = 'unknown'
@@ -149,7 +152,7 @@ if ($Action -eq 'Status') {
     }
     Write-Output "目录：$Root"
     Write-Output "根 DLL SHA-256：$rootSha"
-    Write-Output "原版备份：$(if (Test-Original $Orig) { '有效' } else { '无/无效' })"
+    Write-Output "原版备份：$(if (Test-Original $Orig) { '有效（.orig.dll）' } elseif (Test-Original $Backup) { '有效（host-backup，.orig.dll 缺失或无效）' } else { '无/无效' })"
     return
 }
 
@@ -170,7 +173,14 @@ if ($Action -eq 'Mount') {
             Copy-Item -LiteralPath $Orig -Destination $Backup
         }
     } elseif ($state -eq 'mounted') {
-        # 已经挂载，只补齐可能的备份，然后重新验证代理。
+        # 已经挂载：先把缺的那份备份补齐，再重新验证代理。
+        if (-not (Test-Original $Orig)) {
+            if (Test-Original $Backup) {
+                Copy-Item -LiteralPath $Backup -Destination $Orig
+            } else {
+                throw "没有可验证的 .orig.dll 或 host-backup，拒绝继续挂载"
+            }
+        }
         $backupDir = Split-Path -Parent $Backup
         if (-not (Test-Path -LiteralPath $backupDir -PathType Container)) {
             New-Item -ItemType Directory -Path $backupDir -Force | Out-Null

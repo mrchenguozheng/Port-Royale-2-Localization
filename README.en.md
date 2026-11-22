@@ -38,16 +38,19 @@ from `C:\Windows\SysWOW64`, so the local proxy is bypassed and the game starts
 in English. Use `PR2LocalizationGUI.exe` and choose a language.
 
 Steam does not use `VERSION.dll`. `PR2.exe` statically imports
-`Ascaron.Logging-2.6.dll`; the package ships a proxy with that name plus
-`PR2HostMount.ps1`. Run `PR2HostMount.ps1 -Action Mount` once: it verifies the
-original DLL (`11,776 B`, SHA-256 `0568EC...`) and backs it up as
+`Ascaron.Logging-2.6.dll`; the package ships a proxy with that name under
+`PR2Localization\host\` plus `PR2HostMount.ps1`. The launcher mounts it
+automatically before starting the game: it verifies the original DLL
+(`11,776 B`, SHA-256 `0568EC...`) and backs it up as
 `Ascaron.Logging-2.6.orig.dll` and `PR2Localization\host-backup\`, then replaces
 it. If the size or hash does not match, it stops without overwriting anything.
-Use `-Action Restore` to put the original DLL back.
+Run `PR2HostMount.ps1 -Action Mount` / `-Action Restore` manually if you prefer;
+`PR2Localization.exe --restore` (or the GUI button) puts the original DLL back.
 
-Release packages are split by entry point: GOG packages
-(`PR2-<lang>-gog-<version>.zip`) intentionally omit the host DLL; Steam packages
-(`PR2-<lang>-steam-<version>.zip`) include the host-DLL proxy and mount script.
+Release packages are not split by entry point: one zip
+(`PR2-<lang>-<version>.zip`) works for both GOG and Steam. It always carries
+the host-DLL proxy and mount script — GOG never executes them — and the
+launcher detects the edition from the game directory.
 
 ## Documentation
 
