@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """pr2ctl.deploy —— 把构建产物复制进游戏目录。"""
 
+import configparser
+
 from .base import *  # noqa: F401,F403
 from .detect import read_locale_language
 from . import steam_host
@@ -21,6 +23,37 @@ def _font_lang(target, langs):
     return langs[0]
 
 
+def _mapped_font_names(cfg, lang):
+    """映射文件里某个语言节实际引用的字体文件名（按 basename，去重）。
+
+    build\\runtime\\PR2Localization\\fonts\\ 是累积目录：上一次构建 ru 时生成的
+    PR2Cyr* 会一直躺在根下，整目录照搬会把根本没装的语言字体塞进游戏。
+    这里按当前语言那一节（没有该节时按 [fonts] 全局默认）取值，
+    只认 ``|`` 分隔的候选与实际 ``.ttf`` 文件名；``none`` / ``-`` 表示该项
+    回落根目录原版字体，不进集合。空集合合法——就是这套语言不换字体。
+    """
+    if not lang or not os.path.isfile(cfg):
+        return set()
+    parser = configparser.ConfigParser(inline_comment_prefixes=(";",))
+    try:
+        parser.read(cfg, encoding="utf-8")
+    except (configparser.Error, UnicodeDecodeError):
+        return set()
+    section = lang if parser.has_section(lang) else "fonts"
+    if not parser.has_section(section):
+        return set()
+    names = set()
+    for _key, value in parser.items(section):
+        for cand in value.split("|"):
+            cand = cand.strip()
+            if not cand or cand in ("none", "-"):
+                continue
+            cand = os.path.basename(cand.replace("\\", "/"))
+            if cand.lower().endswith(".ttf"):
+                names.add(cand)
+    return names
+
+
 def deploy_steps(target, langs, edition=None):
     """列出复制要做的事，供进度条按步推进。
 
@@ -34,6 +67,8 @@ def deploy_steps(target, langs, edition=None):
 
     # 四个 TTF 平铺在 build\runtime\PR2Localization\fonts\；也兼容旧的语言子目录。
     # 复制到游戏 PR2Localization\fonts\，不覆盖根目录的原版字体。
+    # 根下只拷当前语言映射里引用到的文件，别把上一次构建别的语言留下的
+    # PR2Cyr*／PR2Pl* 之类一起带进去。
     font_lang = _font_lang(target, langs)
     # 默认映射以 src\font-map.ini 为准：runtime 里的 default 是派生物，可能落后于
     # 模板（[pl] 一节就是这么丢的）。模板不在时才退回 runtime 的旧文件。
@@ -49,7 +84,12 @@ def deploy_steps(target, langs, edition=None):
     font_src = os.path.join(RUNTIME, FONT_DIR)
     names = [n for n in sorted(os.listdir(font_src))
              if n.lower().endswith(".ttf")] if os.path.isdir(font_src) else []
+    if names and font_lang:
+        mapped = _mapped_font_names(cfg, font_lang)
+        names = [n for n in names if n in mapped]
     if not names and font_lang:
+        # 根下没有可用字体（或这一节一个字体都没映射）时退回该语言的子目录；
+        # 子目录本身按语言放，拷整份是对的。
         fallback = os.path.join(font_src, font_lang)
         if os.path.isdir(fallback):
             font_src = fallback
