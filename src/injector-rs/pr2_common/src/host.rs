@@ -2,7 +2,9 @@
 //!
 //! GOG 与 Steam 的 `PR2.exe` 都静态导入同目录的 `Ascaron.Logging-2.6.dll`
 //! （导入表里只有 `Log` 一个函数），两版的原版 DLL 也是同一份字节。所以两版
-//! 走同一条启动路径：先挂载宿主代理，再直启 `PR2.exe`，由代理去加载 Core。
+//! 走同一条本地化入口：先挂载宿主代理，再由代理去加载 Core。拉起的进程不同：
+//! GOG 版由启动器直启 `PR2.exe`；Steam 版交给客户端（`steam://rungameid/12470`），
+//! 装在 `Program Files` 下的 `PR2.exe` 直接 CreateProcess 会拿到错误 740。
 //!
 //! 替换动作本身只有一份实现 —— 发行包里的 `PR2HostMount.ps1`（先校验原版
 //! 大小/SHA-256、建两份备份、写 `.new` 校验后换名）。启动器和 GUI 只判断
@@ -34,6 +36,53 @@ pub const HOST_ORIGINAL_SHA256: &str =
 pub enum Edition {
     Gog,
     Steam,
+}
+
+/// Steam 商店页的 appid，`steam://rungameid/` 后面跟的就是它。
+pub const STEAM_APP_ID: u32 = 12470;
+
+/// Steam 版的启动地址：由客户端拉起 `PR2.exe`，而不是启动器自己建进程。
+pub fn steam_run_url() -> String {
+    format!("steam://rungameid/{}", STEAM_APP_ID)
+}
+
+/// 怎么把游戏拉起来。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LaunchMode {
+    /// 启动器直启 `PR2.exe`（GOG 版，或 Steam 版的排查路径）。
+    Direct,
+    /// 交给 Steam 客户端拉起（`steam://rungameid/12470`）。
+    Steam,
+    /// 挂起进程后远程注入（`--inject`），两版都能用。
+    Inject,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LaunchModeError {
+    /// Steam 版由客户端拉起，父进程的环境变量传不进游戏，`--lang` 没法做一次性覆盖。
+    SteamLangUnsupported,
+}
+
+/// 选启动方式。
+///
+/// - `--inject` 优先：它要自己挂起进程再写远程线程，steam:// 做不到这件事。
+/// - Steam 版不接受 `--lang`：Steam 拉起的 `PR2.exe` 不是启动器的子进程，
+///   `PR2_PACK_LANG` / `PR2_FONT_DIR` 都传不过去；语言只能改
+///   `PR2Localization\packs\locale.ini` 的 `language=`。
+/// - 其余情况直启。
+pub fn launch_mode(
+    edition: Edition,
+    has_lang: bool,
+    inject: bool,
+) -> Result<LaunchMode, LaunchModeError> {
+    if inject {
+        return Ok(LaunchMode::Inject);
+    }
+    match edition {
+        Edition::Steam if has_lang => Err(LaunchModeError::SteamLangUnsupported),
+        Edition::Steam => Ok(LaunchMode::Steam),
+        Edition::Gog => Ok(LaunchMode::Direct),
+    }
 }
 
 /// 根目录宿主 DLL 的状态。
@@ -148,15 +197,19 @@ pub fn host_state(root: &Path) -> HostState {
 
 /// 判断是 Steam 还是 GOG。
 ///
-/// 只用来说明「这是哪个发行版」，**不决定启动路径**：两版都走宿主挂载，
-/// 能不能挂只看根目录有没有宿主 DLL（`has_host_dll`）。
+/// 决定的事只有一件：**由谁来拉起 `PR2.exe`**（GOG 直启，Steam 交给客户端）。
+/// 本地化能力与版别无关，能不能挂只看根目录有没有宿主 DLL（`has_host_dll`）。
 ///
 /// 顺序：GOG 的 `goggame-*.info/.id/.script` 优先（法语 GOG 版也带同名宿主
-/// DLL，不能按 DLL 存在与否猜）；然后是 Steam 的 `steam_appid.txt`；最后才是
-/// 「根目录有宿主 DLL 就当 Steam」。两边都不像时按 GOG 处理。
+/// DLL，不能按 DLL 存在与否猜）；然后是 Steam 库路径 `...\steamapps\common\...`；
+/// 再看 Steam 的 `steam_appid.txt`；最后才是「根目录有宿主 DLL 就当 Steam」。
+/// 两边都不像时按 GOG 处理。
 pub fn detect_edition(root: &Path) -> Edition {
     if has_gog_marker(root) {
         return Edition::Gog;
+    }
+    if in_steam_library(root) {
+        return Edition::Steam;
     }
     if root.join("steam_appid.txt").is_file() {
         return Edition::Steam;
@@ -165,6 +218,13 @@ pub fn detect_edition(root: &Path) -> Edition {
         return Edition::Steam;
     }
     Edition::Gog
+}
+
+/// Steam 的库目录是 `...\steamapps\common\<游戏>`。这条判据比「有宿主 DLL」
+/// 硬：GOG 版没有这个路径，Steam 版只要装在库里就一定有。
+fn in_steam_library(root: &Path) -> bool {
+    let path = root.to_string_lossy().replace('/', "\\").to_lowercase();
+    path.contains("\\steamapps\\common\\")
 }
 
 fn has_gog_marker(root: &Path) -> bool {
@@ -281,6 +341,49 @@ mod tests {
         assert_eq!(detect_edition(&dir), Edition::Steam);
         assert_eq!(steam_app_id(&dir).as_deref(), Some("12470"));
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn detects_steam_by_library_path() {
+        // Steam 安装本身不写 steam_appid.txt（那是给非 Steam 启动用的），
+        // 所以库路径也得能单独认出来。
+        let root = PathBuf::from(
+            r"C:\Program Files (x86)\Steam\steamapps\common\Port Royale 2",
+        );
+        assert!(in_steam_library(&root));
+        assert!(!in_steam_library(Path::new(r"C:\My\Games\Port Royale 2 GOG EN")));
+        assert!(!in_steam_library(Path::new(r"D:\Games\Port Royale 2")));
+    }
+
+    #[test]
+    fn steam_url_is_the_store_app_id() {
+        assert_eq!(steam_run_url(), "steam://rungameid/12470");
+    }
+
+    #[test]
+    fn steam_launch_mode_rejects_single_run_language() {
+        // Steam 拉起的 PR2.exe 不是启动器的子进程，环境变量传不过去。
+        assert_eq!(
+            launch_mode(Edition::Steam, false, false),
+            Ok(LaunchMode::Steam)
+        );
+        assert_eq!(
+            launch_mode(Edition::Steam, true, false),
+            Err(LaunchModeError::SteamLangUnsupported)
+        );
+        // --inject 要自己挂起进程再写远程线程，两种版别都不能交给 Steam。
+        assert_eq!(
+            launch_mode(Edition::Steam, true, true),
+            Ok(LaunchMode::Inject)
+        );
+        assert_eq!(
+            launch_mode(Edition::Gog, true, false),
+            Ok(LaunchMode::Direct)
+        );
+        assert_eq!(
+            launch_mode(Edition::Gog, false, false),
+            Ok(LaunchMode::Direct)
+        );
     }
 
     #[test]

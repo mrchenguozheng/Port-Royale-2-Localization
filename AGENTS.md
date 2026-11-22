@@ -8,8 +8,10 @@
 
 - 这是《Port Royale 2》的**外挂式本地化运行时**：原版 `PR2.exe` 不改字节。
   两个版本的正式入口都是 `PR2LocalizationGUI.exe` / `PR2Localization.exe`：启动器先挂载
-  宿主代理 `Ascaron.Logging-2.6.dll`，再直启 `PR2.exe`。挂载之后直接双击 `PR2.exe`
-  也是有效路径——代理在工作线程里加载 `PR2LocalizationCore.dll`。
+  宿主代理 `Ascaron.Logging-2.6.dll`，再由版本对应的方式拉起游戏——GOG 版直启 `PR2.exe`，
+  Steam 版交给客户端 `steam://rungameid/12470`（`Program Files` 下直接建进程会拿到 740）。
+  挂载之后直接双击 `PR2.exe`（或从 Steam 库里点启动）也是有效路径——代理在工作线程里
+  加载 `PR2LocalizationCore.dll`。
   不要再用 `VERSION.dll`：它属于 Windows 的 KnownDLLs，同目录代理永远进不去 `PR2.exe`。
 - **GOG 英文版 `1.1.2.3` 与 Steam 英文版 `1.1.2.3` 都已通过宿主 DLL 代理实测（中文界面）**。
   两版的 `PR2.exe` 导入表逐项一致（21 个 DLL，`Ascaron.Logging-2.6.dll` 只导入 `Log`），

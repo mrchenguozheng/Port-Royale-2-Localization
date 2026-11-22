@@ -20,9 +20,10 @@
       README.txt
       OFL.txt
 
-两个版本共用同一个包，也共用同一条启动路径：GOG 与 Steam 的 PR2.exe 都静态
+两个版本共用同一个包，本地化入口也相同：GOG 与 Steam 的 PR2.exe 都静态
 导入 Ascaron.Logging-2.6.dll（导入表里只有 Log 一个函数），两版的原版 DLL
-还是同一份字节。所以启动器不分版别，一律先确保宿主代理挂载再直启 PR2.exe；
+还是同一份字节。所以启动器先确保宿主代理挂载，再按版别拉起游戏：GOG 直启
+PR2.exe，Steam 交给客户端（steam://rungameid/12470）；
 根目录没有这个 DLL 的版本才退回注入。宿主代理放在 PR2Localization\\host\\，
 不占根目录原名，解压不会覆盖游戏原版。PR2HostMount.ps1 负责校验原版大小/
 哈希、备份成 Ascaron.Logging-2.6.orig.dll、原子换进根目录和还原；启动器
@@ -399,17 +400,21 @@ def write_readme(langs, default_lang, stage, modes, version="",
                      "标题 PR2CyrDisplay-Head / -Black / -Bold.ttf（由 Noto Serif 按原版度量"
                      "压缩并改名）；均为 SIL OFL 1.1，font-map.default.ini 映射四个逻辑名。")
     install_step = """  2. 双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
-     两版用同一条启动路径：
-       先校验原版 Ascaron.Logging-2.6.dll 的 11,776 B / SHA-256，
-       备份成 Ascaron.Logging-2.6.orig.dll 和
-       PR2Localization\\host-backup\\Ascaron.Logging-2.6.dll，
-       再把代理换进根目录，最后拉起 PR2.exe（不注入）。
-     GOG 与 Steam 的 PR2.exe 都静态导入这个 DLL，所以两版行为一致。
+     先校验原版 Ascaron.Logging-2.6.dll 的 11,776 B / SHA-256，
+     备份成 Ascaron.Logging-2.6.orig.dll 和
+     PR2Localization\\host-backup\\Ascaron.Logging-2.6.dll，
+     再把代理换进根目录（不注入），然后按版别拉起游戏：
+       GOG 版：直接启动根目录的 PR2.exe
+       Steam 版：交给客户端，打开 steam://rungameid/12470
+     GOG 与 Steam 的 PR2.exe 都静态导入这个 DLL。Steam 版读不到启动器的
+     命令行与环境变量，语言写在 PR2Localization\\packs\\locale.ini，GUI 会先
+     把所选语言写进这个文件再交给客户端。
      校验不对或被占用时它会停止，不会覆盖未知文件。
      代理本身在 PR2Localization\\host\\Ascaron.Logging-2.6.dll，解压不会覆盖原版。
      根目录没有这个 DLL 的版本会自动退回注入启动，原因写在
      PR2Localization\\logs\\host.log。
-     习惯命令行的可以在游戏根目录运行：
+     习惯命令行的可以在游戏根目录运行（--lang 只对 GOG 版有效，
+     Steam 版会直接报错退出）：
        PR2Localization.exe --lang=<代码>
        powershell -ExecutionPolicy Bypass -File .\\PR2HostMount.ps1 -Action Mount
   3. 还原原版：在启动器里点「还原原版」，或运行
@@ -423,7 +428,7 @@ def write_readme(langs, default_lang, stage, modes, version="",
   和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。
   如果保留过 PR2Localization\\packs\\overrides\\，卸载前先复制出来。"""
     support_line = ("支持游戏版本：GOG 英文 1.1.2.3 与 Steam 英文 1.1.2.3 都已实测"
-                    "（同一个包，两版走同一条启动路径）。")
+                    "（同一个包；GOG 版直启，Steam 版交给客户端启动）。")
     if pkg_mode == "config":
         font_help = """字体：
   本包不含字体文件。
@@ -607,8 +612,8 @@ def make_release(langs, version, out_dir, mode, log=None, cache=True,
                  baseline_tag=""):
     """出一份发行 zip：langs 里所有语言放进同一个包，共用字体与一份映射。
 
-    一个包同时面向 GOG 与 Steam：宿主代理和挂载脚本恒定进包，两版都执行同一条
-    挂载直启路径。包名不含版别，`PR2-<pkg_id>-<version>.zip`。
+    一个包同时面向 GOG 与 Steam：宿主代理和挂载脚本恒定进包，两版都先挂载；
+    之后由谁来拉起进程按版别决定。包名不含版别，`PR2-<pkg_id>-<version>.zip`。
 
     package_id 为空时按第一个语言命名（单语言包，与旧行为一致）；
     合包时由 src\\release-bundles.toml 给 id（如 latin）。

@@ -20,8 +20,9 @@
 1. 确认是 **GOG 英文版 `1.1.2.3`**，或 Steam 英文版 `1.1.2.3`（两者都走宿主 DLL 入口）；
 2. 从 Release 下载对应语言的 zip，例如中文是 `PR2-zh-v1.0.0.zip`——**一个包两种版本都能用**；
 3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
-4. **两版都双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
-   启动器一律先挂载宿主 DLL 再直启游戏，不用手工跑脚本，也不用从 Steam 启动；
+4. **双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
+   GOG 版由启动器挂载宿主 DLL 后直启游戏；Steam 版挂载后交给 Steam 客户端
+   （`steam://rungameid/12470`）拉起，不用你回库里再点一次；
 5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... N entries, M overrides`。
 6. 想确认装的是哪一版：GUI 副标题与语言列表都带版本（`简体中文 · v1.0.0`），
    命令行 `PR2Localization.exe --version` 打印同一串；语言包改了什么看状态框第二行
@@ -29,8 +30,9 @@
 7. 想回原版：点 GUI 上的「还原原版」，或 `PR2Localization.exe --restore`。
 
 GOG 与 Steam 的 `PR2.exe` 都静态导入同目录的 `Ascaron.Logging-2.6.dll`（导入表里只有 `Log`
-一个函数），两版的原版 DLL 还是同一份字节（`11,776 B` / SHA-256 相同），所以两版走同一条
-启动路径。包里不带 `VERSION.dll`（那是历史路线）。包内恒定带 `Ascaron.Logging-2.6.dll`
+一个函数），两版的原版 DLL 还是同一份字节（`11,776 B` / SHA-256 相同），所以本地化入口
+是同一条；差别只在谁来拉起进程：GOG 版启动器直启 `PR2.exe`，Steam 版交给客户端
+（`steam://rungameid/12470`）——装在 `Program Files` 下的 `PR2.exe` 直接建进程会拿到错误 740。包里不带 `VERSION.dll`（那是历史路线）。包内恒定带 `Ascaron.Logging-2.6.dll`
 宿主代理（放在 `PR2Localization\host\`，解压不会覆盖根目录原版）和 `PR2HostMount.ps1`：
 启动前由脚本校验原版 `Ascaron.Logging-2.6.dll` 的 `11,776 B` /
 SHA-256，通过后备份成 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\`，
@@ -62,7 +64,7 @@ SHA-256，通过后备份成 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization
 | 游戏版本 | 状态 |
 |---|---|
 | **GOG 英文 `1.1.2.3`** | ✅ 已实测（宿主 `Ascaron.Logging-2.6.dll` 代理，中文界面） |
-| **Steam 英文 `1.1.2.3`** | ✅ 已实测（同上，走同一条挂载直启路径） |
+| **Steam 英文 `1.1.2.3`** | ✅ 已实测（同上，启动交给 Steam 客户端） |
 | GOG 法语 `1.1.2.42` | ❌ 不支持（只用作翻译参照） |
 | 其他版本 | ❌ 不支持 |
 

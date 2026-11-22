@@ -214,7 +214,8 @@ def deploy(target, langs=None, edition=None):
     return True, (
         "已复制到：\n%s\n\n"
         "新复制：%s\n未改动：%s\n\n"
-        "点「启动游戏（已注入）」即可启动，或以后手动运行这个目录下的\n"
+        "点「以所选语言启动」即可启动（GOG 版直启 PR2.exe，Steam 版交给客户端），"
+        "或以后手动运行这个目录下的\n"
         "%s。语言包在游戏启动时读取，改完翻译重新构建再复制一次即可。%s"
         % (target,
            "、".join(copied) or "（无）",

@@ -7,8 +7,9 @@ use std::ptr;
 
 use pr2_common::{
     bundled_fonts_complete, detect_edition, exe_dir, fonts_dir, has_host_dll,
-    host_script_path, host_state, log_dir, pack_runtime_ok, proxy_loaded_after,
-    proxy_log_len, read_locale_language, valid_lang_code, Edition, HostState, FONT_NAMES,
+    host_script_path, host_state, launch_mode, log_dir, pack_runtime_ok,
+    proxy_loaded_after, proxy_log_len, read_locale_language, steam_run_url,
+    valid_lang_code, Edition, HostState, LaunchMode, LaunchModeError, FONT_NAMES,
     HOST_DLL, HOST_MOUNT_SCRIPT, HOST_ORIG, RUNTIME_VERSION,
 };
 use sha2::{Digest, Sha256};
@@ -26,6 +27,7 @@ use windows_sys::Win32::System::Threading::{
     CREATE_NO_WINDOW, CREATE_SUSPENDED, INFINITE, LPTHREAD_START_ROUTINE, PROCESS_INFORMATION,
     STARTUPINFOA,
 };
+use windows_sys::Win32::UI::Shell::ShellExecuteW;
 
 const ORIG_FONT_SIZES: [u64; 4] = [296712, 65680, 52876, 53120];const ORIG_FONT_HASHES: [&str; 4] = [
     "1906a771ed879a5de75a3ff552fbad533827fe7b39e18319ce9d9ae134c346c7",
@@ -74,13 +76,15 @@ fn run() -> Result<(), i32> {
             return Ok(());
         } else if arg == "--help" || arg == "-h" {
             println!("[PR2Loc] 用法: PR2Localization.exe [--lang=<代码>] [--vanilla] [--restore] [--inject]");
-            println!("[PR2Loc]   不给参数时两版同路：先把宿主代理挂进根目录，再直接启动 PR2.exe；");
-            println!("[PR2Loc]   GOG 与 Steam 的 PR2.exe 都静态导入这个 DLL，两版走同一条路径。");
+            println!("[PR2Loc]   不给参数时先挂载宿主代理，再由对应版本的方式拉起游戏：");
+            println!("[PR2Loc]   GOG 版直启 PR2.exe；Steam 版交给客户端（steam://rungameid/12470）。");
             println!("[PR2Loc]   --lang     这一次启动用哪个语言包，");
-            println!("[PR2Loc]              优先于 PR2Localization\\packs\\locale.ini（或 locale.default.ini）的 language=，不写文件。");
-            println!("[PR2Loc]   --vanilla  先还原宿主 DLL 与原版字体，再直接启动 PR2.exe，不加载语言包。");
+            println!("[PR2Loc]              优先于 PR2Localization\\packs\\locale.ini 的 language=，不写文件。");
+            println!("[PR2Loc]              只有 GOG 版支持：Steam 拉起的进程不是本进程的子进程，");
+            println!("[PR2Loc]              环境变量传不过去，换语言要改 locale.ini。");
+            println!("[PR2Loc]   --vanilla  先还原宿主 DLL 与原版字体，再以对应版本的方式启动原版游戏。");
             println!("[PR2Loc]   --restore  只还原：把 Ascaron.Logging-2.6.dll 换回原版，恢复原版字体，不启动游戏。");
-            println!("[PR2Loc]   --inject   不挂载宿主，退回远程注入启动（只给排查用）。");
+            println!("[PR2Loc]   --inject   不挂载宿主，退回远程注入启动（只给排查用，需管理员权限）。");
             println!("[PR2Loc]   --version  打印发行版本、构建 commit 与运行时版本，不启动游戏。");
             return Ok(());
         }
@@ -109,12 +113,26 @@ fn run() -> Result<(), i32> {
 
     let edition = detect_edition(&root);
     let edition_label = if edition == Edition::Steam { "Steam" } else { "GOG" };
+    let mode = match launch_mode(edition, lang.is_some(), force_inject) {
+        Ok(mode) => mode,
+        Err(LaunchModeError::SteamLangUnsupported) => {
+            eprintln!("[PR2Loc] Steam 版不接受 --lang：游戏由 Steam 客户端拉起，");
+            eprintln!("[PR2Loc] 启动器的环境变量传不进那个进程。换语言请改");
+            eprintln!("[PR2Loc]   PR2Localization\\packs\\locale.ini 里的 language=");
+            host_log_line(&root, "Steam 版拒绝 --lang：换语言要改 locale.ini。");
+            return Err(1);
+        }
+    };
     backup_original_fonts(&root);
 
     if vanilla {
         // 两版都可能挂过宿主代理，--vanilla 一律先还原再启动。
         restore_host(&root)?;
         restore_original_fonts(&root);
+        if mode == LaunchMode::Steam {
+            println!("[PR2Loc] 已恢复原版状态，交给 Steam 启动原版游戏");
+            return launch_by_steam(&root, "已恢复原版状态", false);
+        }
         match create_process(&exe_path, &root, 0) {
             Ok(pi) => {
                 unsafe {
@@ -157,6 +175,23 @@ fn run() -> Result<(), i32> {
             );
             return Err(1);
         }
+    }
+
+    if mode == LaunchMode::Steam {
+        // Steam 版：字体与语言包都由代理在进程内按 locale.ini 决定。
+        // 启动器这边没有环境变量可传 —— Steam 拉起的 PR2.exe 不是它的子进程。
+        if !has_host_dll(&root) {
+            host_log(
+                &root,
+                &format!(
+                    "根目录没有 {HOST_DLL}（{edition_label} 版），Steam 版没有可接管的导入点。"
+                ),
+            );
+            return Err(1);
+        }
+        println!("[PR2Loc] Steam 版交给客户端启动：{}", steam_run_url());
+        ensure_host(&root)?;
+        return launch_by_steam(&root, "Steam 版交给客户端启动", true);
     }
 
     let font_dir = font_lang
@@ -344,6 +379,66 @@ fn watch_proxy(root: &Path, offset: u64, process: HANDLE) -> bool {
         }
         if exited {
             return false;
+        }
+    }
+    false
+}
+
+/// Steam 版：把游戏交给客户端拉起，而不是自己 CreateProcess。
+///
+/// `Program Files` 下的 `PR2.exe` 直接建进程会拿到错误 740（需要提升权限），
+/// 而 Steam 客户端本来就在自己的环境里启动它，顺便把 DRM 也处理掉。
+fn launch_by_steam(root: &Path, reason: &str, expect_proxy: bool) -> Result<(), i32> {
+    let url = steam_run_url();
+    let log_offset = proxy_log_len(root);
+    let url_w = pr2_common::wide(&url);
+    let open_w = pr2_common::wide("open");
+    let shown = unsafe {
+        ShellExecuteW(
+            0, // 没有父窗口
+            open_w.as_ptr(),
+            url_w.as_ptr(),
+            ptr::null(),
+            ptr::null(),
+            1, // SW_SHOWNORMAL
+        )
+    };
+    // ShellExecute 的老约定：返回值大于 32 才算成功，其余是错误码。
+    if (shown as isize) <= 32 {
+        host_log(
+            root,
+            &format!(
+                "请求 Steam 启动失败：{url}（ShellExecute 返回 {}）",
+                shown as isize
+            ),
+        );
+        return Err(1);
+    }
+    println!("[PR2Loc] 已请求 Steam 启动：{url}");
+    host_log_line(root, &format!("{reason}（{url}）"));
+
+    if !expect_proxy {
+        return Ok(());
+    }
+    if watch_proxy_log(root, log_offset, 30) {
+        println!("[PR2Loc] 宿主代理已进入 PR2.exe 进程");
+        host_log_line(root, "宿主代理已进入 PR2.exe 进程");
+    } else {
+        // Steam 是异步拉起的：没看到不等于失败，可能只是还没起到。
+        host_log(
+            root,
+            "15 秒内没看到代理写日志 —— Steam 可能还在启动，稍后看 logs\\proxy.log。",
+        );
+    }
+    Ok(())
+}
+
+/// 不看进程句柄的等待：Steam 拉起的进程不是本进程的子进程。
+fn watch_proxy_log(root: &Path, offset: u64, polls: u32) -> bool {
+    for _ in 0..polls {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        if proxy_loaded_after(root, offset) {
+            return true;
         }
     }
     false

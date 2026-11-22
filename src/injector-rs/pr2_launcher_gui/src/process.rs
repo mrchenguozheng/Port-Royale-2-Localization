@@ -55,12 +55,17 @@ pub fn launch(root: &Path, lang: Option<&str>, vanilla: bool) -> Result<(), Laun
     if !launcher.is_file() {
         return Err(LaunchError::NoLauncher);
     }
-    if !vanilla && lang.is_none() {
+    // Steam 版交给客户端拉起，启动器那边不接受 --lang（环境变量传不进
+    // Steam 的子进程），语言只能先写进 locale.ini。GOG 版仍靠 --lang 覆盖。
+    let steam = pr2_common::detect_edition(root) == pr2_common::Edition::Steam;
+    if !steam && !vanilla && lang.is_none() {
         return Err(LaunchError::NoLanguage);
     }
 
     let cmd = if vanilla {
         format!("\"{}\" --vanilla", launcher.display())
+    } else if steam {
+        format!("\"{}\"", launcher.display())
     } else {
         format!("\"{}\" --lang={}", launcher.display(), lang.unwrap())
     };

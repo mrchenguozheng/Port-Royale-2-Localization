@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::ptr;
 
 use pr2_common::{
-    build_label, exe_dir, language_fonts_complete, read_locale_language,
-    write_locale_language, RUNTIME_VERSION,
+    build_label, detect_edition, exe_dir, language_fonts_complete, read_locale_language,
+    write_locale_language, Edition, RUNTIME_VERSION,
 };
 use windows_sys::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{
@@ -579,15 +579,26 @@ impl App {
             }
         }
 
+        let steam = detect_edition(&self.root) == Edition::Steam;
+        if steam && !vanilla {
+            // Steam 版由客户端拉起，启动器的 --lang 会被拒绝：语言只有
+            // locale.ini 一条通道，所以必须在启动之前写进去。
+            if let Some(code) = lang.as_deref() {
+                let _ = write_locale_language(&self.root, code);
+            }
+        }
+
         match process::launch(&self.root, lang.as_deref(), vanilla) {
             Ok(()) => {
-                if !vanilla {
+                if !steam && !vanilla {
                     if let Some(code) = lang.as_deref() {
                         let _ = write_locale_language(&self.root, code);
                     }
                 }
                 let text = if vanilla {
                     self.strings.t("status.vanilla")
+                } else if steam {
+                    self.strings.t("status.steam")
                 } else {
                     self.strings.t("status.launched")
                 };
