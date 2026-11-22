@@ -69,8 +69,9 @@ def _read_manifest(target):
 def _write_manifest(target, original_sha, proxy_sha):
     path = os.path.join(target, HOST_MANIFEST)
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    # 不写版别：两版走同一条挂载路径，版别不决定任何行为，也没有读者。
+    # 清单只留还原与「代理是否本工具写的」校验需要的字段。
     data = {
-        "edition": detect_edition(target),
         "host": HOST_DLL,
         "original_sha256": original_sha,
         "proxy_sha256": proxy_sha,

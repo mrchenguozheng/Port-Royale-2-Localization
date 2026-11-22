@@ -67,16 +67,9 @@ function Write-Manifest([string]$Root, [string]$ProxySha) {
     if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
-    # edition 只作诊断：goggame-* 标记优先，其次 steam_appid.txt，都没有就 unknown。
-    $edition = 'unknown'
-    $gog = @(Get-ChildItem -LiteralPath $Root -Filter 'goggame-*.info' -ErrorAction SilentlyContinue).Count
-    if ($gog -gt 0) {
-        $edition = 'gog'
-    } elseif (Test-Path -LiteralPath (Join-Path $Root 'steam_appid.txt') -PathType Leaf) {
-        $edition = 'steam'
-    }
+    # 不写版别：两版走同一条挂载路径，版别不决定任何行为，也没有读者。
+    # 清单只留还原与「代理是否本工具写的」校验需要的字段。
     $data = [ordered]@{
-        edition = $edition
         host = $HostDll
         original_sha256 = $ExpectedSha
         proxy_sha256 = $ProxySha
