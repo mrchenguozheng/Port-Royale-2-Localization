@@ -15,7 +15,10 @@
 #
 # spaCy 与 zh_core_web_sm 也不在这里：中文分词走仓库里的 .venv-spacy
 # （zh_space.spacy_python() 自动发现），由 ci.yml 单独建。
-spylls>=0.1.0
-janome>=0.5.0
-kiwipiepy>=0.24
-fonttools>=4.0
+# 版本钉死：原先写 `>=`，CI 实装已经漂到 spylls 0.1.7 / kiwipiepy 0.25.1，
+# 而开发机是 0.1.0 / 0.24.1 —— 同一份判据在两个版本上跑，绿了也不能说明什么。
+# 升版本时改这里，并在开发机上 `pip install -r requirements-ci.txt` 再跑一遍。
+spylls==0.1.7
+janome==0.5.2
+kiwipiepy==0.25.1
+fonttools==4.68.0

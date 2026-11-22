@@ -11,38 +11,98 @@ on:
 permissions:
   contents: read
 
+# 同一分支的新推送取消旧的一轮：排队中的运行白白占 runner，日志也没人看。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"
+  # 版本写死：CI 的判据要和开发机一致，`spacy download` 还会去 GitHub release
+  # 拉模型（本机网络下会卡死），直接用固定 URL 的 wheel 装。
+  SPACY_VERSION: 3.8.18
+  SPACY_MODEL: zh_core_web_sm-3.8.0-py3-none-any.whl
+  SPACY_MODEL_URL: https://github.com/explosion/spacy-models/releases/download/zh_core_web_sm-3.8.0/zh_core_web_sm-3.8.0-py3-none-any.whl
 
 jobs:
   build:
     runs-on: windows-latest
+    # 正常一轮 3m37s；卡住时别耗到默认 6 小时。
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
+        id: py
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements-ci.txt
+            requirements.txt
 
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: i686-pc-windows-msvc
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/injector-rs -> target
+
       # 判据用的包全装，见 requirements-ci.txt。中文分词还要一份 .venv-spacy，
       # 与开发机同名同结构，zh_space.spacy_python() 直接就能发现。
       - name: Python deps
         shell: pwsh
-        run: |
-          python -m pip install --disable-pip-version-check -r requirements-ci.txt
-          python -m venv .venv-spacy
-          .venv-spacy\Scripts\python -m pip install --disable-pip-version-check spacy
-          .venv-spacy\Scripts\python -m spacy download zh_core_web_sm
+        run: python -m pip install --disable-pip-version-check -r requirements-ci.txt
 
-      - name: Static checks
+      # key 里带 setup-python 的实际版本（含 patch）：venv 的 pyvenv.cfg 写死了
+      # base python 的绝对路径，runner 镜像换 patch 版本后旧的 venv 就不能用了。
+      - name: Restore spacy venv
+        id: spacy-cache
+        uses: actions/cache@v4
+        with:
+          path: .venv-spacy
+          key: spacy-${{ runner.os }}-${{ steps.py.outputs.python-version }}-${{ env.SPACY_VERSION }}-${{ env.SPACY_MODEL }}
+
+      - name: Build spacy venv
+        if: steps.spacy-cache.outputs.cache-hit != 'true'
         shell: pwsh
-        run: .\check.ps1 -NoPause
+        run: |
+          python -m venv .venv-spacy
+          .venv-spacy\Scripts\python -m pip install --disable-pip-version-check "spacy==$env:SPACY_VERSION"
+          .venv-spacy\Scripts\python -m pip install --disable-pip-version-check "$env:SPACY_MODEL_URL"
+          .venv-spacy\Scripts\python -c "import spacy, zh_core_web_sm; print('spacy', spacy.__version__, 'model', zh_core_web_sm.__version__)"
+
+      # 失败时 GitHub 只给一行 "process completed with exit code 1"，真正的
+      # 失败语言与行号全在 check.log 里。所以落一份日志、失败时把关键行打成
+      # ::error:: 注解，再整体传成 artifact。
+      - name: Static checks
+        id: check
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'check.log'
+          .\check.ps1 -NoPause -Jobs 4 *>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            foreach ($line in (Get-Content $log -Tail 60)) {
+              if ($line -match '失败：|^ERROR:|^FAIL:|^E\d+|^W\d+') {
+                "::error::$line"
+              }
+            }
+            "::error::静态检查失败（exit $code），完整日志见 artifact check-log。"
+            exit $code
+          }
+
+      - name: Upload check log
+        if: failure() && steps.check.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-log
+          path: ${{ runner.temp }}/check.log
+          if-no-files-found: warn
 
       - name: Build injector and language packs
         shell: pwsh
+        timeout-minutes: 15
         run: .\build.ps1 -Target All -Lang @('zh','ja') -NoPause
