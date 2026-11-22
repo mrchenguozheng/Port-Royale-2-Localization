@@ -77,6 +77,9 @@ Rust 产物：
   发行包只带 `font-map.default.ini`，用户可另建 `font-map.ini` 按项覆盖默认映射，解压升级不覆盖它。
   同一安装只放一个语言的字体；映射只接受 `fonts` 目录内的文件，不读系统字体；
 非拉丁系默认使用 Noto 对应字体，只接受静态字重，不使用 `.ttc` 或 `-VF.ttf`。
+- 运行日志一律经 `pr2_common::log_util` 打开：append 类超过 1 MiB 先滚成 `<name>.1`（同目录只留
+  一份），不要新增裸 `OpenOptions::append(true)` 的日志写入；`vtable.log`（槽位扫描）与
+  `resolve.log`（`[R]`/`[RGAP]`）是开发诊断，只在 `PR2_LOG_DEBUG=1` 时写，发行版默认不产生。
 - 译文里的 hash id、`%1` 等占位符、`@D$...$` 脚本变量、`<n>`、`<c>`、`<f:...>` 标签
   都不是可翻译文本；改译文时保持原样。
 - 字体路径、语言包路径和 GUI 文案的详细规则见

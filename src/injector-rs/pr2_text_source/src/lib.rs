@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::{c_char, c_void};
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::Write;
 use std::os::windows::ffi::OsStringExt;
 use std::path::Path;
@@ -11,8 +11,9 @@ use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicU32, AtomicUsize, Ordering}
 use std::sync::{Mutex, OnceLock};
 
 use pr2_common::{
-    bundled_fonts_complete, exe_dir, font_rel_dir, log_dir, override_path, pack_dir,
-    pack_path, parse_pack_line, read_locale_language, valid_lang_code, FontMap,
+    bundled_fonts_complete, debug_log_enabled, exe_dir, font_rel_dir, log_dir, open_append_capped,
+    open_truncate, override_path, pack_dir, pack_path, parse_pack_line, read_locale_language,
+    valid_lang_code, FontMap, DEFAULT_MAX_BYTES,
 };
 use windows_sys::Win32::Foundation::{BOOL, CloseHandle, HANDLE, HMODULE};
 use windows_sys::Win32::Storage::FileSystem::{
@@ -547,16 +548,15 @@ unsafe fn log_resolve_gap(hash: u32, out: *mut c_void) {
 }
 
 fn resolve_log(line: &str) {
+    // 开发诊断：默认不写盘，`PR2_LOG_DEBUG=1` 时才记录。
+    if !debug_log_enabled() {
+        return;
+    }
     let m = RESOLVE_LOG.get_or_init(|| Mutex::new(None));
     let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
     if guard.is_none() {
         let path = log_dir(&exe_dir()).join("resolve.log");
-        *guard = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(path)
-            .ok();
+        *guard = open_truncate(&path);
         if let Some(f) = guard.as_mut() {
             let _ = writeln!(
                 f,
@@ -590,15 +590,15 @@ unsafe fn log_lsr_call(hash: u32, found: i32, text: Option<&String>) {
 }
 
 fn lsr_log(line: &str) {
+    // 开发诊断：槽位扫描默认不写盘，`PR2_LOG_DEBUG=1` 时才记录。
+    if !debug_log_enabled() {
+        return;
+    }
     let m = LSR_LOG.get_or_init(|| Mutex::new(None));
     let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
     if guard.is_none() {
         let path = log_dir(&exe_dir()).join("vtable.log");
-        *guard = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-            .ok();
+        *guard = open_append_capped(&path, DEFAULT_MAX_BYTES);
     }
     if let Some(f) = guard.as_mut() {
         let _ = f.write_all(line.as_bytes());
@@ -610,7 +610,7 @@ fn lsr_log(line: &str) {
 
 fn log_line(msg: &str) {
     let path = log_dir(&exe_dir()).join("runtime.log");
-    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(path) {
+    if let Some(mut f) = open_append_capped(&path, DEFAULT_MAX_BYTES) {
         let _ = writeln!(f, "{msg}");
     }
 }
@@ -1335,12 +1335,7 @@ fn font_log_path(path: &str) {
     let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
     if guard.is_none() {
         let p = log_dir(&exe_dir()).join("font-paths.log");
-        *guard = OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(p)
-            .ok();
+        *guard = open_truncate(&p);
         if let Some(f) = guard.as_mut() {
             let _ = writeln!(f, "font path log (read-only hook)");
         }
@@ -1361,12 +1356,7 @@ unsafe fn install_font_log_hooks() {
         let mut guard = m.lock().unwrap_or_else(|e| e.into_inner());
         if guard.is_none() {
             let p = log_dir(&exe_dir()).join("font-paths.log");
-            *guard = OpenOptions::new()
-                .create(true)
-                .truncate(true)
-                .write(true)
-                .open(p)
-                .ok();
+            *guard = open_truncate(&p);
             if let Some(f) = guard.as_mut() {
                 let _ = writeln!(f, "font path log (read-only hook)");
             }

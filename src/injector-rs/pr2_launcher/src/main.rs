@@ -511,8 +511,10 @@ fn host_log(root: &Path, message: &str) {
 /// 只写日志文件；调用方已经自己 `println!` 过的时候用它，避免同一句话打印两遍。
 fn host_log_line(root: &Path, message: &str) {
     use std::io::Write;
+    // 宿主动作开始前会清空这份日志，正常只有一次动作的几十行；上限只防失败路径
+    // 反复重试时把文件写爆（超过 1 MiB 就把旧档滚成 `host.log.1`）。
     let path = log_dir(root).join(HOST_LOG_FILE);
-    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
+    if let Some(mut file) = pr2_common::open_append_capped(&path, pr2_common::DEFAULT_MAX_BYTES) {
         let _ = writeln!(file, "[PR2Loc] {message}");
     }
 }

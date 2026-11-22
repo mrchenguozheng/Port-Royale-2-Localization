@@ -9,6 +9,9 @@ use windows_sys::Win32::System::LibraryLoader::GetModuleFileNameW;
 mod host;
 pub use host::*;
 
+mod log_util;
+pub use log_util::*;
+
 /// 运行时契约版本。
 ///
 /// v1：GOG 走远程注入、Steam 走宿主 DLL 挂载，两条启动路径。

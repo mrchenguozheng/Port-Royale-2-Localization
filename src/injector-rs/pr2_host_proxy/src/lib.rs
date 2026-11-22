@@ -12,7 +12,6 @@
 #![allow(non_snake_case)]
 
 use std::ffi::{c_void, OsString};
-use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::windows::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
@@ -70,11 +69,10 @@ fn module_dir(hinst: HMODULE) -> PathBuf {
 
 fn log_line(dir: &Path, msg: &str) {
     let logdir = log_dir(dir);
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(logdir.join("proxy.log"))
-    {
+    if let Some(mut file) = pr2_common::open_append_capped(
+        &logdir.join("proxy.log"),
+        pr2_common::DEFAULT_MAX_BYTES,
+    ) {
         let _ = writeln!(file, "{msg}");
     }
 }

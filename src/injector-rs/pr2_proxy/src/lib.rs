@@ -11,7 +11,6 @@
 #![allow(non_snake_case)]
 
 use std::ffi::{c_void, OsString};
-use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::windows::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
@@ -166,19 +165,19 @@ fn module_path(h: HMODULE) -> String {
 }
 
 fn log_line(dir: &Path, msg: &str) {
-    if let Ok(mut f) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_dir(dir).join("proxy.log"))
-    {
+    let logdir = log_dir(dir);
+    if let Some(mut f) = pr2_common::open_append_capped(
+        &logdir.join("proxy.log"),
+        pr2_common::DEFAULT_MAX_BYTES,
+    ) {
         let _ = writeln!(f, "{msg}");
         return;
     }
-    if let Ok(mut f) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(dir.join("proxy.log"))
-    {
+    // `logs\` 写不进去时退回游戏根目录：根目录不可写的话代理本身也加载不了。
+    if let Some(mut f) = pr2_common::open_append_capped(
+        &dir.join("proxy.log"),
+        pr2_common::DEFAULT_MAX_BYTES,
+    ) {
         let _ = writeln!(f, "{msg}");
     }
 }
