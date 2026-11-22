@@ -1,4 +1,4 @@
-# PR2HostMount.ps1 —— Steam 版宿主 DLL 的备份、挂载与还原。
+﻿# PR2HostMount.ps1 —— Steam 版宿主 DLL 的备份、挂载与还原。
 #
 # Steam 的 PR2.exe 静态导入 Ascaron.Logging-2.6.dll。本脚本只替换这一个
 # DLL，并在替换前验证原版大小和 SHA-256。校验不通过时不覆盖任何文件。
@@ -6,6 +6,9 @@
 #   powershell -ExecutionPolicy Bypass -File .\PR2HostMount.ps1 -Action Status
 #   powershell -ExecutionPolicy Bypass -File .\PR2HostMount.ps1 -Action Mount
 #   powershell -ExecutionPolicy Bypass -File .\PR2HostMount.ps1 -Action Restore
+#
+# 代理默认取包内的 PR2Localization\host\Ascaron.Logging-2.6.dll；旧包里代理
+# 直接放在根目录（与原名冲突、解压会覆盖原版），这里保留那份作为回退。
 
 [CmdletBinding()]
 param(
@@ -14,7 +17,7 @@ param(
 
     [string]$Target = $PSScriptRoot,
 
-    [string]$ProxyPath = (Join-Path $PSScriptRoot 'Ascaron.Logging-2.6.dll')
+    [string]$ProxyPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -27,7 +30,22 @@ $ExpectedSha = '0568EC654E147B6D80F60B779843F020A9C8A7C4E53AE0BC364EC6937024D160
 
 function Get-FileSha256([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return '' }
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToUpperInvariant()
+    # 不用 Get-FileHash：它属于 PowerShell 4.0+ 的模块，从 PowerShell 7 的终端
+    # 起进程时继承的 PSModulePath 会让 5.1 找不到它。.NET 这条路版本无关。
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $stream = [System.IO.File]::OpenRead($Path)
+        try {
+            $hash = $sha.ComputeHash($stream)
+        } finally {
+            $stream.Dispose()
+        }
+        return ([BitConverter]::ToString($hash) -replace '-', '').ToUpperInvariant()
+    } catch {
+        return ''
+    } finally {
+        $sha.Dispose()
+    }
 }
 
 function Test-Original([string]$Path) {
@@ -65,6 +83,12 @@ function Get-ProxySha {
     $sha = Get-FileSha256 $ProxyPath
     if (-not $sha) { throw "代理不可读：$ProxyPath" }
     return $sha
+}
+
+if (-not $ProxyPath) {
+    $ProxyPath = Join-Path $PSScriptRoot 'Ascaron.Logging-2.6.dll'
+    $hosted = Join-Path $PSScriptRoot 'PR2Localization\host\Ascaron.Logging-2.6.dll'
+    if (Test-Path -LiteralPath $hosted -PathType Leaf) { $ProxyPath = $hosted }
 }
 
 # 替换动作只有这一个实现：先写 <目标>.new，校验 SHA-256 通过后用 Move-Item 换名。

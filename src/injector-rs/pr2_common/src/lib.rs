@@ -6,6 +6,9 @@ use std::path::{Path, PathBuf};
 
 use windows_sys::Win32::System::LibraryLoader::GetModuleFileNameW;
 
+mod host;
+pub use host::*;
+
 pub const RUNTIME_VERSION: u32 = 1;
 pub const DATA_DIR: &str = "PR2Localization";
 pub const FONT_NAMES: [&str; 4] = [

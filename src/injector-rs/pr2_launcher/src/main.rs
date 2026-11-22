@@ -1,11 +1,14 @@
 use std::ffi::c_void;
 use std::fs;
-use std::path::Path;
+use std::os::windows::process::CommandExt;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::ptr;
 
 use pr2_common::{
-    exe_dir, fonts_dir, bundled_fonts_complete, pack_runtime_ok, read_locale_language,
-    valid_lang_code, FONT_NAMES, RUNTIME_VERSION,
+    bundled_fonts_complete, detect_edition, exe_dir, fonts_dir, host_script_path, host_state,
+    log_dir, pack_runtime_ok, read_locale_language, valid_lang_code, Edition, HostState, FONT_NAMES,
+    HOST_DLL, HOST_MOUNT_SCRIPT, HOST_ORIG, RUNTIME_VERSION,
 };
 use sha2::{Digest, Sha256};
 use windows_sys::Win32::Foundation::{CloseHandle, GetLastError};
@@ -19,16 +22,19 @@ use windows_sys::Win32::System::Memory::{
 };
 use windows_sys::Win32::System::Threading::{
     CreateProcessA, CreateRemoteThread, GetExitCodeThread, ResumeThread, WaitForSingleObject,
-    CREATE_SUSPENDED, INFINITE, LPTHREAD_START_ROUTINE, PROCESS_INFORMATION, STARTUPINFOA,
+    CREATE_NO_WINDOW, CREATE_SUSPENDED, INFINITE, LPTHREAD_START_ROUTINE, PROCESS_INFORMATION,
+    STARTUPINFOA,
 };
 
-const ORIG_FONT_SIZES: [u64; 4] = [296712, 65680, 52876, 53120];
-const ORIG_FONT_HASHES: [&str; 4] = [
+const ORIG_FONT_SIZES: [u64; 4] = [296712, 65680, 52876, 53120];const ORIG_FONT_HASHES: [&str; 4] = [
     "1906a771ed879a5de75a3ff552fbad533827fe7b39e18319ce9d9ae134c346c7",
     "f3715e59051796963fc6569d85c16b9abfd6eaf949bcc8a9578c1fe0a423acf9",
     "267f1a2de1c1e738202ca31008c587e045d25268c93662d8fd80b79615d314e7",
     "fd10e52dd5040de4fc00e09919b5e5e360039360deff5bfc2219ffa61061c465",
 ];
+
+/// 宿主动作（挂载/还原）的落盘日志，GUI 读它来显示失败原因。
+const HOST_LOG_FILE: &str = "host.log";
 
 fn main() {
     unsafe {
@@ -44,17 +50,22 @@ fn run() -> Result<(), i32> {
     let root = exe_dir();
     let mut lang: Option<String> = None;
     let mut vanilla = false;
+    let mut restore = false;
 
     for arg in std::env::args().skip(1) {
         if let Some(v) = arg.strip_prefix("--lang=") {
             lang = Some(v.to_string());
         } else if arg == "--vanilla" {
             vanilla = true;
+        } else if arg == "--restore" {
+            restore = true;
         } else if arg == "--help" || arg == "-h" {
-            println!("[PR2Loc] 用法: PR2Localization.exe [--lang=<代码>] [--vanilla]");
+            println!("[PR2Loc] 用法: PR2Localization.exe [--lang=<代码>] [--vanilla] [--restore]");
+            println!("[PR2Loc]   不给参数时按版本自动选路：GOG 注入启动，Steam 先挂载宿主 DLL 再启动。");
             println!("[PR2Loc]   --lang     这一次启动用哪个语言包，");
             println!("[PR2Loc]              优先于 PR2Localization\\packs\\locale.ini（或 locale.default.ini）的 language=，不写文件。");
-            println!("[PR2Loc]   --vanilla  恢复原版字体后直接启动 PR2.exe，不注入。");
+            println!("[PR2Loc]   --vanilla  恢复原版字体（Steam 还会先还原宿主 DLL），启动 PR2.exe，不注入。");
+            println!("[PR2Loc]   --restore  只还原：Steam 还原 Ascaron.Logging-2.6.dll，两版都恢复原版字体，不启动游戏。");
             return Ok(());
         }
     }
@@ -65,6 +76,10 @@ fn run() -> Result<(), i32> {
             return Err(1);
         }
     }
+    if restore && vanilla {
+        eprintln!("[PR2Loc] --restore 与 --vanilla 不能同时使用。");
+        return Err(1);
+    }
 
     let exe_path = root.join("PR2.exe");
     if !exe_path.is_file() {
@@ -72,9 +87,17 @@ fn run() -> Result<(), i32> {
         return Err(1);
     }
 
+    if restore {
+        return restore_all(&root);
+    }
+
+    let edition = detect_edition(&root);
     backup_original_fonts(&root);
 
     if vanilla {
+        if edition == Edition::Steam {
+            restore_steam_host(&root)?;
+        }
         restore_original_fonts(&root);
         match create_process(&exe_path, &root, 0) {
             Ok(pi) => {
@@ -91,7 +114,7 @@ fn run() -> Result<(), i32> {
                 return Err(1);
             }
         }
-        println!("[PR2Loc] 已恢复原版字体，启动原版 PR2.exe（未注入）");
+        println!("[PR2Loc] 已恢复原版状态，启动原版 PR2.exe（未注入）");
         return Ok(());
     }
 
@@ -102,6 +125,10 @@ fn run() -> Result<(), i32> {
             dll_path.display()
         );
         return Err(1);
+    }
+
+    if edition == Edition::Steam {
+        ensure_steam_host(&root)?;
     }
 
     let font_lang = match &lang {
@@ -158,6 +185,26 @@ fn run() -> Result<(), i32> {
         println!("[PR2Loc] 本次使用语言包: {code}.txt (优先于 locale.ini，本次启动生效)");
     }
 
+    if edition == Edition::Steam {
+        // Steam 不注入：根目录的宿主代理由 PR2.exe 静态导入，自己会加载同一个 Core。
+        let pi = match create_process(&exe_path, &root, 0) {
+            Ok(v) => v,
+            Err(_) => {
+                eprintln!(
+                    "[PR2Loc] 启动 PR2.exe 失败 (错误 {})",
+                    unsafe { GetLastError() }
+                );
+                return Err(1);
+            }
+        };
+        unsafe {
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+        }
+        println!("[PR2Loc] Steam 版：宿主代理已就位，PR2.exe 启动中...");
+        return Ok(());
+    }
+
     let pi = match create_process(&exe_path, &root, CREATE_SUSPENDED) {
         Ok(v) => v,
         Err(_) => {
@@ -182,6 +229,183 @@ fn run() -> Result<(), i32> {
         }
         Err(code) => Err(code),
     }
+}
+
+/// Steam：根目录是原版就调脚本挂载，已经挂载就跳过。
+fn ensure_steam_host(root: &Path) -> Result<(), i32> {
+    match host_state(root) {
+        HostState::Mounted => {
+            println!("[PR2Loc] Steam 宿主代理已在位，跳过挂载");
+            host_log_line(root, "宿主代理已在位，跳过挂载");
+            Ok(())
+        }
+        HostState::Original => {
+            println!("[PR2Loc] Steam 版：校验原版宿主 DLL、建立备份并挂载代理…");
+            host_log_line(root, "校验原版宿主 DLL、建立备份并挂载代理");
+            run_host_script(root, "Mount").map(|_| ())
+        }
+        HostState::Missing => {
+            host_log(
+                root,
+                &format!("同目录下找不到 {HOST_DLL}，这不像是 Steam 版；请确认游戏目录。"),
+            );
+            Err(1)
+        }
+        HostState::Unknown => {
+            host_log(
+                root,
+                &format!("根目录 {HOST_DLL} 不是已知原版，也没有可验证的 {HOST_ORIG}。"),
+            );
+            host_log(root, "为避免覆盖其他 mod 或损坏的文件，已停止。");
+            host_log(
+                root,
+                "可以先用 Steam 的「验证游戏文件完整性」把原版 DLL 恢复，再重试。",
+            );
+            Err(1)
+        }
+    }
+}
+
+/// `--vanilla` 在 Steam 版下先还原宿主，再启动原版。
+fn restore_steam_host(root: &Path) -> Result<(), i32> {
+    match host_state(root) {
+        HostState::Original => Ok(()),
+        HostState::Mounted => run_host_script(root, "Restore").map(|_| ()),
+        HostState::Missing => {
+            host_log(root, &format!("同目录下找不到 {HOST_DLL}，不需要还原。"));
+            Err(1)
+        }
+        HostState::Unknown => {
+            host_log(
+                root,
+                &format!("根目录 {HOST_DLL} 不是本工具挂上去的代理，拒绝覆盖未知文件。"),
+            );
+            Err(1)
+        }
+    }
+}
+
+/// `--restore`：Steam 还原宿主 DLL，两版都恢复原版字体，不启动游戏。
+fn restore_all(root: &Path) -> Result<(), i32> {
+    // 本次还原的过程单独记一份，GUI 用 CREATE_NO_WINDOW 调起时看不到控制台，
+    // 失败后就读这份日志给玩家看。
+    clear_host_log(root);
+    let edition = detect_edition(root);
+    if edition == Edition::Steam {
+        if host_state(root) == HostState::Original {
+            println!("[PR2Loc] Steam 宿主 DLL 已经是原版，不需要还原");
+            host_log_line(root, "宿主 DLL 已经是原版，不需要还原");
+        } else {
+            restore_steam_host(root)?;
+            println!("[PR2Loc] 已把 {HOST_DLL} 换回 Steam 原版");
+            host_log_line(root, &format!("已把 {HOST_DLL} 换回 Steam 原版"));
+        }
+    } else {
+        println!("[PR2Loc] 这是 GOG 版，没有需要还原的宿主 DLL");
+        host_log_line(root, "这是 GOG 版，没有需要还原的宿主 DLL");
+    }
+    restore_original_fonts(root);
+    println!("[PR2Loc] 还原完成（本地化文件仍在，只是不再挂载/注入）");
+    host_log_line(root, "还原完成（本地化文件仍在，只是不再挂载/注入）");
+    Ok(())
+}
+
+/// 控制台和 `PR2Localization\logs\host.log` 各写一份，给只有 stderr 的失败路径用。
+///
+/// STEAM 版的所有宿主动作都由 GUI 以 `CREATE_NO_WINDOW` 拉起，玩家看不到控制台，
+/// 所以失败原因必须落盘，GUI 才能把它显示出来。
+fn host_log(root: &Path, message: &str) {
+    eprintln!("[PR2Loc] {message}");
+    host_log_line(root, message);
+}
+
+/// 只写日志文件；调用方已经自己 `println!` 过的时候用它，避免同一句话打印两遍。
+fn host_log_line(root: &Path, message: &str) {
+    use std::io::Write;
+    let path = log_dir(root).join(HOST_LOG_FILE);
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let _ = writeln!(file, "[PR2Loc] {message}");
+    }
+}
+
+fn clear_host_log(root: &Path) {
+    let _ = fs::write(log_dir(root).join(HOST_LOG_FILE), "");
+}
+
+/// 调发行包里的 PR2HostMount.ps1。替换动作只有那一份实现，这里只管传参。
+fn run_host_script(root: &Path, action: &str) -> Result<String, i32> {
+    let script = host_script_path(root);
+    if !script.is_file() {
+        host_log(
+            root,
+            &format!("同目录下找不到 {HOST_MOUNT_SCRIPT}，无法处理 Steam 宿主 DLL。"),
+        );
+        return Err(1);
+    }
+    let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into());
+    let powershell = PathBuf::from(&system_root)
+        .join("System32")
+        .join("WindowsPowerShell")
+        .join("v1.0")
+        .join("powershell.exe");
+    let program = if powershell.is_file() {
+        powershell.into_os_string()
+    } else {
+        "powershell.exe".into()
+    };
+
+    // 用 -Command 而不是 -File：脚本要在子进程里先把输出编码设成 UTF-8，
+    // 否则 Windows PowerShell 5.1 用 OEM 代码页写 stdout，读回来是乱码。
+    let quote = |s: &str| format!("'{}'", s.replace('\'', "''"));
+    let command = format!(
+        "try {{ [Console]::OutputEncoding=[System.Text.Encoding]::UTF8 }} catch {{}}; & {} -Action {} -Target {}",
+        quote(&script.to_string_lossy()),
+        quote(action),
+        quote(&root.to_string_lossy())
+    );
+
+    let output = Command::new(program)
+        .arg("-NoProfile")
+        .arg("-ExecutionPolicy")
+        .arg("Bypass")
+        .arg("-Command")
+        .arg(&command)
+        .current_dir(root)
+        // 从 PowerShell 7 的终端启动时，继承来的 PSModulePath 会让 5.1 找不到
+        // 自己的模块（Get-FileHash、Copy-Item 都会报未知命令），这里清掉。
+        .env_remove("PSModulePath")
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map_err(|exc| {
+            host_log(root, &format!("调用 PowerShell 失败：{exc}"));
+            1
+        })?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    if !output.status.success() {
+        let code = output
+            .status
+            .code()
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "未知".into());
+        host_log(root, &format!("{action} 失败（脚本退出码 {code}）："));
+        for line in stderr.lines().chain(stdout.lines()) {
+            let line = line.trim();
+            if !line.is_empty() {
+                host_log(root, line);
+            }
+        }
+        return Err(2);
+    }
+    for line in stdout.lines() {
+        let line = line.trim();
+        if !line.is_empty() {
+            println!("[PR2Loc] {line}");
+            host_log_line(root, line);
+        }
+    }
+    Ok(stdout)
 }
 
 fn create_process(exe: &Path, root: &Path, flags: u32) -> Result<PROCESS_INFORMATION, ()> {

@@ -18,9 +18,10 @@
       README.txt
       OFL.txt
 
-GOG 版不带宿主 DLL；Steam 版带 Ascaron.Logging-2.6.dll 代理，安装时
-必须先把原版备份成 Ascaron.Logging-2.6.orig.dll。PR2HostMount.ps1 负责
-校验大小/哈希、备份、挂载和还原；校验不通过时不会覆盖原文件。
+GOG 版不带宿主 DLL；Steam 版的宿主代理放在 PR2Localization\\host\\ 里，
+不占根目录原名，解压不会覆盖游戏原版。PR2HostMount.ps1 负责校验原版大小/
+哈希、备份成 Ascaron.Logging-2.6.orig.dll、原子换进根目录和还原；启动器
+PR2Localization.exe 会自动调它，玩家不需要手动运行脚本。
 发行包不包含游戏本体。字体只做映射：默认 ``noto``（静态 Noto 替换字体 +
 ``font-map.default.ini``）；``config`` 只带默认映射；用户可另建 font-map.ini
 按项覆盖它，解压升级不会覆盖这个文件。``none`` 不带字体。
@@ -62,7 +63,10 @@ FLAT_COMMON = ("PR2Localization.exe", "PR2LocalizationGUI.exe",
                "PR2LocalizationCore.dll")
 HOST_DLL = "Ascaron.Logging-2.6.dll"
 HOST_MOUNT_SCRIPT = "PR2HostMount.ps1"
-FLAT_STEAM = FLAT_COMMON + (HOST_DLL, HOST_MOUNT_SCRIPT)
+#: Steam 代理放在数据目录里，不能放在根目录：根目录的同名文件是游戏原版，
+#: 解压时覆盖它就没有原版可校验、可备份、可还原了。挂载动作再把代理换进根目录。
+HOST_PROXY_REL = os.path.join(DATA_DIR, "host", HOST_DLL)
+FLAT_STEAM = FLAT_COMMON + (HOST_MOUNT_SCRIPT,)
 RUNTIME_VERSION = 1  # 与 src/injector-rs/pr2_common/src/lib.rs 的 RUNTIME_VERSION 保持一致
 RUST_RUNTIME_SOURCE = os.path.join(
     SRC, "injector-rs", "pr2_common", "src", "lib.rs")
@@ -156,6 +160,15 @@ def copy_runtime(stage, edition, log):
             raise FileNotFoundError("缺 %s，先构建注入器" % src)
         shutil.copy2(src, os.path.join(stage, name))
         log("复制 %s" % name)
+    if edition == "steam":
+        src = os.path.join(RUNTIME, HOST_DLL)
+        if not os.path.isfile(src):
+            raise FileNotFoundError("缺 %s，先构建注入器" % src)
+        dst = os.path.join(stage, HOST_PROXY_REL)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+        log("复制 %s（宿主代理，挂载时才换进根目录）"
+            % HOST_PROXY_REL.replace(os.sep, "\\"))
 
 
 def copy_font_map(stage, log):
@@ -322,22 +335,26 @@ def write_readme(langs, default_lang, stage, modes, edition, version="",
                      "标题 PR2CyrDisplay-Head / -Black / -Bold.ttf（由 Noto Serif 按原版度量"
                      "压缩并改名）；均为 SIL OFL 1.1，font-map.default.ini 映射四个逻辑名。")
     if edition == "gog":
-        install_step = """  2. GOG：双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
+        install_step = """  2. 双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
      本包是 GOG 版，刻意不包含 VERSION.dll；不要直接双击 PR2.exe。
      如果从旧包升级，根目录残留的 VERSION.dll 可以删除，GOG 不加载它。"""
     else:
-        install_step = """  2. Steam：解压后先运行（在游戏根目录打开 PowerShell）：
-       powershell -ExecutionPolicy Bypass -File .\\PR2HostMount.ps1 -Action Mount
-     脚本会校验原版 Ascaron.Logging-2.6.dll 的 11,776 B / SHA-256，
+        install_step = """  2. 双击 PR2LocalizationGUI.exe，选语言后点「以所选语言启动」。
+     启动器会先校验原版 Ascaron.Logging-2.6.dll 的 11,776 B / SHA-256，
      通过后备份为 Ascaron.Logging-2.6.orig.dll 和
-     PR2Localization\\host-backup\\Ascaron.Logging-2.6.dll，再换上代理。
-     大小或哈希不对时脚本会停止，不会强行覆盖。
-  3. 挂载成功后从 Steam 正常启动游戏；需要临时指定语言时，可用
-     PR2LocalizationGUI.exe 启动。"""
+     PR2Localization\\host-backup\\Ascaron.Logging-2.6.dll，再把代理换进根目录，
+     最后拉起 PR2.exe。校验不对或文件被占用时它会停止，不会覆盖未知文件。
+     代理本身在 PR2Localization\\host\\Ascaron.Logging-2.6.dll，解压不会覆盖原版。
+     习惯命令行的也可以在游戏根目录运行：
+       powershell -ExecutionPolicy Bypass -File .\\PR2HostMount.ps1 -Action Mount
+  3. 还原原版：在启动器里点「还原 Steam 原版」，或运行
+       PR2Localization.exe --restore
+     等价写法：powershell -ExecutionPolicy Bypass -File .\\PR2HostMount.ps1 -Action Restore
+     还原过程写在 PR2Localization\\logs\\host.log，失败时 GUI 对话框会带上它的末尾几行。"""
     if edition == "gog":
         uninstall_line = "  删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll\n  和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。\n  如果保留过 PR2Localization\\packs\\overrides\\，卸载前先复制出来。"
     else:
-        uninstall_line = "  先运行 .\\PR2HostMount.ps1 -Action Restore 还原 Ascaron.Logging-2.6.dll，\n  再删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll、\n  PR2HostMount.ps1 和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。\n  如果保留过 PR2Localization\\packs\\overrides\\，卸载前先复制出来。"
+        uninstall_line = "  先点启动器的「还原 Steam 原版」（或跑 PR2Localization.exe --restore），\n  再删除 PR2Localization.exe、PR2LocalizationGUI.exe、PR2LocalizationCore.dll、\n  PR2HostMount.ps1 和整个 PR2Localization 目录（如果覆盖过根目录 fonts\\，请先用备份恢复）。\n  如果保留过 PR2Localization\\packs\\overrides\\，卸载前先复制出来。"
     if edition == "gog":
         support_line = "支持游戏版本：GOG 英文 1.1.2.3 已实测。本包只用于 GOG；Steam 请下载 Steam 版。"
     else:

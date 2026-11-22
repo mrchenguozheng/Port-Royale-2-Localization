@@ -103,6 +103,8 @@ def kind_for(path):
         return "doc"
     if path == "PR2HostMount.ps1":
         return "script"
+    if path.startswith("PR2Localization/host/"):
+        return "host-proxy"
     if path.startswith("PR2Localization/packs/"):
         if path.endswith(".txt"):
             return "pack"

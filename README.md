@@ -21,20 +21,22 @@
 2. 从 Release 下载对应语言和入口的 zip：GOG 版是 `PR2-zh-gog-v1.0.0.zip`，
    Steam 版是 `PR2-zh-steam-v1.0.0.zip`；
 3. **全部解压到 `PR2.exe` 所在的游戏根目录**；
-4. GOG 双击 `PR2LocalizationGUI.exe`，选语言后点「以所选语言启动」；
-   Steam 先在游戏根目录运行 `PR2HostMount.ps1 -Action Mount`，再从 Steam 启动游戏；
+4. **两版都双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
+   GOG 走注入；Steam 由启动器先挂载宿主 DLL 再直启游戏，不用手工跑脚本，也不用从 Steam 启动；
 5. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... overrides`。
+6. Steam 想回原版：点 GUI 上的「还原 Steam 原版」，或 `PR2Localization.exe --restore`。
 
-GOG 包刻意不含 `VERSION.dll`。Steam 包不带 `VERSION.dll`，而是带
-`Ascaron.Logging-2.6.dll` 宿主代理和 `PR2HostMount.ps1`：挂载脚本先校验原版
-`Ascaron.Logging-2.6.dll` 的 `11,776 B` / SHA-256，通过后备份成
-`Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\`，再换代理；
-原版大小或哈希不对时脚本停止，不强行覆盖。GOG 从旧包升级时，根目录残留的
-`VERSION.dll` 可以删除，GOG 不加载它。
+GOG 包刻意不含 `VERSION.dll`。两个包都不带 `VERSION.dll`；Steam 包带
+`Ascaron.Logging-2.6.dll` 宿主代理（放在 `PR2Localization\host\`，解压不会覆盖根目录原版）
+和 `PR2HostMount.ps1`：启动前由脚本校验原版 `Ascaron.Logging-2.6.dll` 的 `11,776 B` /
+SHA-256，通过后备份成 `Ascaron.Logging-2.6.orig.dll` 和 `PR2Localization\host-backup\`，
+再换代理；原版大小或哈希不对时脚本停止，不强行覆盖。Steam 版的每一步都写
+`PR2Localization\logs\host.log`，GUI 的还原失败对话框显示的就是它的末尾几行。
+GOG 从旧包升级时，根目录残留的 `VERSION.dll` 可以删除，GOG 不加载它。
 GOG 不要直接双击 `PR2.exe`：GOG 的加载器会把 `VERSION.dll` 解析到
 `C:\Windows\SysWOW64\VERSION.dll`，同目录代理不会进入游戏进程，结果是原版英文。
-`PR2Localization.exe` / `PR2LocalizationGUI.exe` 是 GOG 的正式入口，负责注入
-`PR2LocalizationCore.dll`；原版 `PR2.exe` 本身不改。
+`PR2Localization.exe` / `PR2LocalizationGUI.exe` 是两个版本共用的入口，按版别自动分派；
+原版 `PR2.exe` 本身不改。
 
 注意：
 

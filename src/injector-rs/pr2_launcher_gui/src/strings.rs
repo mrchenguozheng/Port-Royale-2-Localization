@@ -9,13 +9,21 @@ const BUILTIN: &[(&str, &str)] = &[
     ("label.language", "Language pack:"),
     ("button.launch", "Launch localized"),
     ("button.vanilla", "Launch original"),
+    ("button.restore", "Restore Steam original"),
     ("button.refresh", "Refresh"),
     ("button.kill", "End game process"),
     ("status.count", "%d language pack(s)"),
     ("status.none", "No .txt in PR2Localization\\packs"),
     ("status.launched", "Localized game launched."),
     ("status.vanilla", "Original game launched."),
+    ("status.restored", "Restored the original Steam DLL and fonts."),
+    ("status.restore_gog", "This is the GOG edition; nothing to restore."),
     ("status.killed", "Ended %d PR2.exe process(es)."),
+    (
+        "confirm.restore",
+        "Restore the original Steam DLL and original fonts?\n\
+         The game will start in English until you launch localized again.",
+    ),
     (
         "hint.footer",
         "Language packs live in PR2Localization\\packs.\nIf exit hangs, end PR2.exe here.",
@@ -50,12 +58,14 @@ const BUILTIN: &[(&str, &str)] = &[
         "error.pack_too_new",
         "Language pack needs a newer launcher (runtime v%d, current v%d).",
     ),
+    (
+        "error.restore_failed",
+        "Restore failed (exit code %lu).\n%s",
+    ),
 ];
 
 pub enum Arg {
-    /// `%s` 分支（`tf` 里）已实现，但内置文案目前都只带数字，没人构造它。
-    /// 留着是为了要塞文件名/路径时不必再动枚举；不加 allow 会报 dead_code。
-    #[allow(dead_code)]
+    /// `%s`：用来把落盘日志的末尾几行带进对话框。
     Str(String),
     Num(u32),
 }
@@ -225,6 +235,21 @@ mod tests {
     #[test]
     fn unescapes_newlines() {
         assert_eq!(unescape("a\\nb"), "a\nb");
+    }
+
+    #[test]
+    fn default_ui_keeps_restore_format_placeholders() {
+        // 发行包只带 ui.default.ini；还原失败的弹框要把退出码和落盘日志末尾都填进去。
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui/ui.default.ini");
+        let mut values = HashMap::new();
+        assert!(read_ini(&path, &mut values), "读不到 {}", path.display());
+        let strings = Strings { values };
+        let text = strings.tf(
+            "error.restore_failed",
+            &[Arg::Num(2), Arg::Str("a\nb".into())],
+        );
+        assert!(text.starts_with("还原失败（退出码 2）"), "{text}");
+        assert!(text.ends_with("a\nb"), "{text}");
     }
 
     #[test]

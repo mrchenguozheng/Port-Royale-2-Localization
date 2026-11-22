@@ -121,10 +121,18 @@ New-Item -ItemType Directory -Force -Path (Join-Path $DataOut 'logs') | Out-Null
 if (Test-Path -LiteralPath $UiSrc -PathType Container) {
     $UiOut = Join-Path $DataOut 'ui'
     New-Item -ItemType Directory -Force -Path $UiOut | Out-Null
+    # 界面文案只有一份 ui.default.ini（用户在同目录放 ui.ini 按项覆盖）。
+    # 旧布局按语言分 en/ja/zh.ini，那份文件早就不再被读取，留在 runtime 里
+    # 会让发行包带过期文案（新加的 key 会显示成 key 本身），这里顺手清掉。
+    $Default = Join-Path $UiSrc 'ui.default.ini'
+    if (-not (Test-Path -LiteralPath $Default -PathType Leaf)) {
+        Stop-WithError "缺界面默认文件：$Default"
+    }
+    Copy-Item -LiteralPath $Default -Destination (Join-Path $UiOut 'ui.default.ini') -Force
     foreach ($lang in @('en', 'ja', 'zh')) {
-        $ini = Join-Path $UiSrc "$lang.ini"
-        if (Test-Path -LiteralPath $ini -PathType Leaf) {
-            Copy-Item -LiteralPath $ini -Destination (Join-Path $UiOut "$lang.ini") -Force
+        $stale = Join-Path $UiOut "$lang.ini"
+        if (Test-Path -LiteralPath $stale -PathType Leaf) {
+            Remove-Item -LiteralPath $stale -Force
         }
     }
 }

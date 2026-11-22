@@ -18,6 +18,38 @@ pub enum LaunchError {
     ExitCode(u32),
 }
 
+/// 宿主动作（挂载/还原）落盘日志的末尾若干行。
+///
+/// GUI 用 `CREATE_NO_WINDOW` 调起 `PR2Localization.exe`，控制台输出玩家看不到，
+/// 失败原因只能从 `PR2Localization\logs\host.log` 读回来。
+pub fn host_log_tail(root: &Path, max_lines: usize, max_chars: usize) -> String {
+    let path = pr2_common::log_dir(root).join("host.log");
+    let Ok(data) = std::fs::read(&path) else {
+        return String::new();
+    };
+    let text = String::from_utf8_lossy(&data);
+    tail_lines(&text, max_lines, max_chars)
+}
+
+fn tail_lines(text: &str, max_lines: usize, max_chars: usize) -> String {
+    let mut lines: Vec<&str> = text
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .collect();
+    if lines.len() > max_lines {
+        lines.drain(..lines.len() - max_lines);
+    }
+    let mut out = lines.join("\n");
+    let chars = out.chars().count();
+    if chars > max_chars {
+        let tail: String = out.chars().skip(chars - max_chars).collect();
+        // 截断点常常落在换行上，去掉残留的行首空白，避免对话框里多出一个空行。
+        out = tail.trim_start_matches(['\n', '\r', ' ', '\t']).to_string();
+    }
+    out
+}
+
 pub fn launch(root: &Path, lang: Option<&str>, vanilla: bool) -> Result<(), LaunchError> {
     let launcher = root.join("PR2Localization.exe");
     if !launcher.is_file() {
@@ -68,6 +100,54 @@ pub fn launch(root: &Path, lang: Option<&str>, vanilla: bool) -> Result<(), Laun
     }
     if code != 0 {
         return Err(LaunchError::ExitCode(code));
+    }
+    Ok(())
+}
+
+pub fn restore(root: &Path) -> Result<(), u32> {
+    let launcher = root.join("PR2Localization.exe");
+    if !launcher.is_file() {
+        return Err(1);
+    }
+    let cmd = format!("\"{}\" --restore", launcher.display());
+    let mut cmd_c: Vec<u8> = cmd.as_bytes().to_vec();
+    cmd_c.push(0);
+    let dir = root.to_string_lossy().into_owned();
+    let mut dir_c: Vec<u8> = dir.as_bytes().to_vec();
+    dir_c.push(0);
+    let mut si: STARTUPINFOA = unsafe { std::mem::zeroed() };
+    si.cb = std::mem::size_of::<STARTUPINFOA>() as u32;
+    let mut pi: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
+    let ok = unsafe {
+        CreateProcessA(
+            ptr::null(),
+            cmd_c.as_mut_ptr(),
+            ptr::null(),
+            ptr::null(),
+            0,
+            CREATE_NO_WINDOW,
+            ptr::null(),
+            dir_c.as_ptr(),
+            &si,
+            &mut pi,
+        )
+    };
+    if ok == 0 {
+        return Err(1);
+    }
+    let mut code = 0u32;
+    unsafe {
+        // 还原要走一次 PowerShell 脚本，给到 30 秒；超时按失败处理。
+        if WaitForSingleObject(pi.hProcess, 30000) != 0 {
+            code = 1;
+        } else {
+            GetExitCodeProcess(pi.hProcess, &mut code);
+        }
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+    if code != 0 {
+        return Err(code);
     }
     Ok(())
 }
@@ -168,5 +248,13 @@ mod tests {
     #[test]
     fn normalizes_windows_path() {
         assert_eq!(normalize_path(r"\\?\C:\Game/PR2.exe"), r"c:\game\pr2.exe");
+    }
+
+    #[test]
+    fn keeps_only_the_log_tail() {
+        assert_eq!(tail_lines("a\n\nb\nc\nd\n", 2, 100), "c\nd");
+        assert_eq!(tail_lines("", 5, 100), "");
+        // 超过字数上限时从头部截掉，保留最新的内容。
+        assert_eq!(tail_lines("12345\n67890\n", 2, 6), "67890");
     }
 }
