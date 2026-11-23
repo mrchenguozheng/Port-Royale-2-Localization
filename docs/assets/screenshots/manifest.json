@@ -1,0 +1,592 @@
+[
+  {
+    "language": "de",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "de/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 404027,
+    "extra": false
+  },
+  {
+    "language": "de",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "de/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 378986,
+    "extra": false
+  },
+  {
+    "language": "de",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "de/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 630070,
+    "extra": false
+  },
+  {
+    "language": "de",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "de/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 496477,
+    "extra": false
+  },
+  {
+    "language": "de",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "de/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 542334,
+    "extra": false
+  },
+  {
+    "language": "de",
+    "slug": "scenario-list",
+    "title": "剧本列表",
+    "file": "de/scenario-list.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 360703,
+    "extra": true
+  },
+  {
+    "language": "de",
+    "slug": "chronicle",
+    "title": "编年史",
+    "file": "de/chronicle.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 500918,
+    "extra": true
+  },
+  {
+    "language": "de",
+    "slug": "messages",
+    "title": "消息窗",
+    "file": "de/messages.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 516683,
+    "extra": true
+  },
+  {
+    "language": "de",
+    "slug": "missions",
+    "title": "任务窗",
+    "file": "de/missions.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 489922,
+    "extra": true
+  },
+  {
+    "language": "es",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "es/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 405046,
+    "extra": false
+  },
+  {
+    "language": "es",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "es/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 390688,
+    "extra": false
+  },
+  {
+    "language": "es",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "es/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 635661,
+    "extra": false
+  },
+  {
+    "language": "es",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "es/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 606967,
+    "extra": false
+  },
+  {
+    "language": "es",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "es/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 662926,
+    "extra": false
+  },
+  {
+    "language": "fr",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "fr/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 353892,
+    "extra": false
+  },
+  {
+    "language": "fr",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "fr/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 338766,
+    "extra": false
+  },
+  {
+    "language": "fr",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "fr/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 539341,
+    "extra": false
+  },
+  {
+    "language": "fr",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "fr/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 537641,
+    "extra": false
+  },
+  {
+    "language": "fr",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "fr/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 565268,
+    "extra": false
+  },
+  {
+    "language": "it",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "it/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 354200,
+    "extra": false
+  },
+  {
+    "language": "it",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "it/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 330217,
+    "extra": false
+  },
+  {
+    "language": "it",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "it/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 547455,
+    "extra": false
+  },
+  {
+    "language": "it",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "it/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 536690,
+    "extra": false
+  },
+  {
+    "language": "it",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "it/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 558632,
+    "extra": false
+  },
+  {
+    "language": "ja",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "ja/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 362707,
+    "extra": false
+  },
+  {
+    "language": "ja",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "ja/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 327555,
+    "extra": false
+  },
+  {
+    "language": "ja",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "ja/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 565152,
+    "extra": false
+  },
+  {
+    "language": "ja",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "ja/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 551435,
+    "extra": false
+  },
+  {
+    "language": "ja",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "ja/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 566107,
+    "extra": false
+  },
+  {
+    "language": "ko",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "ko/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 361490,
+    "extra": false
+  },
+  {
+    "language": "ko",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "ko/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 333841,
+    "extra": false
+  },
+  {
+    "language": "ko",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "ko/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 570016,
+    "extra": false
+  },
+  {
+    "language": "ko",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "ko/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 555118,
+    "extra": false
+  },
+  {
+    "language": "ko",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "ko/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 578300,
+    "extra": false
+  },
+  {
+    "language": "pl",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "pl/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 362054,
+    "extra": false
+  },
+  {
+    "language": "pl",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "pl/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 341173,
+    "extra": false
+  },
+  {
+    "language": "pl",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "pl/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 570220,
+    "extra": false
+  },
+  {
+    "language": "pl",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "pl/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 556807,
+    "extra": false
+  },
+  {
+    "language": "pl",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "pl/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 576538,
+    "extra": false
+  },
+  {
+    "language": "pt-BR",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "pt-BR/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 361059,
+    "extra": false
+  },
+  {
+    "language": "pt-BR",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "pt-BR/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 339723,
+    "extra": false
+  },
+  {
+    "language": "pt-BR",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "pt-BR/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 558954,
+    "extra": false
+  },
+  {
+    "language": "pt-BR",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "pt-BR/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 557578,
+    "extra": false
+  },
+  {
+    "language": "pt-BR",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "pt-BR/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 580919,
+    "extra": false
+  },
+  {
+    "language": "ru",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "ru/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 363260,
+    "extra": false
+  },
+  {
+    "language": "ru",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "ru/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 329327,
+    "extra": false
+  },
+  {
+    "language": "ru",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "ru/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 563661,
+    "extra": false
+  },
+  {
+    "language": "ru",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "ru/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 555278,
+    "extra": false
+  },
+  {
+    "language": "ru",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "ru/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 573620,
+    "extra": false
+  },
+  {
+    "language": "zh",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "zh/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 362276,
+    "extra": false
+  },
+  {
+    "language": "zh",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "zh/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 331536,
+    "extra": false
+  },
+  {
+    "language": "zh",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "zh/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 569239,
+    "extra": false
+  },
+  {
+    "language": "zh",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "zh/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 554568,
+    "extra": false
+  },
+  {
+    "language": "zh",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "zh/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 581448,
+    "extra": false
+  },
+  {
+    "language": "zh-TW",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "zh-TW/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 362822,
+    "extra": false
+  },
+  {
+    "language": "zh-TW",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "zh-TW/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 332635,
+    "extra": false
+  },
+  {
+    "language": "zh-TW",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "zh-TW/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 570474,
+    "extra": false
+  },
+  {
+    "language": "zh-TW",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "zh-TW/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 555228,
+    "extra": false
+  },
+  {
+    "language": "zh-TW",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "zh-TW/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 577976,
+    "extra": false
+  }
+]
