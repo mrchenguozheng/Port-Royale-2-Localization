@@ -258,7 +258,7 @@ def main():
     report["remaining_after"] = remaining(merged, en_doc)
     wrote = True
     if not args.no_compile:
-        rc = compile_pack(args.lang, PACK_OUT, no_fonts=True,
+        rc = compile_pack(args.lang, PACK_OUT, no_fonts=True, union=True,
                           on_line=None if args.json else print)
         if rc != 0:
             with open(path, "wb") as fh:

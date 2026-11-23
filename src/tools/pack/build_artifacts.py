@@ -2,6 +2,7 @@
 """build_artifacts.py —— 构建语言包产物的统一入口。
 
 目前只收口最常重复的一步：在子进程里调用 compile_pack.py。
+默认出并集包（union=True），所有调用方（部署、编辑器、批量合并）口径一致。
 字体只做映射：用 Noto 替换字体（mode = noto），不再缝合原版字体。
 """
 import os
@@ -37,11 +38,11 @@ def run_stream(cmd, on_line=None, env=None):
 
 
 def compile_pack(lang, out_dir, no_fonts=True, on_line=None, env=None,
-                 union=False, version=""):
+                 union=True, version=""):
     """把一个语言编成 PR2Localization\\packs\\<lang>.txt；返回退出码。
 
-    union=True 时只出一份并集包（en 与 fr 两版键集合并），GOG / Steam 两个
-    发行包共用同一份文件；逐版对照仍走默认模式（另写 build\\variants\\）。
+    默认出并集包（en 与 fr 两版键集合并，3590 条），GOG EN / GOG FR / Steam EN
+    共用同一份文件；要逐版对照才把 union 显式关掉（另写 build\\variants\\）。
 
     version 非空时写进 pack 头（``# pack-meta version=``），启动器用它显示
     「简体中文 · v1.0.0」；开发构建不传，pack 头就没有这一行。

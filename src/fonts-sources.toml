@@ -36,6 +36,28 @@ source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/No
 axis = { wght = 700 }
 min_bytes = 12000000
 
+# ---------- 繁体中文（台湾／香港共用） ----------
+[[font]]
+name = "NotoSansTC-Regular.ttf"
+langs = ["zh-hant"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanstc/NotoSansTC%5Bwght%5D.ttf"
+axis = { wght = 400 }
+min_bytes = 9000000
+
+[[font]]
+name = "NotoSerifTC-Black.ttf"
+langs = ["zh-hant"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoseriftc/NotoSerifTC%5Bwght%5D.ttf"
+axis = { wght = 900 }
+min_bytes = 12000000
+
+[[font]]
+name = "NotoSerifTC-Bold.ttf"
+langs = ["zh-hant"]
+source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoseriftc/NotoSerifTC%5Bwght%5D.ttf"
+axis = { wght = 700 }
+min_bytes = 12000000
+
 # ---------- 日文 ----------
 [[font]]
 name = "NotoSansJP-Regular.ttf"

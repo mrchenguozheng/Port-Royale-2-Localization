@@ -1,4 +1,4 @@
-use pr2_common::{ui_dir, UI_DEFAULT_FILE, UI_FILE};
+use pr2_common::{ui_dir, valid_lang_code, UI_DEFAULT_FILE, UI_FILE};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -90,15 +90,23 @@ pub struct Strings {
 }
 
 impl Strings {
-    pub fn load(root: &Path) -> Self {
+    /// 读取界面文案。`lang` 是当前选中的语言包代码：
+    ///
+    /// 1. 先读包内 `ui.default.ini`（发包默认语言，作为兜底）；
+    /// 2. 再读 `ui.<lang>.ini`，按项覆盖默认文案；
+    /// 3. 最后读玩家自己的 `ui.ini`，仍然按项覆盖。
+    ///
+    /// 语言包代码非法或没有对应文件时，只保留默认文案，不会拼出目录外路径。
+    pub fn load(root: &Path, lang: &str) -> Self {
         let mut values = HashMap::new();
         let dir = ui_dir(root);
-        // 包内只有一份按发包语言选好的 ui.default.ini；用户把要改的项抄进 ui.ini
-        // 即可按项覆盖，不需要整份替换，升级也不会覆盖用户文件。
         let has_default = read_ini(&dir.join(UI_DEFAULT_FILE), &mut values);
         if !has_default {
-            // 兼容仍带旧 en.ini 的安装目录；新包不再生成多语言 UI 文件。
+            // 兼容仍带旧 en.ini 的安装目录。
             read_ini(&dir.join("en.ini"), &mut values);
+        }
+        if valid_lang_code(lang) {
+            read_ini(&dir.join(format!("ui.{lang}.ini")), &mut values);
         }
         read_ini(&dir.join(UI_FILE), &mut values);
         Self { values }
@@ -279,10 +287,38 @@ mod tests {
         .unwrap();
         fs::write(dir.join("ui.ini"), "[gui]\ntitle=我的标题\n").unwrap();
 
-        let strings = Strings::load(&root);
+        let strings = Strings::load(&root, "zh");
         assert_eq!(strings.t("title"), "我的标题");
         assert_eq!(strings.t("button.launch"), "启动");
         assert_eq!(strings.t("subtitle"), "Port Royale 2 localization runtime");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn language_file_overrides_default_and_user_file_wins() {
+        let root = temp_root();
+        let dir = pr2_common::ui_dir(&root);
+        fs::write(
+            dir.join("ui.default.ini"),
+            "[gui]\ntitle=Default\nbutton.launch=Launch\n",
+        )
+        .unwrap();
+        fs::write(
+            dir.join("ui.pl.ini"),
+            "[gui]\ntitle=Uruchamianie\nbutton.launch=Uruchom\n",
+        )
+        .unwrap();
+        fs::write(dir.join("ui.ini"), "[gui]\nbutton.launch=Moj przycisk\n").unwrap();
+
+        let pl = Strings::load(&root, "pl");
+        assert_eq!(pl.t("title"), "Uruchamianie");
+        assert_eq!(pl.t("button.launch"), "Moj przycisk");
+        // 语言文件没写的 key 继续用默认文案。
+        assert_eq!(pl.t("subtitle"), "Port Royale 2 localization runtime");
+
+        // 未知语言回落到默认文件，不读拼出的任意路径。
+        let unknown = Strings::load(&root, "../pl");
+        assert_eq!(unknown.t("title"), "Default");
         let _ = fs::remove_dir_all(&root);
     }
 }

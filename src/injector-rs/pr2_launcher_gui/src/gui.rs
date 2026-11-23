@@ -46,6 +46,7 @@ const ID_HINT: i32 = 1010;
 const ST_LEFT: u32 = 0x0000;
 const ST_NOPREFIX: u32 = 0x0080;
 const ST_ETCHEDHORZ: u32 = 0x0010;
+const CBN_SELCHANGE: u32 = 1;
 
 struct AppInit {
     root: PathBuf,
@@ -82,7 +83,11 @@ pub fn run() {
     }
     let dpi = dpi_for_system();
     let root = exe_dir();
-    let strings = Strings::load(&root);
+    // 启动时先按当前 locale 选界面文案；下拉框初始化后会再同步一次，
+    // 处理 locale 缺失或选中的包不在列表里的情况。
+    let initial_lang = read_locale_language(&root).unwrap_or_default();
+    let strings = Strings::load(&root, &initial_lang);
+    let window_title = wide(&strings.t("title"));
     let init = Box::into_raw(Box::new(AppInit { root, strings, dpi })) as *const c_void;
 
     unsafe {
@@ -103,11 +108,11 @@ pub fn run() {
             drop(Box::from_raw(init as *mut AppInit));
             return;
         }
-        let title = wide("Port Royale 2 Localization");
+        let title = window_title.as_ptr();
         let hwnd = CreateWindowExW(
             0,
             class_name.as_ptr(),
-            title.as_ptr(),
+            title,
             WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -439,8 +444,14 @@ impl App {
         }
     }
 
-    fn on_command(&mut self, id: i32, _note: u32) {
+    fn on_command(&mut self, id: i32, note: u32) {
         match id {
+            ID_LANG => {
+                // 下拉框换语言时，界面文案跟着选中语言走。
+                if note == CBN_SELCHANGE {
+                    self.sync_ui_language();
+                }
+            }
             ID_LAUNCH => self.launch(false),
             ID_VANILLA => self.launch(true),
             ID_REFRESH => self.load_packs(),
@@ -474,6 +485,45 @@ impl App {
             unsafe {
                 SendMessageW(self.combo, CB_SETCURSEL, selected as WPARAM, 0);
             }
+        }
+        // 程序化设置选项不会触发 CBN_SELCHANGE，这里主动同步一次文案。
+        self.sync_ui_language();
+    }
+
+    /// 按当前下拉框选中的语言重新装载界面文案，并重写所有控件文字。
+    ///
+    /// 没有选中包时 `lang` 为空，`Strings::load` 回落到包内默认文案，
+    /// 不会保留上一门语言的残留。
+    fn sync_ui_language(&mut self) {
+        let lang = self.selected_code().unwrap_or_default();
+        self.strings = Strings::load(&self.root, &lang);
+        self.apply_strings();
+    }
+
+    fn apply_strings(&mut self) {
+        let title = self.strings.t("title");
+        let subtitle = self.strings.tf(
+            "subtitle.version",
+            &[Arg::Num(RUNTIME_VERSION), Arg::Str(build_label())],
+        );
+        let label = self.strings.t("label.language");
+        let launch = self.strings.t("button.launch");
+        let vanilla = self.strings.t("button.vanilla");
+        let refresh = self.strings.t("button.refresh");
+        let kill = self.strings.t("button.kill");
+        let restore = self.strings.t("button.restore");
+        let hint = self.strings.t("hint.footer");
+        unsafe {
+            SetWindowTextW(self.hwnd, wide(&title).as_ptr());
+            SetWindowTextW(self.title, wide(&title).as_ptr());
+            SetWindowTextW(self.subtitle, wide(&subtitle).as_ptr());
+            SetWindowTextW(self.label, wide(&label).as_ptr());
+            SetWindowTextW(self.btn_launch, wide(&launch).as_ptr());
+            SetWindowTextW(self.btn_vanilla, wide(&vanilla).as_ptr());
+            SetWindowTextW(self.btn_refresh, wide(&refresh).as_ptr());
+            SetWindowTextW(self.btn_kill, wide(&kill).as_ptr());
+            SetWindowTextW(self.btn_restore, wide(&restore).as_ptr());
+            SetWindowTextW(self.hint, wide(&hint).as_ptr());
         }
         self.update_status();
     }

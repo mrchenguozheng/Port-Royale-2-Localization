@@ -11,10 +11,12 @@ src/tools/
 ├─ analysis/   译文检查、进度、说话人与语体分析
 ├─ qa/         读数比对、命中导出、占位前文、串语言扫描、参照 gap 分级
 ├─ install/    pr2ctl 构建/部署/启动/宿主 DLL
-├─ docs/       文档生成（截图画廊 HTML）
+├─ docs/       文档生成（截图画廊 HTML/Markdown、语言矩阵）
 ├─ translate.py / glossary.py / terms_check.py / placeholder_roles.py   译文数据层
+├─ language_registry.py                                                语言集合审计（release/preview/UI/pack/译文/截图/字体/bundle）
 ├─ extract_strings.py                                                  从 PR2.exe 重提基准原文
 ├─ check.py / lint_imports.py / config_check.py / docs_check.py / tools_check.py   质量检查
+├─ precommit.py                                                        轻量提交前闸门
 └─ paths.py    公共路径
 ```
 
@@ -24,16 +26,19 @@ src/tools/
 |---|---|
 | `check.py` | 跑全部检查与单测（`check.ps1` 调它）：跨模块引用 → 语言配置 → 译文规范 → 断行 → 微调层 → 不译清单 → 文档一致性 → 脚本地图 → 单测 |
 | `lint_imports.py` | 找出「用了但没导入」的全局名 |
-| `config_check.py` | locale/packs/translations/ui/font-map 的语言配置是否互相对得上；`release.ps1` 出包前也跑 |
-| `docs_check.py` | 文档索引完整、编号唯一、生成物无漂移、窄断言 |
+| `config_check.py` | locale/packs/translations/ui/font-map/语言注册表的语言配置是否互相对得上；`release.ps1` 出包前也跑 |
+| `docs_check.py` | 文档索引完整、编号唯一、生成物（含语言矩阵）无漂移、窄断言 |
 | `tools_check.py` | 本文件的完整性：每个脚本都被登记、都有 docstring；登记的路径确实存在 |
+| `precommit.py` | 轻量提交前闸门：`config_check` + `docs_check` + 截图画廊 `--check`，不依赖 Rust |
+| `language_registry.py` | 只读审计 release/preview/bundle/pack/译文/UI/截图/字体七套账；`config_check` 与语言矩阵共用 |
 | `paths.py` | 公共路径常量（脚本按目录分组后统一从这里取仓库位置） |
 
 ## 文档生成
 
 | 脚本 | 作用 |
 |---|---|
-| `docs/build_screenshots.py` | 从 `docs/screenshots.json`、`assets/screenshots/manifest.json` 和模板生成 `docs/screenshots.html`；校验图片存在、尺寸与字节数，`--check` 只比对不写盘 |
+| `docs/build_screenshots.py` | 从 `docs/screenshots.json`、`assets/screenshots/manifest.json` 和模板生成 `docs/screenshots.html` 与 `docs/实机截图.md`；校验图片存在、尺寸、字节数与 SHA-256；`--thumbs` 生成 800×600 缩略图，`--check` 只比对不写盘 |
+| `docs/build_language_matrix.py` | 用 `language_registry.audit` 生成 `docs/语言矩阵.md`；`--check` 只比对不写盘 |
 
 ## 基准与参考原文
 
@@ -58,7 +63,7 @@ src/tools/
 
 | 脚本 | 作用 |
 |---|---|
-| `pack/compile_pack.py` | 译文 → 引擎语言包 `packs/<语言>.txt`（含 `--union` 并集基线、`--strict`、`--variant-out`） |
+| `pack/compile_pack.py` | 译文 → 引擎语言包 `packs/<语言>.txt`（默认并集基线；逐版用 `--per-baseline`；`--strict`、`--variant-out`） |
 | `pack/build_artifacts.py` | 构建语言包产物的统一入口（编译 + 字体 + 清单） |
 | `pack/pack_delta.py` | 相对上一次发行（`release-v*`）统计译文条目的增、改、删；出包时给 README 与清单用 |
 | `pack/make_release.py` | 按语言、按 GOG/Steam 入口生成发行 zip（`union=True`，两个 zip 共用同一份并集包） |
@@ -70,6 +75,7 @@ src/tools/
 | `pack/apply_patch.py` | 开发流程：校验 → 编译 → 部署到游戏目录一条命令（`apply_patch.ps1` 调它） |
 | `pack/new_lang.py` | 命令行新建语言（只复制译文文件） |
 | `pack/lang_add.py` | 加一门语言的骨架：译文/语言包/占位符/不译清单/语言规则/字体映射/断行跳过/两处 README，并实测原版字形覆盖 |
+| `pack/derive_variant.py` | 由 `zh-Hant` 底稿加地区差异表派生 `zh-TW` / `zh-HK` 完整译文；`--variant` 单跑，`--all` 全跑 |
 
 ## 文本与规则
 

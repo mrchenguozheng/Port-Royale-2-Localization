@@ -127,6 +127,8 @@ pub fn fonts_dir(root: &Path) -> PathBuf {
 /// 要显式禁用某项，写 `ARIAL.TTF=none` 或 `ARIAL.TTF=-`。
 pub struct FontMap {
     entries: HashMap<String, Vec<String>>,
+    /// 显式写成 none / - 的逻辑名：沿用游戏根目录原版字体，不算缺字体。
+    disabled: HashSet<String>,
     /// 四个逻辑名都被显式写成 none / -：该语言使用游戏根目录原版字体，
     /// 不重定向任何字体文件，也不算“字体缺失”。
     originals: bool,
@@ -316,6 +318,7 @@ impl FontMap {
             if all_disabled {
                 return Some(FontMap {
                     entries,
+                    disabled,
                     originals: true,
                 });
             }
@@ -323,6 +326,7 @@ impl FontMap {
         }
         Some(FontMap {
             entries,
+            disabled,
             originals: false,
         })
     }
@@ -333,8 +337,17 @@ impl FontMap {
         self.entries.get(&key)?.first().cloned()
     }
 
+    /// 四个槽位是否都“有交代”：要么映射到实际存在的字体文件，
+    /// 要么显式写成 none / - 表示沿用原版字体。
+    ///
+    /// `none` 不是缺失，而是配置明确要求不重定向；波兰语的
+    /// `ARIAL.TTF=none` + 三个标题字体就是这样，不能因此弹缺字体框。
     pub fn has_all(&self) -> bool {
-        self.originals || FONT_NAMES.iter().all(|name| self.lookup(name).is_some())
+        self.originals
+            || FONT_NAMES.iter().all(|name| {
+                let key = normalize_font_key(name);
+                self.lookup(name).is_some() || self.disabled.contains(&key)
+            })
     }
 }
 
@@ -737,7 +750,33 @@ mod tests {
             map.lookup("fonts\\ELGRECO_.TTF").unwrap(),
             font.to_string_lossy()
         );
-        assert!(!map.has_all());
+        // none 是显式回落原版字体，不是缺字体；启动器不该因此弹框。
+        assert!(map.has_all());
+        assert!(language_fonts_complete(&root, "zh"));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn font_map_partial_none_still_covers_all_slots() {
+        // 波兰语实际配置：正文槽位 none，三个标题槽位映射到 PR2PlDisplay。
+        let root = temp_root();
+        let fonts = root.join(DATA_DIR).join("fonts");
+        for name in [
+            "PR2PlDisplay-Head.ttf",
+            "PR2PlDisplay-Black.ttf",
+            "PR2PlDisplay-Bold.ttf",
+        ] {
+            fs::write(fonts.join(name), b"fake").unwrap();
+        }
+        fs::write(
+            fonts.join(FONT_MAP_DEFAULT_FILE),
+            "[pl]\nARIAL.TTF=none\nELGRECO_.TTF=PR2PlDisplay-Head.ttf\n\
+             Tiepolo_black.ttf=PR2PlDisplay-Black.ttf\n\
+             Tiepolo_bold.ttf=PR2PlDisplay-Bold.ttf\n",
+        )
+        .unwrap();
+
+        assert!(language_fonts_complete(&root, "pl"));
         let _ = fs::remove_dir_all(&root);
     }
 

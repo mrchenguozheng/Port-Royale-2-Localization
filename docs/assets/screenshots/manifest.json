@@ -7,7 +7,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 404027,
-    "extra": false
+    "extra": false,
+    "sha256": "49c5d7ba2b80ac826953d7005356ce983befb184b59dda332b9cf16b8420e9f2"
   },
   {
     "language": "de",
@@ -17,7 +18,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 378986,
-    "extra": false
+    "extra": false,
+    "sha256": "6112b003cc5e3d5e2370672b674cd32453093a225f9326a5e6823ae954933d74"
   },
   {
     "language": "de",
@@ -27,7 +29,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 630070,
-    "extra": false
+    "extra": false,
+    "sha256": "e045d9fe45590d69279ea2e0dadafb109d220ca73ad153568e3148dd55f9318b"
   },
   {
     "language": "de",
@@ -37,7 +40,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 496477,
-    "extra": false
+    "extra": false,
+    "sha256": "854e0e21d246fd302078553013ffa5d63c6fb273a134c449720e187780812610"
   },
   {
     "language": "de",
@@ -47,7 +51,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 542334,
-    "extra": false
+    "extra": false,
+    "sha256": "d758a6d153baa90b54b8371c9be1c6471e2bbb45e6f666a7a5064d222c32ef3d"
   },
   {
     "language": "de",
@@ -57,7 +62,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 360703,
-    "extra": true
+    "extra": true,
+    "sha256": "97112a63c7636f8114dfb8e12d48e77cf74d880c18838373e859ebb22eb2b5fa"
   },
   {
     "language": "de",
@@ -67,7 +73,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 500918,
-    "extra": true
+    "extra": true,
+    "sha256": "da5c83d2c6ded6d5a89f45ce93f17ec3c72ee55ae6f463e95012f745644464c5"
   },
   {
     "language": "de",
@@ -77,7 +84,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 516683,
-    "extra": true
+    "extra": true,
+    "sha256": "228531c86999869180ba658b10fb2aa12d61ba3c2d6dc13b6c1bcc194f971f7e"
   },
   {
     "language": "de",
@@ -87,7 +95,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 489922,
-    "extra": true
+    "extra": true,
+    "sha256": "133431cef14ad584ab3ef4df67828bf9f719d7ebaab0c763b5192a471ad177e9"
   },
   {
     "language": "es",
@@ -97,7 +106,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 405046,
-    "extra": false
+    "extra": false,
+    "sha256": "68889a1db24b514719db14726c5879d8405ac7a62e132f6c357534712ec8cf06"
   },
   {
     "language": "es",
@@ -107,7 +117,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 390688,
-    "extra": false
+    "extra": false,
+    "sha256": "1b29e0e61f5df6371cc0b945b49b4c4f0eeb9dc67e0c9604531b3af2f229df26"
   },
   {
     "language": "es",
@@ -117,7 +128,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 635661,
-    "extra": false
+    "extra": false,
+    "sha256": "06e6455cf3e8022ad0bd9f981c8eff1338c77d5feb0b78433dc2a6c34a2e7c0d"
   },
   {
     "language": "es",
@@ -127,7 +139,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 606967,
-    "extra": false
+    "extra": false,
+    "sha256": "ad3b33dd1fb7461313b3a9d97293fde014fdc8782e2160e6eec752bd3323aeee"
   },
   {
     "language": "es",
@@ -137,7 +150,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 662926,
-    "extra": false
+    "extra": false,
+    "sha256": "c8cde5f1da822b126ebc29656c35f8d0165673a8abacd200100f2714bd3dd01b"
   },
   {
     "language": "fr",
@@ -147,7 +161,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 353892,
-    "extra": false
+    "extra": false,
+    "sha256": "ae3abcb7d034cd20cdbce869611f71522638499647924885a5fab772003298cf"
   },
   {
     "language": "fr",
@@ -157,7 +172,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 338766,
-    "extra": false
+    "extra": false,
+    "sha256": "35c6352567c9df211ce27fb881ee3105cac9d2fb27ac7d1946f79a4364f936ad"
   },
   {
     "language": "fr",
@@ -167,7 +183,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 539341,
-    "extra": false
+    "extra": false,
+    "sha256": "e42e778cd129ba9d89e3db1a9aa8d34e23a9a0174a8d00809a84152babc04dbb"
   },
   {
     "language": "fr",
@@ -177,7 +194,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 537641,
-    "extra": false
+    "extra": false,
+    "sha256": "70cc6c3fb389789f139dc9b78d83695ee80ec8ca21c060e44db72aa32d9ea192"
   },
   {
     "language": "fr",
@@ -187,7 +205,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 565268,
-    "extra": false
+    "extra": false,
+    "sha256": "e459e76afb22364b70772d4fe375841479ad3589797f598262ce8758669f1088"
   },
   {
     "language": "it",
@@ -197,7 +216,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 354200,
-    "extra": false
+    "extra": false,
+    "sha256": "ae8a2524cf1c79713e16ab6171f8a327a5eb54e3aa63087f99d0c8b7f116fb9d"
   },
   {
     "language": "it",
@@ -207,7 +227,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 330217,
-    "extra": false
+    "extra": false,
+    "sha256": "3cfa96e68f6c3c0b3a5843ac62610f476ad7fda5716974aa9e20de72013761aa"
   },
   {
     "language": "it",
@@ -217,7 +238,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 547455,
-    "extra": false
+    "extra": false,
+    "sha256": "e1b84e2af1291f3f3d2be7dace0714371a8f45c9b94b2d350d17541827928f0c"
   },
   {
     "language": "it",
@@ -227,7 +249,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 536690,
-    "extra": false
+    "extra": false,
+    "sha256": "f155c37db3cf5332a50ad3e76b320de9aa5ac2e70e899f29f5a1dafe5f197f8a"
   },
   {
     "language": "it",
@@ -237,7 +260,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 558632,
-    "extra": false
+    "extra": false,
+    "sha256": "f939f00ced3b5108ed49dc6a7b078b1ef7ceaee718afedfae535378c84dd845b"
   },
   {
     "language": "ja",
@@ -247,7 +271,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 362707,
-    "extra": false
+    "extra": false,
+    "sha256": "04a343760a6804542b5ddcf03625463dfb68b54b91eaa9147572d50cae82f5fc"
   },
   {
     "language": "ja",
@@ -257,7 +282,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 327555,
-    "extra": false
+    "extra": false,
+    "sha256": "92553cbb14d80aec67aedb443ad3c53204939f6db55f98e7fde20be0fd6c60e3"
   },
   {
     "language": "ja",
@@ -267,7 +293,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 565152,
-    "extra": false
+    "extra": false,
+    "sha256": "98cb4e92438d89ff2aa61959acfb0b08347f6a32ad4353622282c101c125c23c"
   },
   {
     "language": "ja",
@@ -277,7 +304,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 551435,
-    "extra": false
+    "extra": false,
+    "sha256": "1e3c7a01b9222ebf1d4d30d9a7427bb1dec5ec09e9e39737e1d2fce4dacde8fb"
   },
   {
     "language": "ja",
@@ -287,7 +315,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 566107,
-    "extra": false
+    "extra": false,
+    "sha256": "27828d54c41b3c968b0c8f9922701c74c435773af0a7e6fd27f1680f1be37ecd"
   },
   {
     "language": "ko",
@@ -297,7 +326,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 361490,
-    "extra": false
+    "extra": false,
+    "sha256": "6f21b0b323aabd9ad73c52624b10bbd5e2418b3a7c6fed03f922c0574f08a4c6"
   },
   {
     "language": "ko",
@@ -307,7 +337,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 333841,
-    "extra": false
+    "extra": false,
+    "sha256": "6c211e7c7a4781c5801975d82aa9975d973e32378f05254e3dd50251d66b9b7d"
   },
   {
     "language": "ko",
@@ -317,7 +348,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 570016,
-    "extra": false
+    "extra": false,
+    "sha256": "dd3db917d60e0e0d31355ba59cb458a727b8a02c05ff0cbc702a88a52982fb17"
   },
   {
     "language": "ko",
@@ -327,7 +359,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 555118,
-    "extra": false
+    "extra": false,
+    "sha256": "7fecc1cacef972323104142d94b4d02bfa79bf1e1a280c4d6480abccdcb0ed05"
   },
   {
     "language": "ko",
@@ -337,7 +370,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 578300,
-    "extra": false
+    "extra": false,
+    "sha256": "95cb624aee0848c0f151ac4c5eac8703d2fde955ad696c81a2baf40e9923a9e1"
   },
   {
     "language": "pl",
@@ -347,7 +381,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 362054,
-    "extra": false
+    "extra": false,
+    "sha256": "088cde8aa6b12cae460d543c316d9e1a3bece3bc3f1e4dbb7c25c679a1a905be"
   },
   {
     "language": "pl",
@@ -357,7 +392,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 341173,
-    "extra": false
+    "extra": false,
+    "sha256": "c7474095651c6acb691d6f80e57ccba7c166ca6c781590da07ab035d34d63ceb"
   },
   {
     "language": "pl",
@@ -367,7 +403,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 570220,
-    "extra": false
+    "extra": false,
+    "sha256": "295c5124faacb18a9ab647120ab4efaa83a835ad5f0d205b1b49804671a22bc7"
   },
   {
     "language": "pl",
@@ -377,7 +414,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 556807,
-    "extra": false
+    "extra": false,
+    "sha256": "b91803acc45f1d7ab0ad1af13c8b6eb728d4744d3e02b763d647d8cb396361e2"
   },
   {
     "language": "pl",
@@ -387,7 +425,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 576538,
-    "extra": false
+    "extra": false,
+    "sha256": "4a82c96b3751ad42c9a769f0b0fdd0f09a02214b71bdeba62b595e2791d5b19b"
   },
   {
     "language": "pt-BR",
@@ -397,7 +436,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 361059,
-    "extra": false
+    "extra": false,
+    "sha256": "1bcbdc901c70a36e8788ad61a9f6f39232569d25a1529799294c7a9109090df6"
   },
   {
     "language": "pt-BR",
@@ -407,7 +447,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 339723,
-    "extra": false
+    "extra": false,
+    "sha256": "2fcb5448544f2d93298452540bc3fbaef129eb3cfe580203d0837e53ca04566c"
   },
   {
     "language": "pt-BR",
@@ -417,7 +458,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 558954,
-    "extra": false
+    "extra": false,
+    "sha256": "f7cf4b15f0870124a68ef2836ed8a48f3e4d82f3e96bade3110264b9dc01ae4e"
   },
   {
     "language": "pt-BR",
@@ -427,7 +469,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 557578,
-    "extra": false
+    "extra": false,
+    "sha256": "b364be0f0074aa6d61cfe317a02db0c922b6709623e717753a96325df80723f5"
   },
   {
     "language": "pt-BR",
@@ -437,7 +480,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 580919,
-    "extra": false
+    "extra": false,
+    "sha256": "c575261947809f43f5118aab64ef9bd4bb30cfa115d316bbcbffb4fff9f421e7"
   },
   {
     "language": "ru",
@@ -447,7 +491,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 363260,
-    "extra": false
+    "extra": false,
+    "sha256": "74031c0041ef17684207a5edec793e7b44d54b7b664132d6ce2a03513dec8193"
   },
   {
     "language": "ru",
@@ -457,7 +502,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 329327,
-    "extra": false
+    "extra": false,
+    "sha256": "4fb428ba59095e5c101024d509c8d544c620046a85da5ab71729c8b7c1d0b5f6"
   },
   {
     "language": "ru",
@@ -467,7 +513,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 563661,
-    "extra": false
+    "extra": false,
+    "sha256": "edfa2a5bac74f7d37612045b6ba36f778478511022aff4b33bbe4acd3e632421"
   },
   {
     "language": "ru",
@@ -477,7 +524,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 555278,
-    "extra": false
+    "extra": false,
+    "sha256": "57a88b6f4e584a56383cd01bb229a3e87c91906f4680378deb6ca4b915df0287"
   },
   {
     "language": "ru",
@@ -487,7 +535,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 573620,
-    "extra": false
+    "extra": false,
+    "sha256": "9b2da5e4a0ba846a9a585fcd31bf9522c281adf1d334e0845acd60cf5d7b68a6"
   },
   {
     "language": "zh",
@@ -497,7 +546,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 362276,
-    "extra": false
+    "extra": false,
+    "sha256": "e70e03c4bef13cb9620c82dc7fd1df4ce66e9e918d054472b4a45a6f8da0c307"
   },
   {
     "language": "zh",
@@ -507,7 +557,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 331536,
-    "extra": false
+    "extra": false,
+    "sha256": "39c37fb48a612495139686510ce3997b105071d881b905573dd2278073bf3087"
   },
   {
     "language": "zh",
@@ -517,7 +568,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 569239,
-    "extra": false
+    "extra": false,
+    "sha256": "a863e2505211951bc73bbe446cc7313beefdbf4f4cf25edaba929e4b66959dbc"
   },
   {
     "language": "zh",
@@ -527,7 +579,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 554568,
-    "extra": false
+    "extra": false,
+    "sha256": "15af49bbf008ba1c1bab9236337d2aa49e64361f3fa425301b8f07399304367d"
   },
   {
     "language": "zh",
@@ -537,7 +590,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 581448,
-    "extra": false
+    "extra": false,
+    "sha256": "866f2158fc3d85400dc4846dbb9112933b58c4dd92ff95ca8f9de39ff146c606"
   },
   {
     "language": "zh-TW",
@@ -547,7 +601,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 362822,
-    "extra": false
+    "extra": false,
+    "sha256": "271bb4968886ce59c59c501beec49be677e9fd2057d0a2fd17ce25237d4ca1af"
   },
   {
     "language": "zh-TW",
@@ -557,7 +612,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 332635,
-    "extra": false
+    "extra": false,
+    "sha256": "33422c632aaa449e6efcf00dc9fbd091dd044b2622eafaad586638616a9c4e7c"
   },
   {
     "language": "zh-TW",
@@ -567,7 +623,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 570474,
-    "extra": false
+    "extra": false,
+    "sha256": "b2c934e157a7ed1a7118dd54ee73238ed1952e90496f87074d65a9e8d686f5f0"
   },
   {
     "language": "zh-TW",
@@ -577,7 +634,8 @@
     "width": 1600,
     "height": 1200,
     "bytes": 555228,
-    "extra": false
+    "extra": false,
+    "sha256": "e3793c855497d7eeadc4981c45411147e2b893b36d676f76ea52b5391b8a165b"
   },
   {
     "language": "zh-TW",
@@ -587,6 +645,7 @@
     "width": 1600,
     "height": 1200,
     "bytes": 577976,
-    "extra": false
+    "extra": false,
+    "sha256": "74693390b506dcfb3163903f3ee86a5dd81c9de36fd9e84031f5e7e1feed2c83"
   }
 ]

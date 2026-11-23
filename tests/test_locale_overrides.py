@@ -111,7 +111,7 @@ class TestLocaleAndOverrides(unittest.TestCase):
 
     def test_prune_keeps_overrides_and_locale_files(self):
         def run():
-            return deploy.prune_stale_pack(self.target, ["zh"])
+            return deploy.prune_stale_pack(self.target, ["zh"], prune=True)
         removed = self._with_runtime(run)
         self.assertIn("fr.txt", removed)
         self.assertTrue(os.path.isfile(self.user_ini))
@@ -119,6 +119,13 @@ class TestLocaleAndOverrides(unittest.TestCase):
             self.pack, "locale.default.ini")))
         self.assertTrue(os.path.isfile(os.path.join(
             self.overrides, "zh.txt")))
+
+    def test_prune_is_off_by_default(self):
+        def run():
+            return deploy.prune_stale_pack(self.target, ["zh"])
+        removed = self._with_runtime(run)
+        self.assertEqual(removed, [])
+        self.assertTrue(os.path.isfile(os.path.join(self.pack, "fr.txt")))
 
     def test_read_locale_prefers_user_then_default(self):
         self.assertEqual(pr2ctl.read_locale_language(self.target), "ja")

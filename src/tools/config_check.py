@@ -10,7 +10,9 @@
 - `src/translations/<code>.toml` 是否存在；
 - `src/injector-rs/ui/ui.zh.ini` 是否存在、界面 ini 是否有重复键；
 - `src/font-map.ini` 的逻辑名、坏行和禁用字体；
-- `src/data/placeholder_roles/<code>.toml` 是否存在且可解析。
+- `src/data/placeholder_roles/<code>.toml` 是否存在且可解析；
+- 语言注册表：release / preview / bundle / pack / 译文 / UI / 字体 / 截图是否
+  互相对得上（`language_registry.audit`，只把 errors 当配置错误）。
 
 这些检查只保证配置之间对得上；字体文件是否真的存在由 release/build 阶段
 再按实际产物检查。
@@ -22,6 +24,8 @@ import sys
 import tomllib
 
 from paths import ROOT, SRC
+
+import language_registry  # noqa: E402
 
 INSTALL = os.path.join(SRC, "tools", "install")
 if INSTALL not in sys.path:
@@ -292,6 +296,9 @@ def check_repository(root=ROOT):
     _check_translations(src, packs, errors)
     _check_ui(src, packs, errors)
     _check_placeholder_roles(src, packs, errors, warnings)
+
+    registry_errors, _registry_warnings, _rows = language_registry.audit(root)
+    errors.extend(registry_errors)
 
     if code and code not in packs:
         errors.append("src/locale.ini：language=%s 没有 src/packs/%s.toml"

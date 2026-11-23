@@ -1,0 +1,7 @@
+#!/bin/sh
+# 轻量 pre-commit：只跑不依赖 Rust 的本地闸门。
+# 启用：git config core.hooksPath .githooks
+set -e
+repo=$(git rev-parse --show-toplevel)
+cd "$repo"
+python src/tools/precommit.py

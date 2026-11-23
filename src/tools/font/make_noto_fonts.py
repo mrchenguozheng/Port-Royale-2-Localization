@@ -42,6 +42,21 @@ LANGS = {
         "serif": ("NotoSerifSC", (700, 900)),
         "label": "Simplified Chinese",
     },
+    "zh-hant": {
+        "sans": ("NotoSansTC", 400),
+        "serif": ("NotoSerifTC", (700, 900)),
+        "label": "Traditional Chinese",
+    },
+    "zh-TW": {
+        "sans": ("NotoSansTC", 400),
+        "serif": ("NotoSerifTC", (700, 900)),
+        "label": "Traditional Chinese (Taiwan)",
+    },
+    "zh-HK": {
+        "sans": ("NotoSansTC", 400),
+        "serif": ("NotoSerifTC", (700, 900)),
+        "label": "Traditional Chinese (Hong Kong)",
+    },
     "ja": {
         "sans": ("NotoSansJP", 400),
         "serif": ("NotoSerifJP", (700, 900)),

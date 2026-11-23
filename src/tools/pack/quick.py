@@ -237,7 +237,7 @@ def write_one(lang, entry, text, args):
     quiet = getattr(args, "json", False)
     if not quiet:
         print("\n── 编译 %s ──" % lang)
-    rc = compile_pack(lang, PACK_OUT, no_fonts=True,
+    rc = compile_pack(lang, PACK_OUT, no_fonts=True, union=True,
                       on_line=None if quiet else print)
     if rc != 0:
         restore(path, raw)

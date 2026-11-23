@@ -135,6 +135,14 @@ class TestUnionBaseline(unittest.TestCase):
         self.assertTrue(u["primary"])
         self.assertIn("union", u["id"])
 
+    def test_build_defaults_to_union(self):
+        """默认口径必须是并集：部署与发行共用一份包。"""
+        import inspect
+        from pack import build_artifacts as B
+        self.assertIs(inspect.signature(C.build).parameters["union"].default, True)
+        self.assertIs(
+            inspect.signature(B.compile_pack).parameters["union"].default, True)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -81,9 +81,10 @@ class TestUniversalLayout(unittest.TestCase):
 
 
 class TestUiLayout(unittest.TestCase):
-    """界面文案按语言分文件；发行包按分组默认语言选一份当 ui.default.ini。"""
+    """界面文案按语言分文件；发行包带全部语言文件，另存一份默认兜底。"""
 
-    LANGS = ("zh", "ja", "ko", "ru", "pl", "de", "es", "fr", "it")
+    LANGS = ("zh", "zh-TW", "zh-HK", "ja", "ko", "ru", "pl", "pt-BR",
+             "de", "es", "fr", "it")
 
     def _ui_dir(self):
         return os.path.join(ROOT, "src", "injector-rs", "ui")
@@ -138,19 +139,22 @@ class TestUiLayout(unittest.TestCase):
         self.assertIn("'ui.default.ini'", text)
         self.assertIn("Copy-Item -LiteralPath $Zh", text)
 
-    def test_release_copies_package_language_as_default(self):
+    def test_release_copies_all_language_files_and_default(self):
         src = tempfile.mkdtemp(prefix="pr2-ui-src-")
         stage = tempfile.mkdtemp(prefix="pr2-ui-stage-")
         try:
             os.makedirs(os.path.join(src, "ui"))
-            for lang, text in (("zh", "title=中文"), ("de", "title=Deutsch")):
+            for lang, text in (("zh", "title=中文"), ("de", "title=Deutsch"),
+                               ("pl", "title=Polski")):
                 path = os.path.join(src, "ui", "ui.%s.ini" % lang)
                 with open(path, "w", encoding="utf-8") as fh:
                     fh.write("[gui]\n%s\n" % text)
             make_release.copy_ui(stage, os.path.join(src, "ui"), "de",
                                  lambda _m: None)
             out = os.path.join(stage, make_release.DATA_DIR, "ui")
-            self.assertEqual(sorted(os.listdir(out)), ["ui.default.ini"])
+            self.assertEqual(
+                sorted(os.listdir(out)),
+                ["ui.de.ini", "ui.default.ini", "ui.pl.ini", "ui.zh.ini"])
             with open(os.path.join(out, "ui.default.ini"), encoding="utf-8") as fh:
                 self.assertIn("title=Deutsch", fh.read())
             with self.assertRaises(FileNotFoundError):

@@ -33,6 +33,20 @@ class TestZhText(unittest.TestCase):
         zh = lang_rules.get("zh")
         self.assertEqual(zh.normalize("你好,世界!"), "你好，世界！")
 
+    def test_hant_uses_zh_rules(self):
+        """繁体两个地区变体走同一套中文规则，不是「原样透传」。"""
+        for lang in ("zh-TW", "zh-HK", "zh-Hant"):
+            sp = lang_rules.get_spec(lang)
+            self.assertEqual(sp.spacing.mode, "compact", lang)
+            self.assertIsNotNone(lang_rules.script_re(lang), lang)
+            self.assertEqual(lang_rules.get(lang).LANG, "zh")
+
+    def test_hant_segmented_via_simplified(self):
+        """繁体会先转简体再分词，词界按字数切回原字形。"""
+        from text import zh_space
+        m = zh_space._simplified_map(["製圖師"])
+        self.assertEqual(m.get("製圖師"), "制图师")
+
     def test_ascii_token_kept(self):
         """半角记号内部的标点不转全角：版本号、时间、文件名、英文词。"""
         zh = lang_rules.get("zh")
@@ -91,15 +105,16 @@ class TestZhText(unittest.TestCase):
         self.assertEqual([("亨利八世国王和教宗")[a:b] for a, b in spans], ["亨利八世国王"])
         txt = "亨利·摩根爵士 出任"
         spans = ZH.find_names(txt, given, surn, extras)
-        self.assertEqual([txt[a:b] for a, b in spans], ["亨利·摩根爵士"])
-        self.assertEqual(ZH.pad_names(txt, spans), "亨利·摩根爵士 出任")
+        # 间隔号废止后不再按「名·姓」匹配；静态译名里也不该再有 `·`
+        self.assertEqual(spans, [])
+        spans = ZH.find_names("克里斯托弗 哥伦布", given, surn, extras)
+        self.assertEqual([("克里斯托弗 哥伦布")[a:b] for a, b in spans], ["克里斯托弗 哥伦布"])
         # 引号里的船名不按人名处理
         spans = ZH.find_names("「安妮女王复仇号」", given, surn, extras)
         self.assertEqual(spans, [])
-        # 中间点不能被空格拆开
+        # 带间隔号的串不再被人名识别吞掉
         spans = ZH.find_names("胡安·德·塞普尔维达之类", given, surn, extras)
-        self.assertEqual([("胡安·德·塞普尔维达之类")[a:b] for a, b in spans],
-                         ["胡安·德·塞普尔维达"])
+        self.assertEqual(spans, [])
 
 
 class TestZhSpace(unittest.TestCase):
@@ -115,8 +130,6 @@ class TestZhSpace(unittest.TestCase):
     def test_spaced_keeps_tags_and_names(self):
         self.assertEqual(zh_space.spaced("你好世界", two_chars, 2), "你好 世界")
         self.assertEqual(zh_space.spaced("你好<n>世界", two_chars, 2), "你好<n>世界")
-        self.assertEqual(zh_space.spaced("胡安·德·塞普尔维达来了", two_chars, 2),
-                         "胡安·德·塞普尔维达来了")
 
     def test_collect_runs(self):
         runs = zh_space.collect_runs(["短句", "这是一个足够长的中文句子用来收集并测试断行"])
@@ -161,18 +174,13 @@ class TestZhSpace(unittest.TestCase):
                          "他说「走」 然后离开了。")
         self.assertNotIn(" 」", zh_space.compact("他说「走」然后离开了。", whole, 99))
 
-    def test_compact_keeps_dot_at_line_end(self):
-        """间隔号黏左：`·` 只能断在它后面，不能起头；姓氏后面再断一刀。
-
-        消息模板是 `%1 %2·%3到…` 这种变量拼出来的，名字整体保护（`NAME`）
-        管不到，早先 DP 会把刀落在 `%2 / ·%3`，实机行首就是孤零零一个「·」。
-        """
+    def test_compact_turns_separator_into_space(self):
+        """音译分隔符一律变空格，且不留连续空格、不落在行首。"""
         whole = lambda run: list(run)
         out = zh_space.compact("%1 %2·%3到西班牙城镇%4碰碰运气。", whole, 13)
-        self.assertNotIn(" ·", out)
-        self.assertIn("· ", out)
-        # `·` 后一刀、姓氏那一件之后再来一刀：姓名整体独占两行
-        self.assertIn("%2· %3 ", out)
+        self.assertNotIn("·", out)
+        self.assertNotIn("  ", out)
+        self.assertEqual(out, "%1 %2 %3 到西班牙城镇%4 碰碰运气。")
 
     def test_bind_merges_quantity_phrase(self):
         """数量/指示短语粘右：「好几」「件事」不能留成两个可断点。"""
@@ -197,9 +205,9 @@ class TestZhSpace(unittest.TestCase):
                          ["窗口", "右下角", "那个"])
 
     def test_compact_keeps_short_name_template(self):
-        """`%1·%2` 这种只有三件的姓名模板放得下就不断，别再插空格。"""
+        """`%1·%2` 这类旧写法在排版时改成空格，不再留点号。"""
         whole = lambda run: list(run)
-        self.assertEqual(zh_space.compact("%1·%2", whole, 13), "%1·%2")
+        self.assertEqual(zh_space.compact("%1·%2", whole, 13), "%1 %2")
 
     def test_compact_breaks_on_particle_not_mid_word(self):
         """超预算时才断，且断点落在停顿字「的」后面，不切「英格兰/船」。"""
@@ -227,14 +235,16 @@ class TestZhSpace(unittest.TestCase):
         out = zh_space.compact(t, lookup, 10)
         self.assertIn(" ", out)
 
-    def test_compact_keeps_name_intact(self):
-        """带间隔号的人名整体不被切开，也不能把整句吞成一个「人名」。"""
-        words = ["当时", "的", "捕海盗人", "罗伯特·梅纳德", "追踪", "到", "了",
+    def test_compact_name_uses_space(self):
+        """带分隔符的人名按空格处理，断行不把整句吞成一个 token。"""
+        words = ["当时", "的", "捕海盗人", "罗伯特", "梅纳德", "追踪", "到", "了",
                  "他", "的", "单桅帆船"]
-        lookup = lambda run: words if run == "当时的捕海盗人罗伯特·梅纳德追踪到了他的单桅帆船" else list(run)
+        lookup = lambda run: words
         t = "当时的捕海盗人罗伯特·梅纳德追踪到了他的单桅帆船。"
         out = zh_space.compact(t, lookup, 10)
-        self.assertIn("罗伯特·梅纳德", out)
+        self.assertNotIn("·", out)
+        self.assertIn("罗伯特", out)
+        self.assertNotIn("  ", out)
         for tok in out.split(" "):
             han = sum(1 for c in tok if "\u4e00" <= c <= "\u9fff")
             self.assertLessEqual(han, 10, tok)

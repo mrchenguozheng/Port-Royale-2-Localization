@@ -11,7 +11,7 @@
 标记写在 `src/packs/<语言>.toml` 的 `tags` 里，词表见
 [`pack_tags.py`](src/tools/pack/pack_tags.py)，出包时进 `README.txt` 与 `manifest.json`。
 
-**界面译文没有母语审校。** 启动器的九种界面文案（`zh/ja/ko/ru/pl/de/es/fr/it`）由 AI
+**界面译文没有母语审校。** 启动器的十二种界面文案（`zh/zh-TW/zh-HK/ja/ko/ru/pl/pt-BR/de/es/fr/it`）由 AI
 起草，只做了 key 与占位符的机械一致性校验，**没有经过母语者逐句校对**。这是当前
 已知短板，不是“已修复”。如果你是其中某门语言的母语玩家，愿意帮忙校对，请在项目的
 Issue 区贴出「界面截图 + 现在这行文案 + 建议改法」；游戏内语言包的同类问题也欢迎一并指出。
@@ -45,8 +45,8 @@ GOG 与 Steam 的 `PR2.exe` 静态导入同一份 `Ascaron.Logging-2.6.dll`，�
 发行包不带任何 `.ps1`。挂载后直接双击 `PR2.exe` 也有效，没挂载时双击就是原版英文。
 完整校验与备份规则见[运行契约](docs/运行契约.md)。
 
-启动器界面按发包语言选一份：`PR2-zh` 用中文、`PR2-latin` 用德语（组内 de/es/fr/it 共用），
-包内换游戏语言不会换界面。源码九份 `ui.<lang>.ini`，`ui.default.ini` 由构建从 `ui.zh.ini` 生成。
+启动器界面跟随下拉框选中的语言包：选 `Polski` 就是波兰语界面，换回简体中文即中文界面。
+包内带全部 `ui.<lang>.ini`，`ui.default.ini` 只作兜底；源码十二份，构建时由 `ui.zh.ini` 生成默认文件。
 包内布局、挂载语义与支持环境见[运行契约](docs/运行契约.md)。
 
 注意：
@@ -98,7 +98,15 @@ GOG 与 Steam 的 `PR2.exe` 静态导入同一份 `Ascaron.Logging-2.6.dll`，�
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1
 ```
 
-它一次跑完归一化 → 校验 → 编译 → 部署 → 核对。
+它一次跑完归一化 → 校验 → 编译 → 部署 → 核对。部署默认增量：只覆盖
+`--lang`/`--langs` 列出的语言，未列出的包保留；要清理才加 `--prune`。
+
+提交前可跑轻量闸门：
+
+```powershell
+.\precommit.ps1
+git config core.hooksPath .githooks   # 可选：git commit 自动跑
+```
 
 构建入口收成根目录两个脚本：
 
@@ -116,7 +124,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1
 ```
 
 发版默认拒绝脏工作树，`-Tag` 时无条件拒绝；`-Tag` 只允许在当前分支 `main` 或 `release/*`。
-`dist\` 除六个 zip 与 `SHA256SUMS.txt` 外，还会写 `release.json`（版本、提交、是否 dirty、
+`dist\` 除七个 zip 与 `SHA256SUMS.txt` 外，还会写 `release.json`（版本、提交、是否 dirty、
 分组与逐包 SHA-256），CI 与下游校验以它为准。
 
 低层脚本仍在 `src\build_injector.ps1`、`src\build_translation.ps1`；日常不需要直接调用。
@@ -215,7 +223,7 @@ pr2-localization/
 
 ## 语言完成度
 
-九门语言共用一套 3548 条基准（`en.gog_1.1.2.3`），"有意不译"指按键名、职员表、游戏
+十一门发行语言加一门预览语言（`pt-BR`）共用一套 3548 条基准（`en.gog_1.1.2.3`），"有意不译"指按键名、职员表、游戏
 标题、场景文件名模板、纯符号与空占位、以及**原文就是本语言写法**的专名（城镇名、
 海盗与姓氏池）这类按规则保留原文的条目（登记在 `src/data/keep_as_is/`），不计入待译。
 所以「可译 = 3548 − 有意不译」，百分比按 **已译 / 可译** 算。数字会变，取实时值时跑

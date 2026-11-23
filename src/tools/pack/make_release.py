@@ -16,7 +16,8 @@
         fonts/font-map.default.ini      # 默认逻辑名到实际文件名的映射
         docs/OFL.txt                    # 字体许可文本
         docs/NOTO-SOURCES.txt           # 字体来源说明
-        ui/ui.default.ini
+        ui/ui.<lang>.ini                # 全部界面文案，按选中语言读取
+        ui/ui.default.ini               # 分组默认语言，兜底
         logs/
       README.txt
 
@@ -61,9 +62,10 @@ BUILD = os.path.join(ROOT, "build")
 RUNTIME = os.path.join(BUILD, "runtime")
 
 LABELS = {
-    "zh": "简体中文", "ja": "日本語", "ko": "한국어", "ru": "Русский",
+    "zh": "简体中文", "zh-TW": "繁體中文（台灣）", "zh-HK": "繁體中文（香港）",
+    "ja": "日本語", "ko": "한국어", "ru": "Русский",
     "de": "Deutsch", "es": "Español", "fr": "Français", "it": "Italiano",
-    "pl": "Polski",
+    "pl": "Polski", "pt-BR": "Português (Brasil)",
 }
 DATA_DIR = "PR2Localization"
 UI_DEFAULT_FILE = "ui.default.ini"
@@ -204,20 +206,31 @@ def copy_runtime(stage, log):
 
 
 def copy_ui(stage, ui_dir, default_lang, log):
-    """界面默认文案跟随发包语言。
+    """界面文案按语言进包，并在运行时按当前语言包选用。
 
-    源目录里每种语言只有一份 ``ui.<lang>.ini``（简体中文就是 ``ui.zh.ini``，
-    没有额外的 ``ui.default.ini`` 副本）；包里只放分组默认语言那一份，并
-    统一命名成 ``ui.default.ini``。其他语言文件不进包，避免同一份文案在包里
-    存多份、日后各自漂移。
+    源目录里每种语言一份 ``ui.<lang>.ini``（没有额外的 ``ui.default.ini``
+    副本）。发行包把**全部**语言文件放进 ``PR2Localization\\ui``，另外把
+    分组默认语言那份复制成 ``ui.default.ini``：启动器先读默认文件兜底，
+    再按当前语言包读 ``ui.<lang>.ini``，最后用玩家 ``ui.ini`` 覆盖。
     """
     lang_ui = os.path.join(ui_dir, "ui.%s.ini" % default_lang)
     if not os.path.isfile(lang_ui):
         raise FileNotFoundError("缺默认语言界面文案：%s" % lang_ui)
     ui_stage = os.path.join(stage, DATA_DIR, "ui")
     os.makedirs(ui_stage, exist_ok=True)
+    copied = 0
+    for name in sorted(os.listdir(ui_dir)):
+        if not name.startswith("ui.") or not name.endswith(".ini"):
+            continue
+        if name in ("ui.ini", UI_DEFAULT_FILE):
+            continue
+        src = os.path.join(ui_dir, name)
+        if not os.path.isfile(src):
+            continue
+        shutil.copy2(src, os.path.join(ui_stage, name))
+        copied += 1
     shutil.copy2(lang_ui, os.path.join(ui_stage, UI_DEFAULT_FILE))
-    log("复制 PR2Localization\\ui\\（默认界面 %s）" % default_lang)
+    log("复制 PR2Localization\\ui\\（%d 份语言文案，默认 %s）" % (copied, default_lang))
 
 
 def copy_font_map(stage, log):
@@ -720,8 +733,8 @@ def make_release(langs, version, out_dir, mode, log=None, cache=True,
         ui_dir = os.path.join(ROOT, "src", "injector-rs", "ui")
     if not os.path.isdir(ui_dir):
         raise FileNotFoundError("缺 ui 目录：%s（先构建注入器）" % ui_dir)
-    # 界面文案跟随发包语言：分组默认语言是哪门，就把哪门的 ui.<lang>.ini
-    # 以 ui.default.ini 的名字放进包；其他语言文件不进包，避免多份文案漂移。
+    # 界面文案整套进包：启动器按当前选中语言读取 ui.<lang>.ini，
+    # 分组默认语言另复制一份 ui.default.ini 作兜底。
     copy_ui(stage, ui_dir, default_lang, log)
     os.makedirs(os.path.join(stage, DATA_DIR, "logs"), exist_ok=True)
     copy_fonts(langs, stage, modes, log, cache=cache)

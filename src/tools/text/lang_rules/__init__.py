@@ -26,12 +26,26 @@ import importlib
 #: 是显式透传（各自模块里写了理由）。en 是原文语，不在这里。
 REGISTRY = ("zh", "ja", "fr", "de", "es", "pl", "ru", "ko", "it")
 
+#: 同一套规则复用的地区变体：繁体（台灣/香港）与简体共用中文规则，
+#: 只在派生的 `src/data/variants/` 差异表里分地区用词，不另写一份规则。
+ALIASES = {
+    "zh-TW": "zh",
+    "zh-HK": "zh",
+    "zh-Hant": "zh",
+    "zh-CN": "zh",
+}
+
+
+def _rule_lang(lang):
+    return ALIASES.get(lang, lang)
+
 
 def get(lang):
-    if lang not in REGISTRY:
+    name = _rule_lang(lang)
+    if name not in REGISTRY:
         return None
     # 用包自身的名字导入，避免依赖「text 目录在 sys.path 上」这种副作用
-    return importlib.import_module(__name__ + "." + lang)
+    return importlib.import_module(__name__ + "." + name)
 
 
 def names():

@@ -36,10 +36,12 @@
 | [运行契约](运行契约.md) | **唯一口径**：支持环境、包内布局、界面语言、宿主挂载、locale |
 | [构建与安装](构建与安装.md) | 构建、部署、启动、脚本一览 |
 | [发行规范](发行规范.md) | 版本号、发行语言集、产物与校验和、tag、门禁 |
+| [语言矩阵](语言矩阵.md) | 每门语言的 release/preview、UI、语言包、译文、截图、字体与发行分组；生成物，不要手改 |
 | [发行版](发行版.md) | 两个发行包的结构、字体、语言设置、GitHub Actions |
 | [发行构建计划](archive/发行构建计划.md) | 发行包构建的分步计划与验收项 |
 | [字体与分发](字体与分发.md) | 字体只做映射、Noto 许可、`font-map` 映射、禁止分发 |
 | [新语言](新语言.md) | 从准备字体到翻译、构建、部署、验收、出包 |
+| [繁体中文](繁体中文.md) | 繁体底稿、TW/HK 差异表与派生脚本、TC 字体与发行分组 |
 
 ## 开发与原理
 
@@ -65,10 +67,10 @@
 
 | 文档 | 内容 |
 |---|---|
-| [实机截图](实机截图.md) | 德语、西语、法语、意大利语、日语、韩语、波兰语、葡萄牙语（巴西）、俄语、简体中文、繁体中文五屏对照：主菜单、剧本模式建号、剧本 1 欢迎、城镇信息、总督对话；日语、韩语、波兰语、葡萄牙语、俄语、简体中文、繁体中文均为字体方案就位后补拍，德语另附四张补充屏；共 59 张 |
-| [截图画廊](screenshots.html) | 由 `screenshots.json`、`assets/screenshots/manifest.json` 与 `src/tools/docs/screenshots_template.html` 生成，可直接作为 GitHub Pages 页面打开；不要手改 HTML |
+| [实机截图](实机截图.md) | 德语、西语、法语、意大利语、日语、韩语、波兰语、葡萄牙语（巴西）、俄语、简体中文、繁体中文五屏对照：主菜单、剧本模式建号、剧本 1 欢迎、城镇信息、总督对话；日语、韩语、波兰语、葡萄牙语、俄语、简体中文、繁体中文均为字体方案就位后补拍，德语另附四张补充屏；共 59 张；生成物，不要手改 |
+| [截图画廊](screenshots.html) | 由 `screenshots.json`、`assets/screenshots/manifest.json` 与 `src/tools/docs/screenshots_template.html` 生成，可直接作为 GitHub Pages 页面打开；缩略图在 `assets/screenshots/thumbs/`，灯箱打开原图；不要手改 HTML |
 
-若把 GitHub Pages 的源目录设为 `docs`，画廊入口是 `screenshots.html`；本仓库对应 `https://mrchenguozheng.github.io/Port-Royale-2-Localization/screenshots.html`。改图注或注记改 `docs/screenshots.json`，改版式改 `src/tools/docs/screenshots_template.html`，然后运行 `python src/tools/docs/build_screenshots.py`。
+若把 GitHub Pages 的源目录设为 `docs`，画廊入口是 `screenshots.html`；本仓库对应 `https://mrchenguozheng.github.io/Port-Royale-2-Localization/screenshots.html`。图注、注记和手写段落都改 `docs/screenshots.json`，版式改 `src/tools/docs/screenshots_template.html`，然后运行 `python src/tools/docs/build_screenshots.py --thumbs`；`--check` 会同时核对 HTML、Markdown 与缩略图。
 
 ## 翻译数据与历史
 

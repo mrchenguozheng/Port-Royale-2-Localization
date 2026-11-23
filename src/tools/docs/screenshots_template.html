@@ -188,7 +188,7 @@
   const big = document.getElementById('lightboxImg');
   document.querySelectorAll('figure img').forEach(img => {
     img.addEventListener('click', () => {
-      big.src = img.src;
+      big.src = img.dataset.full || img.src;
       big.alt = img.alt;
       box.setAttribute('aria-hidden', 'false');
     });

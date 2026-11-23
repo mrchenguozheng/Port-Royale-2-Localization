@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""pr2ctl.deploy —— 把构建产物复制进游戏目录。"""
+"""pr2ctl.deploy —— 把构建产物复制进游戏目录。
+
+默认是增量覆盖：`langs` 只决定这次写哪些语言，未列出的包留在原处。
+只有显式 `prune=True` 才删除未列出的包；活动/默认 locale 与 overrides 始终保留。
+"""
 
 import configparser
 
@@ -152,8 +156,18 @@ def deploy_steps(target, langs, edition=None):
 
     ui_src = os.path.join(RUNTIME, UI_DIR)
     if os.path.isdir(ui_src):
-        # 界面默认文案跟随这次安装的语言；找不到对应语言就用运行时的默认文件。
-        # 用户自己的 ui.ini 是覆盖层，升级时不碰。
+        # 界面文案整套装进 PR2Localization\ui\：启动器按当前语言包读取
+        # ui.<lang>.ini，`ui.default.ini` 只作兜底。用户自己的 ui.ini 是
+        # 覆盖层，升级时不碰，也不从构建目录搬进去。
+        for name in sorted(os.listdir(ui_src)):
+            if (not name.startswith("ui.") or not name.endswith(".ini")
+                    or name in (UI_FILE, UI_DEFAULT_FILE)):
+                continue
+            src = os.path.join(ui_src, name)
+            if os.path.isfile(src):
+                steps.append(("PR2Localization\\ui\\%s" % name, src,
+                              os.path.join(target, UI_DIR, name)))
+        # 默认文件跟随这次安装的语言；找不到对应语言就用运行时的默认文件。
         ui_name = UI_DEFAULT_FILE
         if font_lang and os.path.isfile(os.path.join(ui_src, "ui.%s.ini" % font_lang)):
             ui_name = "ui.%s.ini" % font_lang
@@ -224,13 +238,15 @@ def copy_if_different(src, dst):
         return "copied"
 
 
-def prune_stale_pack(target, langs):
+def prune_stale_pack(target, langs, prune=False):
     """删掉游戏目录 PR2Localization\\packs\\ 里本次不装的文件，返回删掉的名字。
 
-    只删多出来的，不动要留的 —— 整个 rmtree 会让「内容相同就跳过」
-    永远生效不了，语言包每次都被重写。用户活动 locale.ini、发行默认
-    locale.default.ini 和本机 overrides 目录始终保留。
+    默认**不清理**：`--langs` 只决定这次覆盖哪些语言，未列出的包留在原处。
+    只有调用方显式传 ``prune=True`` 才删除，避免“只部署 ko,pt-BR 就把
+    zh/zh-TW 从游戏目录移走”。清理时仍保留活动/默认 locale 与 overrides。
     """
+    if not prune:
+        return []
     dst_pack = os.path.join(target, PACK_DIR)
     if not os.path.isdir(dst_pack):
         return []
@@ -253,7 +269,7 @@ def prune_stale_pack(target, langs):
     return removed
 
 
-def deploy(target, langs=None, edition=None):
+def deploy(target, langs=None, edition=None, prune=False):
     """把构建产物复制到 target。返回 (是否成功, 说明)。"""
     if not writable(target):
         return False, (
@@ -264,7 +280,7 @@ def deploy(target, langs=None, edition=None):
     has_host = steam_host.has_host(target)
     copied, same, failed = [], [], []
     try:
-        for name in prune_stale_pack(target, langs):
+        for name in prune_stale_pack(target, langs, prune=prune):
             same.append("%s（已移除）" % name)
 
         for label, src, dst in deploy_steps(target, langs, edition):
@@ -309,7 +325,7 @@ def deploy(target, langs=None, edition=None):
     )
 
 
-def run_deploy(target, langs, events, edition=None):
+def run_deploy(target, langs, events, edition=None, prune=False):
     """部署线程主体，逐步推进进度条。任何一步失败就停下。"""
     try:
         if not writable(target):
@@ -321,7 +337,7 @@ def run_deploy(target, langs, events, edition=None):
         edition = edition_of(target, edition)
         has_host = steam_host.has_host(target)
 
-        for name in prune_stale_pack(target, langs):
+        for name in prune_stale_pack(target, langs, prune=prune):
             events.put(("line", "移除 %s\\%s（本次不装）" % (PACK_DIR, name)))
 
         steps = deploy_steps(target, langs, edition)

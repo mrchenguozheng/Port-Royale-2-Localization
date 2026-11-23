@@ -5,7 +5,8 @@
 依次跑：
 1. 跨模块引用检查（lint_imports.py）
 2. 语言配置检查（config_check.py）
-3. 译文规范复核（analysis/text_lint.py，**逐语言**，E 级与 W 级都算失败）
+3. 译文规范复核（analysis/text_lint.py，**逐语言**）：发行语言 E 级与 W 级都算失败，
+   预览语言只把 E 级算失败（W 级照报，不卡预览进度）
 4. 断行长度复核（analysis/line_run.py，**逐语言**）
 5. 英文微调层自查（translate.py overrides：id 存在、token 一致、不许白改）
 6. 不译清单对账（analysis/keep_audit.py，**逐语言**：登记的 id 存在、登记项
@@ -42,6 +43,11 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 import translate as T                                   # noqa: E402
+
+PACK_TOOLS = os.path.join(HERE, "pack")
+if PACK_TOOLS not in sys.path:
+    sys.path.insert(0, PACK_TOOLS)
+import release_version as RV                            # noqa: E402
 
 SKIP_FILE = os.path.join(ROOT, "src", "data", "check_skip.txt")
 
@@ -259,7 +265,14 @@ def main(argv=None):
         return 1
     if not run("语言配置", [PY, os.path.join("src", "tools", "config_check.py")]):
         return 1
-    if not run_each_lang("译文规范", lint, langs_, ["--strict"], args.jobs):
+    release = set(RV.read_languages(os.path.join(ROOT, "src")))
+    strict_langs = [c for c in langs_ if c in release]
+    preview_langs = [c for c in langs_ if c not in release]
+    if strict_langs and not run_each_lang(
+            "译文规范（发行）", lint, strict_langs, ["--strict"], args.jobs):
+        return 1
+    if preview_langs and not run_each_lang(
+            "译文规范（预览）", lint, preview_langs, (), args.jobs):
         return 1
     if not run_each_lang("断行长度", line_run, langs_, (), args.jobs):
         return 1

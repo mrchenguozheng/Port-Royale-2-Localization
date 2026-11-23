@@ -65,9 +65,13 @@ def run(step, cmd):
         sys.exit("\n[失败] %s（退出码 %d）" % (step, proc.returncode))
 
 
-def pick_langs(explicit):
-    if explicit:
-        return [x.strip() for x in explicit.split(",") if x.strip()]
+def pick_langs(explicit, repeated=()):
+    values = list(explicit or []) + list(repeated or [])
+    if values:
+        out = []
+        for value in values:
+            out.extend(x.strip() for x in value.split(",") if x.strip())
+        return out
     langs = [x for x in B.available_langs() if not x.startswith("test_")]
     return langs or ["ja"]
 
@@ -89,17 +93,22 @@ def pick_game_dir(explicit):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--langs", default="", help="逗号分隔，默认 ja,zh")
+    ap.add_argument("--langs", nargs="+", default=[],
+                    help="一个或多个语言；也接受逗号分隔。PowerShell 里建议写 --lang <代码>")
+    ap.add_argument("--lang", action="append", default=[],
+                    help="追加一个语言，可重复；避免 PowerShell 拆逗号")
     ap.add_argument("--game-dir", default="", help="游戏目录（含 PR2.exe）")
     ap.add_argument("--no-check", action="store_true", help="跳过 check_breaks")
     ap.add_argument("--no-fonts", action="store_true", help="编译时不重裁字体")
+    ap.add_argument("--prune", action="store_true",
+                    help="部署后删除本次未列出的语言包（默认保留）")
     ap.add_argument("--launch", action="store_true", help="部署完成后启动游戏")
     ap.add_argument("--locale", default="",
                     help="部署后把游戏语言设为该代码（默认保持现有 locale.ini）")
     ap.add_argument("--dry-run", action="store_true", help="只打印计划，不写文件")
     args = ap.parse_args()
 
-    langs = pick_langs(args.langs)
+    langs = pick_langs(args.langs, args.lang)
     target = pick_game_dir(args.game_dir)
     sha, build = B.identify_dir(target)
 
@@ -113,8 +122,10 @@ def main():
             print("\n[计划] %s" % lang)
             if not args.no_check:
                 print("  check_breaks --lang %s --strict" % lang)
-            print("  compile_pack --lang %s%s" % (lang, " --no-fonts" if args.no_fonts else ""))
-        print("\n[计划] deploy -> %s（复制 %s）" % (target, "、".join(langs)))
+            print("  compile_pack --lang %s --union%s"
+                  % (lang, " --no-fonts" if args.no_fonts else ""))
+        print("\n[计划] deploy -> %s（复制 %s%s）"
+              % (target, "、".join(langs), "，并清理未列出的包" if args.prune else "，保留其余包"))
         return 0
 
     # 1) 校验 + 编译（translations/ 是唯一手改层，构建不再回写它）
@@ -124,7 +135,7 @@ def main():
                 [sys.executable, os.path.join(HERE, "check_breaks.py"), "--lang", lang, "--strict"])
         print("\n── 编译 %s ──" % lang)
         if compile_pack(lang, PACK_OUT, no_fonts=args.no_fonts,
-                        on_line=print) != 0:
+                        on_line=print, union=True) != 0:
             sys.exit("[失败] 编译 %s" % lang)
 
     # 2) 注入器产物必须已在 build\runtime\ 里
@@ -135,7 +146,7 @@ def main():
 
     # 3) 部署
     print("\n── 部署到游戏目录 ──")
-    ok, msg = B.deploy(target, langs)
+    ok, msg = B.deploy(target, langs, prune=args.prune)
     if not ok:
         sys.exit("[失败] " + msg)
     print("   " + msg.replace("\n", "\n   "))

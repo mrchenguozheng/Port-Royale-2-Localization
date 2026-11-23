@@ -18,7 +18,10 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "src", "tools"))
 sys.path.insert(0, os.path.join(ROOT, "src", "tools", "text"))
+sys.path.insert(0, os.path.join(ROOT, "src", "tools", "docs"))
 import var_codes as VC
+import build_language_matrix as LM
+LANGUAGE_MATRIX = os.path.join(ROOT, "docs", "语言矩阵.md")
 
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 NUM = re.compile(r"^(\d\d)-")
@@ -159,6 +162,20 @@ def check_exceptions():
     return bad
 
 
+def check_language_matrix():
+    """docs/语言矩阵.md 必须与配置审计结果一致；生成物不手改。"""
+    try:
+        want = LM.build()
+    except ValueError as exc:
+        return ["语言矩阵审计失败：%s" % exc]
+    with open(LANGUAGE_MATRIX, encoding="utf-8") as fh:
+        got = fh.read()
+    if want != got:
+        return ["docs/语言矩阵.md 与配置不一致；运行 "
+                "python src/tools/docs/build_language_matrix.py"]
+    return []
+
+
 def main():
     items = [
         ("docs 索引", lambda: check_index(README, "docs/README.md")),
@@ -167,6 +184,7 @@ def main():
         ("界面映射编号", lambda: check_numbering(os.path.join(ROOT, "docs", "界面映射"),
                                               "界面映射")),
         ("码表与语料", check_drift),
+        ("语言矩阵", check_language_matrix),
         ("未知码清单", check_unknown_codes),
         ("例外与源码常量", check_exceptions),
     ]

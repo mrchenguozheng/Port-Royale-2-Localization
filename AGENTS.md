@@ -15,7 +15,7 @@
   不要再用 `VERSION.dll`：它属于 Windows 的 KnownDLLs，同目录代理永远进不去 `PR2.exe`。
 - 支持环境是 **Windows 10 / Windows 11**（64 位系统跑 32 位游戏）；**Windows 7 不在支持范围**，
   也没有验证过，不要再写「避开 PowerShell 2.0 所以兼容 Win7」这类推导。
-- 启动器界面九种语言（`zh/ja/ko/ru/pl/de/es/fr/it`）是 AI 起草 + 机械一致性校验，
+- 启动器界面十二种语言（`zh/zh-TW/zh-HK/ja/ko/ru/pl/pt-BR/de/es/fr/it`）是 AI 起草 + 机械一致性校验，
   **没有母语审校**。文档与 README 必须如实披露并留玩家反馈入口，不能写成“已审校”。
   反馈方式：Issue 里贴截图、当前文案与建议改法；不要编造不存在的反馈链接。
 - 游戏版本：**GOG 英文版 `1.1.2.3`、Steam 英文版 `1.1.2.3` 与 GOG 法语版 `1.1.2.42` 都已通过宿主 DLL
@@ -51,7 +51,7 @@
 | 路径 | 作用 |
 |---|---|
 | `src/injector-rs/` | Rust workspace：`pr2_common`、`pr2_proxy`、`pr2_text_source`、`pr2_launcher`、`pr2_launcher_gui`、`pr2_host_proxy` |
-| `src/injector-rs/ui/` | GUI 界面文案：`ui.<lang>.ini` 九份；**源码没有 `ui.default.ini`**，构建从 `ui.zh.ini` 生成运行时默认，发行包只放分组默认语言一份 |
+| `src/injector-rs/ui/` | GUI 界面文案：`ui.<lang>.ini` 十二份；**源码没有 `ui.default.ini`**，构建从 `ui.zh.ini` 生成运行时默认；发行包带全部语言文件，启动器按当前语言包选用 |
 | `src/translations/` | 唯一手改译文层：`zh.toml`、`ja.toml` 等 |
 | `src/tools/` | 语言包编译、字体、部署、校验和分析工具 |
 | `build/` | 构建产物；`build/runtime/` 是可整体复制的安装源 |

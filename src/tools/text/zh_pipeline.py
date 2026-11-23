@@ -25,10 +25,9 @@ CONJ = ("因为", "所以", "但是", "如果", "虽然", "然后", "而且", "�
         "一旦", "以便", "以免", "甚至", "反而", "否则", "不然", "总之", "也就是说")
 SINGLE_CONJ = {"但": "是", "而": "是且也又在对就", "却": "是也又就",
                "并": "且不没未非能会已将无发", "或": "者是许", "因": "为此", "所": "以"}
-PUNCT_CHARS = "，。！？；：、…—）)」』】》”’·"
+PUNCT_CHARS = "，。！？；：、…—）)」』】》”’"
 TITLES = ("先生", "爵士", "女士", "小姐", "夫人", "船长", "总督", "副王", "国王",
           "女王", "伯爵", "将军", "指挥官", "上校", "中尉", "少校", "神父", "医生")
-NAME_STOP = "的了他是在和与也就都但而或又着过们吗呢吧啊呀哦嗯，。！？、；：…—（）()「」『』【】《》 \u3000<@%"
 SPACE = " \u3000"
 SENT_END = "。！？…!?"
 
@@ -68,8 +67,6 @@ def build_names(doc):
     return given, surn, extras, towns
 
 
-name_re = None
-
 QUOTE_RX = re.compile(r"「[^」]*」|『[^』]*』|《[^》]*》")
 _NAME_CACHE = {}
 
@@ -94,14 +91,9 @@ def _name_regexes(all_names):
 
 
 def find_names(text, given, surn, extras, all_names=None):
-    global name_re
-    if name_re is None:
-        name_re = re.compile(
-            "(%s)\u00b7([\\u4e00-\\u9fff]{1,6}?)(?=[%s]|%s|$)"
-            % ("|".join(map(re.escape, sorted(given, key=len, reverse=True))),
-               re.escape(NAME_STOP), "|".join(map(re.escape, TITLES))))
-    spans = ([(m.start(), m.end()) for m in name_re.finditer(text)]
-             if "·" in text else [])
+    # 音译分隔符已废止，名字在译文里就是空格分段；这里只按词表找整名，
+    # 不再有「名·姓」那条正则（名单里的名字本身带空格，bare_re 直接匹配）。
+    spans = []
 
     if all_names is None:
         all_names = set(given) | set(surn) | set(extras)

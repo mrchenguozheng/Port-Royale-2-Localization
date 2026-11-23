@@ -7,7 +7,9 @@
    用户输入可以不带 ``v``；归一化后一律带 ``v``，文件名、manifest、
    README、tag 全用归一化结果。
 2. 发行语言集：``src/release-languages.txt`` 每行一个语言代码，``#`` 起注释。
-   有 pack 和译文、但没列进清单的语言不进发行包（比如试点中的 de/es/fr）。
+   语言代码允许两三个字母加可选 ISO 3166/UN M.49 地区子标签（如 ``zh-TW``、
+   ``zh-HK``、``pt-BR``）。有 pack 和译文、但没列进清单的语言不进发行包；
+   预览语言另见 ``src/preview-languages.txt``。
 """
 
 import os
@@ -15,7 +17,8 @@ import re
 
 VERSION_RE = re.compile(
     r"^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z][0-9A-Za-z.-]*))?$")
-LANG_RE = re.compile(r"^[a-z]{2,3}$")
+# 2–3 位主语言，加可选地区子标签；zh-TW / zh-HK / pt-BR 不能只靠 ^[a-z]{2,3}$
+LANG_RE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$")
 LANGUAGES_FILE = "release-languages.txt"
 
 

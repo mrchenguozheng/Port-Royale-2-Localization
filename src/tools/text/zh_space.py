@@ -60,10 +60,10 @@ ROOT = os.path.dirname(os.path.dirname(TOOLS))
 #: 标签/占位符：占位符部分与校验用的 base.VAR 同源，避免两处各写一份。
 TAG = re.compile("(<[^>]*>|" + base.VAR.pattern + ")")
 CJK_RUN = re.compile(r"[\u4e00-\u9fff]+")
-#: 带间隔号的人名：每段 1～10 字，不能贪婪到吞下整句。
-#: 早先用 `[\u4e00-\u9fff]+`，只要句子里有一个 `·`，整个句子就被当成一个「名字」
-#: 整体保护起来，永远等不到断行——长文空白的一部分就是这么来的。
-NAME = re.compile(r"[\u4e00-\u9fff]{1,10}(?:·[\u4e00-\u9fff]{1,10})+")
+#: 音译名分隔符：中文一律写成空格，不再用 `·` / `‧`（见 `strip_separators`）。
+#: 旧版这里有一份「带间隔号的人名」保护正则；间隔号废止后它不再匹配，
+#: 名字按空格分段，断行落在名与姓之间是预期行为。
+SEPARATORS = ("\u00b7", "\u2027")
 
 #: 单字虚词：粘在前一个词后面。不能收「不/没/都/也」这类否定与副词 ——
 #: 它们管的是后面那个动词，粘左会拼出「城镇不 / 能是」；介词（从/在/把/被/给）
@@ -140,6 +140,33 @@ def _segment_spacy(runs):
     return dict(zip(runs, json.loads(proc.stdout.decode("utf-8"))))
 
 
+def _simplified_map(runs):
+    """繁体片段 → 简体写法，只用于分词。
+
+    spaCy 的中文模型是在简体语料上训的，直接喂繁体会把「製圖師」「地名」
+    这类词切碎（实测「製圖 / 師為」「地 / 名背」）。这里先把整段转成简体
+    送去分词，再按字数把词界切回原字形；只有逐字等长的转换才采用，遇到
+    「麵→面」之外的长度变化就放弃该片段，退回单字成组。
+    """
+    try:
+        import opencc
+    except ImportError:
+        return {}
+    try:
+        conv = opencc.OpenCC("t2s")
+    except Exception:
+        return {}
+    out = {}
+    for run in runs:
+        try:
+            simp = conv.convert(run)
+        except Exception:
+            continue
+        if simp != run and len(simp) == len(run):
+            out[run] = simp
+    return out
+
+
 def segment(runs):
     """把待分词的片段一次性切成词。
 
@@ -156,21 +183,32 @@ def segment(runs):
         lookup = lambda run: list(run)  # noqa: E731
         lookup.missing = []
         return lookup, "none"
-    seg = _segment_spacy(runs)
+    simp = _simplified_map(runs)
+    seg = _segment_spacy([simp.get(run, run) for run in runs])
     if seg is None:
         return None, ""
     name = "spacy"
     missed = []
 
     def lookup(run):
-        words = seg.get(run)
+        key = simp.get(run, run)
+        words = seg.get(key)
         if words is None:
             # 比 MIN_RUN 还短的片段本来就不需要分词；进了收集范围却没结果，
             # 才是「只能按单字成组、可能切在词中间」的信号。
             if len(run) >= MIN_RUN:
                 missed.append(run)
             return list(run)
-        return words
+        if key == run:
+            return words
+        # 简体词界按字数切回繁体原串；长度对不上就整段单字，别硬套。
+        out, pos = [], 0
+        for word in words:
+            out.append(run[pos:pos + len(word)])
+            pos += len(word)
+        if pos != len(run) or any(not w for w in out):
+            return list(run)
+        return out
 
     lookup.missing = missed
     return lookup, name
@@ -248,15 +286,28 @@ def pack(words, max_chars=MAX_CHARS):
     return " ".join(groups)
 
 
+def strip_separators(text, mark=" "):
+    """把音译间隔号换成空格：`克里斯托弗·哥伦布` → `克里斯托弗 哥伦布`。
+
+    中文排版只用空格分段，`·` / `‧` 一律不出现在译文里。译文里若残留，
+    在这里兜底替换，免得构建产物和源文件口径不一致。
+
+    `compact()` 传 `mark=SEP_MARK`：它的「抹掉汉字间空格」一步会把真空格
+    也删掉，名字中间那一刀就丢了；换成非空白哨兵，排完版再还原成空格。
+    """
+    for sep in SEPARATORS:
+        if sep in text:
+            text = text.replace(sep, mark)
+    return text
+
+
+#: 间隔号在排版过程中的临时替身（非空白字符，不会被 `_TIGHT_SPACE` 抹掉）。
+SEP_MARK = "\x02"
+
+
 def spaced(text, lookup, max_chars=MAX_CHARS):
-    """在汉字串内部按词成组插空格；标签/占位符/含间隔号的人名原样保留。"""
-    names = []
-
-    def keep(m):
-        names.append(m.group(0))
-        return "\x00%d\x00" % (len(names) - 1)
-
-    text = NAME.sub(keep, text)
+    """在汉字串内部按词成组插空格；标签/占位符原样保留。"""
+    text = strip_separators(text)
     parts = TAG.split(text)
     out = []
     for i, p in enumerate(parts):
@@ -266,7 +317,7 @@ def spaced(text, lookup, max_chars=MAX_CHARS):
         out.append(CJK_RUN.sub(
             lambda m: pack(bind(lookup(m.group(0))), max_chars), p))
     text = "".join(out)
-    return re.sub(r"\x00(\d+)\x00", lambda m: names[int(m.group(1))], text)
+    return text
 
 
 def collect_runs(texts, min_run=MIN_RUN):
@@ -336,11 +387,12 @@ _HARD_TAG = re.compile(r"<n[^>]*>|\r?\n", re.I)
 _ATOM = re.compile(r"\x00\d+\x00|<[^>]*>|" + base.VAR.pattern)
 
 #: 中文正文里可以贴着空格的两个字符集（汉字与中文标点）。
-_TIGHT = "[\u4e00-\u9fff，。！？；：、…—（）()「」『』【】《》·]"
-#: 只抹「两边都是汉字/全角标点」的空格（作者手打的多余空格）。
+_TIGHT = "[\u4e00-\u9fff，。！？；：、…—（）()「」『』【】《》]"
+#: 只抹「两边都是汉字/全角标点」的**连续多个**空格（作者手打的多余空格）。
+#: 单个空格现在有实际语义：音译名分段（`克里斯托弗 哥伦布`），必须保留。
 #: 汉字与拉丁词、数字之间那点空隙要留着：中文与西文混排本来就该有间隔，
 #: 而引擎正好把空格当折行点，白送一个可断位置。
-_TIGHT_SPACE = re.compile(r"(?<=%s)\s+(?=%s)" % (_TIGHT, _TIGHT))
+_TIGHT_SPACE = re.compile(r"(?<=%s)\s{2,}(?=%s)" % (_TIGHT, _TIGHT))
 
 
 def load_user_words(words):
@@ -379,14 +431,19 @@ def compact(text, lookup, max_chars=MAX_CHARS):
     不能放下，行多了顶多滚动），所以改成逢标点必断。
     禁则仍生效：下一件若是收尾引号括号（`」` `』`）这类不能起头的标点，不断。
     """
-    parts = _HARD.split(text)
+    parts = _HARD.split(strip_separators(text, SEP_MARK))
     out = []
     for p in parts:
         if _HARD_TAG.fullmatch(p):
             out.append(p)
             continue
         out.append(_compact_seg(_TIGHT_SPACE.sub("", p).strip(), lookup, max_chars, []))
-    return "".join(out)
+    text = "".join(out)
+    # 哨兵两侧若已被断行层插了空格，先并掉，再还原成单个空格：
+    # 否则「名<哨兵>姓」外加一刀会变成两个连续空格。
+    for pair in (SEP_MARK + " ", " " + SEP_MARK):
+        text = text.replace(pair, " ")
+    return text.replace(SEP_MARK, " ")
 
 
 def _compact_seg(seg, lookup, max_chars, names):

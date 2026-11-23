@@ -40,7 +40,7 @@ if ROOT not in sys.path:
 DEFAULT_OUT = os.path.join(ROOT, "build", "runtime", "PR2Localization", "packs")
 #: 非 primary 基线的语言包落点。**不放进 packs\\**：运行时按 packs\\<语言>.txt
 #: 找活动语言，多出来的同级文件会让语言列表出现重名项，子目录也会被部署脚本
-#: 一起拷进游戏目录。放仓库 build\\variants\\<版本id>\\ 下，按目标安装手动取用。
+#: 一起拷进游戏目录。放仓库 build\\variants\\<版本id>\\ 下，只在逐版对照时用。
 DEFAULT_VARIANT_OUT = os.path.join(ROOT, "build", "variants")
 
 # 占位符与「占位文本」的判定只有一份，在 shared\core\validate.py。
@@ -386,7 +386,7 @@ def union_baseline(bases):
 
 
 def build(lang, out_dir, strict, marks=False, baseline="all", variant_out=None,
-          union=False, pack_version=""):
+          union=True, pack_version=""):
     # 参考原文**不参与编译**：生成 en.txt / fr.txt 交给引擎等于用「原始英文」
     # 覆盖游戏，等于没汉化。所以直接拒绝，而不是打个警告继续跑。
     # 名单问 translate —— 那里是唯一一份（src\orig\en.gog_1.1.2.3 之类）。
@@ -524,14 +524,16 @@ def main():
     ap.add_argument("--marks", action="store_true",
                     help="给每条正文加 [XXXX] 排查标记（开发用，正常包不要加）")
     ap.add_argument("--baseline", default="all",
-                    help="按哪个原版键集出包：all（默认，每个基线各一份）、或某个版本 id"
-                         "（如 fr.gog_1.1.2.42）。primary 那份写到 --out，其余写到"
-                         " build\\variants\\<id>\\")
+                    help="按哪个原版键集出包：all（默认，参与并集）、或某个版本 id"
+                         "（如 fr.gog_1.1.2.42）。逐版模式（--per-baseline）下 primary 那份"
+                         "写到 --out，其余写到 build\\variants\\<id>\\")
     ap.add_argument("--variant-out", default=DEFAULT_VARIANT_OUT,
-                    help="非 primary 基线的输出根目录（默认 build\\variants）")
-    ap.add_argument("--union", action="store_true",
+                    help="逐版模式下非 primary 基线的输出根目录（默认 build\\variants）")
+    ap.add_argument("--union", dest="union", action="store_true", default=True,
                     help="只出一份并集包（所有基线的键集合并，写在 --out 的 <语言>.txt）。"
-                         "GOG 与 Steam 两个发行包共用这一份；逐版对照仍用默认模式。")
+                         "这是默认行为：一份包同时支持 GOG EN / GOG FR / Steam EN。")
+    ap.add_argument("--per-baseline", dest="union", action="store_false",
+                    help="按每个基线各出一份（逐版对照与诊断用，不用于发行/部署）")
     ap.add_argument("--version", default="",
                     help="写进 pack 头的发行版本号（如 v1.0.0），启动器用它显示"
                          "「简体中文 · v1.0.0」；不给时不写这一行")
@@ -541,6 +543,9 @@ def main():
         lang = _default_lang()
     code = build(lang, a.out, a.strict, a.marks, a.baseline, a.variant_out,
                  a.union, pack_version=a.version)
+    if code == 0:
+        print("口径：%s" % ("并集键集（一份包覆盖 GOG EN / GOG FR / Steam EN）"
+                          if a.union else "逐版（对照/诊断用）"))
 
     # 编完语言包顺手检查字体：字体只做映射，按 Noto 替换字体生成。
     # 字体缺失 = 构建失败（以前这里吞异常打「字体检查跳过」，CI 上等于没有字体判据）。

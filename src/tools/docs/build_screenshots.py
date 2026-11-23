@@ -1,33 +1,40 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""从结构化数据生成实机截图画廊。
+"""从结构化数据生成实机截图画廊（HTML 与 Markdown 同一份源）。
 
-页面结构、CSS 与灯箱脚本在 ``screenshots_template.html`` 里；图注、说明、
-覆盖点和补充屏在 ``docs/screenshots.json`` 里；图片是否存在、尺寸与字节数
-以 ``docs/assets/screenshots/manifest.json`` 为准。生成物是
-``docs/screenshots.html``，不要手改它。
+页面结构与 CSS/灯箱在 ``screenshots_template.html`` 里；图注、说明、覆盖点
+和补充屏在 ``docs/screenshots.json`` 里；图片是否存在、尺寸、字节数与
+SHA-256 以 ``docs/assets/screenshots/manifest.json`` 为准。两个生成物
+``docs/screenshots.html`` 与 ``docs/实机截图.md`` 都是生成物，不要手改。
+
+缩略图放在 ``docs/assets/screenshots/thumbs/``，由 ``--thumbs`` 生成；
+HTML 只引用 800×600 的缩略图，灯箱打开原图。Markdown 直接引用原图。
 
 用法::
 
-    python src/tools/docs/build_screenshots.py
+    python src/tools/docs/build_screenshots.py --thumbs
     python src/tools/docs/build_screenshots.py --check
 
-``--check`` 只比较生成结果与现有 HTML，不写文件；供测试和 CI 使用。
+``--check`` 比较 HTML/Markdown 是否为最新，并检查缩略图是否存在。
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DATA = ROOT / "docs" / "screenshots.json"
 DEFAULT_TEMPLATE = Path(__file__).with_name("screenshots_template.html")
 DEFAULT_OUTPUT = ROOT / "docs" / "screenshots.html"
+DEFAULT_MARKDOWN = ROOT / "docs" / "实机截图.md"
+SCHEMA_VERSION = 1
 
 
 def cn_number(value: int) -> str:
@@ -56,14 +63,39 @@ def load_json(path: Path) -> dict:
         return json.load(fh)
 
 
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def thumb_rel(page: dict, entry: dict) -> str:
+    return f"{page.get('thumb_root', 'assets/screenshots/thumbs')}/{entry['file']}"
+
+
+def full_rel(page: dict, entry: dict) -> str:
+    return f"{page.get('image_root', 'assets/screenshots')}/{entry['file']}"
+
+
 def collect_manifest(data: dict, docs_root: Path) -> list[dict]:
-    """校验清单、图片实际尺寸/字节数与数据引用，返回整份清单。"""
+    """校验清单、图片实际尺寸/字节数/SHA-256 与数据引用，返回整份清单。"""
+    if data.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError(
+            f"screenshots.json.schema_version={data.get('schema_version')!r}，"
+            f"期望 {SCHEMA_VERSION}"
+        )
     page = data["page"]
     languages = data["languages"]
     screens = data["screens"]
     extras = data.get("extras", [])
     if not languages or not screens:
         raise ValueError("screenshots.json 里 languages/screens 不能为空")
+    thumb_width = int(page.get("thumb_width", 800))
+    thumb_height = int(page.get("thumb_height", 600))
+    if thumb_width <= 0 or thumb_height <= 0:
+        raise ValueError("page.thumb_width/thumb_height 必须是正数")
 
     manifest_path = docs_root / page.get("manifest", "assets/screenshots/manifest.json")
     image_root = docs_root / page.get("image_root", "assets/screenshots")
@@ -82,6 +114,8 @@ def collect_manifest(data: dict, docs_root: Path) -> list[dict]:
             raise ValueError(f"manifest.json 重复条目：{key}")
         if entry["file"] in by_file:
             raise ValueError(f"manifest.json 重复文件：{entry['file']}")
+        if not re.fullmatch(r"[0-9a-f]{64}", entry.get("sha256", "")):
+            raise ValueError(f"manifest.json 缺少合法 sha256：{entry['file']}")
         by_key[key] = entry
         by_file[entry["file"]] = entry
 
@@ -114,6 +148,8 @@ def collect_manifest(data: dict, docs_root: Path) -> list[dict]:
                     f"{entry['file']} 实际 {image_path.stat().st_size} B，"
                     f"清单写 {entry['bytes']} B"
                 )
+            if sha256_file(image_path) != entry["sha256"]:
+                raise ValueError(f"{entry['file']} 的 SHA-256 与清单不一致")
             used.add(key)
 
     for extra in extras:
@@ -127,10 +163,17 @@ def collect_manifest(data: dict, docs_root: Path) -> list[dict]:
         image_path = image_root / filename
         if not image_path.is_file():
             raise ValueError(f"补充屏不存在：{image_path}")
+        if entry.get("width") != expected_width or entry.get("height") != expected_height:
+            raise ValueError(
+                f"{filename} 尺寸 {entry.get('width')}×{entry.get('height')}，"
+                f"期望 {expected_width}×{expected_height}"
+            )
         if image_path.stat().st_size != entry["bytes"]:
             raise ValueError(
                 f"{filename} 实际 {image_path.stat().st_size} B，清单写 {entry['bytes']} B"
             )
+        if sha256_file(image_path) != entry["sha256"]:
+            raise ValueError(f"{filename} 的 SHA-256 与清单不一致")
         used.add(key)
 
     unused = set(by_key) - used
@@ -199,10 +242,19 @@ def render_coverage(
     return head, "\n".join(rows)
 
 
-def render_figure(src: str, alt: str, native: str, caption: str, indent: str = "      ") -> str:
+def render_figure(
+    page: dict, entry: dict, alt: str, native: str, caption: str,
+    indent: str = "      ",
+) -> str:
+    thumb = thumb_rel(page, entry)
+    full = full_rel(page, entry)
+    width = int(page.get("thumb_width", 800))
+    height = int(page.get("thumb_height", 600))
     return (
         f"{indent}<figure>\n"
-        f'{indent}  <img src="{html.escape(src)}" alt="{inline(alt)}" decoding="sync">\n'
+        f'{indent}  <img src="{html.escape(thumb)}" data-full="{html.escape(full)}" '
+        f'alt="{inline(alt)}" width="{width}" height="{height}" '
+        f'loading="lazy" decoding="async">\n'
         f'{indent}  <figcaption><span class="lang">{inline(native)}</span> {inline(caption)}</figcaption>\n'
         f"{indent}</figure>"
     )
@@ -211,7 +263,6 @@ def render_figure(src: str, alt: str, native: str, caption: str, indent: str = "
 def render_sections(
     page: dict, languages: list[dict], screens: list[dict], by_key: dict
 ) -> str:
-    image_root = page.get("image_root", "assets/screenshots")
     blocks = []
     for screen in screens:
         figures = []
@@ -219,7 +270,8 @@ def render_sections(
             entry = by_key[(lang["code"], screen["slug"])]
             figures.append(
                 render_figure(
-                    f"{image_root}/{entry['file']}",
+                    page,
+                    entry,
                     f"{lang['alt']}{screen['title']}",
                     lang["native"],
                     screen["captions"][lang["code"]],
@@ -245,13 +297,14 @@ def render_notes(notes: list[dict]) -> str:
     )
 
 
-def render_extras(page: dict, extras: list[dict]) -> str:
-    image_root = page.get("image_root", "assets/screenshots")
+def render_extras(page: dict, extras: list[dict], by_file: dict) -> str:
     blocks = []
     for extra in extras:
+        entry = by_file[extra["file"]]
         blocks.append(
             render_figure(
-                f"{image_root}/{extra['file']}",
+                page,
+                entry,
                 extra["alt"],
                 extra["lang"],
                 extra["caption"],
@@ -265,10 +318,11 @@ def render_footer(
     page: dict, languages: list[dict], screens: list[dict], extras: list[dict], total: int
 ) -> str:
     image_root = page.get("image_root", "assets/screenshots")
+    thumb_root = page.get("thumb_root", "assets/screenshots/thumbs")
     compare_count = len(screens) * len(languages)
     extra_count = len(extras)
     return (
-        f"图片目录：<code>docs/{image_root}/</code> · "
+        f"缩略图：<code>docs/{thumb_root}/</code> · 原图：<code>docs/{image_root}/</code> · "
         f"{cn_number(len(screens))}屏对照{cn_number(len(languages))}语共 {compare_count} 张，"
         f"加{inline(page.get('extra_label', '补充'))} {extra_count} 张，共 {total} 张 · "
         "机器可读清单：<code>manifest.json</code> · 截图口径与覆盖表见 "
@@ -285,6 +339,7 @@ def build_html(data: dict, template: str, docs_root: Path) -> str:
 
     entries = collect_manifest(data, docs_root)
     by_key = {(entry["language"], entry["slug"]): entry for entry in entries}
+    by_file = {entry["file"]: entry for entry in entries}
     columns = int(page.get("columns", 4))
     groups = groups_of(languages, columns)
 
@@ -341,7 +396,7 @@ def build_html(data: dict, template: str, docs_root: Path) -> str:
         "{{NOTES}}": render_notes(notes),
         "{{EXTRA_HEADING}}": inline(page.get("extra_heading", "补充屏")),
         "{{EXTRA_SUB}}": inline(page.get("extra_sub", "")),
-        "{{EXTRA_GRID}}": render_extras(page, extras),
+        "{{EXTRA_GRID}}": render_extras(page, extras, by_file),
         "{{FOOTER}}": render_footer(page, languages, screens, extras, len(entries)),
     }
 
@@ -355,6 +410,168 @@ def build_html(data: dict, template: str, docs_root: Path) -> str:
     if leftover:
         raise ValueError("模板还有未替换占位符：" + ", ".join(sorted(set(leftover))))
     return result
+
+
+def md_cell(value: str) -> str:
+    """表格单元：竖线转义，换行压成空格。"""
+    return re.sub(r"\s+", " ", str(value)).replace("|", "\\|").strip()
+
+
+def md_path(path: str) -> str:
+    return quote(path, safe="/-._~")
+
+
+def render_markdown_coverage(
+    page: dict, languages: list[dict], screens: list[dict], by_key: dict
+) -> list[str]:
+    head = "| # | 屏 | 验证点 | " + " | ".join(
+        md_cell(lang["native"]) for lang in languages
+    ) + " |"
+    sep = "|" + "---|" * (3 + len(languages))
+    lines = [head, sep]
+    for screen in screens:
+        cells = [md_cell(screen["num"]), md_cell(screen["title"]), md_cell(screen["verify"])]
+        for lang in languages:
+            entry = by_key.get((lang["code"], screen["slug"]))
+            if entry is None:
+                cells.append("—")
+            else:
+                cells.append(f"[{lang['code']}]({md_path(full_rel(page, entry))})")
+        lines.append("| " + " | ".join(cells) + " |")
+    return lines
+
+
+def render_markdown_sections(
+    page: dict, languages: list[dict], screens: list[dict], by_key: dict
+) -> list[str]:
+    lines = []
+    for screen in screens:
+        lines.extend([
+            f"### {screen['num']}. {screen['title']}",
+            "",
+            screen["desc"],
+            "",
+            "| " + " | ".join(md_cell(lang["native"]) for lang in languages) + " |",
+            "|---|" + "---|" * (len(languages) - 1),
+        ])
+        cells = []
+        for lang in languages:
+            entry = by_key[(lang["code"], screen["slug"])]
+            alt = f"{lang['code']} {screen['title']}"
+            cells.append(f"![{md_cell(alt)}]({md_path(full_rel(page, entry))})")
+        lines.extend(["| " + " | ".join(cells) + " |", ""])
+    return lines
+
+
+def render_markdown_extras(page: dict, extras: list[dict], by_file: dict) -> list[str]:
+    lines = []
+    for start in range(0, len(extras), 2):
+        group = extras[start:start + 2]
+        labels = [
+            md_cell(extra["caption"].split("：", 1)[0] or extra["alt"])
+            for extra in group
+        ]
+        lines.append("| " + " | ".join(labels) + " |")
+        lines.append("|" + "---|" * len(group))
+        cells = []
+        for extra in group:
+            entry = by_file[extra["file"]]
+            cells.append(
+                f"![{md_cell(extra['alt'])}]({md_path(full_rel(page, entry))})"
+            )
+        lines.extend(["| " + " | ".join(cells) + " |", ""])
+    return lines
+
+
+def build_markdown(data: dict, docs_root: Path) -> str:
+    page = data["page"]
+    languages = data["languages"]
+    screens = data["screens"]
+    extras = data.get("extras", [])
+    markup = page.get("markdown", {})
+    entries = collect_manifest(data, docs_root)
+    by_key = {(entry["language"], entry["slug"]): entry for entry in entries}
+    by_file = {entry["file"]: entry for entry in entries}
+
+    title = markup.get("title", "实机截图")
+    bullets = markup.get("bullets", [])
+    notes_heading = markup.get("notes_heading", "语言注记")
+    notes = markup.get("notes", [])
+    extra_intro = markup.get("extra_intro", "")
+
+    lines = [
+        f"# {title}",
+        "",
+        "> 本文件与 `screenshots.html` 均由 `docs/screenshots.json` 经",
+        "> `src/tools/docs/build_screenshots.py` 生成，不要手改。",
+        "",
+        "在线画廊：[screenshots.html](screenshots.html)。",
+        "",
+        "## 口径",
+        "",
+    ]
+    lines.extend(f"- {item}" for item in bullets)
+    lines.extend([
+        "",
+        f"## {cn_number(len(languages))}语{cn_number(len(screens))}屏覆盖",
+        "",
+        "✓ 表示该语言在该屏有归档实机图；点击语言代码打开原图。",
+        "",
+    ])
+    lines.extend(render_markdown_coverage(page, languages, screens, by_key))
+    lines.extend([
+        "",
+        "## 对照",
+        "",
+    ])
+    lines.extend(render_markdown_sections(page, languages, screens, by_key))
+    lines.extend([
+        f"## {notes_heading}",
+        "",
+    ])
+    lines.extend(f"- {note}" for note in notes)
+    lines.extend([
+        "",
+        f"## {page.get('extra_heading', '补充屏')}",
+        "",
+        extra_intro,
+        "",
+    ])
+    lines.extend(render_markdown_extras(page, extras, by_file))
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def check_thumbnails(data: dict, docs_root: Path) -> None:
+    page = data["page"]
+    thumb_root = docs_root / page.get("thumb_root", "assets/screenshots/thumbs")
+    for entry in collect_manifest(data, docs_root):
+        path = thumb_root / entry["file"]
+        if not path.is_file():
+            raise ValueError(f"缩略图不存在：{path}；运行 --thumbs")
+
+
+def generate_thumbnails(data: dict, docs_root: Path) -> int:
+    """把归档原图缩到 thumb_width/height；需要 Pillow。"""
+    try:
+        from PIL import Image
+    except ImportError as exc:  # pragma: no cover - 只在缺依赖时触发
+        raise SystemExit("需要 Pillow：python -m pip install Pillow") from exc
+
+    page = data["page"]
+    image_root = docs_root / page.get("image_root", "assets/screenshots")
+    thumb_root = docs_root / page.get("thumb_root", "assets/screenshots/thumbs")
+    width = int(page.get("thumb_width", 800))
+    height = int(page.get("thumb_height", 600))
+    entries = collect_manifest(data, docs_root)
+    for entry in entries:
+        source = image_root / entry["file"]
+        target = thumb_root / entry["file"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(source) as image:
+            image.convert("RGB").resize((width, height), Image.Resampling.LANCZOS).save(
+                target, "JPEG", quality=82, optimize=True, progressive=True
+            )
+    return len(entries)
 
 
 def build(
@@ -371,21 +588,47 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA)
     parser.add_argument("--template", type=Path, default=DEFAULT_TEMPLATE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--markdown", type=Path, default=DEFAULT_MARKDOWN)
+    parser.add_argument("--thumbs", action="store_true", help="生成/刷新 800×600 缩略图")
     parser.add_argument("--check", action="store_true", help="只检查生成物是否最新")
     args = parser.parse_args(argv)
 
-    generated = build(args.data, args.template)
+    data = load_json(args.data)
+    template = args.template.read_text(encoding="utf-8")
+    generated = build_html(data, template, args.data.parent)
+    generated_md = build_markdown(data, args.data.parent)
+    docs_root = args.data.parent
+
+    if args.thumbs:
+        count = generate_thumbnails(data, docs_root)
+        print(f"已生成 {count} 张缩略图")
+
     if args.check:
+        errors = []
         current = args.output.read_text(encoding="utf-8") if args.output.exists() else ""
         if generated != current:
-            print(f"{args.output} 不是最新生成物；运行 python src/tools/docs/build_screenshots.py", file=sys.stderr)
+            errors.append(f"{args.output} 不是最新生成物")
+        current_md = args.markdown.read_text(encoding="utf-8") if args.markdown.exists() else ""
+        if generated_md != current_md:
+            errors.append(f"{args.markdown} 不是最新生成物")
+        try:
+            check_thumbnails(data, docs_root)
+        except ValueError as exc:
+            errors.append(str(exc))
+        if errors:
+            for item in errors:
+                print(item, file=sys.stderr)
+            print("运行 python src/tools/docs/build_screenshots.py --thumbs", file=sys.stderr)
             return 1
-        print(f"{args.output} 已是最新生成物")
+        print("screenshots.html / 实机截图.md / 缩略图 都已是最新生成物")
         return 0
 
     with args.output.open("w", encoding="utf-8", newline="\n") as fh:
         fh.write(generated)
+    with args.markdown.open("w", encoding="utf-8", newline="\n") as fh:
+        fh.write(generated_md)
     print(f"已生成 {args.output}")
+    print(f"已生成 {args.markdown}")
     return 0
 
 

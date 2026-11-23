@@ -75,9 +75,9 @@ GUI 读取这些注释后：
 回答不了「改了哪几条」—— 那要靠出包时写在 `README.txt` 与 `manifest.json`
 里的 `delta`（相对上一个 `release-v*` tag 的条目增改删）。
 
-启动器界面随发包语言走：源目录只有按语言的 `ui.<lang>.ini` 九份，**没有 `ui.default.ini`**
-（构建时从 `ui.zh.ini` 生成运行时默认）；发行包把分组默认语言那份复制成
-`PR2Localization/ui/ui.default.ini`；用户可在同目录放 `ui.ini` 按项覆盖。
+启动器界面跟随当前选中的语言包：源目录是按语言的 `ui.<lang>.ini` 十二份，**没有 `ui.default.ini`**
+（构建时从 `ui.zh.ini` 生成运行时兜底）；发行包把全部语言文件放进 `PR2Localization/ui/`，
+另把分组默认语言那份复制成 `ui.default.ini`。用户可在同目录放 `ui.ini` 按项覆盖。
 语言包只负责游戏内文本，不带 `gui`。
 
 也可以直接改已生成的 `PR2Localization/packs/<代码>.txt` 开头来覆盖（手改后重新编译会被

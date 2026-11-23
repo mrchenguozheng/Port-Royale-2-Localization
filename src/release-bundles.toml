@@ -8,7 +8,7 @@
 # 分组依据是 src\font-map.ini 里各语言节的四个逻辑名（ARIAL.TTF / ELGRECO_.TTF /
 # Tiepolo_black.ttf / Tiepolo_bold.ttf）指向哪些实际字体文件：
 #
-#   de / es / fr / it   四项全是 none —— 原版拉丁字体已覆盖，构不打包任何字体
+#   de / es / fr / it   四项全是 none —— 原版拉丁字体已覆盖，不打包任何字体
 #                        → 字体集为空，四门共用同一份空字体集与同一份映射
 #   zh                  NotoSansSC-Regular + NotoSerifSC-Black/Bold
 #   ja                  NotoSansJP-Regular + NotoSerifJP-Black/Bold
@@ -32,6 +32,12 @@ id = "zh"
 label = "简体中文"
 langs = ["zh"]
 default = "zh"
+
+[[bundle]]
+id = "zh-hant"
+label = "繁體中文（台灣・香港）"
+langs = ["zh-TW", "zh-HK"]
+default = "zh-TW"
 
 [[bundle]]
 id = "ja"

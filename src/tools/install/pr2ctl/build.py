@@ -59,7 +59,7 @@ def build_pack(lang, out_dir, events):
     from pack import build_artifacts
     events.put(("line", "[%s] 编译中…" % lang))
     code = build_artifacts.compile_pack(
-        lang, out_dir, no_fonts=True,
+        lang, out_dir, no_fonts=True, union=True,
         on_line=lambda line: events.put(("line", line)),
         env=child_env(),
     )
