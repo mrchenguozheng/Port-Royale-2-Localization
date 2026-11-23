@@ -84,7 +84,7 @@ def check_language(src, lang):
             for raw in fh.read().splitlines():
                 line = raw.strip()
                 if line.startswith("[") and line.endswith("]"):
-                    if line[1:-1].strip().lower() == lang:
+                    if line[1:-1].strip().lower() == lang.lower():
                         has_section = True
                         break
         if not has_section:

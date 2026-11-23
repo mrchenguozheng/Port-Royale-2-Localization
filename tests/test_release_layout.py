@@ -251,6 +251,16 @@ class TestBundles(unittest.TestCase):
             self.assertEqual(make_release.LABELS.get(lang), alias,
                              "LABELS 与 %s 的 alias 不一致" % path)
 
+    def test_region_code_font_map_lookup_is_case_insensitive(self):
+        """`zh-TW` 这类带地区码的语言，font-map 节名不能按小写字符串直接比。"""
+        import release_version
+        self.assertEqual(
+            release_version.check_language(
+                os.path.join(ROOT, "src"), "zh-TW"), [])
+        self.assertEqual(
+            release_version.check_language(
+                os.path.join(ROOT, "src"), "zh-HK"), [])
+
 
 class TestPackOverridesDir(unittest.TestCase):
     """发行包里只放一个空的 ``packs\\overrides\\``。

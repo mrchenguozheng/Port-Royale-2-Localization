@@ -8,6 +8,8 @@
 #   janome     日语分词（lang_rules/ja.py 优先用它）：断行长度、助词空格
 #   kiwipiepy  韩语助词收音（text_lint.py --lang ko，按世宗标签判 JKS/JKO/JX）
 #   fonttools  字体度量与生成（字体相关检查与用例）
+#   opencc-python-reimplemented
+#              繁体转简体（zh-Hant 分词前转换；缺了 test_rules 会直接失败）
 #
 # 不列 fugashi / unidic-lite：ja.py 的分词器顺序是 janome → fugashi → 无，janome
 # 在场时这两个永不参与判定，装上也改变不了任何结论；unidic-lite 在 PyPI 只有
@@ -22,3 +24,4 @@ spylls==0.1.7
 janome==0.5.2
 kiwipiepy==0.25.1
 fonttools==4.68.0
+opencc-python-reimplemented==0.1.7
