@@ -356,5 +356,18 @@ class TestReleaseLanguageCodes(unittest.TestCase):
             self.assertNotRegex(code, pattern)
 
 
+    def test_traditional_fonts_are_selected_by_release_codes(self):
+        # CI 传的是发行代码 zh-TW / zh-HK；字体清单若只标 zh-hant，
+        # fetch_noto_fonts.py 会认为「没有要补的字体」，出包时才报缺 TC 文件。
+        sys.path.insert(0, os.path.join(ROOT, "src", "tools", "font"))
+        import fetch_noto_fonts
+        items = fetch_noto_fonts.load_manifest()
+        for lang in ("zh-TW", "zh-HK"):
+            names = set(fetch_noto_fonts.wanted(items, [lang]))
+            for font in ("NotoSansTC-Regular.ttf", "NotoSerifTC-Black.ttf",
+                         "NotoSerifTC-Bold.ttf"):
+                self.assertIn(font, names, "%s 取不到 %s" % (lang, font))
+
+
 if __name__ == "__main__":
     unittest.main()

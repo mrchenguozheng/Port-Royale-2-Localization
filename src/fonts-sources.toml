@@ -37,23 +37,25 @@ axis = { wght = 700 }
 min_bytes = 12000000
 
 # ---------- 繁体中文（台湾／香港共用） ----------
+# 发行代码是 zh-TW / zh-HK；zh-hant 只是派生底稿。三处都列上，
+# 否则 CI 按 zh-TW/zh-HK 取字体时会漏掉这套 TC 文件。
 [[font]]
 name = "NotoSansTC-Regular.ttf"
-langs = ["zh-hant"]
+langs = ["zh-hant", "zh-TW", "zh-HK"]
 source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanstc/NotoSansTC%5Bwght%5D.ttf"
 axis = { wght = 400 }
 min_bytes = 9000000
 
 [[font]]
 name = "NotoSerifTC-Black.ttf"
-langs = ["zh-hant"]
+langs = ["zh-hant", "zh-TW", "zh-HK"]
 source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoseriftc/NotoSerifTC%5Bwght%5D.ttf"
 axis = { wght = 900 }
 min_bytes = 12000000
 
 [[font]]
 name = "NotoSerifTC-Bold.ttf"
-langs = ["zh-hant"]
+langs = ["zh-hant", "zh-TW", "zh-HK"]
 source = "https://raw.githubusercontent.com/google/fonts/main/ofl/notoseriftc/NotoSerifTC%5Bwght%5D.ttf"
 axis = { wght = 700 }
 min_bytes = 12000000
