@@ -90,12 +90,12 @@ GOG 与 Steam 的 `PR2.exe` 静态导入同一份 `Ascaron.Logging-2.6.dll`，�
 
 ## 开发者：构建与翻译
 
-需要 Rust（rustup + `i686-pc-windows-msvc` target）+ Python 3.11 以上（当前用 3.15）+ PowerShell 7（`pwsh`）+ MSVC 链接器（Rust 32 位 target 需要；项目不含 C++ 源码）。
+需要 Rust（rustup + `i686-pc-windows-msvc` target）+ Python 3.11 以上（当前用 3.15）+ MSVC 链接器（Rust 32 位 target 需要；项目不含 C++ 源码）。构建脚本全是 Python，不需要 PowerShell。
 
 开发时改译文直接编辑 `src\translations\<语言>.toml`，然后：
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1
+python apply_patch.py
 ```
 
 它一次跑完归一化 → 校验 → 编译 → 部署 → 核对。部署默认增量：只覆盖
@@ -104,30 +104,36 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File .\apply_patch.ps1
 提交前可跑轻量闸门：
 
 ```powershell
-.\precommit.ps1
+python precommit.py
 git config core.hooksPath .githooks   # 可选：git commit 自动跑
 ```
 
-构建入口收成根目录两个脚本：
+构建入口：
 
 ```powershell
-.\build.ps1                         # 注入器 + 全部语言包（清单见 src\release-languages.txt）
-.\build.ps1 -Target Packs -Lang zh  # 只编中文语言包
-.\build.ps1 -Target Injector        # 只编 Rust 注入器
+python build.py                         # 注入器 + 全部语言包
+python build.py --target packs --lang zh  # 只编中文语言包
+python build.py --target injector        # 只编 Rust 注入器
 
-.\release.ps1 -Version v1.0.0       # 每个分组一个 zip（GOG / Steam 通用）
-.\release.ps1 -Version v1.0.0 -Bundle zh     # 只出中文分组
-.\release.ps1 -Version v1.0.0 -Bundle latin  # 只出拉丁分组（de+es+fr+it）
-.\release.ps1 -Version v1.0.0 -AllowDirty    # 工作树脏时仍出包（版本头记 dirty）
-.\release.ps1 -Version v1.0.0 -Tag  # 额外创建 release-v1.0.0 本地 tag（要求干净树）
-.\release.ps1 -Version v1.0.0 -Tag -Push  # 再推送 tag
+python release.py --version v1.0.0       # 每个分组一个 zip（GOG / Steam 通用）
+python release.py --version v1.0.0 --bundle zh     # 只出中文分组
+python release.py --version v1.0.0 --bundle latin  # 只出拉丁分组（de+es+fr+it）
+python release.py --version v1.0.0 --allow-dirty   # 工作树脏时仍出包；版本头记 dirty
+python release.py --version v1.0.0 --tag           # 创建 v1.0.0 本地 tag（要求干净树）
+python release.py --version v1.0.0 --tag --push    # 再推送 tag
 ```
 
-发版默认拒绝脏工作树，`-Tag` 时无条件拒绝；`-Tag` 只允许在当前分支 `main` 或 `release/*`。
+发版默认拒绝脏工作树，`--tag` 时无条件拒绝；`--tag` 只允许在当前分支 `main` 或 `release/*`。
+版本 tag 用普通 `vMAJOR.MINOR.PATCH`，已有 tag 不覆盖。CI 对每个版本 tag 自动构建，
+但只生成 **draft GitHub Release**；由维护者自己挑一个正式发布。
 `dist\` 除七个 zip 与 `SHA256SUMS.txt` 外，还会写 `release.json`（版本、提交、是否 dirty、
 分组与逐包 SHA-256），CI 与下游校验以它为准。
 
-低层脚本仍在 `src\build_injector.ps1`、`src\build_translation.ps1`；日常不需要直接调用。
+低层脚本在 `src\build_injector.py`、`src\build_translation.py`；日常不需要直接调用。
+每个 zip 根目录带 `manifest.json`，记录两个目标 exe（GOG 与 Steam）、参考原文、
+翻译来源/AI 标记和逐文件
+SHA-256；出包前自校验，失败不出包。
+脚本位置和参数见[构建与安装](docs/构建与安装.md#脚本位置)。
 每个 zip 根目录带 `manifest.json`，记录两个目标 exe（GOG 与 Steam）、参考原文、
 翻译来源/AI 标记和逐文件
 SHA-256；出包前自校验，失败不出包。
@@ -137,9 +143,9 @@ SHA-256；出包前自校验，失败不出包。
 
 ```
 pr2-localization/
-├─ build.ps1                  构建入口：注入器 + 语言包
-├─ release.ps1                发布入口：构建运行时 + 打 zip + 可选 tag
-├─ apply_patch.ps1            归一化 → 校验 → 编译 → 部署
+├─ build.py                   构建入口：注入器 + 语言包
+├─ release.py                 发布入口：构建运行时 + 打 zip + 可选 tag
+├─ apply_patch.py             归一化 → 校验 → 编译 → 部署
 ├─ shared/                   工具共用的存储/校验核心
 ├─ src/
 │  ├─ translations/          译文唯一手改层（直接编辑 TOML）

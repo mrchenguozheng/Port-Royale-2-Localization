@@ -1,37 +1,40 @@
-# Noto 源字体（可选入库目录）
+# Noto 源字体（仓库内置）
 
-这个目录是字体兜底的**项目内落点**：GitHub runner 上没有装 Noto 时，构建会
-先看这里，其次看 `build\cache\noto-src`（下载缓存），最后才看系统字体目录。
+构建**只认这个目录**。GitHub Actions 不下载字体，也不读 `build/cache/noto-src`、
+runner 系统字体；`src/fonts-sources.toml` 里列出的文件缺任何一个，CI 会在构建
+注入器之前直接失败。
 
-平时不用往这里放文件——缺字体时执行：
-
-```
-python src\tools\font\fetch_noto_fonts.py --langs zh,ja --fetch
-```
-
-它会按 `src\fonts-sources.toml` 下载可变字体，再按需要的字重实例化成静态
-文件，默认落在 `build\cache\noto-src`（不入库，CI 用 actions/cache 持久）。
-
-需要完全离线、或要让字体跟着仓库走时，把清单里的 12 个静态文件直接放本目录：
+目录内是 15 个静态文件，约 112MB：
 
 ```
+简体中文
 NotoSansSC-Regular.ttf   NotoSerifSC-Black.ttf   NotoSerifSC-Bold.ttf
+
+繁体中文（台湾／香港共用）
+NotoSansTC-Regular.ttf   NotoSerifTC-Black.ttf   NotoSerifTC-Bold.ttf
+
+日语
 NotoSansJP-Regular.ttf   NotoSerifJP-Black.ttf   NotoSerifJP-Bold.ttf
+
+韩语
 NotoSansKR-Regular.ttf   NotoSerifKR-Black.ttf   NotoSerifKR-Bold.ttf
-NotoSans-Regular.ttf     NotoSerif-Black.ttf     NotoSerif-Bold.ttf
-```
 
-也可以一次生成到本目录：
-
-```
-python src\tools\font\fetch_noto_fonts.py --fetch --out assets\fonts\noto
+拉丁／西里尔共用
+NotoSans-Regular.ttf     NotoSerif-Black.ttf      NotoSerif-Bold.ttf
 ```
 
 两条硬规则：
 
-1. **不要放 `-VF.ttf` 可变字体**。脚本按静态文件名取用（`font-map.ini` 里
-   映射的也是静态名），VF 需要 fontTools 实例化，交给 fetch 脚本处理。
-2. 体积约 96MB，全量入库会让 clone 变慢，所以默认空着、按需下载。
+1. **不要放 `-VF.ttf` 可变字体**。`font-map.ini` 映射的是静态文件名；这里的
+   15 个文件都是按字重实例化后的静态字体。
+2. **换字体必须提交文件**。不要恢复 CI 下载或 `actions/cache`；要更新字体，
+   先在本地按 `src/fonts-sources.toml` 生成，再连同 `sha256` 一起提交。
 
-缺失时的行为已经收紧：项目内和系统都没有 → 构建直接失败，不再输出
-「字体检查跳过」的包。
+检查：
+
+```
+python src\tools\font\fetch_noto_fonts.py --no-system
+```
+
+`PR2_FONT_DIRS` 会由 CI/Release 固定指向本目录。缺失时脚本退出 1，并列出
+缺的文件。

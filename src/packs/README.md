@@ -14,7 +14,7 @@ min_runtime = 1      # 最低运行时版本
 # version = "1.0.0"  # 可选：发行版本；出包时由 --version 注入，一般不手写
 ```
 
-`version` 只在发行时确定：`release.ps1 -Version v1.0.0` 会把它传给
+`version` 只在发行时确定：`release.py --version v1.0.0` 会把它传给
 `make_release.py` → `compile_pack.py --version`，写进 pack 头。开发构建不传，
 pack 头就没有这一行，启动器列表只显示名字。写进头的值不带前缀 `v`
 （`version=1.0.0`），显示时补成 `v1.0.0`。
@@ -73,7 +73,7 @@ GUI 读取这些注释后：
 摘要的用处是**判断两份包是不是同一份内容**：手上那份和刚下的那份摘要一样，
 说明译文逐字相同；不一样但版本号相同，说明是同一版本重打的包，译文动过。
 回答不了「改了哪几条」—— 那要靠出包时写在 `README.txt` 与 `manifest.json`
-里的 `delta`（相对上一个 `release-v*` tag 的条目增改删）。
+里的 `delta`（相对上一个 `v*` tag 的条目增改删）。
 
 启动器界面跟随当前选中的语言包：源目录是按语言的 `ui.<lang>.ini` 十二份，**没有 `ui.default.ini`**
 （构建时从 `ui.zh.ini` 生成运行时兜底）；发行包把全部语言文件放进 `PR2Localization/ui/`，

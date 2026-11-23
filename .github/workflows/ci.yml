@@ -19,6 +19,8 @@ concurrency:
 env:
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"
+  # 字体只认仓库里的静态文件；不读下载缓存、不读 runner 系统字体。
+  PR2_FONT_DIRS: ${{ github.workspace }}/assets/fonts/noto
   # 版本写死：CI 的判据要和开发机一致，`spacy download` 还会去 GitHub release
   # 拉模型（本机网络下会卡死），直接用固定 URL 的 wheel 装。
   SPACY_VERSION: 3.8.18
@@ -42,27 +44,15 @@ jobs:
             requirements-ci.txt
             requirements.txt
 
-      # 字体在所有重活之前确认：runner 上没有 Noto 就退回项目内缓存，缓存里缺的
-      # 按 src/fonts-sources.toml 补齐（下载 + 按字重实例化成静态文件）；两处都
-      # 补不上就当场失败，不再等到 build 阶段才"字体检查跳过"。
-      - name: Restore font cache
-        id: font-cache
-        uses: actions/cache@v5
-        with:
-          path: build/cache/noto-src
-          key: noto-${{ runner.os }}-${{ hashFiles('src/fonts-sources.toml') }}
-
-      - name: Ensure Noto source fonts
+      # 字体必须在仓库里：CI 不下载字体，也不读 runner 字体或下载缓存。
+      # 缺任何一个都当场失败，早于构建注入器与语言包。
+      - name: Check vendored Noto fonts
         shell: pwsh
         run: |
-          # 搜索顺序固定为：assets\fonts\noto → build\cache\noto-src，系统字体靠最后；
-          # --no-system 让这一步只认项目内，避免 runner 镜像自带字体把结果带漂。
-          python -m pip install --disable-pip-version-check fonttools==4.68.0
-          $log = Join-Path $env:RUNNER_TEMP 'fonts.log'
-          & python src\tools\font\fetch_noto_fonts.py --langs zh,ja --fetch --no-system *>&1 |
-            Tee-Object -FilePath $log
+          $env:PR2_FONT_DIRS = Join-Path $env:GITHUB_WORKSPACE 'assets\fonts\noto'
+          python src\tools\font\fetch_noto_fonts.py --no-system
           if ($LASTEXITCODE -ne 0) {
-            "::error::Noto 源字体缺失，项目内也没能补齐；见上方清单与查过的目录。"
+            "::error::Noto 源字体缺失：assets\fonts\noto 必须带齐 src\fonts-sources.toml 列出的文件。"
             exit 1
           }
 
@@ -101,15 +91,12 @@ jobs:
       # 失败时 GitHub 只给一行 "process completed with exit code 1"，真正的
       # 失败语言与行号全在 check.log 里。所以落一份日志、失败时把关键行打成
       # ::error:: 注解，再整体传成 artifact。
-      #
-      # 必须用 `pwsh -File` 起子进程：check.ps1 内部是 `exit $exitCode`，
-      # 在当前进程里调它会直接结束整个 step，后面的日志注解一行都跑不到。
       - name: Static checks
         id: check
         shell: pwsh
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'check.log'
-          & pwsh -NoProfile -NonInteractive -File .\check.ps1 -NoPause -Jobs 4 *>&1 |
+          python check.py --no-pause --jobs 4 *>&1 |
             Tee-Object -FilePath $log
           $code = $LASTEXITCODE
           if ($code -ne 0) {
@@ -134,9 +121,7 @@ jobs:
           $log = Join-Path $env:RUNNER_TEMP 'build.log'
           # 关掉 ANSI 色码：日志里的 "warning:" 要能按行首匹配
           $env:CARGO_TERM_COLOR = 'never'
-          # 用 -Command 而不是 -File：`-Lang zh,ja` 要让内层 pwsh 解析成数组，
-          # 走 -File 时数组参数会被拍平成字符串。
-          & pwsh -NoProfile -NonInteractive -Command '.\build.ps1 -Target All -Lang zh,ja -NoPause' *>&1 |
+          python build.py --target all --lang zh,ja --no-pause *>&1 |
             Tee-Object -FilePath $log
           $code = $LASTEXITCODE
           if ($code -ne 0) {

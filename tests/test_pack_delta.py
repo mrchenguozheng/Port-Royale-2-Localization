@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""语言包变化统计：相对上一次发行（``release-v*`` tag）改了多少条译文。
+"""语言包变化统计：相对上一次发行（``v*`` tag）改了多少条译文。
 
 口径是**译文条目**，不是 diff 行数，所以这里既测 id 集合的折算式，
 也在一座临时 git 仓库里测基准选择与几种「没有可比基准」的分支 ——
@@ -84,16 +84,16 @@ class TestPackDeltaInRepo(unittest.TestCase):
     def test_initial_when_baseline_has_no_translation_file(self):
         # 基准里压根没有这份译文（连文件都不存在）：不给数字，只标「第一次收录」。
         _git(self.tmp, "commit", "-q", "--allow-empty", "-m", "base")
-        _git(self.tmp, "tag", "release-v0.1.0")
+        _git(self.tmp, "tag", "v0.1.0")
         self._write('"0xaaaabbbb" = "甲"\n')
         delta = pack_delta.pack_delta("zh", "v0.2.0", root=self.tmp)
         self.assertEqual(delta["kind"], "initial")
-        self.assertEqual(delta["baseline"], "release-v0.1.0")
+        self.assertEqual(delta["baseline"], "v0.1.0")
 
     def test_changed_counts_entries_not_lines(self):
         self._write('"0xaaaabbbb" = "甲"\n"0xccccdddd" = "乙"\n')
         self._commit()
-        _git(self.tmp, "tag", "release-v0.1.0")
+        _git(self.tmp, "tag", "v0.1.0")
         # 改一条、加一条；没有提交也算进本次变化（出包前可能带着未提交改动）。
         self._write('"0xaaaabbbb" = "甲改"\n"0xccccdddd" = "乙"\n'
                     '"0xeeeeffff" = "丙"\n')
@@ -106,7 +106,7 @@ class TestPackDeltaInRepo(unittest.TestCase):
     def test_same_when_nothing_changed(self):
         self._write('"0xaaaabbbb" = "甲"\n')
         self._commit()
-        _git(self.tmp, "tag", "release-v0.1.0")
+        _git(self.tmp, "tag", "v0.1.0")
         delta = pack_delta.pack_delta("zh", "v0.2.0", root=self.tmp)
         self.assertEqual(delta["kind"], "same")
         self.assertEqual(delta["changed"], 0)
@@ -114,12 +114,12 @@ class TestPackDeltaInRepo(unittest.TestCase):
     def test_same_version_tag_is_not_used_as_its_own_baseline(self):
         self._write('"0xaaaabbbb" = "甲"\n')
         self._commit()
-        _git(self.tmp, "tag", "release-v0.1.0")
+        _git(self.tmp, "tag", "v0.1.0")
         self._write('"0xaaaabbbb" = "甲改"\n')
         self._commit()
-        _git(self.tmp, "tag", "release-v0.2.0")
+        _git(self.tmp, "tag", "v0.2.0")
         delta = pack_delta.pack_delta("zh", "v0.2.0", root=self.tmp)
-        self.assertEqual(delta["baseline"], "release-v0.1.0")
+        self.assertEqual(delta["baseline"], "v0.1.0")
         self.assertEqual(delta["kind"], "changed")
         self.assertEqual(delta["changed"], 1)
 
@@ -133,9 +133,9 @@ class TestPackDeltaInRepo(unittest.TestCase):
     def test_explicit_tag_overrides_auto(self):
         self._write('"0xaaaabbbb" = "甲"\n')
         self._commit()
-        _git(self.tmp, "tag", "release-v0.1.0")
+        _git(self.tmp, "tag", "v0.1.0")
         delta = pack_delta.pack_delta("zh", "v0.2.0", root=self.tmp,
-                                      tag="release-v0.1.0")
+                                      tag="v0.1.0")
         self.assertEqual(delta["kind"], "same")
 
 

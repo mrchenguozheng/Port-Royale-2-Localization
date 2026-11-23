@@ -9,11 +9,11 @@ r"""src/tools/pack/pack_delta.py — 语言包相对上一次发行的变化
 换行位置怎么挪都无关。译文文件是 `"0xid" = "正文"` 一条一行，但重译时整段
 重排很常见，按行统计会把「换行挪了位置」也算成改动。
 
-【基准】默认取 ``release-v*`` 里版本号最大的 tag（``--baseline-tag`` 可覆盖）。
+【基准】默认取 ``v<版本>`` 形式里版本号最大的 tag（``--baseline-tag`` 可覆盖）。
 * 与本次版本同名的 tag 会排除 —— 重打同一个版本时不能拿它跟自己比；
 * 基准 tag 里没有 ``src/translations/<语言>.toml`` 时记 ``kind="initial"``、
   **不给数字**：基线里还没这份译文，「新增 N 条」只是整份文件相加，不是变化；
-* 仓库里一个 ``release-v*`` 都没有时记 ``kind="none"``。
+* 仓库里一个 ``v<版本>`` 都没有时记 ``kind="none"``。
 
 diff 走的是「基准 tag 对**工作树**」（``git diff <tag> -- <路径>``），
 所以还没提交的译文改动也会算进本次变化 —— 出包前本来就可能带着未提交改动。
@@ -23,9 +23,9 @@ import os
 import re
 import subprocess
 
-#: `src/tools/pack/` 往上三层是仓库根。
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))))
+#: `src/tools/pack/` 往上四层是仓库根。
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))))
 
 #: 译文文件里一条数据行：`-"0x1a2b3c4d" = "…"` / `+"0x1a2b3c4d" = "…"`。
 #: id 允许带引号（译文层是带引号的 key），也允许裸写。
@@ -97,14 +97,14 @@ def summarize(removed, added):
 
 
 def baseline_tag(version="", root=ROOT):
-    """取上一个发行 tag：``release-v*`` 里版本号最大的那个，排除本次版本。"""
+    """取上一个发行 tag：``v*`` 里版本号最大的那个，排除本次版本。"""
     tags = _git(root, "tag", "--list", "--merged", "HEAD",
-                "--sort=-version:refname", "release-v*")
+                "--sort=-version:refname", "v[0-9]*")
     if not tags:
         return ""
-    skip = "release-%s" % version if version else ""
+    wanted = version if version.startswith("v") else ("v%s" % version if version else "")
     for name in (line.strip() for line in tags.splitlines()):
-        if name and name != skip:
+        if name and name != wanted and re.match(r"^v\d+\.\d+\.\d+", name):
             return name
     return ""
 

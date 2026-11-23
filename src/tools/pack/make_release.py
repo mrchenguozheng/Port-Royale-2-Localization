@@ -404,7 +404,7 @@ def _delta_note(delta):
             base, delta.get("added", 0), delta.get("changed", 0),
             delta.get("removed", 0))
     if kind == "none":
-        return "无可比基准（仓库里没有 release-v* 发行 tag）"
+        return "无可比基准（仓库里没有 v* 发行 tag）"
     return "变化统计失败（git 出错，不猜数字）"
 
 
@@ -717,7 +717,7 @@ def make_release(langs, version, out_dir, mode, log=None, cache=True,
         shutil.rmtree(stage)
     os.makedirs(stage)
     build_pack(langs, stage, log, default_lang, version=version)
-    # 相对上一次发行（``release-v*`` 里版本号最大的 tag）的条目变化。
+    # 相对上一次发行（``v*`` 里版本号最大的 tag）的条目变化。
     # 数字写进 README 与 manifest；基准不可用时只写原因，不猜数字。
     import pack_delta
     deltas = {lang: pack_delta.pack_delta(lang, version, tag=baseline_tag)
@@ -789,7 +789,7 @@ def main():
     ap.add_argument("--no-font-cache", action="store_true",
                     help="忽略 build/cache/noto 里的 Noto 字体缓存")
     ap.add_argument("--baseline-tag", default="",
-                    help="变化统计的基准 tag；默认取 release-v* 里版本号最大、"
+                    help="变化统计的基准 tag；默认取 v* 里版本号最大、"
                          "且不与本次版本同名的那一个")
     args = ap.parse_args()
 

@@ -132,12 +132,12 @@ class TestUiLayout(unittest.TestCase):
 
     def test_build_generates_default_from_zh(self):
         """运行时默认文件必须来自 ui.zh.ini，不能另存一份中文副本。"""
-        script = os.path.join(ROOT, "src", "build_injector.ps1")
+        script = os.path.join(ROOT, "src", "build_injector.py")
         with open(script, encoding="utf-8") as fh:
             text = fh.read()
-        self.assertIn("'ui.zh.ini'", text)
-        self.assertIn("'ui.default.ini'", text)
-        self.assertIn("Copy-Item -LiteralPath $Zh", text)
+        self.assertIn('"ui.zh.ini"', text)
+        self.assertIn('"ui.default.ini"', text)
+        self.assertIn("shutil.copy2(zh", text)
 
     def test_release_copies_all_language_files_and_default(self):
         src = tempfile.mkdtemp(prefix="pr2-ui-src-")
@@ -165,13 +165,13 @@ class TestUiLayout(unittest.TestCase):
             shutil.rmtree(stage, ignore_errors=True)
 
     def test_build_copies_all_language_ui_files(self):
-        script = os.path.join(ROOT, "src", "build_injector.ps1")
+        script = os.path.join(ROOT, "src", "build_injector.py")
         with open(script, encoding="utf-8") as fh:
             text = fh.read()
-        self.assertIn("-Filter 'ui.*.ini'", text)
-        self.assertIn("$_.Name", text)
+        self.assertIn('name.startswith("ui.")', text)
+        self.assertIn("name.endswith(\".ini\")", text)
         # 旧布局的 en/ja/zh.ini 仍要从 runtime 清掉，否则旧安装带过期文案。
-        self.assertIn("foreach ($lang in @('en', 'ja', 'zh'))", text)
+        self.assertIn('for stale in ("en.ini", "ja.ini", "zh.ini")', text)
 
 
     def test_default_ui_has_version_keys(self):
@@ -323,37 +323,34 @@ class TestInjectorVersionStamp(unittest.TestCase):
             return fh.read()
 
     def test_build_writes_the_stamp(self):
-        text = self._read(os.path.join("src", "build_injector.ps1"))
-        self.assertIn("build\\injector-version.txt", text)
-        self.assertIn("$ShowVersion", text)
+        text = self._read(os.path.join("src", "build_injector.py"))
+        self.assertIn('"build", "injector-version.txt"', text)
+        self.assertIn("show_version", text)
         # 记录放在 build 根：放进 runtime 会被装进游戏目录、也可能进包。
-        self.assertNotIn("Join-Path $Runtime 'injector-version.txt'", text)
+        self.assertNotIn('os.path.join("build", "runtime", "injector-version.txt")', text)
 
     def test_skip_injector_refuses_a_mismatch(self):
-        text = self._read("release.ps1")
-        self.assertIn("build\\injector-version.txt", text)
-        self.assertIn("$builtVersion", text)
-        self.assertIn("if ($builtVersion -ne $Version)", text)
-        self.assertIn("-SkipInjector 无法确认现有 exe 的版本", text)
+        text = self._read("release.py")
+        self.assertIn('"build", "injector-version.txt"', text)
+        self.assertIn("built", text)
+        self.assertIn("built != version", text)
+        self.assertIn("无法确认现有 exe 版本", text)
 
 
 class TestReleaseLanguageCodes(unittest.TestCase):
-    """``release.ps1`` 的发行语言校验要允许地区子标签。
+    """``release.py`` 的发行语言校验要允许地区子标签。
 
     ``release-languages.txt`` 里有 ``zh-TW`` / ``zh-HK``；只写 ``^[a-z]{2,3}$``
     会在出包第一步就判「语言代码不合法」，本地也复现不了 CI 才走到的路径。
     """
 
     def test_region_subtags_are_accepted(self):
-        with open(os.path.join(ROOT, "release.ps1"), encoding="utf-8") as fh:
-            text = fh.read()
-        marker = "$name -notmatch '"
-        start = text.index(marker) + len(marker)
-        pattern = text[start:text.index("'", start)]
+        sys.path.insert(0, ROOT)
+        import release
         for code in ("zh", "zh-TW", "zh-HK", "pt-BR"):
-            self.assertRegex(code, pattern)
+            self.assertRegex(code, release.LANG_RX.pattern)
         for code in ("zh_TW", "zh-", "-TW", "zh-TW-"):
-            self.assertNotRegex(code, pattern)
+            self.assertNotRegex(code, release.LANG_RX.pattern)
 
 
     def test_traditional_fonts_are_selected_by_release_codes(self):

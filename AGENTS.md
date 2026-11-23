@@ -34,11 +34,11 @@
   根目录没有这个 DLL 的版本自动退回注入，理由写进 `PR2Localization\logs\host.log`；
   不要把这个回退做成静默跳过。
   还原走 `PR2Localization.exe --restore` 或 GUI 的「还原原版」按钮，两版同一套动作。
-  版本只有一份来源：`release.ps1 -Version` 同时编进 exe（`--version` 与 GUI 副标题）
+  版本只有一份来源：`release.py --version` 同时编进 exe（`--version` 与 GUI 副标题）
   和语言包头 `# pack-meta version=`；不要在任何一处另写版本号。
   语言包里另有三项由编译期自己算的内容描述（`entries` / `untranslated` / `digest`）
   和一项键集来源（`scope`）：**不要手写、也不要拿来当版本号**，改译文后重编自然更新。
-  相对上一次发行的「改了多少条」由 `pack_delta.py` 从 `release-v*` tag 现算，
+  相对上一次发行的「改了多少条」由 `pack_delta.py` 从 `v*` tag 现算，
   写进 `README.txt` 与 `manifest.json`，同样不用人工维护。
   `packs\overrides\<语言>.txt` 是玩家自己的本机覆盖：不进包、不改包头，发行包里
   只留一个空的 `overrides\` 目录，里面不要放示例文件。启动器不统计覆盖条数，
@@ -101,43 +101,44 @@ Rust 与 Python 的文件名、原版大小与 SHA-256。代理不是游戏原�
 
 ## 常用入口
 
-所有脚本都要求 **PowerShell 7（pwsh）**，在仓库根目录执行。译文直接改
+所有脚本都是 **Python 3.11+**，在仓库根目录执行；不需要 PowerShell。译文直接改
 `src/translations/<语言>.toml`，没有编辑器界面，构建与部署都走命令行：
 
 ```powershell
-.\apply_patch.ps1                    # 归一化 → 校验 → 编译 → 部署 → 核对
+python apply_patch.py                    # 归一化 → 校验 → 编译 → 部署 → 核对
 ```
 
 ```powershell
-.\build.ps1                         # 注入器 + 全部语言包（清单见 src\release-languages.txt）
-.\build.ps1 -Target Packs -Lang zh  # 只编中文语言包
-.\build.ps1 -Target Injector        # 只编 Rust 注入器
+python build.py                         # 注入器 + 全部语言包
+python build.py --target packs --lang zh  # 只编中文语言包
+python build.py --target injector        # 只编 Rust 注入器
 
-.\release.ps1 -Version v1.0.0       # 每个分组一个 zip（GOG/Steam 通用）
-.\release.ps1 -Version v1.0.0 -Bundle zh     # 只出中文分组
-.\release.ps1 -Version v1.0.0 -Bundle latin  # 只出拉丁分组（de+es+fr+it）
-.\release.ps1 -Version v1.0.0 -AllowDirty    # 工作树脏时仍出包；版本头记 dirty
-.\release.ps1 -Version v1.0.0 -Tag -Push  # 出包并创建/推送 release-<版本> tag
+python release.py --version v1.0.0       # 每个分组一个 zip（GOG/Steam 通用）
+python release.py --version v1.0.0 --bundle zh     # 只出中文分组
+python release.py --version v1.0.0 --bundle latin  # 只出拉丁分组（de+es+fr+it）
+python release.py --version v1.0.0 --allow-dirty   # 工作树脏时仍出包；版本头记 dirty
+python release.py --version v1.0.0 --tag --push    # 出包并创建/推送 v<版本> tag
 ```
 
-`release.ps1` 默认拒绝脏工作树；`-Tag` 时无条件拒绝，且只允许在 `main` 或 `release/*`
-分支打 tag。每次出包会先删同版本旧 zip，再写 `dist/release.json`（version / commit /
-dirty / pack_mode / languages / 逐包 sha256 与大小）；CI 的 Release 校验依赖它。
+`release.py` 默认拒绝脏工作树；`--tag` 时无条件拒绝，且只允许在 `main` 或 `release/*`
+分支打 tag。普通版本 tag 不覆盖；每次出包会先删同版本旧 zip，再写 `dist/release.json`
+（version / commit / dirty / pack_mode / languages / 逐包 sha256 与大小）；CI 的 Release
+校验依赖它。CI 对每个 `v*` tag 自动构建，但只建 draft Release，由维护者自己选择发布。
 
-日常入口在仓库根目录；`src\build_injector.ps1`、`src\build_translation.ps1`
+日常入口在仓库根目录；`src\build_injector.py`、`src\build_translation.py`
 仍是低层实现，排查单步问题时才直接调用。
 
 ```powershell
-.\apply_patch.ps1
-.\apply_patch.ps1 --langs ja
-.\apply_patch.ps1 --launch
+python apply_patch.py
+python apply_patch.py --langs ja
+python apply_patch.py --launch
 ```
 
 归一化 → 校验 → 编译 → 部署 → 核对；默认处理日文和中文，使用上一次游戏目录。
 
 ```powershell
-.\check.ps1                          # 全量：Rust 闸门 + Python 检查 + 单测
-.\check.ps1 -SkipRust                # 只跑 Python 部分
+python check.py                          # 全量：Rust 闸门 + Python 检查 + 单测
+python check.py --skip-rust              # 只跑 Python 部分
 ```
 
 Rust 闸门按顺序执行，任一失败即停：
@@ -150,9 +151,9 @@ cargo test --workspace --locked
 ```
 
 逐个 crate `cargo check` 是为了防止 workspace 特性合并掩盖单个 crate 缺特性；
-找不到 cargo 时 `check.ps1` 会提示用 `-SkipRust`，CI 不允许跳过。
+找不到 cargo 时 `check.py` 会提示用 `--skip-rust`，CI 不允许跳过。
 
-`check.py` 会先跑 `config_check.py` 检查 locale/packs/translations/ui/font-map 的语言配置，再跑译文规范、断行、微调层、**不译清单对账**（`analysis/keep_audit.py`：登记的 id 存在、登记项没被译过、结构性不可译的没占着待译）、文档一致性、**脚本地图**（`tools_check.py`：每个脚本都有 docstring、都登记在 `src/tools/README.md`），最后跑单测。`release.ps1` 在构建前也会跑同一项配置检查；`make_release.py` 直接调用时也会先检查。
+`check.py` 会先跑 `config_check.py` 检查 locale/packs/translations/ui/font-map 的语言配置，再跑译文规范、断行、微调层、**不译清单对账**（`analysis/keep_audit.py`：登记的 id 存在、登记项没被译过、结构性不可译的没占着待译）、文档一致性、**脚本地图**（`tools_check.py`：每个脚本都有 docstring、都登记在 `src/tools/README.md`），最后跑单测。`release.py` 在构建前也会跑同一项配置检查；`make_release.py` 直接调用时也会先检查。
 
 Rust 构建与测试：
 

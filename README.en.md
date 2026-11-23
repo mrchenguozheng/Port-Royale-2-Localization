@@ -68,7 +68,7 @@ Release packages are not split by entry point: one zip
 the host-DLL proxy — GOG never needs a separate script — and the launcher
 detects the edition from the game directory.
 
-Versions are visible in three places, all from the same `-Version` value: the
+Versions are visible in three places, all from the same `--version` value: the
 GUI subtitle (`runtime v1 · v1.0.0 (c8aa6e3)`), each language list entry
 (`简体中文 · v1.0.0` — read from the pack's `# pack-meta version=` header), and
 `PR2Localization.exe --version`. Dev builds print `dev (c8aa6e3+dirty)`.
@@ -80,7 +80,7 @@ translated lines only, so re-packing the same text under a new version number
 keeps it unchanged, while editing one line changes it. `README.txt` in the
 package root and `manifest.json` (`translations[].delta`) additionally state
 how many entries were added, changed or removed since the previous
-`release-v*` tag.
+`v*` tag.
 
 ## Documentation
 

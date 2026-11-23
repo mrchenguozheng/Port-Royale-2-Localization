@@ -1,12 +1,11 @@
 name: Release
 
-# Tag release-v* on main builds and publishes the per-language GOG/Steam packages
-# listed in src/release-languages.txt. Manual runs build the same artifacts but
-# keep them as workflow artifacts. Tags must sit on main or release/*.
+# 普通版本 tag（v1.0.0 / v1.1.0 / v1.1.1-rc.1）自动进入构建。
+# 构建产物与草稿 Release 都留在 GitHub，由维护者自己选择哪一个正式发布。
 on:
   push:
     tags:
-      - "release-v*"
+      - "v[0-9]*"
   workflow_dispatch:
     inputs:
       version:
@@ -24,11 +23,13 @@ concurrency:
 env:
   PYTHONUTF8: "1"
   PYTHONIOENCODING: "utf-8"
+  # 字体只认仓库里的静态文件；不读下载缓存、不读 runner 系统字体。
+  PR2_FONT_DIRS: ${{ github.workspace }}/assets/fonts/noto
 
 jobs:
   release:
     runs-on: windows-latest
-    # 九门语言全量出包 + 字体生成，给足但别无限等候。
+    # 全分组出包（7 个 zip），给足但别无限等候。
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
@@ -63,7 +64,7 @@ jobs:
         run: |
           if ($env:EVENT_NAME -eq "workflow_dispatch") {
             $version = $env:INPUT_VERSION
-          } elseif ($env:REF_NAME -match '^release-(v[0-9].*)$') {
+          } elseif ($env:REF_NAME -match '^(v[0-9].*)$') {
             $version = $Matches[1]
           } else {
             throw "无法从触发事件推导版本"
@@ -95,23 +96,11 @@ jobs:
           }
           throw "tag 提交不在 origin/main 或 origin/release/* 上：$sha；请在 main 上打 tag"
 
-      - name: Read release languages and bundles
+      - name: Read release bundles
         shell: pwsh
         run: |
-          # 语言全集：字体准备按它下载（--langs）。分组只认 src\release-bundles.toml，
-          # 由 make_release.py 读出来，PowerShell 不在这一步重复实现解析。
-          $list = Join-Path "src" "release-languages.txt"
-          $names = @()
-          foreach ($raw in Get-Content -LiteralPath $list -Encoding utf8) {
-            $line = ($raw -split '#', 2)[0].Trim()
-            if (-not $line) { continue }
-            $names += @($line -split '[,\s]+' | Where-Object { $_ })
-          }
-          $names = @($names | Select-Object -Unique)
-          if ($names.Count -eq 0) { throw "发行语言清单为空：$list" }
-          "LANGS=$($names -join ',')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          Write-Host "LANGS=$($names -join ',')"
-
+          # 分组只认 src\release-bundles.toml，由 make_release.py 读出来，
+          # PowerShell 不在这一步重复实现解析。
           $raw = @(& python src\tools\pack\make_release.py --list-bundles)
           if ($LASTEXITCODE -ne 0) { throw "读不到发行分组：src\release-bundles.toml" }
           $ids = @($raw | Where-Object { $_ -match '\|' } |
@@ -120,25 +109,15 @@ jobs:
           "BUNDLES=$($ids -join ',')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "BUNDLES=$($ids -join ',')"
 
-      # 字体与 CI 走同一套：项目内缓存优先，缓存里缺的按清单下载并实例化成
-      # 静态文件；系统字体不参与，同一 tag 重建出的包才逐字节一致。
-      - name: Restore font cache
-        id: font-cache
-        uses: actions/cache@v5
-        with:
-          path: build/cache/noto-src
-          key: noto-${{ runner.os }}-${{ hashFiles('src/fonts-sources.toml') }}
-
-      - name: Ensure Noto source fonts
+      # 字体随仓库走：Release 不下载、不读 runner 字体、不读下载缓存。
+      # 缺任何一个都在出包前失败。
+      - name: Check vendored Noto fonts
         shell: pwsh
         run: |
-          # 与 CI 同一套顺序：assets\fonts\noto → build\cache\noto-src，系统字体
-          # 不参与（--no-system），同一 tag 重建出的包才逐字节一致。
-          $log = Join-Path $env:RUNNER_TEMP 'fonts.log'
-          & python src\tools\font\fetch_noto_fonts.py --langs $env:LANGS --fetch --no-system *>&1 |
-            Tee-Object -FilePath $log
+          $env:PR2_FONT_DIRS = Join-Path $env:GITHUB_WORKSPACE 'assets\fonts\noto'
+          python src\tools\font\fetch_noto_fonts.py --no-system
           if ($LASTEXITCODE -ne 0) {
-            "::error::Noto 源字体缺失，项目内也没能补齐；见上方清单与查过的目录。"
+            "::error::Noto 源字体缺失：assets\fonts\noto 必须带齐 src\fonts-sources.toml 列出的文件。"
             exit 1
           }
 
@@ -156,7 +135,7 @@ jobs:
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'release-build.log'
           $env:CARGO_TERM_COLOR = 'never'
-          & pwsh -NoProfile -NonInteractive -Command '$b = $env:BUNDLES -split ","; .\release.ps1 -Version $env:VERSION -Bundle $b -NoPause' *>&1 |
+          python release.py --version $env:VERSION --bundle $env:BUNDLES --no-pause *>&1 |
             Tee-Object -FilePath $log
           $code = $LASTEXITCODE
           if ($code -ne 0) {
@@ -207,10 +186,12 @@ jobs:
             dist/release.json
           if-no-files-found: error
 
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/release-v')
+      - name: Create draft GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with:
+          draft: true
+          name: PR2 Localization ${{ env.VERSION }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
