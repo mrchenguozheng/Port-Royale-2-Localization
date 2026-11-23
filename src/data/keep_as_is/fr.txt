@@ -497,3 +497,8 @@
 0x3a9ca75d	key
 0x3a9ca75e	key
 0x3a9ca75f	key
+
+# 状态提示：法语写法与英文同形，保留原文。
+0x246aece6	same
+0xcc1709af	same
+0xeb61a2d8	same
