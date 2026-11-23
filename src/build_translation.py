@@ -13,6 +13,9 @@ PACKS = os.path.join(REPO, "build", "runtime", "PR2Localization", "packs")
 COMPILE = os.path.join(SRC, "tools", "pack", "compile_pack.py")
 LOCALE = os.path.join(SRC, "locale.ini")
 
+sys.path.insert(0, os.path.join(SRC, "tools", "pack"))
+from make_release import resolve_font_mode  # noqa: E402
+
 
 def main():
     parser = argparse.ArgumentParser(description="编译 PR2 语言包")
@@ -30,8 +33,10 @@ def main():
 
     os.makedirs(PACKS, exist_ok=True)
     print("[pack] 编译 %s ..." % lang)
-    code = subprocess.run(
-        [sys.executable, COMPILE, "--lang", lang, "--out", PACKS]).returncode
+    cmd = [sys.executable, COMPILE, "--lang", lang, "--out", PACKS]
+    if resolve_font_mode(lang, "auto") == "config":
+        cmd.append("--no-fonts")
+    code = subprocess.run(cmd).returncode
     if code != 0:
         print("[pack] FAILED. 见上方错误。")
         return 1

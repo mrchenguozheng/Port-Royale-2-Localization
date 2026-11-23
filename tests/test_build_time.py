@@ -15,9 +15,10 @@ import make_release  # noqa: E402
 
 class TestResolveFontMode(unittest.TestCase):
     def test_languages_using_original_fonts_get_config(self):
-        # de / es 在 font-map.ini 里四项都是 none，原版拉丁字体直接可用。
-        self.assertEqual(make_release.resolve_font_mode("de", "auto"), "config")
-        self.assertEqual(make_release.resolve_font_mode("es", "auto"), "config")
+        # de / es / fr / it / pt-BR 在 font-map.ini 里四项都是 none，原版拉丁字体直接可用。
+        for lang in ("de", "es", "fr", "it", "pt-BR"):
+            self.assertEqual(make_release.resolve_font_mode(lang, "auto"),
+                             "config", lang)
 
     def test_languages_with_real_fonts_get_noto(self):
         for lang in ("zh", "ja", "ko", "ru"):
