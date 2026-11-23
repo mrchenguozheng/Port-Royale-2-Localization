@@ -33,6 +33,14 @@ class TestLanguageRegistry(unittest.TestCase):
         )
         self.assertEqual(preview, ["pt-BR"])
 
+    def test_zh_hk_screenshots_use_zh_tw(self):
+        errors, warnings, rows = language_registry.audit(ROOT)
+        self.assertEqual(errors, [])
+        row = next(r for r in rows if r.code == "zh-HK")
+        self.assertTrue(row.screenshot)
+        self.assertEqual(row.screenshot_source, "zh-TW")
+        self.assertFalse(any("zh-HK" in w and "截图" in w for w in warnings))
+
     def test_pick_langs_accepts_list_and_csv(self):
         self.assertEqual(apply_patch.pick_langs(["ja,zh"]), ["ja", "zh"])
         self.assertEqual(apply_patch.pick_langs([], ["ko", "pt-BR"]),

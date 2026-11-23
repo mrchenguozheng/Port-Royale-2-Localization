@@ -40,6 +40,7 @@ class LanguageRow:
     pack: bool
     translation: bool
     screenshot: bool
+    screenshot_source: str
     font_mode: str
     bundle: str
     review_status: str
@@ -136,12 +137,20 @@ def _read_translations(src):
 
 
 def _read_screenshots(root):
+    """返回 (实拍语言集合, 沿用映射)。沿用只做视觉参考，不冒充独立实机验证。"""
     path = os.path.join(root, "docs", "screenshots.json")
     if not os.path.isfile(path):
-        return set()
+        return set(), {}
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
-    return {item["code"] for item in data.get("languages", [])}
+    shots = {item["code"] for item in data.get("languages", [])}
+    derived = {}
+    for item in data.get("derived_languages", []):
+        code = item.get("code")
+        source = item.get("from")
+        if code and source:
+            derived[code] = source
+    return shots, derived
 
 
 def audit(root):
@@ -178,7 +187,8 @@ def audit(root):
     fonts = _read_font_modes(src)
     ui = _read_ui(src)
     translations = _read_translations(src)
-    screenshots = _read_screenshots(root)
+    screenshots, shot_derived = _read_screenshots(root)
+    shot_coverage = set(screenshots) | set(shot_derived)
 
     bundle_by_lang = {}
     bundle_ids = set()
@@ -238,9 +248,19 @@ def audit(root):
 
     for code in sorted(set(screenshots) - set(packs)):
         errors.append("docs/screenshots.json：截图语言 %s 没有语言包配置" % code)
-    for code in sorted(set(release) - set(screenshots)):
+    for code, source in sorted(shot_derived.items()):
+        if code in screenshots:
+            errors.append("docs/screenshots.json：%s 既有实拍又有沿用，删掉一边" % code)
+        if code not in packs:
+            errors.append("docs/screenshots.json：沿用语言 %s 没有语言包配置" % code)
+        if source not in screenshots:
+            errors.append("docs/screenshots.json：%s 沿用 %s，但后者没有实拍截图"
+                          % (code, source))
+        if source == code:
+            errors.append("docs/screenshots.json：%s 不能沿用自己" % code)
+    for code in sorted(set(release) - shot_coverage):
         warnings.append("docs/screenshots.json：发行语言 %s 还没有实机截图" % code)
-    for code in sorted(set(ui) - set(screenshots)):
+    for code in sorted(set(ui) - shot_coverage):
         if code in release:
             continue
         warnings.append("docs/screenshots.json：UI 语言 %s 还没有实机截图" % code)
@@ -263,7 +283,8 @@ def audit(root):
             ui=code in ui,
             pack=code in packs,
             translation=code in translations,
-            screenshot=code in screenshots,
+            screenshot=code in shot_coverage,
+            screenshot_source=shot_derived.get(code, ""),
             font_mode=fonts.get(code, "—"),
             bundle=bundle_by_lang.get(code, "—"),
             review_status=review,

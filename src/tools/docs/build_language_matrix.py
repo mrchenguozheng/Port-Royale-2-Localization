@@ -39,8 +39,20 @@ def build(root: Path = ROOT) -> str:
     release = [row.code for row in rows if row.release]
     preview = [row.code for row in rows if row.review_status == "preview"]
     release_count, preview_count, shot_count = LR.summary(rows)
+    shot_actual = sum(1 for row in rows if row.screenshot and not row.screenshot_source)
+    shot_derived = [row for row in rows if row.screenshot_source]
     ui_count = sum(1 for row in rows if row.ui)
     pack_count = sum(1 for row in rows if row.pack)
+
+    if shot_derived:
+        shot_line = ("- 实机截图：%s门实拍；%s，共覆盖%s门。" % (
+            cn_number(shot_actual),
+            "、".join("`%s` 沿用 `%s`" % (row.code, row.screenshot_source)
+                      for row in shot_derived),
+            cn_number(shot_count),
+        ))
+    else:
+        shot_line = "- 实机截图：%s门实拍。" % cn_number(shot_actual)
 
     lines = [
         "# 语言矩阵",
@@ -55,12 +67,10 @@ def build(root: Path = ROOT) -> str:
         "- 预览（preview）：%s，共%s门；不进发行包。" % (
             "、".join(f"`{x}`" for x in preview) or "无", cn_number(preview_count)),
         "- UI 与语言包：%s门（`ui.<lang>.ini` / `packs/<lang>.toml`）。" % cn_number(ui_count),
-        "- 实机截图：%s门；缺 %s。" % (
-            cn_number(shot_count),
-            "、".join(f"`{x}`" for x in sorted(set(release) - {r.code for r in rows if r.screenshot})) or "无",
-        ),
+        shot_line,
         "",
         "`zh-Hant` 是繁体派生底稿，不是发行代码；`zh-TW` / `zh-HK` 是两个发行代码。",
+        "`zh-HK` 的大部分界面文案与 `zh-TW` 相同，截图沿用 `zh-TW`，不是独立实机验证。",
         "`pt-BR` 是预览语言，有 pack、译文、UI 和截图，但不在 `release-languages.txt`，"
         "也不进 `release-bundles.toml`。",
         "",
@@ -69,6 +79,9 @@ def build(root: Path = ROOT) -> str:
     ]
     for row in rows:
         mark = lambda value: "✓" if value else "—"
+        shot_cell = ("—" if not row.screenshot
+                     else ("✓（同 `%s`）" % row.screenshot_source
+                           if row.screenshot_source else "✓"))
         lines.append("| `%s` | %s | %s | %s | %s | %s | %s | `%s` | `%s` |" % (
             row.code,
             row.name.replace("|", "\\|"),
@@ -76,7 +89,7 @@ def build(root: Path = ROOT) -> str:
             mark(row.ui),
             mark(row.pack),
             mark(row.translation),
-            mark(row.screenshot),
+            shot_cell,
             row.font_mode,
             row.bundle,
         ))
