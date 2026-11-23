@@ -337,5 +337,24 @@ class TestInjectorVersionStamp(unittest.TestCase):
         self.assertIn("-SkipInjector 无法确认现有 exe 的版本", text)
 
 
+class TestReleaseLanguageCodes(unittest.TestCase):
+    """``release.ps1`` 的发行语言校验要允许地区子标签。
+
+    ``release-languages.txt`` 里有 ``zh-TW`` / ``zh-HK``；只写 ``^[a-z]{2,3}$``
+    会在出包第一步就判「语言代码不合法」，本地也复现不了 CI 才走到的路径。
+    """
+
+    def test_region_subtags_are_accepted(self):
+        with open(os.path.join(ROOT, "release.ps1"), encoding="utf-8") as fh:
+            text = fh.read()
+        marker = "$name -notmatch '"
+        start = text.index(marker) + len(marker)
+        pattern = text[start:text.index("'", start)]
+        for code in ("zh", "zh-TW", "zh-HK", "pt-BR"):
+            self.assertRegex(code, pattern)
+        for code in ("zh_TW", "zh-", "-TW", "zh-TW-"):
+            self.assertNotRegex(code, pattern)
+
+
 if __name__ == "__main__":
     unittest.main()

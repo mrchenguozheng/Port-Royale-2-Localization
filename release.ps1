@@ -142,7 +142,9 @@ function Assert-ReleaseLanguages {
     param([string[]]$Names)
     $problems = @()
     foreach ($name in $Names) {
-        if ($name -notmatch '^[a-z]{2,3}$') {
+        # 与 src\tools\pack\release_version.py 的 LANG_RE 同口径：主语言 2–3 位，
+        # 可选地区子标签；zh-TW / zh-HK 是发行语言，不能只认 ^[a-z]{2,3}$。
+        if ($name -notmatch '^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$') {
             $problems += "语言代码不合法：$name"
             continue
         }
