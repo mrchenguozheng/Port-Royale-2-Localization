@@ -9,6 +9,7 @@ game's UI text; the original `PR2.exe` is not modified.
 | Package | In-game packs | Launcher UI |
 |---|---|---|
 | `PR2-zh` | `zh` | `zh` |
+| `PR2-zh-hant` | `zh-TW`, `zh-HK` | `zh-TW` |
 | `PR2-ja` | `ja` | `ja` |
 | `PR2-ko` | `ko` | `ko` |
 | `PR2-ru` | `ru` | `ru` |
@@ -16,14 +17,15 @@ game's UI text; the original `PR2.exe` is not modified.
 | `PR2-latin` | `de`, `es`, `fr`, `it`, `pt-BR` | `de` |
 | English (original) | built-in | `en` |
 
-`zh`, `ja`, `ko`, `ru`, `de`, `es`, `fr`, `it`, `pl` and `pt-BR` are the shipped
-language packs. English is the original game language and the fallback when a
-pack is missing. Each package ships exactly one `ui.default.ini` in its package
-language; switching the game locale inside `PR2-latin` does not switch the
-launcher UI. Source has nine `ui.<lang>.ini` files and `ui.default.ini` is
-generated at build time from `ui.zh.ini`.
+The shipped packs cover twelve release languages: `zh`, `zh-TW`, `zh-HK`,
+`ja`, `ko`, `ru`, `de`, `es`, `fr`, `it`, `pl` and `pt-BR`. English is the
+original game language and the fallback when a pack is missing. Each package
+ships exactly one `ui.default.ini` in its package language; switching the game
+locale inside `PR2-latin` does not switch the launcher UI. Source has twelve
+`ui.<lang>.ini` files and `ui.default.ini` is generated at build time from
+`ui.zh.ini`.
 
-**Launcher UI has no native-speaker review.** The nine launcher translations
+**Launcher UI has no native-speaker review.** The twelve launcher translations
 were drafted with AI and only checked mechanically (same keys, same
 placeholders). They have not been proofread line by line by native speakers.
 If you are a native speaker of one of these languages and want to help, please
