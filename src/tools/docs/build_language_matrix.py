@@ -70,7 +70,7 @@ def build(root: Path = ROOT) -> str:
         shot_line,
         "",
         "`zh-Hant` 是繁体派生底稿，不是发行代码；`zh-TW` / `zh-HK` 是两个发行代码。",
-        "`zh-HK` 的大部分界面文案与 `zh-TW` 相同，截图沿用 `zh-TW`，不是独立实机验证。",
+        "`zh-HK` 的大部分界面文案与 `zh-TW` 相同，但已单独补拍五屏，按自己的实机画面归档。",
         "`pt-BR` 是预览语言，有 pack、译文、UI 和截图，但不在 `release-languages.txt`，"
         "也不进 `release-bundles.toml`。",
         "",

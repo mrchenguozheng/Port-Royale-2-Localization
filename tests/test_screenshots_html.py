@@ -78,10 +78,11 @@ class TestScreenshotsGallery(unittest.TestCase):
     def test_semantic_fixes_survive_regeneration(self):
         self.assertIn("名 / 姓 / 起始城镇", self.generated)
         self.assertIn("名 / 姓 / 起始城鎮", self.generated)
+        self.assertIn("總督易卜拉欣 加西亞 / 見習水手 魔貝卡 博豪", self.generated)
         self.assertIn("이름 / 성 / 시작 도시", self.generated)
         self.assertIn("Nome / Sobrenome / Cidade inicial", self.generated)
-        self.assertIn("归档的简体与繁体台湾建号图已替换", self.generated)
-        self.assertIn("十一语五屏覆盖", self.generated_md)
+        self.assertIn("归档的简体、繁体台湾与繁体香港建号图都已替换", self.generated)
+        self.assertIn("十二语五屏覆盖", self.generated_md)
 
 
 if __name__ == "__main__":

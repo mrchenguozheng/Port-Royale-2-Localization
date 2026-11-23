@@ -647,5 +647,60 @@
     "bytes": 577976,
     "extra": false,
     "sha256": "74693390b506dcfb3163903f3ee86a5dd81c9de36fd9e84031f5e7e1feed2c83"
+  },
+  {
+    "language": "zh-HK",
+    "slug": "main-menu",
+    "title": "主菜单",
+    "file": "zh-HK/main-menu.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 489911,
+    "extra": false,
+    "sha256": "546eb0d0fd865a69c81175ef4e0e9b05a3e831b9c7c8ca4b1669e5c24b5ffe6f"
+  },
+  {
+    "language": "zh-HK",
+    "slug": "scenario-setup",
+    "title": "剧本模式建号",
+    "file": "zh-HK/scenario-setup.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 446306,
+    "extra": false,
+    "sha256": "05b7a2eddb6ee3e4a1bf94bd1f0b021ca5fc226eac5a42a99d518fb1ca6821b6"
+  },
+  {
+    "language": "zh-HK",
+    "slug": "scenario-welcome",
+    "title": "剧本 1 欢迎",
+    "file": "zh-HK/scenario-welcome.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 758183,
+    "extra": false,
+    "sha256": "7ff32003058ae4999ff0ab6aa4c253150ba37280a83573d6ebd476d00e8f76ea"
+  },
+  {
+    "language": "zh-HK",
+    "slug": "town-info",
+    "title": "城镇信息",
+    "file": "zh-HK/town-info.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 739338,
+    "extra": false,
+    "sha256": "106007c910e88906d97c348be571810c977bfbb3f5150a66c4172fc6733312eb"
+  },
+  {
+    "language": "zh-HK",
+    "slug": "governor-dialog",
+    "title": "总督对话",
+    "file": "zh-HK/governor-dialog.jpg",
+    "width": 1600,
+    "height": 1200,
+    "bytes": 774217,
+    "extra": false,
+    "sha256": "536c6d0be4198986bf00b145703a54e0cc92c63424da6e45837abb2d95f73754"
   }
 ]
