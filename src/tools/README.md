@@ -11,6 +11,7 @@ src/tools/
 ├─ analysis/   译文检查、进度、说话人与语体分析
 ├─ qa/         读数比对、命中导出、占位前文、串语言扫描、参照 gap 分级
 ├─ install/    pr2ctl 构建/部署/启动/宿主 DLL
+├─ docs/       文档生成（截图画廊 HTML）
 ├─ translate.py / glossary.py / terms_check.py / placeholder_roles.py   译文数据层
 ├─ extract_strings.py                                                  从 PR2.exe 重提基准原文
 ├─ check.py / lint_imports.py / config_check.py / docs_check.py / tools_check.py   质量检查
@@ -27,6 +28,12 @@ src/tools/
 | `docs_check.py` | 文档索引完整、编号唯一、生成物无漂移、窄断言 |
 | `tools_check.py` | 本文件的完整性：每个脚本都被登记、都有 docstring；登记的路径确实存在 |
 | `paths.py` | 公共路径常量（脚本按目录分组后统一从这里取仓库位置） |
+
+## 文档生成
+
+| 脚本 | 作用 |
+|---|---|
+| `docs/build_screenshots.py` | 从 `docs/screenshots.json`、`assets/screenshots/manifest.json` 和模板生成 `docs/screenshots.html`；校验图片存在、尺寸与字节数，`--check` 只比对不写盘 |
 
 ## 基准与参考原文
 

@@ -1,0 +1,252 @@
+{
+  "page": {
+    "title_suffix": "Port Royale 2 本地化",
+    "eyebrow": "Port Royale 2 Localization · Visual QA",
+    "heading_prefix": "实机截图：",
+    "lede_tail": "重点不在“译得对不对”，而在译文放进真实控件后是否仍然清楚：木牌短标签、输入框预填姓名、长文弹窗、密集数值、对话与头像。",
+    "version": "GOG FR 1.1.2.42",
+    "package": "全量并集包 · 3590 条",
+    "date": "2026-11-23",
+    "image_note": "1600 × 1200 · 仅裁黑边",
+    "intro": "**「建号」指剧本模式建号**：选完剧本后填写姓名、起始城镇、特长与起始资产的那一屏，不是自由模式。「剧本 1 欢迎」是进入剧本 1 后出现的欢迎与剧本目标弹窗。截图只裁掉左右黑边，没有修字或调色。",
+    "columns": 4,
+    "coverage_heading": "五屏覆盖",
+    "coverage_sub": "同一屏、同一版本、同一套包",
+    "compare_heading": "五屏对照",
+    "extra_heading": "德语补充屏",
+    "extra_sub": "窗口类的额外覆盖，不参与五屏对照",
+    "extra_label": "德语补充",
+    "manifest": "assets/screenshots/manifest.json",
+    "image_root": "assets/screenshots",
+    "image_width": 1600,
+    "image_height": 1200,
+    "toc": [
+      {
+        "href": "#coverage",
+        "label": "覆盖表"
+      },
+      {
+        "href": "#compare",
+        "label": "五屏对照"
+      },
+      {
+        "href": "#extra",
+        "label": "德语补充"
+      }
+    ]
+  },
+  "languages": [
+    {
+      "code": "de",
+      "native": "Deutsch",
+      "short": "德语",
+      "alt": "德语"
+    },
+    {
+      "code": "es",
+      "native": "Español",
+      "short": "西语",
+      "alt": "西语"
+    },
+    {
+      "code": "fr",
+      "native": "Français",
+      "short": "法语",
+      "alt": "法语"
+    },
+    {
+      "code": "it",
+      "native": "Italiano",
+      "short": "意大利语",
+      "alt": "意大利语"
+    },
+    {
+      "code": "ja",
+      "native": "日本語",
+      "short": "日语",
+      "alt": "日语"
+    },
+    {
+      "code": "ko",
+      "native": "한국어",
+      "short": "韩语",
+      "alt": "韩语"
+    },
+    {
+      "code": "pl",
+      "native": "Polski",
+      "short": "波兰语",
+      "alt": "波兰语"
+    },
+    {
+      "code": "pt-BR",
+      "native": "Português (BR)",
+      "short": "葡语（巴西）",
+      "alt": "葡萄牙语（巴西）"
+    },
+    {
+      "code": "ru",
+      "native": "Русский",
+      "short": "俄语",
+      "alt": "俄语"
+    },
+    {
+      "code": "zh",
+      "native": "简体中文",
+      "short": "简体中文",
+      "alt": "简体中文"
+    },
+    {
+      "code": "zh-TW",
+      "native": "繁體中文",
+      "short": "繁体中文",
+      "alt": "繁体中文"
+    }
+  ],
+  "screens": [
+    {
+      "num": "01",
+      "slug": "main-menu",
+      "title": "主菜单",
+      "desc": "最短的按钮词与最长的按钮词都在这一屏，先看木牌是否撑得住。",
+      "verify": "木牌短标签、最长按钮词",
+      "captions": {
+        "de": "Freies Spiel / Szenarien / Danksagungen",
+        "es": "Nueva partida / Campañas / Salir del juego",
+        "fr": "Jeu libre / Scénarios / Quitter le jeu",
+        "it": "Modalità libera / Scenari / Esci dal gioco",
+        "ja": "フリープレイモード / シナリオ / ゲームを終了",
+        "ko": "자유 모드 / 시나리오 / 게임 종료",
+        "pl": "Tryb wolnej gry / Scenariusze / Wczytaj / Wyjście z gry",
+        "pt-BR": "Modo livre / Cenários / Carregar / Opções / Créditos / Sair do jogo",
+        "ru": "Режим свободной игры / Сценарии / Загрузить / Настройки / Создатели / Выйти из игры",
+        "zh": "自由模式 / 剧本 / 载入 / 选项 / 制作人员 / 退出游戏",
+        "zh-TW": "自由模式 / 劇本 / 載入 / 選項 / 製作人員 / 退出遊戲"
+      }
+    },
+    {
+      "num": "02",
+      "slug": "scenario-setup",
+      "title": "剧本模式建号",
+      "desc": "两个姓名输入框、左右箭头、特长说明框与起始资产说明框同屏。",
+      "verify": "输入框预填姓名、左右箭头、特长说明框",
+      "captions": {
+        "de": "Vorname / Name / Startstadt / Merkmal",
+        "es": "Nombre / Apellido / Ciudad y Nación / Bonificación",
+        "fr": "Prénom / Nom / Ville de départ / Fonction",
+        "it": "Nome / Città di partenza / Caratteristica / Patrimonio iniziale",
+        "ja": "名 / 姓 / 開始時の町 / 特典",
+        "ko": "이름 / 성 / 시작 도시 / 기능",
+        "pl": "Imię / Nazwisko / Miasto startowe / Cecha",
+        "pt-BR": "Nome / Sobrenome / Cidade inicial / Recurso / Experiência comercial",
+        "ru": "Имя / Фамилия / Стартовый город / Особенность / Опыт торговли",
+        "zh": "名 / 姓 / 起始城镇 / 特长 / 贸易经验",
+        "zh-TW": "名 / 姓 / 起始城鎮 / 特長 / 貿易經驗"
+      }
+    },
+    {
+      "num": "03",
+      "slug": "scenario-welcome",
+      "title": "剧本 1 欢迎",
+      "desc": "标题、三段正文、剧本目标与关闭按钮，是最容易露断行问题的一屏。",
+      "verify": "长文弹窗、标题、剧本目标、关闭按钮",
+      "captions": {
+        "de": "Willkommen bei Port Royale 2 / Szenarioziel",
+        "es": "Bienvenido a Port Royale 2 / Objetivo de la Campaña",
+        "fr": "Bienvenue dans Port Royale 2 / Objectif",
+        "it": "Benvenuto in Port Royale 2 / Obiettivo dello scenario",
+        "ja": "Port Royale 2へようこそ / シナリオ目標",
+        "ko": "포트 로열 2 환영합니다 / 시나리오 목표",
+        "pl": "Witaj w grze Port Royale 2 / Cel scenariusza",
+        "pt-BR": "Bem-vindo ao Port Royale 2 / Objetivo do cenário / Fechar",
+        "ru": "Добро пожаловать в Порт-Рояль 2 / Цель сценария / Закрыть",
+        "zh": "欢迎来到 Port Royale 2 / 剧本目标 / 关闭",
+        "zh-TW": "歡迎來到 Port Royale 2 / 劇本目標 / 關閉"
+      }
+    },
+    {
+      "num": "04",
+      "slug": "town-info",
+      "title": "城镇信息",
+      "desc": "人口、建筑、关系、生产图标挤在一块，专门看字段名和数值是否互相压住。",
+      "verify": "密集字段、数值对齐、关系条、生产图标",
+      "captions": {
+        "de": "Cartagena / Größe / Eure Gebäude / Produktion",
+        "es": "Cartagena / Tamaño / Tus edificios / Producción",
+        "fr": "Carthagène / Taille / Vos bâtiments / Production",
+        "it": "Cartagena / Dimensione / I tuoi edifici / Produzione",
+        "ja": "カルタヘナ / 規模 / 自分の建物 / 生産",
+        "ko": "카르타헤나 / 크기 / 내 건물 / 생산",
+        "pl": "Cartagena / Status miasta / Rozmiar / Produkcja",
+        "pt-BR": "Cidade do governador espanhol / Status da cidade / Tamanho / Sua relação com Espanha / Produção",
+        "ru": "Испанский административный центр / Статус города / Размер / Отношения со страной Испания / Производство",
+        "zh": "西班牙总督城 / 城镇的状态 / 规模 / 你与西班牙的关系 / 生产 / 关闭",
+        "zh-TW": "西班牙總督城 / 城鎮的狀態 / 規模 / 你與西班牙的關係 / 生產"
+      }
+    },
+    {
+      "num": "05",
+      "slug": "governor-dialog",
+      "title": "总督对话",
+      "desc": "说话人名、长段正文、继续按钮与右侧头像同屏，看正文会不会顶到边界。",
+      "verify": "说话人名、长段正文、继续按钮、头像",
+      "captions": {
+        "de": "Gouverneur Carlos Galiano / Weiter",
+        "es": "Gobernador Francisco García / Continuar",
+        "fr": "Gouverneur Ibrahim Garcia / Continuer",
+        "it": "Governatore Ibrahim Garcia / Continua",
+        "ja": "総督 ロレンソ サンチェス / 続ける",
+        "ko": "총독 이브라힘 가르시아 / 계속",
+        "pl": "Gubernator Ibrahim Garcia / Dalej",
+        "pt-BR": "Governador Ibrahim Garcia / Grumete Manuel Arragon / Continuar",
+        "ru": "Губернатор Франко Санчес / Юнга Теерт Ваассе / Далее",
+        "zh": "总督易卜拉欣 加西亚 / 见习水手 汉斯 洛兰 / 继续",
+        "zh-TW": "總督易卜拉欣 加西亞 / 見習水手 科內利厄斯 杜波瓦 / 繼續"
+      }
+    }
+  ],
+  "notes": [
+    {
+      "title": "日语断行",
+      "body": "字体已正常覆盖，没有缺字方块。断行仍由游戏引擎自动折行，`一般情報` 面板把「目標は」后的 `、` 折到了行首，说明引擎不执行日文禁则；没有按 `1600×1200` 截图手插 `<n>`，避免把截图像素当作控件宽度判据。"
+    },
+    {
+      "title": "韩语姓输入框",
+      "body": "字体覆盖正常，没有缺字方块。建号页第一栏为 `이름`、第二栏为 `성`；第二栏的键是 `0xc4f9393f`，已从 `이름` 改为 `성` 并重编译部署，归档建号图已替换为修复后画面；城镇信息的关系标题显示 `스페인와(과)의 관계`，这是模板 `%1와(과)` 的占位粒子兜底，不是译文里手写了两种助词。"
+    },
+    {
+      "title": "葡语巴西姓输入框",
+      "body": "建号页第一栏为 `Nome`、第二栏为 `Sobrenome`；第二栏的键是 `0xc4f9393f`，不是通用整名标签 `0x0059b428`，法语同屏 `Prénom / Nom` 也证明它是姓。译文已从 `Nome` 改为 `Sobrenome` 并重编译部署，归档建号图已替换为修复后画面。"
+    },
+    {
+      "title": "中文姓输入框",
+      "body": "建号页第二栏的键是 `0xc4f9393f`，不是通用整名标签 `0x0059b428`；该键法语作 `Nom`、日语作 `姓`、俄语作 `Фамилия`，确认是姓输入框。译文已从 `姓名` 改为 `姓`，`zh`／`zh-TW`／`zh-HK` 同步重编译部署，`zh-Hant` 底稿同步；归档的简体与繁体台湾建号图已替换为修复后画面，繁体香港尚未重拍，仍显示改前 `姓名`。"
+    }
+  ],
+  "extras": [
+    {
+      "file": "de/scenario-list.jpg",
+      "alt": "德语剧本列表",
+      "lang": "Deutsch",
+      "caption": "剧本列表：Szenario / Status / 右侧说明"
+    },
+    {
+      "file": "de/chronicle.jpg",
+      "alt": "德语编年史",
+      "lang": "Deutsch",
+      "caption": "编年史：Chronik / 两个时间条"
+    },
+    {
+      "file": "de/messages.jpg",
+      "alt": "德语消息窗",
+      "lang": "Deutsch",
+      "caption": "消息窗：Nachrichten / 两条长文"
+    },
+    {
+      "file": "de/missions.jpg",
+      "alt": "德语任务窗",
+      "lang": "Deutsch",
+      "caption": "任务窗：Aufträge / 剧本目标"
+    }
+  ]
+}
