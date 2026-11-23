@@ -13,10 +13,10 @@ game's UI text; the original `PR2.exe` is not modified.
 | `PR2-ko` | `ko` | `ko` |
 | `PR2-ru` | `ru` | `ru` |
 | `PR2-pl` | `pl` | `pl` |
-| `PR2-latin` | `de`, `es`, `fr`, `it` | `de` |
+| `PR2-latin` | `de`, `es`, `fr`, `it`, `pt-BR` | `de` |
 | English (original) | built-in | `en` |
 
-`zh`, `ja`, `ko`, `ru`, `de`, `es`, `fr`, `it` and `pl` are the shipped
+`zh`, `ja`, `ko`, `ru`, `de`, `es`, `fr`, `it`, `pl` and `pt-BR` are the shipped
 language packs. English is the original game language and the fallback when a
 pack is missing. Each package ships exactly one `ui.default.ini` in its package
 language; switching the game locale inside `PR2-latin` does not switch the

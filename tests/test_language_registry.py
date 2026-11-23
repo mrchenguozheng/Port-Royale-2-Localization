@@ -22,16 +22,16 @@ class TestLanguageRegistry(unittest.TestCase):
 
     def test_release_languages_include_region_codes(self):
         langs = release_version.read_languages(os.path.join(ROOT, "src"))
-        self.assertEqual(len(langs), 11)
+        self.assertEqual(len(langs), 12)
         self.assertIn("zh-TW", langs)
         self.assertIn("zh-HK", langs)
-        self.assertNotIn("pt-BR", langs)
+        self.assertIn("pt-BR", langs)
 
-    def test_preview_is_pt_br(self):
+    def test_preview_list_is_empty(self):
         preview = language_registry._read_raw_languages(
             os.path.join(ROOT, "src", "preview-languages.txt")
         )
-        self.assertEqual(preview, ["pt-BR"])
+        self.assertEqual(preview, [])
 
     def test_zh_hk_has_own_screenshots(self):
         errors, warnings, rows = language_registry.audit(ROOT)

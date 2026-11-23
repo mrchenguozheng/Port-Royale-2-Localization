@@ -8,5 +8,4 @@
 # 一门语言是否进发行包，只看 release-languages.txt 与 release-bundles.toml。
 #
 # 当前语言集已冻结：新增语言先按 docs/新语言.md 解冻，再加进本文件或发行清单。
-
-pt-BR
+# 2026-11-24：pt-BR 已转入发行清单，当前没有预览语言。

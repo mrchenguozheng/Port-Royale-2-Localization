@@ -115,7 +115,7 @@ python build.py --target injector        # 只编 Rust 注入器
 
 python release.py --version v1.0.0       # 每个分组一个 zip（GOG/Steam 通用）
 python release.py --version v1.0.0 --bundle zh     # 只出中文分组
-python release.py --version v1.0.0 --bundle latin  # 只出拉丁分组（de+es+fr+it）
+python release.py --version v1.0.0 --bundle latin  # 只出拉丁分组（de+es+fr+it+pt-BR）
 python release.py --version v1.0.0 --allow-dirty   # 工作树脏时仍出包；版本头记 dirty
 python release.py --version v1.0.0 --tag --push    # 出包并创建/推送 v<版本> tag
 ```

@@ -8,8 +8,8 @@
 # 分组依据是 src\font-map.ini 里各语言节的四个逻辑名（ARIAL.TTF / ELGRECO_.TTF /
 # Tiepolo_black.ttf / Tiepolo_bold.ttf）指向哪些实际字体文件：
 #
-#   de / es / fr / it   四项全是 none —— 原版拉丁字体已覆盖，不打包任何字体
-#                        → 字体集为空，四门共用同一份空字体集与同一份映射
+#   de / es / fr / it / pt-BR   四项全是 none —— 原版拉丁字体已覆盖，不打包任何字体
+#                        → 字体集为空，五门共用同一份空字体集与同一份映射
 #   zh                  NotoSansSC-Regular + NotoSerifSC-Black/Bold
 #   ja                  NotoSansJP-Regular + NotoSerifJP-Black/Bold
 #   ko                  NotoSansKR-Regular + NotoSerifKR-Black/Bold
@@ -57,12 +57,12 @@ label = "Русский"
 langs = ["ru"]
 default = "ru"
 
-# 西语 / 德 / 法 / 意：四门都不带字体，原版拉丁字体已经覆盖各自的重音与变音，
+# 西语 / 德 / 法 / 意 / 葡（巴西）：五门都不带字体，原版拉丁字体已经覆盖各自的重音与变音，
 # 标题栏目的缺口也一样（只有 ²³€，与原版一致），所以合成一份发行包。
 [[bundle]]
 id = "latin"
-label = "Deutsch · Español · Français · Italiano"
-langs = ["de", "es", "fr", "it"]
+label = "Deutsch · Español · Français · Italiano · Português (Brasil)"
+langs = ["de", "es", "fr", "it", "pt-BR"]
 default = "de"
 
 # 波兰语单出一包：它带三个标题字体文件，跟 latin 的「零字体」前提不同，
