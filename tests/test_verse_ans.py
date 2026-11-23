@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""诗谜谜底队列的不变式：分组覆盖、同组同文、已填的线索六语齐备且真在谜面里。
+"""诗谜谜底队列的不变式：分组覆盖、同组同文、已填的线索各语齐备且真在谜面里。
 
 工具是 src/tools/text/verse_ans.py，队列是 glossary/verse_ans.toml。
 这里读真实数据，属于全仓不变式：队列填错（漏线索、线索写了个谜面里没有的词）在
@@ -17,7 +17,7 @@ import toml_io
 import terms_check as TC
 import verse_ans as VA
 
-LANGS = ("zh", "de", "es", "fr", "ja", "ru")
+LANGS = ("zh", "de", "es", "fr", "ja", "ru", "it", "pt-BR")
 QUEUE = os.path.join(ROOT, "glossary", "verse_ans.toml")
 
 

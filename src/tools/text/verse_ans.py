@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""诗谜谜底队列：把 glossary\\verse_ans.toml 里填好的 ans 落进六语译文。
+"""诗谜谜底队列：把 glossary\\verse_ans.toml 里填好的 ans 落进各语译文。
 
 谜面在 09 卷第六十四节定义的 verse 区间里，整片不挂 town/ref/lit/term，只允许
 [riddle:answer=谜底;group=整组键含自己;clue=线索,…]（`;` 分字段；`answer` 里 `|` 是
@@ -14,14 +14,14 @@
 两种、不能写同一种；`I'm`、`l'abondance` 这类撇号在项中间，不必包。
 这个工具只管那一件事：
 
-    python src\\tools\\text\\verse_ans.py --list     # 看 41 条 / 29 组，谁还没填
-    python src\\tools\\text\\verse_ans.py --apply    # 把填好的组写进六语译文
+    python src\\tools\\text\\verse_ans.py --list     # 看 32 组 / 48 槽位，谁还没填
+    python src\\tools\\text\\verse_ans.py --apply    # 把填好的组写进各语译文
 
 --apply 的判据：
   · answer 正常不写类型前缀：值在 marks.ANS_KEYS 里就是方位，否则按城镇查 entities；
     方位包括正向（north/east/southeast…）与否定（-north/-southeast…，减号表示
     「不是那边」）。这两类不登记实体、不查译名；
-  · 六语线索都不能空，只收英文逗号，每条线索都要出现在该语言自己的谜面正文里；
+  · 各语线索都不能空，只收英文逗号，每条线索都要出现在该语言自己的谜面正文里；
   · 已经标成同值的组直接跳开（可重复跑），标成别的值则报错，不覆盖；没标注的键不算
     冲突，按待写补上（新接入一门语言时，它的谜面还没有 `[riddle:]` 头就属于这种）；
   · 诗谜副本（整行 `[riddle:copy=键]`）与不含谜的同文引用（整行 `[ref:键]`）都没有自己的
@@ -47,7 +47,7 @@ EN_PATH = os.path.join(ROOT, "src", "orig", "en.gog_1.1.2.3.toml")
 ENTITIES = os.path.join(ROOT, "src", "data", "names", "entities.toml")
 NAMES_DIR = os.path.join(ROOT, "src", "data", "names")
 TRANS = os.path.join(ROOT, "src", "translations")
-LANGS = ("zh", "de", "es", "fr", "ja", "ru", "it")
+LANGS = ("zh", "de", "es", "fr", "ja", "ru", "it", "pt-BR")
 #: 城镇名在英文表里分 8 段，段间留空，合起来 76 条 = staedte.ini 的段数。
 #: 早先只认了第一段（50 镇），Maracaibo / Caracas / Gibraltar / Port of Spain 这些
 #: 落在后面的段里，查不到就等于「不在城镇表」。
@@ -462,7 +462,7 @@ def main():
     ap.add_argument("--list", action="store_true", help="列出各组与填写状态")
     ap.add_argument("--langs", action="store_true",
                     help="配合 --list：六门谜面全打出来（线索要逐门核对）")
-    ap.add_argument("--apply", action="store_true", help="把填好的谜底落进六语译文")
+    ap.add_argument("--apply", action="store_true", help="把填好的谜底落进各语译文")
     args = ap.parse_args()
     if args.list:
         cmd_list(args.langs)
