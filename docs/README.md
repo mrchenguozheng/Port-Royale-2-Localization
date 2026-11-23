@@ -61,6 +61,15 @@
 | [界面映射/README.md](界面映射/README.md) | 「哪句话出现在哪个界面」的十二卷总览：分卷表、排查包标记清理规则、待采集清单 |
 | [01 菜单与剧本](界面映射/01-菜单与剧本.md) … [12 内部贴图资源名索引](界面映射/12-内部贴图资源名索引.md) | 按界面分卷，每卷一张「界面 → 键」表，语言列只作对照；卷名与内容见子索引 |
 
+## 实机验收
+
+| 文档 | 内容 |
+|---|---|
+| [实机截图](实机截图.md) | 德语、西语、法语、意大利语、日语、韩语、波兰语、葡萄牙语（巴西）、俄语、简体中文、繁体中文五屏对照：主菜单、剧本模式建号、剧本 1 欢迎、城镇信息、总督对话；日语、韩语、波兰语、葡萄牙语、俄语、简体中文、繁体中文均为字体方案就位后补拍，德语另附四张补充屏；共 59 张 |
+| [截图画廊](screenshots.html) | 由 `screenshots.json`、`assets/screenshots/manifest.json` 与 `src/tools/docs/screenshots_template.html` 生成，可直接作为 GitHub Pages 页面打开；不要手改 HTML |
+
+若把 GitHub Pages 的源目录设为 `docs`，画廊入口是 `screenshots.html`；本仓库对应 `https://mrchenguozheng.github.io/Port-Royale-2-Localization/screenshots.html`。改图注或注记改 `docs/screenshots.json`，改版式改 `src/tools/docs/screenshots_template.html`，然后运行 `python src/tools/docs/build_screenshots.py`。
+
 ## 翻译数据与历史
 
 | 文档 | 内容 |
