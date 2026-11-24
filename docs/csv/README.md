@@ -25,7 +25,7 @@ CSV 是分析和人工审校的附属数据，不是游戏运行需要的文件�
 | 文件 | 说明 |
 |---|---|
 | `review/人工修订.csv` | 人工确认过的中文修订记录（hash / 原译 / 改为 / 日期） |
-| `review/zh-text-edits.csv` | 中文文本历史改动对照；[中文文本改动对比](../archive/中文文本改动对比.md) 引用 |
+| `review/zh-text-edits.csv` | 中文文本历史改动对照；CSV 本身即历史快照 |
 
 ## generated/：可重跑的中间产物
 
