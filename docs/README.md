@@ -1,6 +1,6 @@
 # 文档索引
 
-[项目 README](../README.md) · [维护指南](../AGENTS.md) · [English](../README.en.md)
+[项目 README](../README.md) · [参与开发](../CONTRIBUTING.md) · [维护指南](../AGENTS.md) · [English](../README.en.md)
 
 > **GOG 英文版 `1.1.2.3`、Steam 英文版 `1.1.2.3` 与 GOG 法语版 `1.1.2.42` 都已实测**
 > **（宿主 DLL 代理）。** GOG 正式入口是 `PR2LocalizationGUI.exe`（它负责挂载）；

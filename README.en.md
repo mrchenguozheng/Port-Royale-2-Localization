@@ -90,6 +90,7 @@ All maintained documentation is in Chinese. This page is the only English
 entry point; it does not mirror the full documentation set.
 
 - [Documentation index](docs/README.md)
+- [Contributing guidelines](CONTRIBUTING.md)
 - [Runtime contract](docs/运行契约.md) — package layout, host mount, UI language
 - [Chinese project README](README.md)
 - [Player guide](docs/玩家指南.md)
