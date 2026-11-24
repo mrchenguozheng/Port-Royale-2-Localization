@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -37,8 +38,10 @@ jobs:
           cp -r docs/assets/screenshots site/assets/screenshots
 
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: site
+      - name: Wait for artifact registration
+        run: sleep 10
       - id: deployment
         uses: actions/deploy-pages@v4
