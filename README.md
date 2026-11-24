@@ -2,7 +2,7 @@
 
 《Port Royale 2》的本地化项目：**用外挂语言包替换界面文本，原版 `PR2.exe` 全程不改。**
 
-[English](README.en.md) · [中文文档索引](docs/README.md)
+[实机截图（十二种语言）](https://mrchenguozheng.github.io/Port-Royale-2-Localization/) · [English](README.en.md) · [中文文档索引](docs/README.md)
 
 **Supported languages:** Simplified Chinese (`zh`), Japanese (`ja`), Korean (`ko`), Russian (`ru`), German (`de`), Spanish (`es`), French (`fr`), Italian (`it`), Polish (`pl`); English (`en`) is the original game language and fallback. See [README.en.md](README.en.md#supported-languages).
 
