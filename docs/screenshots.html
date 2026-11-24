@@ -47,8 +47,9 @@
   .chip{
     border:1px solid var(--line);background:rgba(255,255,255,.03);
     color:#c8d2dc;border-radius:999px;padding:5px 12px;font-size:12px;
-    max-width:100%;overflow-wrap:anywhere
+    max-width:100%;overflow-wrap:anywhere;word-break:keep-all
   }
+  .chip-count{display:none}
   nav.toc{
     display:flex;flex-wrap:wrap;gap:8px 18px;margin:24px 0 0;font-size:14px
   }
@@ -174,6 +175,8 @@
     .lede{font-size:14px}
     .player-copy h2{font-size:22px}
     .section-head{display:block}
+    .chip-langs{display:none}
+    .chip-count{display:inline}
     .section-head .sub{display:block;margin-top:4px}
   }
   @media (max-width:1000px){
@@ -201,9 +204,10 @@
     <h1>十二种语言的《Port Royale 2》实机界面</h1>
     <p class="lede">同一组五个界面，十二种语言各拍一遍。先给第一次接触的人看效果和装法，再放完整对照表。</p>
     <div class="meta">
+      <span class="chip chip-count">十二种语言</span>
       <span class="chip">GOG FR 1.1.2.42</span>
       <span class="chip">全量并集包 · 3590 条</span>
-      <span class="chip">Deutsch / Español / Français / Italiano / 日本語 / 한국어 / Polski / Português (BR) / Русский / 简体中文 / 繁體中文 / 繁體中文（香港）</span>
+      <span class="chip chip-langs">Deutsch / Español / Français / Italiano / 日本語 / 한국어 / Polski / Português (BR) / Русский / 简体中文 / 繁體中文 / 繁體中文（香港）</span>
       <span class="chip">2026-11-23</span>
       <span class="chip">1600 × 1200 · 仅裁黑边</span>
       <span class="chip">64 张</span>

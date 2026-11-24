@@ -47,8 +47,9 @@
   .chip{
     border:1px solid var(--line);background:rgba(255,255,255,.03);
     color:#c8d2dc;border-radius:999px;padding:5px 12px;font-size:12px;
-    max-width:100%;overflow-wrap:anywhere
+    max-width:100%;overflow-wrap:anywhere;word-break:keep-all
   }
+  .chip-count{display:none}
   nav.toc{
     display:flex;flex-wrap:wrap;gap:8px 18px;margin:24px 0 0;font-size:14px
   }
@@ -174,6 +175,8 @@
     .lede{font-size:14px}
     .player-copy h2{font-size:22px}
     .section-head{display:block}
+    .chip-langs{display:none}
+    .chip-count{display:inline}
     .section-head .sub{display:block;margin-top:4px}
   }
   @media (max-width:1000px){
@@ -201,6 +204,7 @@
     <h1>{{H1}}</h1>
     <p class="lede">{{LEDE}}</p>
     <div class="meta">
+      <span class="chip chip-count">十二种语言</span>
 {{META_CHIPS}}
     </div>
     <nav class="toc">

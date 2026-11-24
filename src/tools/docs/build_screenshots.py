@@ -196,16 +196,16 @@ def groups_of(languages: list[dict], columns: int) -> list[list[dict]]:
 
 def render_chips(page: dict, languages: list[dict], total: int) -> str:
     chips = [
-        page.get("version", ""),
-        page.get("package", ""),
-        " / ".join(lang["native"] for lang in languages),
-        page.get("date", ""),
-        page.get("image_note", ""),
-        f"{total} 张",
+        (page.get("version", ""), ""),
+        (page.get("package", ""), ""),
+        (" / ".join(lang["native"] for lang in languages), " chip-langs"),
+        (page.get("date", ""), ""),
+        (page.get("image_note", ""), ""),
+        (f"{total} 张", ""),
     ]
     return "\n".join(
-        f'      <span class="chip">{inline(chip)}</span>'
-        for chip in chips if chip
+        f'      <span class="chip{suffix}">{inline(chip)}</span>'
+        for chip, suffix in chips if chip
     )
 
 
