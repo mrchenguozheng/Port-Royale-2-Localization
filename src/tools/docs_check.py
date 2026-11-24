@@ -5,8 +5,8 @@
 语料变了文档里的次数还是旧的，代码里的豁免清单与文档里的例外说明各走各的。
 这里把「能从数据算出来的」与「必须两边一致的」都变成可跑的红灯。
 
-刻意不做：不解析自然语言正文。断言只认两种语法——markdown 链接、
-以及显式写死的「未知码清单」一行。09 卷那种日志型文档的叙述不归这里管。
+刻意不做：不解析自然语言正文。断言只认 Markdown 链接、索引成员、生成物和
+`glossary/variable_codes.toml` 的 `meta.unknown_codes`；09 卷那种日志型文档的叙述不归这里管。
 
 用法：python src/tools/docs_check.py
 """
@@ -14,6 +14,7 @@ import ast
 import os
 import re
 import sys
+from urllib.parse import unquote
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "src", "tools"))
@@ -24,12 +25,14 @@ import build_language_matrix as LM
 LANGUAGE_MATRIX = os.path.join(ROOT, "docs", "语言矩阵.md")
 
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+LINK_OR_IMAGE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 NUM = re.compile(r"^(\d\d)-")
-INFER_DOC = os.path.join(ROOT, "docs", "界面映射", "09-推断-连续键区.md")
 LINT = os.path.join(ROOT, "src", "tools", "analysis", "text_lint.py")
 README = os.path.join(ROOT, "docs", "README.md")
 MAPS_README = os.path.join(ROOT, "docs", "界面映射", "README.md")
 ARCHIVE_README = os.path.join(ROOT, "docs", "archive", "README.md")
+ROOT_DOCS = ("README.md", "README.en.md", "CONTRIBUTING.md", "AGENTS.md")
+DOC_DIRS = ("docs", "glossary", "src/tools")
 
 
 def _md_files(d):
@@ -47,6 +50,60 @@ def _links(path):
             continue
         out.append((target, os.path.normpath(os.path.join(os.path.dirname(path), t))))
     return out
+
+
+def _all_docs():
+    """入口文档 + docs/ + glossary/ + src/tools/ 下的全部 Markdown。"""
+    out = [os.path.join(ROOT, f) for f in ROOT_DOCS
+           if os.path.isfile(os.path.join(ROOT, f))]
+    for d in DOC_DIRS:
+        for dirpath, dirnames, filenames in os.walk(os.path.join(ROOT, d)):
+            dirnames[:] = sorted(x for x in dirnames if x not in (".git", "build", "node_modules"))
+            out.extend(os.path.join(dirpath, f) for f in sorted(filenames)
+                       if f.endswith(".md"))
+    return sorted(set(out))
+
+
+def _strip_fences(text):
+    """把围栏代码块内容清空但保留行号，避免把示例里的链接当成真链接。"""
+    lines = []
+    fenced = False
+    for line in text.splitlines():
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            lines.append("")
+        else:
+            lines.append("" if fenced else line)
+    return "\n".join(lines)
+
+
+def check_links():
+    """全库相对链接与图片路径都要能落地；外链和纯锚点不查。"""
+    bad = []
+    for path in _all_docs():
+        with open(path, encoding="utf-8") as f:
+            text = _strip_fences(f.read())
+        for m in LINK_OR_IMAGE.finditer(text):
+            raw = m.group(1).strip()
+            target = raw
+            if target.startswith("<") and target.endswith(">"):
+                target = target[1:-1]
+            if (not target or target.startswith("#")
+                    or target.startswith(("http://", "https://", "mailto:", "tel:", "data:"))):
+                continue
+            target = target.split("#", 1)[0].split("?", 1)[0]
+            if not target:
+                continue
+            target = unquote(target)
+            if target.startswith("/"):
+                full = os.path.join(ROOT, target.lstrip("/"))
+            else:
+                full = os.path.normpath(os.path.join(os.path.dirname(path), target))
+            if not os.path.exists(full):
+                line_no = text.count("\n", 0, m.start()) + 1
+                bad.append("%s:%d 指向不存在的路径：%s"
+                           % (os.path.relpath(path, ROOT), line_no, raw))
+    return bad
 
 
 def check_index(path, title):
@@ -102,26 +159,11 @@ def check_drift():
     return bad
 
 
-def _unknown_from_doc():
-    with open(INFER_DOC, encoding="utf-8") as f:
-        for line in f:
-            if "未知码清单" in line:
-                return set(re.findall(r"`([A-Za-z])`", line))
-    return None
-
-
 def check_unknown_codes():
-    """09 卷点名的未知码 == 表里 conf=unknown 的码 == meta.unknown_codes。"""
+    """未知码只有一个源：variable_codes.toml 的 conf=unknown == meta.unknown_codes。"""
     bad = []
     meta, codes, _v = VC.load_table()
     table = {c for c in codes if codes[c].get("conf") == "unknown"}
-    doc = _unknown_from_doc()
-    if doc is None:
-        bad.append("09 卷 68.1 找不到「未知码清单」这一行（它是机器可读断言的锚点）")
-        return bad
-    if doc != table:
-        bad.append("09 卷点名的未知码 %s 与表里 conf=unknown 的 %s 不一致"
-                   % (sorted(doc), sorted(table)))
     if set(meta.get("unknown_codes", [])) != table:
         bad.append("meta.unknown_codes 与 conf=unknown 不一致，跑 --sync")
     return bad
@@ -178,6 +220,7 @@ def check_language_matrix():
 
 def main():
     items = [
+        ("全库链接", check_links),
         ("docs 索引", lambda: check_index(README, "docs/README.md")),
         ("界面映射索引", lambda: check_index(MAPS_README, "界面映射/README.md")),
         ("归档索引", lambda: check_index(ARCHIVE_README, "docs/archive/README.md")),

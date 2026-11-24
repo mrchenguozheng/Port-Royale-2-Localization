@@ -37,15 +37,19 @@ MARK = re.compile(r"^0x[0-9A-F]{8} = (?:<[^>\n]*>)*\[[0-9A-F]{4,8}\] ")
 MARK_ANY = re.compile(r"^0x([0-9A-F]{8}) = ((?:<[^>\n]*>)*)\[([0-9A-F]{3,8})\] ?")
 MAP_DIR = os.path.join(ROOT, "docs", "界面映射")
 MAP_DOC = os.path.join(ROOT, "docs", "界面映射.md")   # 拆卷前的单文件，只作兼容
+CLEARED_DATA = os.path.join(SRC, "data", "ui_mapping", "cleared.txt")
 
 
 def map_sources(target=None):
-    """返回作为“已查清清单”的 md 文件列表。
+    """返回作为“已查清清单”的源文件列表。
 
-    默认：`docs/界面映射/` 下全部 *.md（拆卷后的正本），外加旧单文件（若还在）。
-    传目录 → 该目录下全部 *.md；传文件 → 只有它。
+    默认只读 `src/data/ui_mapping/cleared.txt`：文档里的批次日志不再参与运行。
+    传目录 → 该目录下全部 *.md；传文件 → 只有它（排查旧文档时用）。
+    数据文件不存在时退回旧行为：`docs/界面映射/` 下全部 *.md 加旧单文件。
     """
     if target is None:
+        if os.path.isfile(CLEARED_DATA):
+            return [CLEARED_DATA]
         out = []
         if os.path.isdir(MAP_DIR):
             out += sorted(glob.glob(os.path.join(MAP_DIR, "*.md")))
@@ -58,16 +62,16 @@ def map_sources(target=None):
 
 
 def load_cleared(sources):
-    """从界面映射的分卷里取已实机确认的键，支持三类写法。
+    """从数据文件或界面映射分卷里取已实机确认的键，支持三类写法。
 
     1. 逐条：同一行既有 `[XXXX]` 又有 0x 键 —— 这一条已确认；
     2. 整段：`- 整体清除：`0xfc51xxxx`（名表）` —— 该前缀下全部视为已确认（类别级）；
     3. 例外：`- 整体保留：`0xfc512ea5`` —— 即使落在已清除的整段里也保留标记。
-    文档是唯一来源：文档里没有标记/没有整段声明的键，继续带标记。
+    数据文件 `src/data/ui_mapping/cleared.txt` 是唯一来源；文档里的批次日志只作证据。
     推断行（标记列写 —）不算确认。
     """
     if not sources:
-        print("清除：找不到界面映射，全部保留标记")
+        print("清除：找不到已确认键数据，全部保留标记")
         return {}, [], set()
     cleared, prefixes, keep = {}, [], set()
     for path in sources:
@@ -171,9 +175,12 @@ def build(lang, sources=None):
         return any(key.startswith(p) for p in prefixes)
 
     present, stripped = set(), []
+    unmarked_before = 0
     for l in out_lines:
         m = MARK_ANY.match(l)
         if not m:
+            if l.startswith("0x"):
+                unmarked_before += 1
             continue
         key = "0x" + m.group(1)
         present.add(key)
@@ -181,7 +188,7 @@ def build(lang, sources=None):
             stripped.append(key)
     missing = sorted(set(cleared) - present)
     if missing:
-        print("清除：文档里有 %d 条键不在本包内，已跳过：%s" % (len(missing), ", ".join(missing)))
+        print("清除：清单里有 %d 条键不在本包内，已跳过：%s" % (len(missing), ", ".join(missing)))
     if stripped:
         new = []
         for l in out_lines:
@@ -196,11 +203,13 @@ def build(lang, sources=None):
 
     total = sum(1 for l in out_lines if l.startswith("0x"))
     marked = sum(1 for l in out_lines if MARK.match(l))
-    print("产物 %s：条目 %d、带标记 %d、按界面映射（%d 份清单）去掉标记 %d 条、%d 字节"
-          % (path, total, marked, len(sources), total - marked, os.path.getsize(path)))
-    if marked + len(stripped) != total:
-        raise SystemExit("计数不符：带标记 %d + 已去标记 %d ≠ 条目 %d"
-                         % (marked, len(stripped), total))
+    print("产物 %s：条目 %d、带标记 %d、按已确认键数据（%d 份清单）去掉标记 %d 条"
+          "（其中原本无标记 %d 条）、%d 字节"
+          % (path, total, marked, len(sources), len(stripped), unmarked_before,
+             os.path.getsize(path)))
+    if marked + len(stripped) + unmarked_before != total:
+        raise SystemExit("计数不符：带标记 %d + 已去标记 %d + 原本无标记 %d ≠ 条目 %d"
+                         % (marked, len(stripped), unmarked_before, total))
     audit = os.path.join(out, "cleared.txt")
     io.open(audit, "w", encoding="utf-8", newline="\n").write(
         "\n".join(sorted(stripped)) + "\n")
@@ -215,7 +224,7 @@ def main():
     lang = "de"
     if "--lang" in sys.argv:
         lang = sys.argv[sys.argv.index("--lang") + 1]
-    sources = None                      # None = docs/界面映射/ 全部 md
+    sources = None                      # None = src/data/ui_mapping/cleared.txt
     if "--no-clear" in sys.argv:
         sources = []                    # 空列表 = 一份清单都不读，全部保留标记
     if "--clear-map" in sys.argv:

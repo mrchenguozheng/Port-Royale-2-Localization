@@ -26,18 +26,18 @@ Issue 区贴出「界面截图 + 现在这行文案 + 建议改法」；游戏�
 挂载与还原都在启动器进程里完成（`pr2_common` 里的 Rust 实现），不调用 PowerShell，
 也不受「禁止执行脚本」这类组策略影响；失败原因写在 `PR2Localization\logs\host.log`。
 
-1. 确认系统是 **Windows 10 / Windows 11**（不支持 Windows 7）；
-2. 确认是 **GOG 英文版 `1.1.2.3`**、Steam 英文版 `1.1.2.3`，或 GOG 法语版 `1.1.2.42`（三者都走宿主 DLL 入口）；
-3. 从 Release 下载对应语言的 zip，例如中文是 `PR2-zh-v1.0.0.zip`——**一个包两种版本都能用**；
-4. **全部解压到 `PR2.exe` 所在的游戏根目录**；
-5. **双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：
-   GOG 版由启动器挂载宿主 DLL 后直启游戏；Steam 版挂载后交给 Steam 客户端
-   （`steam://rungameid/12470`）拉起，不用你回库里再点一次；
-6. 进游戏后看 `PR2Localization\logs\runtime.log`，第一行应有 `pack 'zh' ... N entries, M overrides`。
-7. 想确认装的是哪一版：GUI 副标题与语言列表都带版本（`简体中文 · v1.0.0`），
-   命令行 `PR2Localization.exe --version` 打印同一串；语言包改了什么看状态框第二行
-   （`3590 条 · 未译 0 · 摘要 9cfa2931c1c2`）与包根 `README.txt` 的「语言包变化」段。
-8. 想回原版：点 GUI 上的「还原原版」，或 `PR2Localization.exe --restore`。
+1. 确认系统是 **Windows 10 / Windows 11**，游戏是 GOG 英文 `1.1.2.3`、Steam 英文 `1.1.2.3`
+   或 GOG 法语 `1.1.2.42`（其他版本不在验证范围）；
+2. 从 Release 下载对应语言的 zip，**全部解压到 `PR2.exe` 所在的游戏根目录**——
+   一个包 GOG 与 Steam 通用，例如中文是 `PR2-zh-v1.0.0.zip`；
+3. **双击 `PR2LocalizationGUI.exe`**，选语言后点「以所选语言启动」：GOG 由启动器挂载宿主 DLL
+   后直启游戏，Steam 挂载后交给客户端（`steam://rungameid/12470`）；
+4. 进游戏后看 `PR2Localization\logs\runtime.log`，首行应有
+   `pack 'zh' ... N entries, M overrides`；想回原版点 GUI「还原原版」或
+   `PR2Localization.exe --restore`。
+
+版本在 GUI 副标题、语言列表和 `PR2Localization.exe --version` 三处同源；
+具体校验、卸载与常见问题见[玩家指南](docs/玩家指南.md)。
 
 GOG 与 Steam 的 `PR2.exe` 静态导入同一份 `Ascaron.Logging-2.6.dll`，所以本地化入口只有一条；
 差别只是 GOG 由启动器直启、Steam 交给客户端。包内代理放在 `PR2Localization\host\`，

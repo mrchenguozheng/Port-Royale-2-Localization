@@ -89,9 +89,12 @@ class TestDocsChecks(unittest.TestCase):
     def test_generated_md_matches_render(self):
         self.assertEqual(DC.check_drift(), [])
 
-    def test_unknown_codes_line_is_parseable(self):
-        doc = DC._unknown_from_doc()
-        self.assertEqual(doc, {"A", "M", "d", "r", "s"})
+    def test_unknown_codes_single_source(self):
+        meta, codes, _vars = VC.load_table()
+        table = {c for c in codes if codes[c].get("conf") == "unknown"}
+        self.assertEqual(set(meta["unknown_codes"]), {"A", "M", "d", "r", "s"})
+        self.assertEqual(set(meta["unknown_codes"]), table)
+        self.assertEqual(DC.check_unknown_codes(), [])
 
     def test_exception_keys_match_lint_constant(self):
         self.assertEqual(set(VC.EXCEPTIONS), set(DC._lint_const("VAR_CODE_ORIG")))

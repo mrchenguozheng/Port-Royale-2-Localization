@@ -27,7 +27,7 @@ src/tools/
 | `check.py` | 跑全部检查与单测（`check.py` 调它）：跨模块引用 → 语言配置 → 译文规范 → 断行 → 微调层 → 不译清单 → 文档一致性 → 脚本地图 → 单测 |
 | `lint_imports.py` | 找出「用了但没导入」的全局名 |
 | `config_check.py` | locale/packs/translations/ui/font-map/语言注册表的语言配置是否互相对得上；`release.py` 出包前也跑 |
-| `docs_check.py` | 文档索引完整、编号唯一、生成物（含语言矩阵）无漂移、窄断言 |
+| `docs_check.py` | 全库相对链接与图片路径、索引完整、编号唯一、生成物（含语言矩阵）无漂移、未知码单源 |
 | `tools_check.py` | 本文件的完整性：每个脚本都被登记、都有 docstring；登记的路径确实存在 |
 | `precommit.py` | 轻量提交前闸门：`config_check` + `docs_check` + 截图画廊 `--check`，不依赖 Rust |
 | `language_registry.py` | 只读审计 release/preview/bundle/pack/译文/UI/截图/字体七套账；`config_check` 与语言矩阵共用 |

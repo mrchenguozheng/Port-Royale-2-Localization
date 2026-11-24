@@ -178,7 +178,7 @@ def render_toml(meta, codes, vars_, st):
     L.append("#")
     L.append("# 结构：@ + 单字母格式码 + $ + 变量名 + $，尾 $ 必需（%d 处引用零例外）。"
              % st["total_en"])
-    L.append("# 码是「类型/转换器」标签（大小写是类型名的一部分，不是文本变换，见 09 卷 67.9）。")
+    L.append("# 码是「类型/转换器」标签（大小写是类型名的一部分，不是文本变换，见归档 09-推断日志.md 67.9）。")
     L.append("#")
     L.append("# 手工维护：meaning / display / conf / evidence。其余字段由 --sync 重算，不要手改。")
     L.append("# 置信度三档：confirmed=配对结构实证 / inferred=由配对与语境推断 / unknown=只有配对事实")
@@ -251,7 +251,7 @@ def render_md(meta, codes, vars_, st):
     L.append("")
     L.append("结构：`@` + 单字母格式码 + `$` + 变量名 + `$`，尾 `$` 必需（%d 处零例外）。"
              "**码是类型标签，不是文本变换**——同字母的大小写对应不同类型"
-             "（`G` 货物 / `g` 金币、`N` 人名 / `n` 国家），详见 09 卷 67.9。"
+             "（`G` 货物 / `g` 金币、`N` 人名 / `n` 国家），详见归档 09-推断日志.md 67.9。"
              % st["total_en"])
     L.append("")
     L.append("> 本文件由 `src/tools/text/var_codes.py --sync` 生成，**不要手改**；"

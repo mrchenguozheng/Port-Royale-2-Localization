@@ -5,8 +5,8 @@
 原名 zh_lint.py，因检查范围早已扩到六语（模板、占位、标注、空值、同原文异译
 对所有语言都适用，只有标点与引号几类是中文专有），更名为 text_lint.py。
 
-判据全部来自 docs/界面映射/09-推断-连续键区.md 里已经落卷的结论，
-这里只负责机械复核，不做判断。分级：
+判据全部来自界面映射各卷已经落卷的结论（历史批次日志见
+`docs/archive/09-推断日志.md`），这里只负责机械复核，不做判断。分级：
 
   E（必改）：模板与原文不一致、汉字旁的半角标点、直引号、`・`、空值
   W（提示）：本段新定则里「建议但历史遗留较多」的几类
@@ -764,7 +764,7 @@ def main(argv):
                   % (len(vids) - len(no_ans), len(vids), no_ans[0])))
 
     lines = []
-    lines.append("# %s 机械复核（判据见 09 卷已落卷定则）\n" % lang)
+    lines.append("# %s 机械复核（判据见 text_lint 定则与归档 09-推断日志）\n" % lang)
     # 豁免只对 W 级：E 级一律不许免（模板不一致、空值、标注错误这些改得动，也不该留）。
     waived = load_lint_ok(lang)
     dropped = [(k, why, ctx) for k, why, ctx in W if k in waived]
