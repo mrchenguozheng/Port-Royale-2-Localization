@@ -1,0 +1,44 @@
+name: Pages
+
+# 只发布玩家截图画廊：screenshots.html 作为站点首页，缩略图与原图一并上传。
+# docs/ 下的 Markdown 不进入站点，避免 .md 链接和跨目录链接 404。
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - docs/screenshots.html
+      - docs/assets/screenshots/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build static gallery
+        run: |
+          mkdir -p site/assets
+          cp docs/screenshots.html site/index.html
+          cp -r docs/assets/screenshots site/assets/screenshots
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

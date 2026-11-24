@@ -2,14 +2,83 @@
   "schema_version": 1,
   "page": {
     "title_suffix": "Port Royale 2 本地化",
-    "eyebrow": "Port Royale 2 Localization · Visual QA",
+    "eyebrow": "Port Royale 2 Localization · 玩家入口",
     "heading_prefix": "实机截图：",
+    "h1": "十二种语言的《Port Royale 2》实机界面",
+    "lede": "同一组五个界面，十二种语言各拍一遍。先给第一次接触的人看效果和装法，再放完整对照表。",
     "lede_tail": "重点不在“译得对不对”，而在译文放进真实控件后是否仍然清楚：木牌短标签、输入框预填姓名、长文弹窗、密集数值、对话与头像。",
     "version": "GOG FR 1.1.2.42",
     "package": "全量并集包 · 3590 条",
     "date": "2026-11-23",
     "image_note": "1600 × 1200 · 仅裁黑边",
     "intro": "**「建号」指剧本模式建号**：选完剧本后填写姓名、起始城镇、特长与起始资产的那一屏，不是自由模式。「剧本 1 欢迎」是进入剧本 1 后出现的欢迎与剧本目标弹窗。截图只裁掉左右黑边，没有修字或调色。",
+    "repo_url": "https://github.com/mrchenguozheng/Port-Royale-2-Localization",
+    "site_url": "https://mrchenguozheng.github.io/Port-Royale-2-Localization/",
+    "player": {
+      "kicker": "先看效果，再看怎么装",
+      "heading": "这不是效果图，是装好语言包后的游戏画面",
+      "body": "十二种语言的同一组界面，全部来自实际游戏窗口。原版 PR2.exe 不改，语言包挂在启动器里；GOG 和 Steam 都能用，失败可以一键还原。",
+      "facts": [
+        "Windows 10 / 11",
+        "GOG 英文 1.1.2.3 · Steam 英文 1.1.2.3 · GOG 法语 1.1.2.42",
+        "十二种语言 · 64 张实机截图"
+      ],
+      "download_label": "下载语言包",
+      "download_url": "https://github.com/mrchenguozheng/Port-Royale-2-Localization/releases/latest",
+      "secondary_label": "看全部对照",
+      "secondary_href": "#compare",
+      "samples": [
+        {
+          "file": "zh/main-menu.jpg",
+          "lang": "简体中文",
+          "alt": "简体中文主菜单实机截图",
+          "caption": "主菜单：自由模式 / 剧本 / 载入 / 选项 / 制作人员 / 退出游戏"
+        },
+        {
+          "file": "ja/scenario-setup.jpg",
+          "lang": "日本語",
+          "alt": "日语剧本模式建号实机截图",
+          "caption": "建号：名 / 姓 / 起始城镇 / 特长 / 贸易经验"
+        },
+        {
+          "file": "ru/town-info.jpg",
+          "lang": "Русский",
+          "alt": "俄语城镇信息实机截图",
+          "caption": "城镇信息：规模 / 关系 / 生产"
+        },
+        {
+          "file": "de/governor-dialog.jpg",
+          "lang": "Deutsch",
+          "alt": "德语总督对话实机截图",
+          "caption": "总督对话：长段正文 / 继续 / 头像"
+        }
+      ],
+      "how_heading": "怎么用",
+      "how_lead": "不用安装器、不用 Python、不用编译。四步进游戏，一步还原。",
+      "steps": [
+        {
+          "title": "确认版本",
+          "body": "Windows 10 / 11；GOG 英文 1.1.2.3、Steam 英文 1.1.2.3 或 GOG 法语 1.1.2.42。其他版本不在验证范围。"
+        },
+        {
+          "title": "下载并解压",
+          "body": "到 Release 下载对应语言的 zip，全部解压到 PR2.exe 所在的游戏根目录。中文包例如 PR2-zh-v1.0.0.zip。"
+        },
+        {
+          "title": "选语言启动",
+          "body": "双击 PR2LocalizationGUI.exe，在下拉框选语言，点「以所选语言启动」。GOG 由启动器直启，Steam 交给客户端拉起。"
+        },
+        {
+          "title": "进游戏确认",
+          "body": "打开 PR2Localization\\logs\\runtime.log，第一行应出现 pack 'zh' ... N entries。界面变成所选语言即生效。"
+        },
+        {
+          "title": "想回原版",
+          "body": "点 GUI 上的「还原原版」，或运行 PR2Localization.exe --restore。原版 PR2.exe 全程不改。"
+        }
+      ],
+      "caveat": "界面译文由 AI 辅助起草并做机械一致性校验，没有母语审校；这些截图用于确认真实控件里的可读性，不代表官方本地化。"
+    },
     "columns": 4,
     "coverage_heading": "五屏覆盖",
     "coverage_sub": "同一屏、同一版本、同一套包",
@@ -23,6 +92,14 @@
     "image_height": 1200,
     "toc": [
       {
+        "href": "#effect",
+        "label": "效果"
+      },
+      {
+        "href": "#how",
+        "label": "怎么用"
+      },
+      {
         "href": "#coverage",
         "label": "覆盖表"
       },
@@ -33,6 +110,10 @@
       {
         "href": "#extra",
         "label": "德语补充"
+      },
+      {
+        "href": "https://github.com/mrchenguozheng/Port-Royale-2-Localization/releases/latest",
+        "label": "下载"
       }
     ],
     "thumb_root": "assets/screenshots/thumbs",

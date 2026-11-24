@@ -211,15 +211,9 @@ def render_chips(page: dict, languages: list[dict], total: int) -> str:
 
 def render_toc(page: dict) -> str:
     links = [
-        f'      <a href="{html.escape(item["href"])}">{inline(item["label"])}</a>'
+        f'      <a href="{html.escape(item["href"], quote=True)}">{inline(item["label"])}</a>'
         for item in page.get("toc", [])
     ]
-    links.extend(
-        [
-            '      <a href="实机截图.md">Markdown 版</a>',
-            '      <a href="README.md">文档索引</a>',
-        ]
-    )
     return "\n".join(links)
 
 
@@ -257,6 +251,69 @@ def render_figure(
         f'loading="lazy" decoding="async">\n'
         f'{indent}  <figcaption><span class="lang">{inline(native)}</span> {inline(caption)}</figcaption>\n'
         f"{indent}</figure>"
+    )
+
+
+def render_player(page: dict, by_file: dict) -> str:
+    """玩家入口：先给效果图与安装步骤，再进入完整对照。"""
+    player = page.get("player")
+    if not player:
+        return ""
+
+    facts = "\n".join(
+        f"        <li>{inline(item)}</li>" for item in player.get("facts", [])
+    )
+    samples = []
+    for sample in player.get("samples", []):
+        entry = by_file.get(sample["file"])
+        if entry is None:
+            raise ValueError(f"玩家入口引用了不存在的截图：{sample['file']}")
+        samples.append(
+            render_figure(
+                page,
+                entry,
+                sample.get("alt", ""),
+                sample.get("lang", ""),
+                sample.get("caption", ""),
+                indent="        ",
+            )
+        )
+    steps = "\n".join(
+        f'        <li><span class="step-num">{index:02d}</span>'
+        f"<h3>{inline(step['title'])}</h3><p>{inline(step['body'])}</p></li>"
+        for index, step in enumerate(player.get("steps", []), 1)
+    )
+    download = html.escape(player.get("download_url", "#"), quote=True)
+    secondary = html.escape(player.get("secondary_href", "#compare"), quote=True)
+
+    return (
+        '  <section class="player" id="effect">\n'
+        '    <div class="player-copy">\n'
+        f'      <div class="eyebrow">{inline(player.get("kicker", ""))}</div>\n'
+        f'      <h2>{inline(player.get("heading", ""))}</h2>\n'
+        f'      <p class="player-body">{inline(player.get("body", ""))}</p>\n'
+        '      <ul class="facts">\n'
+        f'{facts}\n'
+        "      </ul>\n"
+        '      <div class="actions">\n'
+        f'        <a class="btn primary" href="{download}">{inline(player.get("download_label", "下载"))}</a>\n'
+        f'        <a class="btn" href="{secondary}">{inline(player.get("secondary_label", "看全部"))}</a>\n'
+        "      </div>\n"
+        "    </div>\n"
+        '    <div class="preview-grid">\n'
+        + "\n".join(samples)
+        + "\n    </div>\n"
+        "  </section>\n\n"
+        '  <section class="how" id="how">\n'
+        '    <div class="section-head">\n'
+        f'      <h2>{inline(player.get("how_heading", "怎么用"))}</h2>\n'
+        f'      <span class="sub">{inline(player.get("how_lead", ""))}</span>\n'
+        "    </div>\n"
+        '    <ol class="how-steps">\n'
+        + steps
+        + "\n    </ol>\n"
+        f'    <p class="caveat">{inline(player.get("caveat", ""))}</p>\n'
+        "  </section>"
     )
 
 
@@ -319,6 +376,7 @@ def render_footer(
 ) -> str:
     image_root = page.get("image_root", "assets/screenshots")
     thumb_root = page.get("thumb_root", "assets/screenshots/thumbs")
+    repo_url = page.get("repo_url", "#").rstrip("/")
     compare_count = len(screens) * len(languages)
     extra_count = len(extras)
     return (
@@ -326,7 +384,7 @@ def render_footer(
         f"{cn_number(len(screens))}屏对照{cn_number(len(languages))}语共 {compare_count} 张，"
         f"加{inline(page.get('extra_label', '补充'))} {extra_count} 张，共 {total} 张 · "
         "机器可读清单：<code>manifest.json</code> · 截图口径与覆盖表见 "
-        '<a href="实机截图.md">实机截图.md</a>'
+        f'<a href="{html.escape(repo_url, quote=True)}/blob/main/docs/实机截图.md">实机截图.md</a>'
     )
 
 
@@ -343,7 +401,7 @@ def build_html(data: dict, template: str, docs_root: Path) -> str:
     columns = int(page.get("columns", 4))
     groups = groups_of(languages, columns)
 
-    h1 = (
+    h1 = page.get("h1") or (
         page.get("heading_prefix", "实机截图：")
         + cn_number(len(languages))
         + "种语言"
@@ -363,7 +421,7 @@ def build_html(data: dict, template: str, docs_root: Path) -> str:
         if len(group) < columns:
             text += " 居中"
         lede_rows.append(f"第 {index} 行 {text}")
-    lede = (
+    lede = page.get("lede") or (
         f"同一组{cn_number(len(screens))}个界面，{cn_number(len(languages))}种语言"
         f"按{cn_number(columns)}列排："
         + "，".join(lede_rows)
@@ -385,6 +443,7 @@ def build_html(data: dict, template: str, docs_root: Path) -> str:
         "{{LEDE}}": inline(lede),
         "{{META_CHIPS}}": render_chips(page, languages, len(entries)),
         "{{TOC}}": render_toc(page),
+        "{{PLAYER}}": render_player(page, by_file),
         "{{INTRO}}": inline(page.get("intro", "")),
         "{{COVERAGE_HEADING}}": inline(page.get("coverage_heading", "五屏覆盖")),
         "{{COVERAGE_SUB}}": inline(page.get("coverage_sub", "")),
@@ -505,7 +564,7 @@ def build_markdown(data: dict, docs_root: Path) -> str:
         "> 本文件与 `screenshots.html` 均由 `docs/screenshots.json` 经",
         "> `src/tools/docs/build_screenshots.py` 生成，不要手改。",
         "",
-        "在线画廊：[screenshots.html](screenshots.html)。",
+        f"在线画廊：[GitHub Pages]({page.get('site_url', 'screenshots.html')})。",
         "",
         "## 口径",
         "",

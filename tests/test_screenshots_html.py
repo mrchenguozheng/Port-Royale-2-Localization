@@ -18,6 +18,8 @@ class TestScreenshotsGallery(unittest.TestCase):
         self.screen_count = len(self.data["screens"])
         self.extra_count = len(self.data.get("extras", []))
         self.figure_count = self.lang_count * self.screen_count + self.extra_count
+        self.preview_count = len(self.data.get("page", {}).get("player", {}).get("samples", []))
+        self.rendered_figure_count = self.figure_count + self.preview_count
         self.generated = build_screenshots.build()
         self.checked_in = build_screenshots.DEFAULT_OUTPUT.read_text(encoding="utf-8")
         self.generated_md = build_screenshots.build_markdown(
@@ -43,11 +45,14 @@ class TestScreenshotsGallery(unittest.TestCase):
 
     def test_counts(self):
         self.assertEqual(self.generated.count('<section class="row">'), self.screen_count)
-        self.assertEqual(self.generated.count("<figure>"), self.figure_count)
+        self.assertEqual(self.generated.count("<figure>"), self.rendered_figure_count)
         self.assertEqual(
-            self.generated.count('<img src="assets/screenshots/thumbs/'), self.figure_count
+            self.generated.count('<img src="assets/screenshots/thumbs/'),
+            self.rendered_figure_count,
         )
-        self.assertEqual(self.generated.count('<span class="lang">'), self.figure_count)
+        self.assertEqual(
+            self.generated.count('<span class="lang">'), self.rendered_figure_count
+        )
         self.assertEqual(
             self.generated.count('<p class="note">'), len(self.data.get("notes", []))
         )
@@ -67,10 +72,11 @@ class TestScreenshotsGallery(unittest.TestCase):
     def test_lazy_thumbnail_with_full_image(self):
         self.assertNotIn('decoding="sync"', self.generated)
         self.assertEqual(
-            self.generated.count('loading="lazy"'), self.figure_count
+            self.generated.count('loading="lazy"'), self.rendered_figure_count
         )
         self.assertEqual(
-            self.generated.count('data-full="assets/screenshots/'), self.figure_count
+            self.generated.count('data-full="assets/screenshots/'),
+            self.rendered_figure_count,
         )
         self.assertIn('width="800"', self.generated)
         self.assertIn('height="600"', self.generated)
@@ -83,6 +89,21 @@ class TestScreenshotsGallery(unittest.TestCase):
         self.assertIn("Nome / Sobrenome / Cidade inicial", self.generated)
         self.assertIn("归档的简体、繁体台湾与繁体香港建号图都已替换", self.generated)
         self.assertIn("十二语五屏覆盖", self.generated_md)
+
+    def test_player_entry_has_effect_and_usage(self):
+        player = self.data["page"]["player"]
+        self.assertIn(player["heading"], self.generated)
+        self.assertIn("下载语言包", self.generated)
+        self.assertIn("PR2LocalizationGUI.exe", self.generated)
+        self.assertIn("PR2Localization.exe --restore", self.generated)
+        self.assertEqual(
+            self.generated.count('<section class="player"'),
+            1,
+        )
+        self.assertEqual(
+            self.generated.count('<section class="how"'),
+            1,
+        )
 
 
 if __name__ == "__main__":

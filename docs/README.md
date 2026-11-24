@@ -68,9 +68,9 @@
 | 文档 | 内容 |
 |---|---|
 | [实机截图](实机截图.md) | 德语、西语、法语、意大利语、日语、韩语、波兰语、葡萄牙语（巴西）、俄语、简体中文、繁体中文（台湾）、繁体中文（香港）五屏对照：主菜单、剧本模式建号、剧本 1 欢迎、城镇信息、总督对话；各语均为字体方案就位后补拍，德语另附四张补充屏；共 64 张；生成物，不要手改 |
-| [截图画廊](screenshots.html) | 由 `screenshots.json`、`assets/screenshots/manifest.json` 与 `src/tools/docs/screenshots_template.html` 生成，可直接作为 GitHub Pages 页面打开；缩略图在 `assets/screenshots/thumbs/`，灯箱打开原图；不要手改 HTML |
+| [截图画廊](screenshots.html) | 由 `screenshots.json`、`assets/screenshots/manifest.json` 与 `src/tools/docs/screenshots_template.html` 生成；顶部先给效果图和安装步骤，再给十二语五屏对照。缩略图在 `assets/screenshots/thumbs/`，灯箱打开原图；不要手改 HTML |
 
-若把 GitHub Pages 的源目录设为 `docs`，画廊入口是 `screenshots.html`；本仓库对应 `https://mrchenguozheng.github.io/Port-Royale-2-Localization/screenshots.html`。图注、注记和手写段落都改 `docs/screenshots.json`，版式改 `src/tools/docs/screenshots_template.html`，然后运行 `python src/tools/docs/build_screenshots.py --thumbs`；`--check` 会同时核对 HTML、Markdown 与缩略图。
+在线画廊只发布 `screenshots.html` 与 `assets/screenshots/`：`.github/workflows/pages.yml` 把 HTML 复制成站点首页后上传，`docs/` 下的 Markdown 不进入站点，因此不会出现 `.md` 链接 404。地址是 `https://mrchenguozheng.github.io/Port-Royale-2-Localization/`；`docs/screenshots.html` 是本地源文件，Pages 上的根路径由工作流生成。图注、注记和手写段落都改 `docs/screenshots.json`，版式改 `src/tools/docs/screenshots_template.html`，然后运行 `python src/tools/docs/build_screenshots.py --thumbs`；`--check` 会同时核对 HTML、Markdown 与缩略图。
 
 ## 翻译数据与历史
 
