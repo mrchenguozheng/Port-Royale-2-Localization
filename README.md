@@ -4,7 +4,7 @@
 
 [实机截图（十二种语言）](https://mrchenguozheng.github.io/Port-Royale-2-Localization/) · [English](README.en.md) · [中文文档索引](docs/README.md)
 
-**Supported languages:** Simplified Chinese (`zh`), Japanese (`ja`), Korean (`ko`), Russian (`ru`), German (`de`), Spanish (`es`), French (`fr`), Italian (`it`), Polish (`pl`); English (`en`) is the original game language and fallback. See [README.en.md](README.en.md#supported-languages).
+**Supported languages:** Simplified Chinese (`zh`), Traditional Chinese — Taiwan (`zh-TW`), Traditional Chinese — Hong Kong (`zh-HK`), Japanese (`ja`), Korean (`ko`), Russian (`ru`), German (`de`), Spanish (`es`), French (`fr`), Italian (`it`), Polish (`pl`), Brazilian Portuguese (`pt-BR`); English (`en`) is the original game language and fallback. See [README.en.md](README.en.md#supported-languages).
 
 **译文标记：** 同人制作 · 社区协作 · AI 辅助（预览版）。这批译文不是官方本地化，
 由社区制作、AI 辅助起草并人工审校；旧语言包若改自原版零售文件会单独标 `retail`。
